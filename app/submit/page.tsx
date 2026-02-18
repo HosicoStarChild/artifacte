@@ -15,10 +15,23 @@ export default function SubmitPage() {
     name: "", category: "DIGITAL_ART", description: "", value: "", condition: "", contact: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) setSubmitted(true);
+    } catch (err) {
+      console.error("Submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -143,9 +156,10 @@ export default function SubmitPage() {
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg font-semibold text-sm transition mt-2"
+                  disabled={submitting}
+                  className="w-full py-3 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg font-semibold text-sm transition mt-2 disabled:opacity-50"
                 >
-                  Submit Now
+                  {submitting ? "Submitting..." : "Submit Now"}
                 </button>
               </form>
             </div>

@@ -113,6 +113,16 @@ export default function AuctionDetail() {
       setBidStatus(null);
       setBidUsd1("");
       showToast(`✓ Bid of ${usd1Amount.toLocaleString()} USD1 placed! TX: ${sig.slice(0, 12)}...`, "success");
+
+      // Notify listings bot
+      fetch("/api/listing-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "ITEM_SOLD",
+          payload: { name: auction.name, category: auction.category, price: usd1Amount.toLocaleString(), currency, link: `https://artifacte-five.vercel.app/auctions/${slug}` },
+        }),
+      }).catch(() => {});
     } catch (err: any) {
       setBidStatus(null);
       showToast(`Error: ${err.message?.slice(0, 60)}`, "error");
