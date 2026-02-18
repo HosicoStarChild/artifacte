@@ -1,0 +1,5 @@
+node_modules
+.next
+.env*
+target/
+sync-engine/node_modules
