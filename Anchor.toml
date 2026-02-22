@@ -1,10 +1,12 @@
+[toolchain]
+
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
 [programs.devnet]
-rwa_nft = "RWAnft1111111111111111111111111111111111111"
-auction = "Auct1111111111111111111111111111111111111111"
+auction = "23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN"
+rwa_nft = "F9mkXqMrgF1sSV3wDtTUpTs82B5XJ5qz9A33nBAdcNqb"
 
 [registry]
 url = "https://api.apr.dev"
