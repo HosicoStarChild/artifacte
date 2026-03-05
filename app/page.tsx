@@ -1,6 +1,7 @@
 import { assets, auctions, listings, formatFullPrice } from "@/lib/data";
 import AssetCard from "@/components/AssetCard";
 import AuctionCard from "@/components/AuctionCard";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
 
 export default function Home() {
@@ -31,8 +32,11 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
                   <img src={l.image} alt={l.name} className="w-full h-full object-cover" />
                 </div>
-                <div>
-                  <h3 className="text-white font-medium text-sm">{l.name}</h3>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="text-white font-medium text-sm">{l.name}</h3>
+                    <VerifiedBadge collectionName={l.name} />
+                  </div>
                   <p className="text-gray-500 text-xs mb-2">{l.subtitle}</p>
                   <p className="text-white font-semibold">{formatFullPrice(l.price)}</p>
                 </div>

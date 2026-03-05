@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 const digitalArtPieces = [
   {
@@ -104,9 +105,12 @@ export default function DigitalArtPage() {
                 />
               </div>
               <div className="p-5">
-                <span className="text-[10px] font-bold tracking-widest text-purple-400 uppercase">
-                  Digital Art
-                </span>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[10px] font-bold tracking-widest text-purple-400 uppercase">
+                    Digital Art
+                  </span>
+                  <VerifiedBadge collectionName={piece.name} />
+                </div>
                 <h3 className="text-white font-medium mt-1">{piece.name}</h3>
                 <p className="text-gray-500 text-xs mt-0.5">by {piece.artist}</p>
                 <p className="text-gray-600 text-[10px] mt-1">{piece.description}</p>

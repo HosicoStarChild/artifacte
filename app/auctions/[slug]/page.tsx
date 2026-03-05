@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { auctions, formatFullPrice, Bid } from "@/lib/data";
 import Countdown from "@/components/Countdown";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -151,7 +152,10 @@ export default function AuctionDetail() {
 
           {/* Details */}
           <div>
-            <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">{auction.subtitle}</p>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase">{auction.subtitle}</p>
+              <VerifiedBadge collectionName={auction.name} showLabel={true} />
+            </div>
             <h1 className="font-serif text-3xl text-white mb-4">{auction.name}</h1>
             <p className="text-gray-400 text-sm mb-6 leading-relaxed">{auction.description}</p>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Auction, formatPrice } from "@/lib/data";
 import Countdown from "./Countdown";
+import VerifiedBadge from "./VerifiedBadge";
 
 export default function AuctionCard({ auction }: { auction: Auction }) {
   return (
@@ -21,7 +22,10 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
           </div>
         </div>
         <div className="p-4">
-          <p className="text-gold-400 text-[10px] font-bold tracking-wider mb-1">{auction.subtitle}</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="text-gold-400 text-[10px] font-bold tracking-wider">{auction.subtitle}</p>
+            <VerifiedBadge collectionName={auction.name} />
+          </div>
           <h3 className="text-white font-medium text-sm mb-3">{auction.name}</h3>
           <div>
             <p className="text-gray-500 text-[10px] uppercase tracking-wider">Current Bid</p>

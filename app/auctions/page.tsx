@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { auctions, listings, formatFullPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
@@ -140,7 +141,10 @@ export default function AuctionsPage() {
                     />
                   </div>
                   <div className="p-5">
-                    <span className="text-[10px] font-bold tracking-widest text-gold-400 uppercase">Fixed Price</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-bold tracking-widest text-gold-400 uppercase">Fixed Price</span>
+                      <VerifiedBadge collectionName={l.name} />
+                    </div>
                     <h3 className="text-white font-medium mt-1">{l.name}</h3>
                     <p className="text-gray-500 text-xs mt-1">{l.subtitle}</p>
                     <div className="flex items-center justify-between mt-4">
