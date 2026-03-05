@@ -8,21 +8,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: {
-          900: "#0a0e1a",
-          800: "#0f1628",
-          700: "#162036",
-          600: "#1c2a44",
+        dark: {
+          900: "#0a0a0f",
+          800: "#141419",
+          700: "#1a1a1f",
+          600: "#242429",
         },
         gold: {
           400: "#d4a843",
-          500: "#c9952c",
+          500: "#C9A55C",
           600: "#b8860b",
         },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         serif: ["Playfair Display", "Georgia", "serif"],
+      },
+      fontSize: {
+        "hero": ["3.5rem", { lineHeight: "1.1" }],
+        "section": ["2.5rem", { lineHeight: "1.1" }],
       },
     },
   },

@@ -146,14 +146,13 @@ export default function ApplyPage() {
       <div className="pt-24 pb-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-12 text-center">
+            <div className="bg-dark-800 rounded-lg border border-white/5 p-12 text-center">
               <div className="text-5xl mb-4">🔐</div>
-              <h2 className="font-serif text-2xl text-white mb-2">
+              <h2 className="font-serif text-2xl text-white mb-3">
                 Wallet Connection Required
               </h2>
-              <p className="text-gray-400 text-sm">
-                Connect your wallet to submit an application to the Artifacte
-                platform.
+              <p className="text-gray-400 text-base">
+                Connect your wallet to submit an application to the Artifacte platform.
               </p>
             </div>
           </div>
@@ -166,37 +165,36 @@ export default function ApplyPage() {
     <div className="pt-24 pb-20 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
-        <div className="max-w-2xl mb-12">
-          <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-4">
+        <div className="max-w-2xl mb-16">
+          <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-4">
             Apply to Artifacte
           </p>
-          <h1 className="font-serif text-4xl text-white mb-4">
+          <h1 className="font-serif text-4xl md:text-5xl text-white mb-4">
             Apply Your Collection
           </h1>
           <p className="text-gray-400 text-base leading-relaxed">
-            Submit your collection for review to be listed on Artifacte. Our
-            team reviews all applications within 48 hours.
+            Submit your collection for review to be listed on Artifacte. Our team reviews all applications within 48 hours and connects qualified creators with collectors.
           </p>
         </div>
 
         {/* Application Form */}
         {!submitted ? (
           <div className="max-w-2xl mb-16">
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-8">
-              <h2 className="font-serif text-2xl text-white mb-6">
+            <div className="bg-dark-800 rounded-lg border border-white/5 p-8 md:p-10">
+              <h2 className="font-serif text-2xl text-white mb-8">
                 Collection Details
               </h2>
 
               {error && (
-                <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-6">
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-8">
                   <p className="text-red-400 text-sm">{error}</p>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Collection Name */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Collection Name <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -206,16 +204,15 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, collectionName: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                     placeholder="My Amazing Collection"
                   />
                 </div>
 
                 {/* Collection Address */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
-                    Collection Address / Mint Authority{" "}
-                    <span className="text-red-400">*</span>
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
+                    Collection Address / Mint Authority <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
@@ -224,17 +221,17 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, collectionAddress: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                     placeholder="HZwXCVqDvBVGx8d7wFqkxHwvkU1gL3rDQHtPqDdKa6f"
                   />
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-gray-500 text-xs mt-1.5">
                     Solana public key for your collection
                   </p>
                 </div>
 
                 {/* Category */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Category <span className="text-red-400">*</span>
                   </label>
                   <select
@@ -242,7 +239,7 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, category: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -254,7 +251,7 @@ export default function ApplyPage() {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Description <span className="text-red-400">*</span>
                   </label>
                   <textarea
@@ -265,19 +262,18 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, description: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition resize-none"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors resize-none"
                     placeholder="Describe your collection, its history, and any relevant details..."
                   />
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-gray-500 text-xs mt-1.5">
                     {form.description.length}/500 characters
                   </p>
                 </div>
 
                 {/* Pitch */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
-                    Why it belongs on Artifacte{" "}
-                    <span className="text-red-400">*</span>
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
+                    Why it belongs on Artifacte <span className="text-red-400">*</span>
                   </label>
                   <textarea
                     required
@@ -287,17 +283,17 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, pitch: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition resize-none"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors resize-none"
                     placeholder="Explain what makes your collection unique and why it fits our platform..."
                   />
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-gray-500 text-xs mt-1.5">
                     {form.pitch.length}/300 characters
                   </p>
                 </div>
 
                 {/* Sample Images */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Sample Image URLs (up to 3)
                   </label>
                   {form.sampleImages.map((img, index) => (
@@ -310,7 +306,7 @@ export default function ApplyPage() {
                         newImages[index] = e.target.value;
                         setForm({ ...form, sampleImages: newImages });
                       }}
-                      className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition mb-2"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors mb-2"
                       placeholder={`Image URL ${index + 1} (optional)`}
                     />
                   ))}
@@ -318,7 +314,7 @@ export default function ApplyPage() {
 
                 {/* Website */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Website (optional)
                   </label>
                   <input
@@ -327,14 +323,14 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, website: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                     placeholder="https://example.com"
                   />
                 </div>
 
                 {/* Twitter */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-gray-300 font-medium mb-2">
                     Twitter Handle (optional)
                   </label>
                   <input
@@ -343,7 +339,7 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, twitter: e.target.value })
                     }
-                    className="w-full bg-navy-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                     placeholder="@yourhandle"
                   />
                 </div>
@@ -351,7 +347,7 @@ export default function ApplyPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-navy-900 rounded-lg font-semibold text-sm transition mt-2"
+                  className="w-full py-3 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200 mt-4"
                 >
                   {loading ? "Submitting..." : "Submit Application"}
                 </button>
@@ -360,18 +356,17 @@ export default function ApplyPage() {
           </div>
         ) : (
           <div className="max-w-2xl mb-16">
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-12 text-center">
-              <div className="text-5xl mb-4">✅</div>
-              <h2 className="font-serif text-2xl text-white mb-2">
+            <div className="bg-dark-800 rounded-lg border border-white/5 p-12 text-center">
+              <div className="text-5xl mb-6">✅</div>
+              <h2 className="font-serif text-2xl text-white mb-3">
                 Application Submitted!
               </h2>
-              <p className="text-gray-400 text-sm mb-6">
-                We'll review it within 48 hours. You'll be notified of the
-                decision on your wallet address.
+              <p className="text-gray-400 text-base mb-8">
+                We'll review your application within 48 hours. Check back soon for updates.
               </p>
               <button
                 onClick={() => setSubmitted(false)}
-                className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm hover:bg-white/10 transition"
+                className="px-6 py-2.5 bg-dark-900 border border-white/10 rounded-lg text-white text-sm hover:bg-white/5 transition-colors duration-200"
               >
                 Submit Another Application
               </button>
@@ -382,14 +377,14 @@ export default function ApplyPage() {
         {/* User's Applications */}
         {!loadingApps && userApplications.length > 0 && (
           <div className="max-w-2xl">
-            <h2 className="font-serif text-2xl text-white mb-6">
+            <h2 className="font-serif text-2xl text-white mb-8">
               Your Applications
             </h2>
             <div className="space-y-4">
               {userApplications.map((app) => (
                 <div
                   key={app.id}
-                  className="bg-navy-800 rounded-xl border border-white/5 p-6"
+                  className="bg-dark-800 rounded-lg border border-white/5 p-6"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>

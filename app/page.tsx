@@ -5,44 +5,172 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
 
 export default function Home() {
-  return (
-    <div className="pt-20">
-      {/* Live Auctions */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-serif text-3xl text-white">Live Auctions</h2>
-          <Link href="/auctions" className="text-gold-400 text-sm hover:text-gold-500 transition">
-            View All →
-          </Link>
-        </div>
-        <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 snap-x">
-          {auctions.map((a) => (
-            <AuctionCard key={a.id} auction={a} />
-          ))}
-        </div>
-      </section>
+  // Get featured auction (first one) for hero
+  const featured = auctions[0];
 
-      {/* Recent Listings */}
-      <section id="listings" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <h2 className="font-serif text-3xl text-white mb-8">Recent RWA Listings</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {listings.map((l) => (
-            <div key={l.id} className="bg-navy-800 rounded-xl border border-white/5 p-5 card-hover">
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                  <img src={l.image} alt={l.name} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="text-white font-medium text-sm">{l.name}</h3>
-                    <VerifiedBadge collectionName={l.name} />
-                  </div>
-                  <p className="text-gray-500 text-xs mb-2">{l.subtitle}</p>
-                  <p className="text-white font-semibold">{formatFullPrice(l.price)}</p>
+  return (
+    <div>
+      {/* Hero Section */}
+      <section className="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {featured && (
+            <div className="relative rounded-lg overflow-hidden mb-16">
+              {/* Hero Image */}
+              <div className="relative h-[500px] md:h-[600px] overflow-hidden group">
+                <img
+                  src={featured.image}
+                  alt={featured.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+                />
+                {/* Dark overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-transparent to-transparent" />
+                
+                {/* Content overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
+                  <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">Featured Auction</p>
+                  <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 max-w-2xl leading-tight">
+                    {featured.name}
+                  </h1>
+                  <p className="text-gray-300 text-base max-w-xl mb-6 leading-relaxed">
+                    {featured.description}
+                  </p>
+                  <Link
+                    href={`/auctions/${featured.slug}`}
+                    className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
+                  >
+                    Place a Bid →
+                  </Link>
                 </div>
               </div>
             </div>
-          ))}
+          )}
+
+          {/* Category Grid */}
+          <div className="mb-24">
+            <div className="flex items-center justify-between mb-12">
+              <div>
+                <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Browse</p>
+                <h2 className="font-serif text-3xl md:text-4xl text-white">Collections</h2>
+              </div>
+              <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+                View All →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                { name: "Digital Art", emoji: "🎨", count: 24 },
+                { name: "Spirits", emoji: "🥃", count: 18 },
+                { name: "TCG Cards", emoji: "🃏", count: 32 },
+                { name: "Sports Cards", emoji: "⚽", count: 28 },
+                { name: "Watches", emoji: "⌚", count: 15 },
+                { name: "Vintage", emoji: "🏛️", count: 22 },
+              ].map((cat, i) => (
+                <Link key={i} href="/auctions" className="group">
+                  <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">
+                    <div className="text-4xl mb-4">{cat.emoji}</div>
+                    <h3 className="font-serif text-xl text-white mb-2">{cat.name}</h3>
+                    <p className="text-gray-500 text-sm">{cat.count} Items</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Auctions Section */}
+      <section className="bg-dark-800/30 border-t border-white/5 py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Active Auctions</p>
+              <h2 className="font-serif text-3xl md:text-4xl text-white">Live Now</h2>
+            </div>
+            <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+              View All Auctions →
+            </Link>
+          </div>
+          <div className="overflow-x-auto pb-4 -mx-4 px-4">
+            <div className="flex gap-6 snap-x">
+              {auctions.slice(0, 5).map((a) => (
+                <div key={a.id} className="flex-shrink-0 w-80 snap-start">
+                  <AuctionCard auction={a} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Recent Listings Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Fixed Price</p>
+              <h2 className="font-serif text-3xl md:text-4xl text-white">Available Now</h2>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listings.slice(0, 6).map((l) => (
+              <Link key={l.id} href={`/auctions?listing=${l.id}`} className="group">
+                <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
+                  <div className="aspect-square overflow-hidden bg-dark-900">
+                    <img
+                      src={l.image}
+                      alt={l.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    />
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="text-white font-medium">{l.name}</h3>
+                        <VerifiedBadge collectionName={l.name} />
+                      </div>
+                      <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
+                    </div>
+                    <p className="text-gold-500 font-semibold text-lg">{formatFullPrice(l.price)}</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="border-t border-white/5 py-20 px-4 sm:px-6 lg:px-8 bg-dark-800/20">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">Process</p>
+            <h2 className="font-serif text-3xl md:text-4xl text-white">How It Works</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl mx-auto">
+            {[
+              {
+                step: "01",
+                title: "Browse & Discover",
+                description: "Explore curated real-world assets tokenized as NFTs with verified provenance and authentication.",
+              },
+              {
+                step: "02",
+                title: "Bid or Buy",
+                description: "Place bids on live auctions or purchase items at fixed prices using USD1 or USDC on Solana.",
+              },
+              {
+                step: "03",
+                title: "Own & Trade",
+                description: "Take ownership of your asset NFT and trade it on secondary markets with full transparency.",
+              },
+            ].map((item, i) => (
+              <div key={i} className="text-center">
+                <div className="text-4xl font-serif text-gold-500 mb-4">{item.step}</div>
+                <h3 className="font-serif text-xl text-white mb-3">{item.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{item.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

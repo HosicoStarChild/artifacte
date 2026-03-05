@@ -99,23 +99,23 @@ export default function AgentsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
-          <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">
+          <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">
             AI Agents
           </p>
-          <h1 className="font-serif text-4xl text-white mb-2">Agent Dashboard</h1>
-          <p className="text-gray-400 text-sm">
-            Discover and interact with registered AI agents on Artifacte
+          <h1 className="font-serif text-4xl md:text-5xl text-white mb-3">Agent Dashboard</h1>
+          <p className="text-gray-400 text-base">
+            Discover and interact with registered AI agents on the Artifacte platform
           </p>
         </div>
 
         {/* Search & Filter */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-4 mb-10 pb-8 border-b border-white/5">
           <input
             type="text"
             placeholder="Search agents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2.5 bg-navy-800 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-gold-500 transition"
+            className="flex-1 px-4 py-2.5 bg-dark-800 border border-white/5 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-gold-500 transition-colors"
           />
 
           <div className="flex gap-2 flex-wrap">
@@ -123,39 +123,37 @@ export default function AgentsPage() {
               <button
                 key={perm}
                 onClick={() => setFilterPermission(filterPermission === perm ? null : perm)}
-                className={`px-3 py-2.5 rounded-lg text-xs font-medium transition ${
+                className={`px-4 py-2.5 rounded-lg text-xs font-medium transition-colors duration-200 ${
                   filterPermission === perm
-                    ? "bg-gold-500 text-navy-900"
-                    : "bg-navy-800 text-gray-400 border border-white/10 hover:text-white"
+                    ? "bg-gold-500 text-dark-900"
+                    : "bg-dark-800 text-gray-400 border border-white/5 hover:text-white"
                 }`}
               >
                 {perm}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* CTA Button */}
-        <div className="flex justify-end mb-8">
+          {/* CTA Button */}
           <Link
             href="/agents/register"
-            className="px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition"
+            className="px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 whitespace-nowrap"
           >
-            + Register Your Agent
+            + Register Agent
           </Link>
         </div>
 
         {/* Agent Count */}
         <div className="mb-8">
           <p className="text-gray-400 text-sm">
-            Total Agents: <span className="text-gold-400 font-semibold">{filteredAgents.length}</span>
+            Total Agents: <span className="text-gold-500 font-semibold">{filteredAgents.length}</span>
           </p>
         </div>
 
         {/* Agents Grid */}
         {loading ? (
           <div className="text-center py-24">
-            <div className="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-400 text-sm">Loading agents from devnet...</p>
           </div>
         ) : filteredAgents.length === 0 ? (
@@ -163,10 +161,10 @@ export default function AgentsPage() {
             <p className="text-gray-400 text-sm">No agents found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredAgents.map((agent) => (
               <Link href={`/agents/${agent.address}`} key={agent.address}>
-                <div className="bg-navy-800 rounded-xl border border-white/5 overflow-hidden card-hover cursor-pointer group h-full relative">
+                <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover cursor-pointer group h-full relative">
                   {/* API Key Status Indicator */}
                   <div className="absolute top-4 right-4 z-10">
                     <div
@@ -175,7 +173,7 @@ export default function AgentsPage() {
                           ? "bg-green-500 shadow-lg shadow-green-500/50"
                           : agent.hasApiKey
                           ? "bg-yellow-500 shadow-lg shadow-yellow-500/50"
-                          : "bg-gray-500"
+                          : "bg-gray-600"
                       }`}
                       title={
                         agent.hasApiKey
@@ -188,29 +186,29 @@ export default function AgentsPage() {
                   </div>
 
                   {/* Avatar */}
-                  <div className="aspect-square overflow-hidden bg-navy-900">
+                  <div className="aspect-square overflow-hidden bg-dark-900">
                     <img
                       src={agent.avatarImage}
                       alt={agent.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src =
-                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%230f1628' width='200' height='200'/%3E%3Ctext x='50%' y='50%' font-size='40' fill='%23c9952c' text-anchor='middle' dominant-baseline='middle'%3E🤖%3C/text%3E%3C/svg%3E";
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23141419' width='200' height='200'/%3E%3Ctext x='50%' y='50%' font-size='40' fill='%23C9A55C' text-anchor='middle' dominant-baseline='middle'%3E🤖%3C/text%3E%3C/svg%3E";
                       }}
                     />
                   </div>
 
                   {/* Info */}
-                  <div className="p-5">
-                    <h3 className="text-white font-semibold text-lg">{agent.name}</h3>
+                  <div className="p-6">
+                    <h3 className="text-white font-serif text-lg">{agent.name}</h3>
 
                     {/* Wallet */}
-                    <p className="text-gray-500 text-xs mt-2 font-mono">
+                    <p className="text-gray-500 text-xs mt-3 font-mono">
                       Owner: {agent.ownerWallet}
                     </p>
 
                     {/* Permissions */}
-                    <div className="flex flex-wrap gap-2 mt-4 mb-4">
+                    <div className="flex flex-wrap gap-2 mt-4 mb-6">
                       {agent.permissions.map((perm) => (
                         <span
                           key={perm}
@@ -224,12 +222,12 @@ export default function AgentsPage() {
                     </div>
 
                     {/* Date and Status */}
-                    <div className="flex items-center justify-between">
-                      <p className="text-gray-600 text-[10px]">
-                        Created {new Date(agent.createdDate).toLocaleDateString()}
+                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                      <p className="text-gray-600 text-xs">
+                        {new Date(agent.createdDate).toLocaleDateString()}
                       </p>
                       {agent.hasApiKey && (
-                        <span className="text-[10px] text-gray-500">
+                        <span className="text-xs text-gray-500">
                           {agent.connectionStatus === "connected" ? "✓ Connected" : "○ Registered"}
                         </span>
                       )}

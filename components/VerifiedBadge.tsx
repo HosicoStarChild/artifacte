@@ -54,7 +54,7 @@ export default function VerifiedBadge({
   if (!isVerified) return null;
 
   return (
-    <div className="flex items-center gap-1 text-gold-400">
+    <div className="flex items-center gap-1 text-gold-500">
       <svg
         className="w-4 h-4 flex-shrink-0"
         fill="currentColor"
@@ -66,7 +66,7 @@ export default function VerifiedBadge({
           clipRule="evenodd"
         />
       </svg>
-      {showLabel && <span className="text-xs font-medium">Verified Collection</span>}
+      {showLabel && <span className="text-xs font-semibold">Verified</span>}
     </div>
   );
 }
