@@ -18,13 +18,34 @@ interface NFTItem {
   image: string;
 }
 
+interface Category {
+  id: string;
+  label: string;
+  emoji: string;
+}
+
+interface SpendingLimit {
+  enabled: boolean;
+  limit: number;
+  currency: "SOL" | "USD1";
+}
+
 export default function RegisterAgentPage() {
   const wallet = useWallet();
   const { publicKey, connected } = wallet;
   const { connection } = useConnection();
 
+  // Category options
+  const ARTIFACT_CATEGORIES: Category[] = [
+    { id: "Digital Art", label: "Digital Art", emoji: "🎨" },
+    { id: "Spirits", label: "Spirits", emoji: "🥃" },
+    { id: "TCG Cards", label: "TCG Cards", emoji: "🃏" },
+    { id: "Sports Cards", label: "Sports Cards", emoji: "⚾" },
+    { id: "Watches", label: "Watches", emoji: "⌚" },
+  ];
+
   // Step states
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [nfts, setNfts] = useState<NFTItem[]>([]);
   const [selectedNFT, setSelectedNFT] = useState<NFTItem | null>(null);
   const [agentName, setAgentName] = useState("");
@@ -33,6 +54,17 @@ export default function RegisterAgentPage() {
     Bid: false,
     Chat: false,
   });
+  const [spendingLimits, setSpendingLimits] = useState<{
+    daily: SpendingLimit;
+    weekly: SpendingLimit;
+    monthly: SpendingLimit;
+  }>({
+    daily: { enabled: false, limit: 0, currency: "SOL" },
+    weekly: { enabled: false, limit: 0, currency: "SOL" },
+    monthly: { enabled: false, limit: 0, currency: "SOL" },
+  });
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set(["Digital Art"]));
+  const [selectAllCategories, setSelectAllCategories] = useState(false);
   const [loading, setLoading] = useState(false);
   const [nftLoading, setNftLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -196,6 +228,14 @@ export default function RegisterAgentPage() {
         return;
       }
       setCurrentStep(4);
+    } else if (currentStep === 4) {
+      if (selectedCategories.size === 0) {
+        showToast("Please select at least one category", "error");
+        return;
+      }
+      setCurrentStep(5);
+    } else if (currentStep === 5) {
+      setCurrentStep(6);
     }
   };
 
@@ -228,6 +268,30 @@ export default function RegisterAgentPage() {
       // Generate API key
       const newApiKey = generateApiKey();
 
+      // Create spending limits with reset timestamps
+      const now = Date.now();
+      const tomorrow = now + 24 * 60 * 60 * 1000;
+      const nextMonday = getNextMonday(now);
+      const nextMonth = getFirstOfNextMonth(now);
+
+      const formattedSpendingLimits = {
+        daily: {
+          ...spendingLimits.daily,
+          spent: 0,
+          resetAt: tomorrow,
+        },
+        weekly: {
+          ...spendingLimits.weekly,
+          spent: 0,
+          resetAt: nextMonday,
+        },
+        monthly: {
+          ...spendingLimits.monthly,
+          spent: 0,
+          resetAt: nextMonth,
+        },
+      };
+
       // Register API key in backend
       const apiRes = await fetch("/api/agents/register", {
         method: "POST",
@@ -238,6 +302,8 @@ export default function RegisterAgentPage() {
           apiKey: newApiKey,
           nftMint: selectedNFT.mint,
           permissions,
+          categories: Array.from(selectedCategories),
+          spendingLimits: formattedSpendingLimits,
         }),
       });
 
@@ -256,6 +322,31 @@ export default function RegisterAgentPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper functions for calculating reset times
+  const getNextMonday = (from: number): number => {
+    const date = new Date(from);
+    const day = date.getUTCDay();
+    const daysUntilMonday = day === 0 ? 1 : 8 - day;
+    const nextMonday = new Date(date);
+    nextMonday.setUTCDate(nextMonday.getUTCDate() + daysUntilMonday);
+    nextMonday.setUTCHours(0, 0, 0, 0);
+    return nextMonday.getTime();
+  };
+
+  const getFirstOfNextMonth = (from: number): number => {
+    const date = new Date(from);
+    const nextMonth = new Date(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + 1,
+      1,
+      0,
+      0,
+      0,
+      0
+    );
+    return nextMonth.getTime();
   };
 
   if (!connected) {
@@ -323,7 +414,9 @@ export default function RegisterAgentPage() {
                   { step: 1, title: "Select NFT" },
                   { step: 2, title: "Agent Name" },
                   { step: 3, title: "Permissions" },
-                  { step: 4, title: "Review & Register" },
+                  { step: 4, title: "Categories" },
+                  { step: 5, title: "Spending Limits" },
+                  { step: 6, title: "Review & Register" },
                 ].map((item) => (
                   <div
                     key={item.step}
@@ -522,8 +615,173 @@ export default function RegisterAgentPage() {
               </div>
             )}
 
-            {/* Step 4: Review */}
+            {/* Step 4: Categories */}
             {currentStep === 4 && (
+              <div>
+                <h2 className="text-white font-serif text-2xl mb-4">Category Preferences</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Select which categories your agent can bid on and trade (select one or more)
+                </p>
+
+                <label className="flex items-center gap-3 p-4 bg-navy-800 rounded-lg border border-white/5 cursor-pointer hover:border-white/10 transition mb-4">
+                  <input
+                    type="checkbox"
+                    checked={selectAllCategories}
+                    onChange={(e) => {
+                      setSelectAllCategories(e.target.checked);
+                      if (e.target.checked) {
+                        setSelectedCategories(new Set(ARTIFACT_CATEGORIES.map(c => c.id)));
+                      } else {
+                        setSelectedCategories(new Set());
+                      }
+                    }}
+                    className="w-5 h-5 rounded accent-gold-500"
+                  />
+                  <div>
+                    <p className="text-white font-medium text-sm">All Categories</p>
+                    <p className="text-gray-500 text-xs">Agent can operate across all categories</p>
+                  </div>
+                </label>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {ARTIFACT_CATEGORIES.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onClick={() => {
+                        const next = new Set(selectedCategories);
+                        if (next.has(cat.id)) {
+                          next.delete(cat.id);
+                          setSelectAllCategories(false);
+                        } else {
+                          next.add(cat.id);
+                          if (next.size === ARTIFACT_CATEGORIES.length) setSelectAllCategories(true);
+                        }
+                        setSelectedCategories(next);
+                      }}
+                      className={`cursor-pointer rounded-lg p-4 border-2 transition text-center ${
+                        selectedCategories.has(cat.id)
+                          ? "border-gold-500 bg-gold-500/10 shadow-lg shadow-gold-500/10"
+                          : "border-white/10 bg-navy-800 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="text-3xl mb-2">{cat.emoji}</div>
+                      <p className={`text-sm font-medium ${selectedCategories.has(cat.id) ? "text-gold-300" : "text-gray-400"}`}>
+                        {cat.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-gray-600 text-xs mt-4">
+                  {selectedCategories.size} of {ARTIFACT_CATEGORIES.length} categories selected
+                </p>
+              </div>
+            )}
+
+            {/* Step 5: Spending Limits */}
+            {currentStep === 5 && (
+              <div>
+                <h2 className="text-white font-serif text-2xl mb-4">Set Spending Limits</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Optional: Set daily, weekly, and monthly spending caps (leave disabled for unlimited)
+                </p>
+
+                <div className="space-y-6">
+                  {(["daily", "weekly", "monthly"] as const).map((period) => (
+                    <div key={period} className="bg-navy-800 rounded-lg border border-white/5 p-5">
+                      <div className="flex items-start gap-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={spendingLimits[period].enabled}
+                            onChange={(e) =>
+                              setSpendingLimits({
+                                ...spendingLimits,
+                                [period]: {
+                                  ...spendingLimits[period],
+                                  enabled: e.target.checked,
+                                },
+                              })
+                            }
+                            className="w-5 h-5 rounded accent-gold-500"
+                          />
+                          <div>
+                            <p className="text-white font-medium text-sm capitalize">
+                              {period} Limit
+                            </p>
+                            <p className="text-gray-500 text-xs">
+                              {period === "daily"
+                                ? "Reset at midnight UTC"
+                                : period === "weekly"
+                                ? "Reset on Monday UTC"
+                                : "Reset on 1st of month UTC"}
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+
+                      {spendingLimits[period].enabled && (
+                        <div className="mt-4 space-y-3 pl-8">
+                          <div>
+                            <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
+                              Amount
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={spendingLimits[period].limit || ""}
+                              onChange={(e) =>
+                                setSpendingLimits({
+                                  ...spendingLimits,
+                                  [period]: {
+                                    ...spendingLimits[period],
+                                    limit: parseFloat(e.target.value) || 0,
+                                  },
+                                })
+                              }
+                              className="w-full px-4 py-2.5 bg-navy-900 border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-gold-500 transition"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
+                              Currency
+                            </label>
+                            <select
+                              value={spendingLimits[period].currency}
+                              onChange={(e) =>
+                                setSpendingLimits({
+                                  ...spendingLimits,
+                                  [period]: {
+                                    ...spendingLimits[period],
+                                    currency: e.target.value as "SOL" | "USD1",
+                                  },
+                                })
+                              }
+                              className="w-full px-4 py-2.5 bg-navy-900 border border-white/10 rounded-lg text-white focus:outline-none focus:border-gold-500 transition"
+                            >
+                              <option value="SOL">SOL</option>
+                              <option value="USD1">USD1</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-xs">
+                    💡 Spending limits help prevent over-budget transactions. You can update them anytime after registration.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Review */}
+            {currentStep === 6 && (
               <div>
                 <h2 className="text-white font-serif text-2xl mb-4">Review & Register</h2>
                 <p className="text-gray-400 text-sm mb-6">
@@ -583,6 +841,47 @@ export default function RegisterAgentPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Categories */}
+                  <div className="bg-navy-800 rounded-lg border border-white/5 p-5">
+                    <p className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+                      Categories
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from(selectedCategories).map((cat) => {
+                        const catInfo = ARTIFACT_CATEGORIES.find(c => c.id === cat);
+                        return (
+                          <span
+                            key={cat}
+                            className="px-3 py-1.5 bg-gold-500/20 text-gold-300 border border-gold-500/30 rounded-md text-xs font-medium"
+                          >
+                            {catInfo?.emoji} {cat}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Spending Limits */}
+                  <div className="bg-navy-800 rounded-lg border border-white/5 p-5">
+                    <p className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+                      Spending Limits
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      {(["daily", "weekly", "monthly"] as const).map((period) => (
+                        <div key={period} className="flex items-center justify-between">
+                          <span className="text-gray-400 capitalize">{period}</span>
+                          {spendingLimits[period].enabled ? (
+                            <span className="text-gold-300 font-medium">
+                              {spendingLimits[period].limit.toFixed(2)} {spendingLimits[period].currency}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">Unlimited</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -625,7 +924,7 @@ export default function RegisterAgentPage() {
                 <button
                   onClick={() => {
                     const newStep = Math.max(1, currentStep - 1);
-                    setCurrentStep(newStep as 1 | 2 | 3 | 4);
+                    setCurrentStep(newStep as 1 | 2 | 3 | 4 | 5);
                   }}
                   disabled={currentStep === 1}
                   className="px-6 py-2.5 bg-navy-800 border border-white/10 text-white rounded-lg text-sm font-medium hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
@@ -633,7 +932,7 @@ export default function RegisterAgentPage() {
                   Previous
                 </button>
 
-                {currentStep === 4 ? (
+                {currentStep === 6 ? (
                   <button
                     onClick={handleRegisterAgent}
                     disabled={loading}

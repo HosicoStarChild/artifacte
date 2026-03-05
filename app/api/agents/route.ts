@@ -3,6 +3,7 @@ import {
   registerAgentApiKey,
   getAllAgents,
   getAgentByWallet,
+  SpendingLimits,
 } from "@/app/lib/api-keys";
 
 /**
@@ -12,7 +13,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { walletAddress, agentName, apiKey, nftMint, permissions } = body;
+    const { walletAddress, agentName, apiKey, nftMint, permissions, spendingLimits } = body;
 
     if (!walletAddress || !agentName || !apiKey || !nftMint) {
       return NextResponse.json(
@@ -26,7 +27,9 @@ export async function POST(req: NextRequest) {
       agentName,
       apiKey,
       nftMint,
-      permissions || { Trade: false, Bid: false, Chat: false }
+      permissions || { Trade: false, Bid: false, Chat: false },
+      [], // categories default
+      spendingLimits as SpendingLimits | undefined
     );
 
     return NextResponse.json(
@@ -37,6 +40,7 @@ export async function POST(req: NextRequest) {
           agentName: record.agentName,
           nftMint: record.nftMint,
           permissions: record.permissions,
+          spendingLimits: record.spendingLimits,
           createdAt: record.createdAt,
         },
       },

@@ -7,6 +7,20 @@ import { useState, useEffect } from "react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { fetchAgent } from "@/app/lib/agent-registry";
 
+interface SpendingLimit {
+  enabled: boolean;
+  limit: number;
+  currency: "SOL" | "USD1";
+  spent: number;
+  resetAt: number;
+}
+
+interface SpendingLimits {
+  daily: SpendingLimit;
+  weekly: SpendingLimit;
+  monthly: SpendingLimit;
+}
+
 interface Agent {
   address: string;
   name: string;
@@ -26,6 +40,16 @@ interface ApiKeyInfo {
     Chat: boolean;
   };
   connectionStatus: "connected" | "disconnected";
+  spendingLimits?: SpendingLimits;
+}
+
+interface BudgetStatus {
+  limits: SpendingLimits;
+  progress: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
 }
 
 const permissionColors: Record<string, string> = {
@@ -39,10 +63,14 @@ export default function AgentProfilePage() {
   const { publicKey } = useWallet();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [apiKeyInfo, setApiKeyInfo] = useState<ApiKeyInfo | null>(null);
+  const [budgetStatus, setBudgetStatus] = useState<BudgetStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiKeyCopied, setApiKeyCopied] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [regeneratingKey, setRegeneratingKey] = useState(false);
+  const [editingLimits, setEditingLimits] = useState(false);
+  const [editedLimits, setEditedLimits] = useState<SpendingLimits | null>(null);
+  const [savingLimits, setSavingLimits] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const address = params.address as string;
@@ -87,7 +115,17 @@ export default function AgentProfilePage() {
                   nftMint: agentRecord.nftMint,
                   permissions: agentRecord.permissions,
                   connectionStatus: agentRecord.connectionStatus,
+                  spendingLimits: agentRecord.spendingLimits,
                 });
+
+                // Load budget status
+                const budgetRes = await fetch(
+                  `/api/agents/budget?address=${agentRecord.walletAddress}`
+                );
+                if (budgetRes.ok) {
+                  const budgetData = await budgetRes.json();
+                  setBudgetStatus(budgetData);
+                }
               }
             }
           } else {
@@ -110,6 +148,58 @@ export default function AgentProfilePage() {
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleEditLimits = () => {
+    if (budgetStatus) {
+      setEditedLimits(budgetStatus.limits);
+      setEditingLimits(true);
+    }
+  };
+
+  const handleSaveLimits = async () => {
+    if (!apiKeyInfo || !editedLimits) return;
+
+    setSavingLimits(true);
+    try {
+      const res = await fetch("/api/agents/limits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: apiKeyInfo.walletAddress,
+          spendingLimits: editedLimits,
+        }),
+      });
+
+      if (!res.ok) {
+        showToast("Failed to update spending limits", "error");
+        setSavingLimits(false);
+        return;
+      }
+
+      const data = await res.json();
+      setApiKeyInfo({
+        ...apiKeyInfo,
+        spendingLimits: data.agent.spendingLimits,
+      });
+
+      // Refresh budget status
+      const budgetRes = await fetch(
+        `/api/agents/budget?address=${apiKeyInfo.walletAddress}`
+      );
+      if (budgetRes.ok) {
+        const budgetData = await budgetRes.json();
+        setBudgetStatus(budgetData);
+      }
+
+      setEditingLimits(false);
+      showToast("Spending limits updated successfully", "success");
+    } catch (error) {
+      console.error("Failed to save limits:", error);
+      showToast("Failed to update spending limits", "error");
+    } finally {
+      setSavingLimits(false);
+    }
   };
 
   const handleRegenerateApiKey = async () => {
@@ -325,6 +415,177 @@ export default function AgentProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Budget Section */}
+        {isOwner && budgetStatus && (
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-2xl text-white">Budget</h2>
+              {!editingLimits && (
+                <button
+                  onClick={handleEditLimits}
+                  className="px-4 py-2.5 bg-navy-700 hover:bg-navy-600 text-white border border-white/10 rounded-lg text-sm font-medium transition"
+                >
+                  Edit Limits
+                </button>
+              )}
+            </div>
+
+            {!editingLimits ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {(["daily", "weekly", "monthly"] as const).map((period) => {
+                  const limit = budgetStatus.limits[period];
+                  const progress = budgetStatus.progress[period];
+                  const isOver = limit.enabled && progress > 100;
+
+                  return (
+                    <div
+                      key={period}
+                      className={`rounded-xl border p-6 ${
+                        isOver
+                          ? "bg-red-500/10 border-red-500/30"
+                          : "bg-navy-800 border-white/5"
+                      }`}
+                    >
+                      <div className="mb-4">
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1 capitalize">
+                          {period} Limit
+                        </p>
+                        {limit.enabled ? (
+                          <p className={`text-lg font-semibold ${isOver ? "text-red-300" : "text-white"}`}>
+                            {limit.spent.toFixed(2)} / {limit.limit.toFixed(2)} {limit.currency}
+                          </p>
+                        ) : (
+                          <p className="text-lg font-semibold text-gray-400">Unlimited</p>
+                        )}
+                      </div>
+
+                      {limit.enabled && (
+                        <>
+                          <div className="w-full bg-navy-900 rounded-full h-2.5 overflow-hidden mb-3">
+                            <div
+                              className={`h-full transition-all ${
+                                progress > 100 ? "bg-red-500" : "bg-gold-500"
+                              }`}
+                              style={{
+                                width: `${Math.min(progress, 100)}%`,
+                              }}
+                            ></div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={isOver ? "text-red-300" : "text-gray-400"}>
+                              {progress > 100 ? "⚠️ Over budget" : `${progress.toFixed(0)}%`}
+                            </span>
+                            <span className="text-gray-500">
+                              {(limit.limit - limit.spent).toFixed(2)} remaining
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-navy-800 rounded-xl border border-white/5 p-8">
+                <p className="text-gray-400 text-sm mb-6">Edit spending limits for each period:</p>
+                <div className="space-y-6 mb-6">
+                  {editedLimits &&
+                    (["daily", "weekly", "monthly"] as const).map((period) => (
+                      <div key={period} className="bg-navy-900 rounded-lg p-5">
+                        <div className="flex items-start gap-4">
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editedLimits[period].enabled}
+                              onChange={(e) =>
+                                setEditedLimits({
+                                  ...editedLimits,
+                                  [period]: {
+                                    ...editedLimits[period],
+                                    enabled: e.target.checked,
+                                  },
+                                })
+                              }
+                              className="w-5 h-5 rounded accent-gold-500"
+                            />
+                            <p className="text-white font-medium text-sm capitalize">
+                              {period} Limit
+                            </p>
+                          </label>
+                        </div>
+
+                        {editedLimits[period].enabled && (
+                          <div className="mt-4 space-y-3 pl-8">
+                            <div>
+                              <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
+                                Amount
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editedLimits[period].limit}
+                                onChange={(e) =>
+                                  setEditedLimits({
+                                    ...editedLimits,
+                                    [period]: {
+                                      ...editedLimits[period],
+                                      limit: parseFloat(e.target.value) || 0,
+                                    },
+                                  })
+                                }
+                                className="w-full px-4 py-2.5 bg-navy-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-gold-500 transition"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
+                                Currency
+                              </label>
+                              <select
+                                value={editedLimits[period].currency}
+                                onChange={(e) =>
+                                  setEditedLimits({
+                                    ...editedLimits,
+                                    [period]: {
+                                      ...editedLimits[period],
+                                      currency: e.target.value as "SOL" | "USD1",
+                                    },
+                                  })
+                                }
+                                className="w-full px-4 py-2.5 bg-navy-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-gold-500 transition"
+                              >
+                                <option value="SOL">SOL</option>
+                                <option value="USD1">USD1</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setEditingLimits(false)}
+                    disabled={savingLimits}
+                    className="px-6 py-2.5 bg-navy-700 border border-white/10 text-white rounded-lg text-sm font-medium hover:border-white/20 disabled:opacity-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveLimits}
+                    disabled={savingLimits}
+                    className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-navy-900 rounded-lg text-sm font-semibold transition"
+                  >
+                    {savingLimits ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* API Key Section (Owner Only) */}
         {isOwner && apiKeyInfo && (
