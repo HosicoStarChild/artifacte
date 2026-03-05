@@ -27,6 +27,7 @@ export default function Navbar() {
             <Link href="/" className="text-sm text-gray-300 hover:text-white transition">Home</Link>
             <Link href="/portfolio" className="text-sm text-gray-300 hover:text-white transition">Portfolio</Link>
             <Link href="/auctions" className="text-sm text-gray-300 hover:text-white transition">Auctions</Link>
+            <Link href="/agents" className="text-sm text-gray-300 hover:text-white transition">Agents</Link>
             <Link href="/digital-art" className="text-sm text-gray-300 hover:text-white transition">Digital Art</Link>
             <Link href="/submit" className="text-sm text-gray-300 hover:text-white transition">Submit</Link>
             <Link href="/about" className="text-sm text-gray-300 hover:text-white transition">About</Link>
@@ -49,6 +50,7 @@ export default function Navbar() {
             <Link href="/" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Home</Link>
             <Link href="/portfolio" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Portfolio</Link>
             <Link href="/auctions" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Auctions</Link>
+            <Link href="/agents" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Agents</Link>
             <Link href="/digital-art" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Digital Art</Link>
             <Link href="/submit" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Submit</Link>
             <Link href="/about" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>About</Link>
