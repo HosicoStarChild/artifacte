@@ -34,7 +34,6 @@ export default function Navbar() {
             <Link href="/auctions" className="text-sm text-gray-300 hover:text-white transition">Auctions</Link>
             <Link href="/agents" className="text-sm text-gray-300 hover:text-white transition">Agents</Link>
             <Link href="/digital-art" className="text-sm text-gray-300 hover:text-white transition">Digital Art</Link>
-            <Link href="/submit" className="text-sm text-gray-300 hover:text-white transition">Submit</Link>
             <Link href="/apply" className="text-sm text-gray-300 hover:text-white transition">Apply to List</Link>
             <Link href="/about" className="text-sm text-gray-300 hover:text-white transition">About</Link>
             {isAdmin && (
@@ -61,7 +60,6 @@ export default function Navbar() {
             <Link href="/auctions" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Auctions</Link>
             <Link href="/agents" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Agents</Link>
             <Link href="/digital-art" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Digital Art</Link>
-            <Link href="/submit" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Submit</Link>
             <Link href="/apply" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Apply to List</Link>
             <Link href="/about" className="block text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>About</Link>
             {isAdmin && (
