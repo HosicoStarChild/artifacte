@@ -36,6 +36,15 @@ export default function RegisterAgentPage() {
   const [loading, setLoading] = useState(false);
   const [nftLoading, setNftLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  // Client-side API key generation
+  const generateApiKey = (): string => {
+    const randomHex = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    return `art_agent_${randomHex}`;
+  };
 
   // Fetch NFTs when wallet connects
   useEffect(() => {
@@ -216,10 +225,31 @@ export default function RegisterAgentPage() {
         permissions.Chat
       );
 
-      showToast(`✓ Agent registered! Tx: ${signature.slice(0, 8)}...`, "success");
-      setTimeout(() => {
-        window.location.href = "/agents";
-      }, 2000);
+      // Generate API key
+      const newApiKey = generateApiKey();
+
+      // Register API key in backend
+      const apiRes = await fetch("/api/agents/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: publicKey.toBase58(),
+          agentName,
+          apiKey: newApiKey,
+          nftMint: selectedNFT.mint,
+          permissions,
+        }),
+      });
+
+      if (!apiRes.ok) {
+        showToast("Agent registered on-chain but API key storage failed", "error");
+        setLoading(false);
+        return;
+      }
+
+      // Set API key for display
+      setApiKey(newApiKey);
+      showToast("✓ Agent registered successfully! Your API key is ready.", "success");
     } catch (e: any) {
       console.error("Registration failed:", e);
       showToast(e.message || "Failed to register agent", "error");
@@ -557,36 +587,70 @@ export default function RegisterAgentPage() {
               </div>
             )}
 
-            {/* Navigation Buttons */}
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={() => {
-                  const newStep = Math.max(1, currentStep - 1);
-                  setCurrentStep(newStep as 1 | 2 | 3 | 4);
-                }}
-                disabled={currentStep === 1}
-                className="px-6 py-2.5 bg-navy-800 border border-white/10 text-white rounded-lg text-sm font-medium hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                Previous
-              </button>
+            {/* API Key Display */}
+            {apiKey && (
+              <div className="bg-navy-900 rounded-xl border border-white/5 p-8 my-12">
+                <h2 className="text-white font-serif text-2xl mb-4">🔑 Your API Key</h2>
+                <p className="text-amber-300 text-sm mb-6">
+                  ⚠️ Save this API key now — you won't be able to see it again!
+                </p>
+                <div className="bg-navy-800 rounded-lg border border-white/5 p-4 mb-6">
+                  <code className="text-white font-mono text-sm break-all">
+                    {apiKey}
+                  </code>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(apiKey);
+                    showToast("API key copied to clipboard!", "success");
+                  }}
+                  className="w-full px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition mb-4"
+                >
+                  Copy API Key
+                </button>
+                <button
+                  onClick={() => {
+                    window.location.href = "/agents";
+                  }}
+                  className="w-full px-6 py-2.5 bg-navy-700 hover:bg-navy-600 border border-white/10 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  Go to Dashboard
+                </button>
+              </div>
+            )}
 
-              {currentStep === 4 ? (
+            {/* Navigation Buttons */}
+            {!apiKey && (
+              <div className="flex gap-4 mt-8">
                 <button
-                  onClick={handleRegisterAgent}
-                  disabled={loading}
-                  className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-navy-900 rounded-lg text-sm font-semibold transition"
+                  onClick={() => {
+                    const newStep = Math.max(1, currentStep - 1);
+                    setCurrentStep(newStep as 1 | 2 | 3 | 4);
+                  }}
+                  disabled={currentStep === 1}
+                  className="px-6 py-2.5 bg-navy-800 border border-white/10 text-white rounded-lg text-sm font-medium hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  {loading ? "Registering..." : "Register Agent"}
+                  Previous
                 </button>
-              ) : (
-                <button
-                  onClick={handleStepForward}
-                  className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition"
-                >
-                  Continue
-                </button>
-              )}
-            </div>
+
+                {currentStep === 4 ? (
+                  <button
+                    onClick={handleRegisterAgent}
+                    disabled={loading}
+                    className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-navy-900 rounded-lg text-sm font-semibold transition"
+                  >
+                    {loading ? "Registering..." : "Register Agent"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStepForward}
+                    className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition"
+                  >
+                    Continue
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

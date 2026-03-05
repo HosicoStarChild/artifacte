@@ -12,6 +12,8 @@ interface Agent {
   avatarImage: string;
   permissions: ("Trade" | "Bid" | "Chat")[];
   createdDate: string;
+  hasApiKey: boolean;
+  connectionStatus: "connected" | "disconnected";
 }
 
 export default function AgentsPage() {
@@ -26,6 +28,16 @@ export default function AgentsPage() {
         setLoading(true);
         const connection = new Connection("https://api.devnet.solana.com", "confirmed");
         const agentData = await fetchAllAgents(connection);
+        
+        // Fetch API key data from API endpoint
+        const apiRes = await fetch("/api/agents");
+        const apiData = await apiRes.json();
+        const apiAgents = apiData.agents || [];
+
+        // Create a map of wallet address to API key info
+        const apiKeyMap = new Map<string, any>(
+          apiAgents.map((ak: any) => [ak.walletAddress, ak])
+        );
 
         // Transform on-chain data to UI format
         const transformedAgents: Agent[] = agentData.map((agent) => {
@@ -34,13 +46,18 @@ export default function AgentsPage() {
           if (agent.canBid) permissions.push("Bid");
           if (agent.canChat) permissions.push("Chat");
 
+          const walletAddr = agent.owner.toBase58();
+          const apiKeyInfo: any = apiKeyMap.get(walletAddr);
+
           return {
             address: agent.address,
             name: agent.name,
-            ownerWallet: `${agent.owner.toBase58().slice(0, 8)}...${agent.owner.toBase58().slice(-4)}`,
+            ownerWallet: `${walletAddr.slice(0, 8)}...${walletAddr.slice(-4)}`,
             avatarImage: `https://picsum.photos/200/200?seed=${agent.address}`,
             permissions,
             createdDate: new Date(agent.createdAt * 1000).toISOString().split("T")[0],
+            hasApiKey: !!apiKeyInfo,
+            connectionStatus: apiKeyInfo?.connectionStatus || "disconnected",
           };
         });
 
@@ -128,6 +145,13 @@ export default function AgentsPage() {
           </Link>
         </div>
 
+        {/* Agent Count */}
+        <div className="mb-8">
+          <p className="text-gray-400 text-sm">
+            Total Agents: <span className="text-gold-400 font-semibold">{filteredAgents.length}</span>
+          </p>
+        </div>
+
         {/* Agents Grid */}
         {loading ? (
           <div className="text-center py-24">
@@ -142,7 +166,27 @@ export default function AgentsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredAgents.map((agent) => (
               <Link href={`/agents/${agent.address}`} key={agent.address}>
-                <div className="bg-navy-800 rounded-xl border border-white/5 overflow-hidden card-hover cursor-pointer group h-full">
+                <div className="bg-navy-800 rounded-xl border border-white/5 overflow-hidden card-hover cursor-pointer group h-full relative">
+                  {/* API Key Status Indicator */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        agent.hasApiKey && agent.connectionStatus === "connected"
+                          ? "bg-green-500 shadow-lg shadow-green-500/50"
+                          : agent.hasApiKey
+                          ? "bg-yellow-500 shadow-lg shadow-yellow-500/50"
+                          : "bg-gray-500"
+                      }`}
+                      title={
+                        agent.hasApiKey
+                          ? agent.connectionStatus === "connected"
+                            ? "Connected"
+                            : "Registered (not connected)"
+                          : "No API key"
+                      }
+                    ></div>
+                  </div>
+
                   {/* Avatar */}
                   <div className="aspect-square overflow-hidden bg-navy-900">
                     <img
@@ -179,10 +223,17 @@ export default function AgentsPage() {
                       ))}
                     </div>
 
-                    {/* Date */}
-                    <p className="text-gray-600 text-[10px]">
-                      Created {new Date(agent.createdDate).toLocaleDateString()}
-                    </p>
+                    {/* Date and Status */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-gray-600 text-[10px]">
+                        Created {new Date(agent.createdDate).toLocaleDateString()}
+                      </p>
+                      {agent.hasApiKey && (
+                        <span className="text-[10px] text-gray-500">
+                          {agent.connectionStatus === "connected" ? "✓ Connected" : "○ Registered"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Link>

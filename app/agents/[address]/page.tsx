@@ -16,6 +16,18 @@ interface Agent {
   createdDate: string;
 }
 
+interface ApiKeyInfo {
+  walletAddress: string;
+  agentName: string;
+  nftMint: string;
+  permissions: {
+    Trade: boolean;
+    Bid: boolean;
+    Chat: boolean;
+  };
+  connectionStatus: "connected" | "disconnected";
+}
+
 const permissionColors: Record<string, string> = {
   Trade: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   Bid: "bg-purple-500/20 text-purple-300 border-purple-500/30",
@@ -26,9 +38,15 @@ export default function AgentProfilePage() {
   const params = useParams();
   const { publicKey } = useWallet();
   const [agent, setAgent] = useState<Agent | null>(null);
+  const [apiKeyInfo, setApiKeyInfo] = useState<ApiKeyInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [regeneratingKey, setRegeneratingKey] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const address = params.address as string;
+  const isOwner = publicKey && apiKeyInfo && publicKey.toBase58() === apiKeyInfo.walletAddress;
 
   useEffect(() => {
     async function loadAgent() {
@@ -36,7 +54,6 @@ export default function AgentProfilePage() {
         setLoading(true);
         const connection = new Connection("https://api.devnet.solana.com", "confirmed");
         
-        // The address param is the agent PDA address
         try {
           const ownerPubkey = new PublicKey(address);
           const agentData = await fetchAgent(connection, ownerPubkey);
@@ -55,6 +72,24 @@ export default function AgentProfilePage() {
               permissions,
               createdDate: new Date(agentData.createdAt * 1000).toISOString().split("T")[0],
             });
+
+            // Load API key info if this is the owner
+            if (publicKey && publicKey.toBase58() === agentData.owner.toBase58()) {
+              const apiRes = await fetch("/api/agents");
+              const apiData = await apiRes.json();
+              const agentRecord = apiData.agents?.find(
+                (a: any) => a.walletAddress === agentData.owner.toBase58()
+              );
+              if (agentRecord) {
+                setApiKeyInfo({
+                  walletAddress: agentRecord.walletAddress,
+                  agentName: agentRecord.agentName,
+                  nftMint: agentRecord.nftMint,
+                  permissions: agentRecord.permissions,
+                  connectionStatus: agentRecord.connectionStatus,
+                });
+              }
+            }
           } else {
             setAgent(null);
           }
@@ -70,7 +105,46 @@ export default function AgentProfilePage() {
     if (address) {
       loadAgent();
     }
-  }, [address]);
+  }, [address, publicKey]);
+
+  const showToast = (message: string, type: "success" | "error") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleRegenerateApiKey = async () => {
+    if (!isOwner) return;
+    
+    setRegeneratingKey(true);
+    try {
+      const res = await fetch("/api/agents/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress: apiKeyInfo!.walletAddress }),
+      });
+
+      if (!res.ok) {
+        showToast("Failed to regenerate API key", "error");
+        return;
+      }
+
+      const data = await res.json();
+      setApiKeyInfo({
+        walletAddress: data.agent.walletAddress,
+        agentName: data.agent.agentName,
+        nftMint: data.agent.nftMint,
+        permissions: data.agent.permissions,
+        connectionStatus: data.agent.connectionStatus,
+      });
+      showToast("API key regenerated successfully", "success");
+      setShowApiKey(true);
+    } catch (error) {
+      console.error("Failed to regenerate API key:", error);
+      showToast("Failed to regenerate API key", "error");
+    } finally {
+      setRegeneratingKey(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -109,12 +183,23 @@ export default function AgentProfilePage() {
     );
   }
 
-  const isOwner =
-    publicKey && publicKey.toBase58() === agent.ownerWallet;
   const truncatedWallet = `${agent.ownerWallet.slice(0, 8)}...${agent.ownerWallet.slice(-8)}`;
 
   return (
     <div className="pt-24 pb-20 min-h-screen">
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
+            toast.type === "success"
+              ? "bg-green-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Link */}
         <Link
@@ -212,19 +297,91 @@ export default function AgentProfilePage() {
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="bg-navy-900 rounded-lg p-4">
-                <p className="text-gray-400 text-sm">
-                  This AI agent is configured to{" "}
-                  {agent.permissions.length === 0
-                    ? "perform no actions"
-                    : agent.permissions.join(", ").toLowerCase()}
-                  . {isOwner ? "You can edit this agent at any time." : "Contact the owner for modifications."}
-                </p>
-              </div>
+              {/* Connection Status */}
+              {apiKeyInfo && (
+                <div className="bg-navy-900 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        apiKeyInfo.connectionStatus === "connected"
+                          ? "bg-green-500"
+                          : "bg-gray-500"
+                      }`}
+                    ></div>
+                    <span
+                      className={
+                        apiKeyInfo.connectionStatus === "connected"
+                          ? "text-green-400 text-sm font-medium"
+                          : "text-gray-400 text-sm font-medium"
+                      }
+                    >
+                      {apiKeyInfo.connectionStatus === "connected"
+                        ? "Connected to MCP Server"
+                        : "Not Connected"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* API Key Section (Owner Only) */}
+        {isOwner && apiKeyInfo && (
+          <div className="mt-12">
+            <h2 className="font-serif text-2xl text-white mb-6">API Key Management</h2>
+            <div className="bg-navy-800 rounded-xl border border-white/5 p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
+                    API Key Status
+                  </p>
+                  <p className="text-white text-lg font-semibold">
+                    {showApiKey ? "Visible" : "Hidden for Security"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="px-4 py-2.5 bg-navy-700 hover:bg-navy-600 text-white border border-white/10 rounded-lg text-sm font-medium transition"
+                >
+                  {showApiKey ? "Hide" : "Show"}
+                </button>
+              </div>
+
+              {showApiKey && apiKeyInfo && (
+                <>
+                  <div className="bg-navy-900 rounded-lg border border-white/5 p-4 mb-6 font-mono text-sm text-gray-300 overflow-x-auto break-all">
+                    <span className="text-gray-500">(API key is stored securely and hidden for security)</span>
+                  </div>
+
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-6">
+                    <p className="text-amber-200 text-xs">
+                      ⚠️ Store your API key securely. Never share it publicly or commit it to version control.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-3">
+                <div className="bg-navy-900 rounded-lg p-4">
+                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">How to Connect</p>
+                  <p className="text-gray-300 text-sm">
+                    Use your API key to authenticate with the MCP server. Include it in your agent configuration 
+                    to enable trading, bidding, and other operations on Artifacte.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleRegenerateApiKey}
+                  disabled={regeneratingKey}
+                  className="w-full px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {regeneratingKey ? "Regenerating..." : "Regenerate API Key"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Activity Feed */}
         <div className="mt-12">
