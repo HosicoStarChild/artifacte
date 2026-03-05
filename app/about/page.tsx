@@ -112,40 +112,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* How to Submit */}
-        <section className="mb-20">
-          <h2 className="font-serif text-3xl text-white mb-4">How to Submit Real-World Asset NFTs for Auction</h2>
-          <p className="text-gray-400 text-sm mb-10 max-w-2xl">
-            List your real-world assets as NFTs in just a few simple steps — secure, transparent, and globally accessible.
-          </p>
-
-          <div className="relative max-w-xl">
-            <div className="absolute left-[18px] top-2 bottom-2 w-px bg-white/10" />
-            <div className="space-y-8">
-              {[
-                { icon: "💬", title: "Describe The Asset", desc: "Provide key details, ownership information, and provenance to represent your real-world asset as an NFT." },
-                { icon: "📤", title: "Upload Proof & Documentation", desc: "Submit certificates, appraisals, photos, and any legal documentation for verification." },
-                { icon: "📋", title: "Review And Submit", desc: "Review your submission details and confirm everything is accurate before submitting." },
-                { icon: "🔗", title: "Asset Verification", desc: "Our team verifies authenticity, ownership, and documentation of your asset." },
-                { icon: "🏛️", title: "Auction Goes Live", desc: "Once verified, your asset NFT is minted on Solana and the auction goes live." },
-              ].map((step, i) => (
-                <div key={i} className="flex items-start gap-5 relative">
-                  <div className="w-9 h-9 rounded-lg bg-navy-800 border border-white/10 flex items-center justify-center flex-shrink-0 z-10 text-lg">
-                    {step.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-white font-semibold text-base">{step.title}</h3>
-                    <p className="text-gray-500 text-sm mt-1">{step.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Link href="/submit" className="inline-block mt-10 px-6 py-3 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg font-semibold text-sm transition">
-            Submit Now
-          </Link>
-        </section>
+        {/* How to Submit section removed — replaced by Apply to List flow */}
       </div>
     </div>
   );
