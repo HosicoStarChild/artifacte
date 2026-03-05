@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useState, useEffect } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { fetchAgent } from "@/app/lib/agent-registry";
 
 interface Agent {
   address: string;
@@ -13,57 +16,6 @@ interface Agent {
   createdDate: string;
 }
 
-const MOCK_AGENTS: Record<string, Agent> = {
-  agent_0x1A2B3C4D: {
-    address: "agent_0x1A2B3C4D",
-    name: "TradeMaster AI",
-    ownerWallet: "7UXmBkJ9RYZQhV2DvWfXp8mPqLsKtVwXqf2Uw",
-    avatarImage: "https://picsum.photos/400/400?random=1",
-    permissions: ["Trade", "Bid", "Chat"],
-    createdDate: "2025-02-15",
-  },
-  agent_0x5E6F7G8H: {
-    address: "agent_0x5E6F7G8H",
-    name: "Auction Scout",
-    ownerWallet: "3k9mLnOpQrStUvWxYzAbCdEfGhIjKlMnZt8Vx",
-    avatarImage: "https://picsum.photos/400/400?random=2",
-    permissions: ["Bid", "Chat"],
-    createdDate: "2025-02-10",
-  },
-  agent_0x9I0J1K2L: {
-    address: "agent_0x9I0J1K2L",
-    name: "Portfolio Analyzer",
-    ownerWallet: "8qRsTuVwXyZaBcDeFgHiJkLmNoPqRsPn4Hy",
-    avatarImage: "https://picsum.photos/400/400?random=3",
-    permissions: ["Trade"],
-    createdDate: "2025-02-08",
-  },
-  agent_0x3M4N5O6P: {
-    address: "agent_0x3M4N5O6P",
-    name: "Market Monitor",
-    ownerWallet: "2cDeFgHiJkLmNoPqRsT",
-    avatarImage: "https://picsum.photos/400/400?random=4",
-    permissions: ["Chat"],
-    createdDate: "2025-02-05",
-  },
-  agent_0x7Q8R9S0T: {
-    address: "agent_0x7Q8R9S0T",
-    name: "Smart Bidder",
-    ownerWallet: "5mNoPqRstUvWxYzAbCdEfGhIjRst1Uv",
-    avatarImage: "https://picsum.photos/400/400?random=5",
-    permissions: ["Trade", "Bid"],
-    createdDate: "2025-02-01",
-  },
-  agent_0x1U2V3W4X: {
-    address: "agent_0x1U2V3W4X",
-    name: "DeFi Explorer",
-    ownerWallet: "9wXyZaBcDeFgHiJkLmNoPqRsAbC2De",
-    avatarImage: "https://picsum.photos/400/400?random=6",
-    permissions: ["Trade", "Chat"],
-    createdDate: "2025-01-28",
-  },
-};
-
 const permissionColors: Record<string, string> = {
   Trade: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   Bid: "bg-purple-500/20 text-purple-300 border-purple-500/30",
@@ -73,9 +25,71 @@ const permissionColors: Record<string, string> = {
 export default function AgentProfilePage() {
   const params = useParams();
   const { publicKey } = useWallet();
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const address = params.address as string;
-  const agent = MOCK_AGENTS[address];
+
+  useEffect(() => {
+    async function loadAgent() {
+      try {
+        setLoading(true);
+        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+        
+        // The address param is the agent PDA address
+        try {
+          const ownerPubkey = new PublicKey(address);
+          const agentData = await fetchAgent(connection, ownerPubkey);
+
+          if (agentData) {
+            const permissions: ("Trade" | "Bid" | "Chat")[] = [];
+            if (agentData.canTrade) permissions.push("Trade");
+            if (agentData.canBid) permissions.push("Bid");
+            if (agentData.canChat) permissions.push("Chat");
+
+            setAgent({
+              address: agentData.address,
+              name: agentData.name,
+              ownerWallet: agentData.owner.toBase58(),
+              avatarImage: `https://picsum.photos/400/400?seed=${agentData.address}`,
+              permissions,
+              createdDate: new Date(agentData.createdAt * 1000).toISOString().split("T")[0],
+            });
+          } else {
+            setAgent(null);
+          }
+        } catch (e) {
+          console.error("Failed to fetch agent:", e);
+          setAgent(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (address) {
+      loadAgent();
+    }
+  }, [address]);
+
+  if (loading) {
+    return (
+      <div className="pt-24 pb-20 min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/agents"
+            className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-8 inline-block hover:text-gold-500 transition"
+          >
+            ← Back to Agents
+          </Link>
+          <div className="text-center py-24">
+            <div className="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-400 text-sm">Loading agent...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!agent) {
     return (

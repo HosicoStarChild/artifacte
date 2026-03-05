@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { fetchAllAgents } from "@/app/lib/agent-registry";
 
 interface Agent {
   address: string;
@@ -12,68 +14,55 @@ interface Agent {
   createdDate: string;
 }
 
-const MOCK_AGENTS: Agent[] = [
-  {
-    address: "agent_0x1A2B3C4D",
-    name: "TradeMaster AI",
-    ownerWallet: "7UXmB...Qf2Uw",
-    avatarImage: "https://picsum.photos/200/200?random=1",
-    permissions: ["Trade", "Bid", "Chat"],
-    createdDate: "2025-02-15",
-  },
-  {
-    address: "agent_0x5E6F7G8H",
-    name: "Auction Scout",
-    ownerWallet: "3k9mL...Zt8Vx",
-    avatarImage: "https://picsum.photos/200/200?random=2",
-    permissions: ["Bid", "Chat"],
-    createdDate: "2025-02-10",
-  },
-  {
-    address: "agent_0x9I0J1K2L",
-    name: "Portfolio Analyzer",
-    ownerWallet: "8qRsT...Pn4Hy",
-    avatarImage: "https://picsum.photos/200/200?random=3",
-    permissions: ["Trade"],
-    createdDate: "2025-02-08",
-  },
-  {
-    address: "agent_0x3M4N5O6P",
-    name: "Market Monitor",
-    ownerWallet: "2cDeFg...Ij9Kl",
-    avatarImage: "https://picsum.photos/200/200?random=4",
-    permissions: ["Chat"],
-    createdDate: "2025-02-05",
-  },
-  {
-    address: "agent_0x7Q8R9S0T",
-    name: "Smart Bidder",
-    ownerWallet: "5mNoPq...Rst1Uv",
-    avatarImage: "https://picsum.photos/200/200?random=5",
-    permissions: ["Trade", "Bid"],
-    createdDate: "2025-02-01",
-  },
-  {
-    address: "agent_0x1U2V3W4X",
-    name: "DeFi Explorer",
-    ownerWallet: "9wXyZ...AbC2De",
-    avatarImage: "https://picsum.photos/200/200?random=6",
-    permissions: ["Trade", "Chat"],
-    createdDate: "2025-01-28",
-  },
-];
-
 export default function AgentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPermission, setFilterPermission] = useState<"Trade" | "Bid" | "Chat" | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadAgents() {
+      try {
+        setLoading(true);
+        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+        const agentData = await fetchAllAgents(connection);
+
+        // Transform on-chain data to UI format
+        const transformedAgents: Agent[] = agentData.map((agent) => {
+          const permissions: ("Trade" | "Bid" | "Chat")[] = [];
+          if (agent.canTrade) permissions.push("Trade");
+          if (agent.canBid) permissions.push("Bid");
+          if (agent.canChat) permissions.push("Chat");
+
+          return {
+            address: agent.address,
+            name: agent.name,
+            ownerWallet: `${agent.owner.toBase58().slice(0, 8)}...${agent.owner.toBase58().slice(-4)}`,
+            avatarImage: `https://picsum.photos/200/200?seed=${agent.address}`,
+            permissions,
+            createdDate: new Date(agent.createdAt * 1000).toISOString().split("T")[0],
+          };
+        });
+
+        setAgents(transformedAgents);
+      } catch (error) {
+        console.error("Failed to load agents:", error);
+        setAgents([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAgents();
+  }, []);
 
   const filteredAgents = useMemo(() => {
-    return MOCK_AGENTS.filter((agent) => {
+    return agents.filter((agent) => {
       const matchesSearch = agent.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPermission = !filterPermission || agent.permissions.includes(filterPermission);
       return matchesSearch && matchesPermission;
     });
-  }, [searchQuery, filterPermission]);
+  }, [agents, searchQuery, filterPermission]);
 
   const permissionBadgeColor = (permission: string) => {
     switch (permission) {
@@ -140,7 +129,12 @@ export default function AgentsPage() {
         </div>
 
         {/* Agents Grid */}
-        {filteredAgents.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-24">
+            <div className="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-400 text-sm">Loading agents from devnet...</p>
+          </div>
+        ) : filteredAgents.length === 0 ? (
           <div className="text-center py-24">
             <p className="text-gray-400 text-sm">No agents found</p>
           </div>

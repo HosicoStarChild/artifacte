@@ -4,6 +4,8 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { registerAgent } from "@/app/lib/agent-registry";
+import { PublicKey } from "@solana/web3.js";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -17,7 +19,8 @@ interface NFTItem {
 }
 
 export default function RegisterAgentPage() {
-  const { publicKey, connected } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, connected } = wallet;
   const { connection } = useConnection();
 
   // Step states
@@ -190,14 +193,36 @@ export default function RegisterAgentPage() {
   const handleRegisterAgent = async () => {
     setLoading(true);
     try {
-      // Simulate transaction (for now just show success)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      showToast("✓ Agent registered successfully!", "success");
+      if (!publicKey) {
+        showToast("Wallet not connected", "error");
+        setLoading(false);
+        return;
+      }
+
+      if (!selectedNFT) {
+        showToast("Please select an NFT", "error");
+        setLoading(false);
+        return;
+      }
+
+      // Call on-chain register function - use the current wallet context
+      const signature = await registerAgent(
+        wallet,
+        connection,
+        new PublicKey(selectedNFT.mint),
+        agentName,
+        permissions.Trade,
+        permissions.Bid,
+        permissions.Chat
+      );
+
+      showToast(`✓ Agent registered! Tx: ${signature.slice(0, 8)}...`, "success");
       setTimeout(() => {
         window.location.href = "/agents";
-      }, 1500);
-    } catch (e) {
-      showToast("Failed to register agent", "error");
+      }, 2000);
+    } catch (e: any) {
+      console.error("Registration failed:", e);
+      showToast(e.message || "Failed to register agent", "error");
     } finally {
       setLoading(false);
     }
