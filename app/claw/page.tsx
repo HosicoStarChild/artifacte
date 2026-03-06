@@ -147,7 +147,7 @@ export default function ClawPage() {
               className="font-serif text-5xl md:text-7xl text-white mb-4 tracking-tight"
               style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
             >
-              The Claw
+              Salon Privé
             </h1>
             <p className="text-gray-300 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
               Pull rare graded TCG cards. Hold or swap instantly.
