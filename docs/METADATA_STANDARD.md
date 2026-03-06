@@ -7,7 +7,7 @@ All NFTs minted on Artifacte follow this metadata schema. Built on Metaplex Toke
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string (64) | Item name |
-| `symbol` | string | `ARTF` |
+| `symbol` | string | `Artifacte` |
 | `description` | string | Item description |
 | `image` | string (URI) | Primary photo |
 | `category` | enum | `DigitalArt` / `Spirits` / `TCGCards` / `SportsCards` / `Watches` |
@@ -98,7 +98,7 @@ Category-specific fields are stored as JSON in the NFT's `uri` (off-chain metada
 URI JSON structure:
 {
   "name": "...",
-  "symbol": "ARTF",
+  "symbol": "Artifacte",
   "description": "...",
   "image": "https://arweave.net/...",
   "attributes": [
@@ -132,4 +132,4 @@ URI JSON structure:
 
 ## Symbol
 
-All Artifacte NFTs use the symbol `ARTF` for marketplace identification.
+All Artifacte NFTs use the symbol `Artifacte` for marketplace identification.
