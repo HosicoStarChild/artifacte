@@ -352,7 +352,7 @@ export default function ClawPage() {
           onClick={() => setIsChatOpen(!isChatOpen)}
           className="ml-auto px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-all duration-200 uppercase tracking-wider flex items-center gap-2"
         >
-          💬 Chat
+          💬 Salon Privé
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-dark-900 text-gold-500 text-xs font-bold">
             47
           </span>

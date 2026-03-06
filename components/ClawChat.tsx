@@ -253,7 +253,7 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
       <div className="bg-gradient-to-r from-[#0d1229] to-[#1a1f3a] border-b border-[#1a1f3a] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg">🎮</span>
-          <h3 className="text-white font-semibold text-sm">Claw Chat</h3>
+          <h3 className="text-white font-semibold text-sm">Salon Privé</h3>
           <div className="flex items-center gap-1.5 ml-2">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span className="text-xs text-gray-400">{onlineUsers} online</span>
