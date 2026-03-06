@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL");
+declare_id!("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 
 // Treasury wallet
 const TREASURY: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";

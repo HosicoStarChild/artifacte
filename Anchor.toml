@@ -4,15 +4,15 @@
 resolution = true
 skip-lint = false
 
-[programs.devnet]
-auction = "9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL"
-rwa_nft = "3F9p3LxwVzPVgzJZQ59dxxBwQiobhtXdokr8iF7ZETSH"
+[programs.mainnet]
+auction = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"
+rwa_nft = "dK6HkxoT5BHYdPJFomXNSSB1fBUoRjxGT7XxbQudFLH"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
