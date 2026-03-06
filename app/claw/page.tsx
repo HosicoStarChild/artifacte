@@ -24,7 +24,7 @@ const machines = [
   },
   {
     id: 2,
-    name: 'Diamond Claw',
+    name: 'High Rollers',
     tier: '💎',
     price: 150,
     itemsRemaining: 23,
@@ -93,7 +93,7 @@ const mockCards = [
 const recentPulls = [
   { user: '0x4f...2a', card: 'PSA 10 Luffy Gear 5 Alt Art', machine: 'Gold Claw', emoji: '🔥', value: 1250 },
   { user: '0x7e...5c', card: 'PSA 9 Zoro Leader', machine: 'Gold Claw', emoji: '✨', value: 89 },
-  { user: '0x3b...8f', card: 'PSA 10 Ace Manga Alt Art', machine: 'Diamond Claw', emoji: '🌟', value: 5058 },
+  { user: '0x3b...8f', card: 'PSA 10 Ace Manga Alt Art', machine: 'High Rollers', emoji: '🌟', value: 5058 },
   { user: '0x9d...1e', card: 'PSA 10 Nami Alt Art', machine: 'Gold Claw', emoji: '💎', value: 320 },
   { user: '0x2c...7a', card: 'PSA 10 Sanji Alt Art', machine: 'Gold Claw', emoji: '🔥', value: 892 },
 ];
