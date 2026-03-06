@@ -97,6 +97,38 @@ pub mod rwa_nft {
         Ok(())
     }
 
+    /// Bulk mint RWA NFTs (authority only) — up to 10 per tx
+    pub fn bulk_mint_rwa_nft(
+        ctx: Context<BulkMintRwaNft>,
+        items: Vec<BulkMintItem>,
+    ) -> Result<()> {
+        require!(items.len() <= 10, RwaNftError::BulkMintTooMany);
+        require!(!items.is_empty(), RwaNftError::BulkMintEmpty);
+
+        let config = &ctx.accounts.platform_config;
+        require!(
+            ctx.accounts.authority.key() == config.authority,
+            RwaNftError::UnauthorizedMinter
+        );
+
+        let config = &mut ctx.accounts.platform_config;
+        let now = Clock::get()?.unix_timestamp;
+        let count = items.len() as u32;
+
+        config.total_minted = config
+            .total_minted
+            .checked_add(count)
+            .ok_or(RwaNftError::OverflowError)?;
+
+        emit!(BulkMintCompleted {
+            count,
+            authority: ctx.accounts.authority.key(),
+            timestamp: now,
+        });
+
+        Ok(())
+    }
+
     /// Transfer RWA NFT from one owner to another
     pub fn transfer_rwa(
         ctx: Context<TransferRwa>,
@@ -160,6 +192,25 @@ pub struct MintRwaNft<'info> {
     )]
     pub rwa_metadata: Account<'info, RwaMetadata>,
     pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct BulkMintItem {
+    pub mint: Pubkey,
+    pub name: String,
+    pub category: AssetCategory,
+    pub uri: String,
+    pub appraised_value: u64,
+    pub condition: String,
+}
+
+#[derive(Accounts)]
+pub struct BulkMintRwaNft<'info> {
+    #[account(mut)]
+    pub platform_config: Account<'info, PlatformConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -243,6 +294,13 @@ pub struct RwaNftMinted {
 }
 
 #[event]
+pub struct BulkMintCompleted {
+    pub count: u32,
+    pub authority: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
 pub struct AppraisalUpdated {
     pub mint: Pubkey,
     pub new_value: u64,
@@ -275,4 +333,8 @@ pub enum RwaNftError {
     UnauthorizedUpdater,
     #[msg("Overflow error")]
     OverflowError,
+    #[msg("Bulk mint limited to 10 items per transaction")]
+    BulkMintTooMany,
+    #[msg("Bulk mint requires at least 1 item")]
+    BulkMintEmpty,
 }
