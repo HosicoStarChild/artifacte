@@ -97,8 +97,12 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
       // Must have content/metadata
       if (!item.content?.metadata?.name) return false;
       
-      // Skip frozen NFTs (locked by platform, can't list)
-      if (item.ownership?.frozen === true || item.ownership?.delegated === true) return false;
+      // Skip frozen Emporium TCG NFTs (redeemed but never unfrozen)
+      // Other frozen NFTs (e.g. staked ProgrammableNFTs) should still show
+      if (item.ownership?.frozen === true) {
+        const name = (item.content?.metadata?.name || "").toUpperCase();
+        if (name.includes("POKEMON") || name.includes("ONE PIECE") || name.includes("DRAGON BALL")) return false;
+      }
       // Block ALL compressed NFTs — they're almost always airdrop spam
       if (item.compression?.compressed === true) return false;
       
