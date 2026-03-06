@@ -27,7 +27,7 @@ interface BurnableNFT {
 }
 
 export default function BurnPage() {
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signAllTransactions } = useWallet();
   const [assets, setAssets] = useState<BurnableNFT[]>([]);
   const [loading, setLoading] = useState(false);
   const [burning, setBurning] = useState(false);
@@ -95,8 +95,22 @@ export default function BurnPage() {
     setAssets(prev => prev.map(a => ({ ...a, selected: false })));
   }
 
+  function buildBurnIx(assetPubkey: PublicKey, owner: PublicKey): TransactionInstruction {
+    const discriminator = Buffer.from([116, 169, 10, 197, 210, 34, 228, 105]);
+    const burnData = Buffer.concat([discriminator, Buffer.from([0])]);
+    return new TransactionInstruction({
+      programId: MPL_CORE_PROGRAM,
+      keys: [
+        { pubkey: assetPubkey, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: true, isWritable: true },
+        { pubkey: PublicKey.default, isSigner: false, isWritable: false },
+      ],
+      data: burnData,
+    });
+  }
+
   async function burnSelected() {
-    if (!publicKey || !signTransaction) return;
+    if (!publicKey || !signAllTransactions) return;
     const selected = assets.filter(a => a.selected && !a.burnt);
     if (selected.length === 0) {
       showToast.error("No NFTs selected");
@@ -109,52 +123,54 @@ export default function BurnPage() {
     if (!confirmed) return;
 
     setBurning(true);
-    let burnedCount = 0;
+    
+    // Mark all selected as burning
+    setAssets(prev => prev.map(a => a.selected && !a.burnt ? { ...a, burning: true } : a));
 
-    for (const nft of selected) {
-      setAssets(prev => prev.map(a => a.id === nft.id ? { ...a, burning: true } : a));
-      
-      try {
-        const assetPubkey = new PublicKey(nft.id);
-        
-        // Metaplex Core burn instruction
-        // Discriminator for burnV1: [116, 169, 10, 197, 210, 34, 228, 105]
-        const discriminator = Buffer.from([116, 169, 10, 197, 210, 34, 228, 105]);
-        // CompressionProof: None (0 byte)
-        const burnData = Buffer.concat([discriminator, Buffer.from([0])]);
-        
-        const ix = new TransactionInstruction({
-          programId: MPL_CORE_PROGRAM,
-          keys: [
-            { pubkey: assetPubkey, isSigner: false, isWritable: true },  // asset
-            { pubkey: publicKey, isSigner: true, isWritable: true },     // payer / authority
-            { pubkey: PublicKey.default, isSigner: false, isWritable: false }, // collection (none)
-          ],
-          data: burnData,
-        });
+    try {
+      // Get blockhash once
+      const bhRes = await fetch(HELIUS_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1,
+          method: "getLatestBlockhash",
+          params: [{ commitment: "finalized" }],
+        }),
+      });
+      const bhData = await bhRes.json();
+      const blockhash = bhData.result.value.blockhash;
 
-        // Get recent blockhash
-        const bhRes = await fetch(HELIUS_RPC, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0", id: 1,
-            method: "getLatestBlockhash",
-            params: [{ commitment: "finalized" }],
-          }),
-        });
-        const bhData = await bhRes.json();
-        const blockhash = bhData.result.value.blockhash;
+      // Batch into transactions of 10 burns each (safe fit within tx size limit)
+      const BATCH_SIZE = 10;
+      const batches: BurnableNFT[][] = [];
+      for (let i = 0; i < selected.length; i += BATCH_SIZE) {
+        batches.push(selected.slice(i, i + BATCH_SIZE));
+      }
 
+      // Build all transactions
+      const transactions: Transaction[] = [];
+      for (const batch of batches) {
         const tx = new Transaction();
-        tx.add(ix);
+        for (const nft of batch) {
+          tx.add(buildBurnIx(new PublicKey(nft.id), publicKey));
+        }
         tx.recentBlockhash = blockhash;
         tx.feePayer = publicKey;
+        transactions.push(tx);
+      }
 
-        const signed = await signTransaction(tx);
-        const serialized = signed.serialize();
+      showToast.info(`Signing ${transactions.length} transaction(s) to burn ${selected.length} NFTs...`);
 
-        // Send transaction
+      // Sign all at once — one approval in Phantom
+      const signed = await signAllTransactions(transactions);
+
+      // Send all signed transactions
+      let burnedCount = 0;
+      for (let i = 0; i < signed.length; i++) {
+        const batch = batches[i];
+        const serialized = signed[i].serialize();
+
         const sendRes = await fetch(HELIUS_RPC, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -165,33 +181,37 @@ export default function BurnPage() {
           }),
         });
         const sendData = await sendRes.json();
-        
+
         if (sendData.error) {
-          throw new Error(sendData.error.message || "Transaction failed");
+          showToast.error(`Batch ${i + 1} failed: ${sendData.error.message}`);
+          // Mark this batch as not burned
+          const failedIds = new Set(batch.map(n => n.id));
+          setAssets(prev => prev.map(a => failedIds.has(a.id) ? { ...a, burning: false } : a));
+        } else {
+          burnedCount += batch.length;
+          const burnedIds = new Set(batch.map(n => n.id));
+          setAssets(prev => prev.map(a => burnedIds.has(a.id) ? { ...a, burning: false, burnt: true, selected: false } : a));
+          showToast.success(`Batch ${i + 1}/${signed.length}: burned ${batch.length} NFTs`);
         }
 
-        setAssets(prev => prev.map(a => a.id === nft.id ? { ...a, burning: false, burnt: true, selected: false } : a));
-        burnedCount++;
-        showToast.success(`Burned: ${nft.name}`);
-        
-        // Small delay between burns
-        await new Promise(r => setTimeout(r, 500));
-      } catch (err: any) {
-        console.error(`Failed to burn ${nft.name}:`, err);
-        setAssets(prev => prev.map(a => a.id === nft.id ? { ...a, burning: false } : a));
-        
-        if (err.message?.includes("User rejected")) {
-          showToast.error("Transaction rejected — stopping burns");
-          break;
-        }
-        showToast.error(`Failed to burn ${nft.name}: ${err.message}`);
+        // Small delay between sends
+        if (i < signed.length - 1) await new Promise(r => setTimeout(r, 300));
       }
+
+      if (burnedCount > 0) {
+        showToast.success(`✅ Burned ${burnedCount} NFT(s) total`);
+      }
+    } catch (err: any) {
+      if (err.message?.includes("User rejected")) {
+        showToast.error("Transaction rejected");
+      } else {
+        showToast.error(`Burn failed: ${err.message}`);
+      }
+      // Reset burning state
+      setAssets(prev => prev.map(a => ({ ...a, burning: false })));
     }
 
     setBurning(false);
-    if (burnedCount > 0) {
-      showToast.success(`✅ Burned ${burnedCount} NFT(s)`);
-    }
   }
 
   const selectedCount = assets.filter(a => a.selected && !a.burnt).length;
