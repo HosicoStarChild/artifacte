@@ -65,7 +65,7 @@ export default function CategoryAuctionsPage() {
       { label: "Brand", key: "brand", options: ["All", "Topps", "Panini", "Upper Deck"] },
     ],
     DIGITAL_ART: [
-      { label: "Medium", key: "medium", options: ["All", "Generative", "Photography", "3D", "Pixel", "Mixed Media"] },
+      { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
     ],
   };
 
