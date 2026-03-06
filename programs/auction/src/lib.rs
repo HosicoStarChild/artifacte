@@ -26,6 +26,10 @@ pub mod auction {
         let clock = Clock::get()?;
         let listing = &mut ctx.accounts.listing;
 
+        // Validate price is non-zero and reasonable (max 1 billion tokens)
+        require!(price > 0, AuctionError::InvalidPrice);
+        require!(price <= 1_000_000_000_000_000_000, AuctionError::InvalidPrice); // ~1B tokens at 9 decimals
+
         // Validate category matches allowed payments
         validate_category_and_payment(&category, ctx.accounts.payment_mint.key())?;
 
@@ -767,4 +771,6 @@ pub enum AuctionError {
     InvalidDuration,
     #[msg("Invalid payment mint for this category")]
     InvalidPaymentMint,
+    #[msg("Price must be greater than zero")]
+    InvalidPrice,
 }
