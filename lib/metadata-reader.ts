@@ -88,39 +88,29 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
 
     const items: NFTAsset[] = data.result?.items || [];
     
-    // Filter out burned, spam, and invalid NFTs
-    const SPAM_KEYWORDS = [
-      'airdrop', 'free', 'claim', 'bonus', 'lucky box', 'gift #', 'advisory',
-      'appsaga', '$bonk', '$sol', 'get free', 'visit', '.io ', '.com ', '.xyz ',
-      'reward', 'giveaway', 'congratulations', 'winner',
-    ];
-    
+    // Filter: only show valid, non-burned, non-spam NFTs
     return items.filter((item: any) => {
-      // Skip burned assets
+      // Skip burned/redeemed assets
       if (item.burnt === true) return false;
-      // Skip frozen/invalid
-      if (item.ownership?.frozen === true) return false;
       // Skip fungible tokens
       if (item.interface === "FungibleToken" || item.interface === "FungibleAsset") return false;
       // Must have content/metadata
       if (!item.content?.metadata?.name) return false;
       
-      // Spam filter: check name against known spam patterns
-      const name = (item.content.metadata.name || "").toLowerCase();
-      if (SPAM_KEYWORDS.some(kw => name.includes(kw))) return false;
+      // Block ALL compressed NFTs — they're almost always airdrop spam
+      // Real NFTs on Artifacte use MplCoreAsset, ProgrammableNFT, or V1_NFT (non-compressed)
+      if (item.compression?.compressed === true) return false;
       
-      // Skip if authority is known spam (compressed NFT airdrops)
-      if (item.compression?.compressed === true) {
-        // Compressed NFTs from unknown sources are usually spam
-        // Only allow if they have a known verified authority
-        const authority = item.authorities?.[0]?.address || "";
-        const knownAuthorities = [
-          KNOWN_AUTHORITIES.BAXUS,
-          ...KNOWN_AUTHORITIES.PSA,
-          ...KNOWN_AUTHORITIES.CHRONO24,
-        ];
-        if (!knownAuthorities.includes(authority)) return false;
-      }
+      // Additional spam filter for non-compressed items
+      const name = (item.content.metadata.name || "").toLowerCase();
+      const SPAM_KEYWORDS = [
+        'airdrop', 'free', 'claim', 'lucky box', 'gift #', 'advisory',
+        'appsaga', '$bonk', 'get free', '.io ', '.com ', '.xyz ',
+        'reward', 'giveaway', 'congratulations', 'winner', 'coupon',
+        'redeem #', 'ticket', 'pass box', '$gift', '$jbox', 'drop',
+        'pump swap', 'bonker', 'vouch',
+      ];
+      if (SPAM_KEYWORDS.some(kw => name.includes(kw))) return false;
       
       return true;
     });
