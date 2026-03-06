@@ -9,7 +9,7 @@ export default function Footer() {
               <div className="w-6 h-6 rounded-md bg-gold-500 flex items-center justify-center">
                 <span className="text-dark-900 font-serif font-semibold text-xs">A</span>
               </div>
-              <span className="font-serif text-lg text-white">Artifacte</span>
+              <span className="font-serif text-lg font-bold tracking-tight italic" style={{ fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.02em", color: "#f5f5f0" }}>Artifacte</span>
             </div>
             <p className="text-xs text-gray-500 leading-relaxed max-w-sm">
               A premium auction platform for real-world assets tokenized on Solana. Discover, bid, and own authenticated pieces with verified provenance.
