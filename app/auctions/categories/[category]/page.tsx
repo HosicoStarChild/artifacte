@@ -46,7 +46,7 @@ export default function CategoryAuctionsPage() {
   // Category-specific filter options
   const categoryFilters: Record<string, { label: string; key: string; options: string[] }[]> = {
     TCG_CARDS: [
-      { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Magic", "Yu-Gi-Oh"] },
+      { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
       { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
       { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "BGS 9.5", "BGS 10", "CGC 9", "CGC 10"] },
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
