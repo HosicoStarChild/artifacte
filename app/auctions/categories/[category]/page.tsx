@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { auctions, listings, formatFullPrice, categorySlugMap, categoryLabels } from "@/lib/data";
+import { auctions, listings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -239,6 +239,9 @@ export default function CategoryAuctionsPage() {
                                 <p className="text-gold-500 text-xs mt-1">
                                   {usd1Amount} {currency}
                                 </p>
+                                {BAXUS_SELLER_FEE_ENABLED && l.verifiedBy === "BAXUS" && (
+                                  <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
+                                )}
                               </>
                             )}
                           </div>

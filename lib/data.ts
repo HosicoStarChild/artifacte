@@ -5,6 +5,11 @@ export const TREASURY_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 export const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+// BAXUS 10% seller fee — hardcoded until they migrate to Metaplex standard
+// Set to false to disable once BAXUS has royalties on-chain
+export const BAXUS_SELLER_FEE_ENABLED = true;
+export const BAXUS_SELLER_FEE_PERCENT = 10;
+
 export type Category = 
   | "REAL_ESTATE" | "DIGITAL_ART" | "AGRICULTURE" 
   | "AVIATION" | "PRECIOUS_METALS" | "LUXURY" | "SPIRITS"

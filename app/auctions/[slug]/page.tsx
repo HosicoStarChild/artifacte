@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { auctions, formatFullPrice, Bid } from "@/lib/data";
+import { auctions, formatFullPrice, Bid, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
 import Countdown from "@/components/Countdown";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useState, useEffect } from "react";
@@ -171,6 +171,9 @@ export default function AuctionDetail() {
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Current Bid</p>
                   <p className="font-serif text-3xl text-white">{isDigitalArt ? `◎ ${currentBid.toLocaleString()}` : formatFullPrice(currentBid)}</p>
                   <p className="text-gold-500 text-xs mt-2">{currentBid.toLocaleString()} {currencyLabel}</p>
+                  {BAXUS_SELLER_FEE_ENABLED && auction.verifiedBy === "BAXUS" && (
+                    <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Ends In</p>
