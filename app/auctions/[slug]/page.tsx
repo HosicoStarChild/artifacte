@@ -7,7 +7,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Transaction, PublicKey } from "@solana/web3.js";
+import { Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 const WalletMultiButton = dynamic(
@@ -62,9 +62,11 @@ export default function AuctionDetail() {
     );
   }
 
+  const isDigitalArt = auction.category === "DIGITAL_ART";
   const allBids = [...localBids, ...auction.bids].sort((a, b) => b.amount - a.amount);
   const currentBid = allBids[0]?.amount ?? auction.start_price;
-  const minBid = currentBid + 100;
+  const minBid = currentBid + (isDigitalArt ? 1 : 100);
+  const currencyLabel = isDigitalArt ? "SOL" : currency;
 
   const handleBid = async () => {
     if (!publicKey || !connected) {
@@ -79,26 +81,28 @@ export default function AuctionDetail() {
     }
 
     if (usd1Amount < minBid) {
-      setBidStatus(`Minimum bid: ${formatFullPrice(minBid)} ${currency}`);
+      setBidStatus(`Minimum bid: ${minBid.toLocaleString()} ${currencyLabel}`);
       return;
     }
 
     try {
       setBidStatus("Submitting bid on-chain...");
 
-      const token = TOKENS[currency];
-      const tokenAmount = BigInt(Math.round(usd1Amount * 10 ** token.decimals));
-      const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
-      const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
-
-      const tx = new Transaction().add(
-        createTransferInstruction(
-          senderAta,
-          treasuryAta,
-          publicKey,
-          tokenAmount,
-        )
-      );
+      let tx: Transaction;
+      if (isDigitalArt) {
+        const lamports = Math.round(usd1Amount * LAMPORTS_PER_SOL);
+        tx = new Transaction().add(
+          SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: TREASURY, lamports })
+        );
+      } else {
+        const token = TOKENS[currency];
+        const tokenAmount = BigInt(Math.round(usd1Amount * 10 ** token.decimals));
+        const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
+        const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
+        tx = new Transaction().add(
+          createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+        );
+      }
 
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
@@ -113,7 +117,7 @@ export default function AuctionDetail() {
       setLocalBids((prev) => [newBid, ...prev]);
       setBidStatus(null);
       setBidUsd1("");
-      showToast(`✓ Bid of ${usd1Amount.toLocaleString()} USD1 placed! TX: ${sig.slice(0, 12)}...`, "success");
+      showToast(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${sig.slice(0, 12)}...`, "success");
 
       // Notify listings bot
       fetch("/api/listing-event", {
@@ -165,8 +169,8 @@ export default function AuctionDetail() {
               <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b border-white/5">
                 <div>
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Current Bid</p>
-                  <p className="font-serif text-3xl text-white">{formatFullPrice(currentBid)}</p>
-                  <p className="text-gold-500 text-xs mt-2">{currentBid.toLocaleString()} {currency}</p>
+                  <p className="font-serif text-3xl text-white">{isDigitalArt ? `◎ ${currentBid.toLocaleString()}` : formatFullPrice(currentBid)}</p>
+                  <p className="text-gold-500 text-xs mt-2">{currentBid.toLocaleString()} {currencyLabel}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Ends In</p>
@@ -179,31 +183,35 @@ export default function AuctionDetail() {
               {/* Currency Toggle */}
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-gray-500 text-xs font-medium">Pay with:</span>
-                <div className="flex gap-2 bg-dark-900 rounded-lg p-1 border border-white/5">
-                  {(["USD1", "USDC"] as const).map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setCurrency(c)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${
-                        currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+                {isDigitalArt ? (
+                  <span className="text-white text-sm font-medium bg-dark-900 px-4 py-2 rounded-lg border border-white/5">◎ SOL</span>
+                ) : (
+                  <div className="flex gap-2 bg-dark-900 rounded-lg p-1 border border-white/5">
+                    {(["USD1", "USDC"] as const).map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setCurrency(c)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${
+                          currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Bid Input */}
               <div className="space-y-3">
                 <label className="text-gray-400 text-xs font-medium">
-                  Bid Amount ({currency}) — Minimum {formatFullPrice(minBid)} {currency}
+                  Bid Amount ({currencyLabel}) — Minimum {minBid.toLocaleString()} {currencyLabel}
                 </label>
                 <div className="flex gap-3">
                   <input
                     type="number"
-                    step="1"
-                    placeholder={`Min: ${minBid.toLocaleString()} ${currency}`}
+                    step={isDigitalArt ? "0.01" : "1"}
+                    placeholder={`Min: ${minBid.toLocaleString()} ${currencyLabel}`}
                     value={bidUsd1}
                     onChange={(e) => setBidUsd1(e.target.value)}
                     className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-none transition-colors"
@@ -246,8 +254,8 @@ export default function AuctionDetail() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-white font-semibold">{formatFullPrice(b.amount)}</p>
-                        <p className="text-gold-500 text-xs mt-1">{b.amount.toLocaleString()} USD1</p>
+                        <p className="text-white font-semibold">{isDigitalArt ? `◎ ${b.amount.toLocaleString()}` : formatFullPrice(b.amount)}</p>
+                        <p className="text-gold-500 text-xs mt-1">{b.amount.toLocaleString()} {isDigitalArt ? "SOL" : "USD1"}</p>
                       </div>
                     </div>
                   ))
