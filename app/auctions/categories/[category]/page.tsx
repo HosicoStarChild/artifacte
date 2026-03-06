@@ -222,7 +222,8 @@ export default function CategoryAuctionsPage() {
                             <VerifiedBadge collectionName={l.name} />
                           </div>
                           <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
-                          <p className="text-gray-500 text-xs mb-4">{l.subtitle}</p>
+                          <p className="text-gray-500 text-xs mb-1">{l.subtitle}</p>
+                          <p className="text-gray-600 text-xs mb-4">{categoryName}</p>
                         </div>
                         <div className="space-y-4">
                           <div>
