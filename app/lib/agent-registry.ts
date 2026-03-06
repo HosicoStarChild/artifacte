@@ -22,7 +22,7 @@ function getProgram(wallet: WalletContextState, connection: Connection): Program
   const provider = new AnchorProvider(connection, wallet as any, {
     commitment: "confirmed",
   });
-  return new Program(IDL as any, PROGRAM_ID, provider);
+  return new Program(IDL as any, PROGRAM_ID as any, provider as any);
 }
 
 export async function registerAgent(
