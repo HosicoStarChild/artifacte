@@ -49,6 +49,7 @@ export interface Listing {
   price: number;
   image: string;
   category?: Category;
+  nftMint?: string;
 }
 
 const now = Date.now();
