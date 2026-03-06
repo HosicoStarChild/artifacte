@@ -150,7 +150,7 @@ export default function AuctionDetail() {
           {/* Image */}
           <div className="lg:col-span-2">
             <div className="rounded-lg overflow-hidden border border-white/5 bg-dark-800">
-              <img src={auction.image} alt={auction.name} className="w-full h-[500px] object-cover" />
+              <img src={auction.image} alt={auction.name} className="w-full h-[500px] object-contain bg-dark-900" />
             </div>
           </div>
 
