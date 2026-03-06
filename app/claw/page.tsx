@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
 import Navbar from '@/components/Navbar';
+import ClawChat from '@/components/ClawChat';
 
 // Mock data for claw machines
 const machines = [
@@ -123,12 +125,14 @@ const recentPulls = [
 ];
 
 export default function ClawPage() {
+  const { publicKey } = useWallet();
   const [selectedMachine, setSelectedMachine] = useState<typeof machines[0] | null>(null);
   const [isPulling, setIsPulling] = useState(false);
   const [pulledCard, setPulledCard] = useState<typeof mockCards[0] | null>(null);
   const [showPullModal, setShowPullModal] = useState(false);
   const [swapTimer, setSwapTimer] = useState(900); // 15 minutes in seconds
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handlePull = (machine: typeof machines[0]) => {
     setSelectedMachine(machine);
@@ -158,7 +162,7 @@ export default function ClawPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0e27]">
+    <div className="min-h-screen bg-[#0a0e27] flex flex-col">
       <Navbar />
 
       {/* Hero Section */}
@@ -178,20 +182,22 @@ export default function ClawPage() {
         </div>
       </section>
 
-      {/* Available Machines Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-dark-800/30 border-y border-white/5">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16">
-            <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">Machines</p>
-            <h2
-              className="font-serif text-3xl md:text-4xl text-white"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-            >
-              Choose Your Destiny
-            </h2>
-          </div>
+      {/* Available Machines Section with Chat */}
+      <section className="flex-1 py-20 px-4 sm:px-6 lg:px-8 bg-dark-800/30 border-y border-white/5">
+        <div className="max-w-7xl mx-auto flex gap-6 h-full">
+          {/* Machines Grid - Left side (Desktop: 70%, Mobile: 100%) */}
+          <div className="flex-1 lg:flex-none lg:w-2/3 flex flex-col">
+            <div className="mb-16">
+              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">Machines</p>
+              <h2
+                className="font-serif text-3xl md:text-4xl text-white"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              >
+                Choose Your Destiny
+              </h2>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
             {machines.map((machine) => (
               <div
                 key={machine.id}
@@ -249,6 +255,12 @@ export default function ClawPage() {
                 </div>
               </div>
             ))}
+            </div>
+          </div>
+
+          {/* Chat Panel - Right side (Desktop only: 30%, Mobile: hidden) */}
+          <div className="hidden lg:flex lg:w-1/3 lg:flex-col h-full min-h-96">
+            <ClawChat connectedWallet={publicKey?.toBase58()} />
           </div>
         </div>
       </section>
@@ -359,6 +371,44 @@ export default function ClawPage() {
           </div>
         </div>
       </section>
+
+      {/* Mobile Chat Toggle Button */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between p-4 bg-gradient-to-t from-[#0a0e27] to-transparent border-t border-white/5">
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="ml-auto px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-all duration-200 uppercase tracking-wider flex items-center gap-2"
+        >
+          💬 Chat
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-dark-900 text-gold-500 text-xs font-bold">
+            47
+          </span>
+        </button>
+      </div>
+
+      {/* Mobile Chat Drawer */}
+      {isChatOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex flex-col">
+          <div className="mt-auto max-h-[85vh] w-full rounded-t-2xl overflow-hidden">
+            <div className="bg-[#0d1229] border border-[#1a1f3a] h-[85vh] flex flex-col">
+              {/* Drawer handle */}
+              <div className="flex justify-center py-2 bg-[#0d1229] border-b border-[#1a1f3a]">
+                <div className="w-12 h-1 rounded-full bg-gray-600" />
+              </div>
+              {/* Chat component */}
+              <div className="flex-1 overflow-hidden">
+                <ClawChat connectedWallet={publicKey?.toBase58()} />
+              </div>
+            </div>
+          </div>
+          {/* Close drawer button */}
+          <button
+            onClick={() => setIsChatOpen(false)}
+            className="px-4 py-3 text-gray-400 hover:text-white transition-colors duration-200 text-sm"
+          >
+            Close
+          </button>
+        </div>
+      )}
 
       {/* Pull Modal */}
       {showPullModal && (
