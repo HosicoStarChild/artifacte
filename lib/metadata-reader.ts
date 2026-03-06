@@ -97,12 +97,10 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
       // Must have content/metadata
       if (!item.content?.metadata?.name) return false;
       
-      // Skip frozen Emporium TCG NFTs (redeemed but never unfrozen)
-      // Other frozen NFTs (e.g. staked ProgrammableNFTs) should still show
-      if (item.ownership?.frozen === true) {
-        const name = (item.content?.metadata?.name || "").toUpperCase();
-        if (name.includes("POKEMON") || name.includes("ONE PIECE") || name.includes("DRAGON BALL")) return false;
-      }
+      // Skip Emporium TCG NFTs (platform shut down, cards are redeemed/frozen ghosts)
+      const EMPORIUM_AUTHORITY = "pokeWdogfsZSHgENrgEzax8U168X6ynBFkEKPvRUZsy";
+      const authority = item.authorities?.[0]?.address || "";
+      if (authority === EMPORIUM_AUTHORITY) return false;
       // Block ALL compressed NFTs — they're almost always airdrop spam
       if (item.compression?.compressed === true) return false;
       
