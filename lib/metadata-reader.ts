@@ -68,6 +68,10 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
           ownerAddress: walletAddress,
           page: 1,
           limit: 1000,
+          displayOptions: {
+            showFungible: false,
+            showNativeBalance: false,
+          },
         },
       }),
     });
@@ -82,7 +86,25 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
       throw new Error(`Helius RPC error: ${data.error.message}`);
     }
 
-    return data.result?.items || [];
+    const items: NFTAsset[] = data.result?.items || [];
+    
+    // Filter out burned, compressed, and invalid NFTs
+    return items.filter((item: any) => {
+      // Skip burned assets
+      if (item.burnt === true) return false;
+      // Skip frozen/invalid
+      if (item.ownership?.frozen === true) return false;
+      // Skip if supply is 0 (redeemed)
+      if (item.supply?.print_current_supply === 0 && item.supply?.print_max_supply === 0) {
+        // Allow edition NFTs but skip truly empty ones
+        if (!item.content?.metadata?.name) return false;
+      }
+      // Skip fungible tokens that slip through
+      if (item.interface === "FungibleToken" || item.interface === "FungibleAsset") return false;
+      // Must have content/metadata
+      if (!item.content) return false;
+      return true;
+    });
   } catch (error) {
     console.error("Error fetching assets from Helius:", error);
     throw error;
