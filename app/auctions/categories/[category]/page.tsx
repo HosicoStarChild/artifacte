@@ -7,7 +7,7 @@ import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -47,7 +47,9 @@ export default function CategoryAuctionsPage() {
     setTimeout(() => setToast(null), 5000);
   };
 
-  const handleBuyNow = async (listingId: string, priceUsd: number) => {
+  const isDigitalArt = category === "DIGITAL_ART";
+
+  const handleBuyNow = async (listingId: string, price: number) => {
     if (!connected || !publicKey) {
       showToast("Please connect your wallet first", "error");
       return;
@@ -55,20 +57,28 @@ export default function CategoryAuctionsPage() {
 
     setBuyingId(listingId);
     try {
-      const token = TOKENS[currency];
-      const tokenAmount = BigInt(Math.round(priceUsd * 10 ** token.decimals));
+      let tx: Transaction;
 
-      const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
-      const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
-
-      const tx = new Transaction().add(
-        createTransferInstruction(
-          senderAta,
-          treasuryAta,
-          publicKey,
-          tokenAmount,
-        )
-      );
+      if (isDigitalArt) {
+        // Digital Art pays in SOL
+        const lamports = Math.round(price * LAMPORTS_PER_SOL);
+        tx = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: TREASURY,
+            lamports,
+          })
+        );
+      } else {
+        // RWA categories pay in USD1/USDC
+        const token = TOKENS[currency];
+        const tokenAmount = BigInt(Math.round(price * 10 ** token.decimals));
+        const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
+        const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
+        tx = new Transaction().add(
+          createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+        );
+      }
 
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
@@ -157,23 +167,31 @@ export default function CategoryAuctionsPage() {
             </button>
           </div>
 
-          {/* Currency Selector */}
-          <div className="flex items-center gap-3">
-            <span className="text-gray-500 text-xs font-medium tracking-wider">Pay with:</span>
-            <div className="flex gap-2 bg-dark-800 rounded-lg p-1 border border-white/5">
-              {(["USD1", "USDC"] as const).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCurrency(c)}
-                  className={`px-4 py-2 rounded-md text-xs font-medium transition-colors duration-200 ${
-                    currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+          {/* Currency Selector - only for non-Digital Art categories */}
+          {!isDigitalArt && (
+            <div className="flex items-center gap-3">
+              <span className="text-gray-500 text-xs font-medium tracking-wider">Pay with:</span>
+              <div className="flex gap-2 bg-dark-800 rounded-lg p-1 border border-white/5">
+                {(["USD1", "USDC"] as const).map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCurrency(c)}
+                    className={`px-4 py-2 rounded-md text-xs font-medium transition-colors duration-200 ${
+                      currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+          {isDigitalArt && (
+            <div className="flex items-center gap-3">
+              <span className="text-gray-500 text-xs font-medium tracking-wider">Pay with:</span>
+              <span className="text-white text-sm font-medium bg-dark-800 px-4 py-2 rounded-lg border border-white/5">◎ SOL</span>
+            </div>
+          )}
         </div>
 
         {/* Fixed Price Tab */}
@@ -209,10 +227,19 @@ export default function CategoryAuctionsPage() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            <p className="text-white font-serif text-2xl">{formatFullPrice(l.price)}</p>
-                            <p className="text-gold-500 text-xs mt-1">
-                              {usd1Amount} {currency}
-                            </p>
+                            {isDigitalArt ? (
+                              <>
+                                <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
+                                <p className="text-gold-500 text-xs mt-1">SOL</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-white font-serif text-2xl">{formatFullPrice(l.price)}</p>
+                                <p className="text-gold-500 text-xs mt-1">
+                                  {usd1Amount} {currency}
+                                </p>
+                              </>
+                            )}
                           </div>
                           {connected ? (
                             <button
