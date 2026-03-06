@@ -52,6 +52,7 @@ export default function Navbar() {
             </Link>
             <Link href="/auctions" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Auctions
+            </Link>
             <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Agents
             </Link>
