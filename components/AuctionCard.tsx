@@ -32,7 +32,7 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
           </div>
           <div className="pt-4 border-t border-white/5">
             <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">Current Bid</p>
-            <p className="text-white font-serif text-xl">{formatPrice(auction.current_bid)}</p>
+            <p className="text-white font-serif text-xl">{auction.category === "DIGITAL_ART" ? `◎ ${auction.current_bid.toLocaleString()}` : formatPrice(auction.current_bid)}</p>
           </div>
         </div>
       </div>
