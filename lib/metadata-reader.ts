@@ -97,8 +97,9 @@ export async function getAssetsByOwner(walletAddress: string): Promise<NFTAsset[
       // Must have content/metadata
       if (!item.content?.metadata?.name) return false;
       
+      // Skip frozen NFTs (locked by platform, can't list)
+      if (item.ownership?.frozen === true || item.ownership?.delegated === true) return false;
       // Block ALL compressed NFTs — they're almost always airdrop spam
-      // Real NFTs on Artifacte use MplCoreAsset, ProgrammableNFT, or V1_NFT (non-compressed)
       if (item.compression?.compressed === true) return false;
       
       // Additional spam filter for non-compressed items
