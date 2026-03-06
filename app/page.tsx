@@ -123,13 +123,19 @@ export default function Home() {
                   </div>
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="text-white font-medium">{l.name}</h3>
-                        <VerifiedBadge collectionName={l.name} />
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
+                        <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
                       </div>
-                      <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
+                      <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
+                      <p className="text-gray-500 text-xs mb-1">{l.subtitle}{l.verifiedBy ? ` • ${l.verifiedBy} Verified` : ""}</p>
+                      <p className="text-gray-600 text-xs mb-4">{l.category?.replace(/_/g, " ")}</p>
                     </div>
-                    <p className="text-gold-500 font-semibold text-lg">{formatFullPrice(l.price)}</p>
+                    <div>
+                      <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
+                      <p className="text-white font-serif text-2xl">{l.category === "DIGITAL_ART" ? `◎ ${l.price.toLocaleString()}` : formatFullPrice(l.price)}</p>
+                      <p className="text-gold-500 text-xs mt-1">{l.price.toLocaleString()} {l.category === "DIGITAL_ART" ? "SOL" : "USD1"}</p>
+                    </div>
                   </div>
                 </div>
               </Link>
