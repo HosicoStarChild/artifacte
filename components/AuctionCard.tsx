@@ -28,7 +28,8 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
               <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">{auction.subtitle}</p>
               <VerifiedBadge collectionName={auction.name} verifiedBy={auction.verifiedBy} />
             </div>
-            <h3 className="text-white font-medium text-sm mb-2">{auction.name}</h3>
+            <h3 className="text-white font-medium text-sm mb-1">{auction.name}</h3>
+            <p className="text-gray-500 text-xs">{auction.verifiedBy ? `${auction.verifiedBy} Verified` : ""}</p>
           </div>
           <div className="pt-4 border-t border-white/5">
             <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">Current Bid</p>
