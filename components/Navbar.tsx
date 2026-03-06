@@ -56,6 +56,16 @@ export default function Navbar() {
             <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Agents
             </Link>
+            {connected && (
+              <>
+                <Link href="/list" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                  List Item
+                </Link>
+                <Link href="/my-listings" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                  My Listings
+                </Link>
+              </>
+            )}
             <Link href="/apply" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Apply to List
             </Link>
@@ -67,7 +77,7 @@ export default function Navbar() {
           {/* Admin + Wallet */}
           <div className="hidden md:flex items-center gap-4">
             {isAdmin && (
-              <Link href="/admin/applications" className="text-sm text-gold-500 hover:text-gold-400 transition-colors duration-200 font-medium">
+              <Link href="/admin" className="text-sm text-gold-500 hover:text-gold-400 transition-colors duration-200 font-medium">
                 Admin
               </Link>
             )}
@@ -101,6 +111,16 @@ export default function Navbar() {
             <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Agents
             </Link>
+            {connected && (
+              <>
+                <Link href="/list" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
+                  List Item
+                </Link>
+                <Link href="/my-listings" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
+                  My Listings
+                </Link>
+              </>
+            )}
             <Link href="/apply" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Apply to List
             </Link>
@@ -108,7 +128,7 @@ export default function Navbar() {
               About
             </Link>
             {isAdmin && (
-              <Link href="/admin/applications" className="block text-sm text-gold-500 hover:text-gold-400 font-medium px-4 py-2" onClick={() => setMenuOpen(false)}>
+              <Link href="/admin" className="block text-sm text-gold-500 hover:text-gold-400 font-medium px-4 py-2" onClick={() => setMenuOpen(false)}>
                 Admin
               </Link>
             )}

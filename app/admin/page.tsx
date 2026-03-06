@@ -1,320 +1,454 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
+import { BAXUS_SELLER_FEE_ENABLED, TREASURY_WALLET } from "@/lib/data";
 
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
-);
-
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
-
-interface AllowlistEntry {
-  mintAuthority: string;
+interface AdminListing {
+  id: string;
   name: string;
-  category: string;
-  addedAt: number;
-  addedBy: string;
-  verified: boolean;
+  image: string;
+  price: number;
+  status: "pending" | "active" | "completed" | "cancelled";
+  seller: string;
+  createdAt: string;
+}
+
+interface PlatformStats {
+  totalSales: number;
+  totalFees: number;
+  activeListingsCount: number;
+  completedListings: number;
+  totalVolume: number;
 }
 
 export default function AdminPage() {
   const { publicKey, connected } = useWallet();
-  const [collections, setCollections] = useState<AllowlistEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ mintAuthority: "", name: "", category: "Digital Art" });
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [searchCategory, setSearchCategory] = useState<string>("all");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+  const [listings, setListings] = useState<AdminListing[]>([]);
+  const [stats, setStats] = useState<PlatformStats>({
+    totalSales: 0,
+    totalFees: 0,
+    activeListingsCount: 0,
+    completedListings: 0,
+    totalVolume: 0,
+  });
+  const [baxusFeesEnabled, setBaxusFeesEnabled] = useState(BAXUS_SELLER_FEE_ENABLED);
+  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "settings">("overview");
 
-  const isAdmin = connected && publicKey?.toBase58() === ADMIN_WALLET;
-
-  // Fetch collections on mount
   useEffect(() => {
-    fetchCollections();
-  }, []);
-
-  const fetchCollections = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/admin/allowlist");
-      const data = await res.json();
-      if (data.ok || data.collections) {
-        setCollections(data.collections || []);
+    if (connected && publicKey) {
+      const walletAddress = publicKey.toBase58();
+      if (walletAddress === TREASURY_WALLET) {
+        setIsAdmin(true);
+        loadAdminData();
+      } else {
+        setError("Unauthorized: You are not the treasury wallet");
       }
-    } catch (error) {
-      console.error("Failed to fetch collections:", error);
+    }
+  }, [connected, publicKey]);
+
+  async function loadAdminData() {
+    setLoading(true);
+    try {
+      // Mock data for demonstration
+      const mockListings: AdminListing[] = [
+        {
+          id: "a1",
+          name: "Rare Digital Artwork",
+          image: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400",
+          price: 5.5,
+          status: "active",
+          seller: "7xK9...mP2q",
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: "a2",
+          name: "Vintage Sports Card",
+          image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400",
+          price: 2500,
+          status: "pending",
+          seller: "3nR5...vL8w",
+          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: "a3",
+          name: "Collector's Watch",
+          image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400",
+          price: 8500,
+          status: "active",
+          seller: "9pT2...hJ4x",
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: "a4",
+          name: "TCG Holographic Card",
+          image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400",
+          price: 1200,
+          status: "completed",
+          seller: "5mQ8...bN1y",
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: "a5",
+          name: "BAXUS Verified Spirits",
+          image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400",
+          price: 18000,
+          status: "active",
+          seller: "2kL7...qR9z",
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ];
+
+      const mockStats: PlatformStats = {
+        totalSales: 47500,
+        totalFees: 4750,
+        activeListingsCount: 3,
+        completedListings: 2,
+        totalVolume: 315600,
+      };
+
+      setListings(mockListings);
+      setStats(mockStats);
+    } catch (err: any) {
+      setError("Failed to load admin data");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleAddCollection = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdmin || !publicKey) return;
-
-    setSubmitting(true);
-    setMessage(null);
-
+  async function approveListing(id: string) {
     try {
-      const res = await fetch("/api/admin/allowlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mintAuthority: form.mintAuthority,
-          name: form.name,
-          category: form.category,
-          adminWallet: publicKey.toBase58(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.error || "Failed to add collection" });
-        return;
-      }
-
-      setMessage({ type: "success", text: "✓ Collection added successfully" });
-      setForm({ mintAuthority: "", name: "", category: "Digital Art" });
-      await fetchCollections();
-    } catch (error: any) {
-      setMessage({ type: "error", text: "Error adding collection" });
-    } finally {
-      setSubmitting(false);
+      const updated = listings.map((l) => (l.id === id ? { ...l, status: "active" as const } : l));
+      setListings(updated);
+      alert(`Listing ${id} approved`);
+    } catch (err: any) {
+      setError("Failed to approve listing");
     }
-  };
+  }
 
-  const handleRemoveCollection = async (mintAuthority: string) => {
-    if (!isAdmin || !publicKey) return;
-
-    if (!confirm("Are you sure you want to remove this collection?")) return;
-
+  async function rejectListing(id: string) {
     try {
-      const res = await fetch("/api/admin/allowlist", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mintAuthority,
-          adminWallet: publicKey.toBase58(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.error || "Failed to remove collection" });
-        return;
-      }
-
-      setMessage({ type: "success", text: "✓ Collection removed successfully" });
-      await fetchCollections();
-    } catch (error) {
-      setMessage({ type: "error", text: "Error removing collection" });
+      const updated = listings.map((l) => (l.id === id ? { ...l, status: "cancelled" as const } : l));
+      setListings(updated);
+      alert(`Listing ${id} rejected`);
+    } catch (err: any) {
+      setError("Failed to reject listing");
     }
-  };
+  }
 
-  const filteredCollections = collections.filter(
-    (c) => searchCategory === "all" || c.category === searchCategory
-  );
+  async function toggleBaxusFee() {
+    try {
+      setBaxusFeesEnabled(!baxusFeesEnabled);
+      // In production, this would call an API to persist the setting
+      alert(`BAXUS fees ${!baxusFeesEnabled ? "enabled" : "disabled"}`);
+    } catch (err: any) {
+      setError("Failed to toggle BAXUS fees");
+    }
+  }
 
-  const categories = Array.from(new Set(collections.map((c) => c.category)));
+  if (!connected) {
+    return (
+      <main className="min-h-screen bg-dark-900 pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+            <h2 className="font-serif text-2xl font-bold text-white mb-4">Admin Access Required</h2>
+            <p className="text-gray-400">Please connect your wallet to access the admin dashboard.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-dark-900 pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-900/20 border border-red-700 rounded-xl p-12 text-center">
+            <h2 className="font-serif text-2xl font-bold text-white mb-4">Access Denied</h2>
+            <p className="text-gray-400">You do not have permission to access this page. Only the treasury wallet can access the admin dashboard.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <div className="pt-24 pb-20 min-h-screen">
+    <main className="min-h-screen bg-dark-900 pt-32 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-4">Administration</p>
-        <h1 className="font-serif text-4xl text-white mb-2">Allowlist Management</h1>
-        <p className="text-gray-400 text-sm mb-8">Manage approved NFT collections for Artifacte</p>
+        {/* Header */}
+        <div className="mb-12">
+          <h1 className="font-serif text-4xl md:text-5xl font-bold text-white mb-4">Admin Dashboard</h1>
+          <p className="text-gray-400 text-lg">Manage platform, listings, and settings</p>
+        </div>
 
-        {!connected ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-6 bg-navy-800 rounded-xl border border-white/5 p-8">
-            <div className="w-20 h-20 rounded-2xl bg-navy-700 border border-white/10 flex items-center justify-center">
-              <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <p className="text-gray-400 text-sm">Connect your wallet to access the admin panel</p>
-            <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-sm !font-medium" />
+        {error && (
+          <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6 text-red-400">
+            {error}
           </div>
-        ) : !isAdmin ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-6 bg-navy-800 rounded-xl border border-white/5 p-8">
-            <div className="w-20 h-20 rounded-2xl bg-red-900/20 border border-red-500/30 flex items-center justify-center">
-              <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4v2m0 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        )}
+
+        {/* Tabs */}
+        <div className="mb-8 flex gap-4 border-b border-white/10">
+          {(["overview", "listings", "settings"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-4 font-semibold transition-all border-b-2 capitalize ${
+                activeTab === tab
+                  ? "border-gold-500 text-gold-500"
+                  : "border-transparent text-gray-400 hover:text-white"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {loading && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin">
+              <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
             </div>
-            <p className="text-red-400 text-sm font-medium">Access Denied</p>
-            <p className="text-gray-400 text-sm">This page is restricted to the admin wallet only.</p>
-            <p className="text-gray-500 text-xs font-mono bg-navy-900 px-4 py-2 rounded-lg mt-2 max-w-md text-center break-all">
-              {publicKey?.toBase58()}
-            </p>
+            <p className="text-gray-400 mt-4">Loading admin data...</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Add Collection Form */}
-            <div className="lg:col-span-1">
-              <div className="bg-navy-800 rounded-xl border border-white/5 p-6 sticky top-24">
-                <h2 className="font-serif text-xl text-white mb-5">Add Collection</h2>
+        )}
 
-                {message && (
-                  <div className={`mb-4 p-3 rounded-lg text-sm ${
-                    message.type === "success"
-                      ? "bg-green-900/20 border border-green-500/30 text-green-400"
-                      : "bg-red-900/20 border border-red-500/30 text-red-400"
-                  }`}>
-                    {message.text}
-                  </div>
-                )}
-
-                <form onSubmit={handleAddCollection} className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">Mint Authority Address</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.mintAuthority}
-                      onChange={(e) => setForm({ ...form, mintAuthority: e.target.value })}
-                      className="w-full bg-navy-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                      placeholder="Enter Solana address..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">Collection Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full bg-navy-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                      placeholder="e.g. Artifacte Premium"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">Category</label>
-                    <select
-                      value={form.category}
-                      onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="w-full bg-navy-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                    >
-                      <option value="Digital Art">Digital Art</option>
-                      <option value="Real Estate">Real Estate</option>
-                      <option value="Precious Metals">Precious Metals</option>
-                      <option value="Luxury">Luxury</option>
-                      <option value="Spirits">Spirits</option>
-                      <option value="Aviation">Aviation</option>
-                      <option value="Agriculture">Agriculture</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-navy-900 rounded-lg font-semibold text-sm transition mt-6"
-                  >
-                    {submitting ? "Adding..." : "Add Collection"}
-                  </button>
-                </form>
+        {!loading && activeTab === "overview" && (
+          <div>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-12">
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
+                <p className="text-gray-500 text-sm mb-2">Active Listings</p>
+                <p className="font-serif text-4xl font-bold text-white">{stats.activeListingsCount}</p>
+              </div>
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
+                <p className="text-gray-500 text-sm mb-2">Total Sales</p>
+                <p className="font-serif text-4xl font-bold text-gold-500">${stats.totalSales.toLocaleString()}</p>
+              </div>
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
+                <p className="text-gray-500 text-sm mb-2">Total Fees Collected</p>
+                <p className="font-serif text-4xl font-bold text-green-400">${stats.totalFees.toLocaleString()}</p>
+              </div>
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
+                <p className="text-gray-500 text-sm mb-2">Completed Listings</p>
+                <p className="font-serif text-4xl font-bold text-white">{stats.completedListings}</p>
+              </div>
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
+                <p className="text-gray-500 text-sm mb-2">Total Volume</p>
+                <p className="font-serif text-4xl font-bold text-blue-400">${stats.totalVolume.toLocaleString()}</p>
               </div>
             </div>
 
-            {/* Collections Table */}
-            <div className="lg:col-span-2">
-              <div className="bg-navy-800 rounded-xl border border-white/5 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-serif text-xl text-white">Approved Collections</h2>
-                  <span className="text-sm text-gray-400">{filteredCollections.length} total</span>
-                </div>
-
-                {/* Category Filter */}
-                <div className="mb-6 flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSearchCategory("all")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                      searchCategory === "all"
-                        ? "bg-gold-500 text-navy-900"
-                        : "bg-navy-700 text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    All ({collections.length})
-                  </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSearchCategory(cat)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        searchCategory === cat
-                          ? "bg-gold-500 text-navy-900"
-                          : "bg-navy-700 text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      {cat} ({collections.filter((c) => c.category === cat).length})
-                    </button>
-                  ))}
-                </div>
-
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-6 h-6 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : filteredCollections.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-400 text-sm">
-                      {collections.length === 0 ? "No collections added yet" : "No collections in this category"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-white/5">
-                          <th className="px-4 py-3 text-left text-gray-400 font-medium">Name</th>
-                          <th className="px-4 py-3 text-left text-gray-400 font-medium">Category</th>
-                          <th className="px-4 py-3 text-left text-gray-400 font-medium">Added</th>
-                          <th className="px-4 py-3 text-left text-gray-400 font-medium">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {filteredCollections.map((c) => (
-                          <tr key={c.mintAuthority} className="hover:bg-navy-700/30 transition">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gold-400">✓</span>
-                                <div>
-                                  <p className="text-white font-medium">{c.name}</p>
-                                  <p className="text-gray-500 text-xs font-mono mt-1 truncate max-w-xs">
-                                    {c.mintAuthority}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-300 text-sm">{c.category}</td>
-                            <td className="px-4 py-3 text-gray-500 text-xs">
-                              {new Date(c.addedAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => handleRemoveCollection(c.mintAuthority)}
-                                className="px-3 py-1.5 bg-red-900/20 border border-red-500/30 text-red-400 rounded text-xs font-medium hover:bg-red-900/40 transition"
-                              >
-                                Remove
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+            {/* Quick Actions */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+              <h2 className="font-serif text-2xl font-bold text-white mb-6">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={toggleBaxusFee}
+                  className="px-6 py-3 rounded-lg bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold transition-all"
+                >
+                  {baxusFeesEnabled ? "Disable BAXUS Fees" : "Enable BAXUS Fees"}
+                </button>
+                <button className="px-6 py-3 rounded-lg border border-white/10 text-white hover:bg-dark-700 font-semibold transition-all">
+                  Manage Categories
+                </button>
               </div>
             </div>
           </div>
         )}
+
+        {!loading && activeTab === "listings" && (
+          <div>
+            {/* Filter Tabs */}
+            <div className="mb-6 flex gap-2 flex-wrap">
+              {(["pending", "active", "completed", "cancelled"] as const).map((status) => (
+                <button
+                  key={status}
+                  className="px-4 py-2 rounded-lg border border-white/10 text-sm font-medium text-gray-400 hover:text-white hover:border-white/20 transition-all capitalize"
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+
+            {/* Listings Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left px-6 py-4 font-semibold text-gray-400 text-sm">Listing</th>
+                    <th className="text-left px-6 py-4 font-semibold text-gray-400 text-sm">Seller</th>
+                    <th className="text-left px-6 py-4 font-semibold text-gray-400 text-sm">Price</th>
+                    <th className="text-left px-6 py-4 font-semibold text-gray-400 text-sm">Status</th>
+                    <th className="text-left px-6 py-4 font-semibold text-gray-400 text-sm">Created</th>
+                    <th className="text-right px-6 py-4 font-semibold text-gray-400 text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {listings.map((listing) => (
+                    <tr key={listing.id} className="hover:bg-dark-800/50 transition-all">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={listing.image}
+                            alt={listing.name}
+                            className="w-10 h-10 rounded object-cover"
+                          />
+                          <div className="text-sm">
+                            <p className="font-semibold text-white truncate w-32">{listing.name}</p>
+                            <p className="text-gray-500">{listing.id}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-400">{listing.seller}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-white">${listing.price.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                            listing.status === "active"
+                              ? "bg-green-900/40 text-green-300 border border-green-700"
+                              : listing.status === "pending"
+                              ? "bg-yellow-900/40 text-yellow-300 border border-yellow-700"
+                              : listing.status === "completed"
+                              ? "bg-blue-900/40 text-blue-300 border border-blue-700"
+                              : "bg-red-900/40 text-red-300 border border-red-700"
+                          }`}
+                        >
+                          {listing.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-400">
+                        {new Date(listing.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {listing.status === "pending" && (
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => approveListing(listing.id)}
+                              className="text-xs px-3 py-1 bg-green-900/40 text-green-400 border border-green-700 rounded hover:bg-green-900/60 transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => rejectListing(listing.id)}
+                              className="text-xs px-3 py-1 bg-red-900/40 text-red-400 border border-red-700 rounded hover:bg-red-900/60 transition-all"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                        {listing.status !== "pending" && (
+                          <span className="text-xs text-gray-500">No actions</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {!loading && activeTab === "settings" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* BAXUS Fees Setting */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+              <h3 className="font-serif text-xl font-bold text-white mb-6">BAXUS Seller Fees</h3>
+              <p className="text-gray-400 mb-6">
+                Control whether BAXUS verified NFTs incur a 10% seller fee on transaction completion.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-dark-700 rounded-lg border border-white/10">
+                  <div>
+                    <p className="font-semibold text-white">Fee Status</p>
+                    <p className="text-sm text-gray-500">Currently {baxusFeesEnabled ? "enabled" : "disabled"}</p>
+                  </div>
+                  <button
+                    onClick={toggleBaxusFee}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      baxusFeesEnabled
+                        ? "bg-red-900/40 text-red-400 border border-red-700 hover:bg-red-900/60"
+                        : "bg-green-900/40 text-green-400 border border-green-700 hover:bg-green-900/60"
+                    }`}
+                  >
+                    {baxusFeesEnabled ? "Disable" : "Enable"}
+                  </button>
+                </div>
+                <div className="text-sm text-gray-500 bg-dark-700 rounded-lg p-4 border border-white/10">
+                  <p className="font-semibold text-white mb-2">Fee Details</p>
+                  <ul className="space-y-1">
+                    <li>• Rate: 10% of sale price</li>
+                    <li>• Applies to: BAXUS verified NFTs only</li>
+                    <li>• Collected to: Treasury wallet</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Settings */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+              <h3 className="font-serif text-xl font-bold text-white mb-6">Platform Settings</h3>
+              <p className="text-gray-400 mb-6">Manage global platform configuration.</p>
+              <div className="space-y-4">
+                <div className="p-4 bg-dark-700 rounded-lg border border-white/10">
+                  <label className="block">
+                    <p className="font-semibold text-white mb-2">Marketplace Status</p>
+                    <select className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all">
+                      <option>Active</option>
+                      <option>Maintenance</option>
+                      <option>Paused</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-white/10">
+                  <label className="block">
+                    <p className="font-semibold text-white mb-2">Minimum Listing Price (USD)</p>
+                    <input
+                      type="number"
+                      defaultValue="10"
+                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all"
+                    />
+                  </label>
+                </div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-white/10">
+                  <label className="block">
+                    <p className="font-semibold text-white mb-2">Maximum Auction Duration (days)</p>
+                    <input
+                      type="number"
+                      defaultValue="90"
+                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all"
+                    />
+                  </label>
+                </div>
+                <button className="w-full px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition-all">
+                  Save Settings
+                </button>
+              </div>
+            </div>
+
+            {/* Categories */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8 lg:col-span-2">
+              <h3 className="font-serif text-xl font-bold text-white mb-6">Manage Categories</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {["Digital Art", "Spirits", "TCG Cards", "Sports Cards", "Watches", "Watches", "Real Estate", "Aviation"].map(
+                  (cat) => (
+                    <div key={cat} className="p-4 bg-dark-700 rounded-lg border border-white/10 hover:border-gold-500 transition-all cursor-pointer">
+                      <p className="font-semibold text-white text-sm">{cat}</p>
+                      <p className="text-xs text-gray-500 mt-2">128 listings</p>
+                    </div>
+                  )
+                )}
+              </div>
+              <button className="w-full mt-6 px-6 py-3 border border-white/10 text-white hover:bg-dark-700 font-semibold rounded-lg transition-all">
+                + Add Category
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

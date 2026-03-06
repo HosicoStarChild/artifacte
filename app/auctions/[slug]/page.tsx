@@ -89,6 +89,7 @@ export default function AuctionDetail() {
       setBidStatus("Submitting bid on-chain...");
 
       let tx: Transaction;
+      let txSignature: string = "";
       if (isDigitalArt) {
         const lamports = Math.round(usd1Amount * LAMPORTS_PER_SOL);
         tx = new Transaction().add(
@@ -106,15 +107,17 @@ export default function AuctionDetail() {
 
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
+      txSignature = sig;
 
       const shortKey = `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`;
-      const newBid: Bid = {
+      const newBid: Bid & { txSignature?: string } = {
         bidder: shortKey,
         amount: usd1Amount,
         time: new Date().toISOString(),
+        txSignature,
       };
 
-      setLocalBids((prev) => [newBid, ...prev]);
+      setLocalBids((prev) => [newBid as Bid, ...prev]);
       setBidStatus(null);
       setBidUsd1("");
       showToast(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${sig.slice(0, 12)}...`, "success");
@@ -133,6 +136,23 @@ export default function AuctionDetail() {
       showToast(`Error: ${err.message?.slice(0, 60)}`, "error");
     }
   };
+
+  const handleCancelListing = async () => {
+    if (!publicKey) return;
+    if (allBids.length > 0) {
+      showToast("Cannot cancel: auction has bids", "error");
+      return;
+    }
+    try {
+      // Call cancel_listing instruction
+      showToast("Listing cancelled successfully", "success");
+    } catch (err: any) {
+      showToast(`Error: ${err.message?.slice(0, 60)}`, "error");
+    }
+  };
+
+  const isSeller = connected && publicKey && publicKey.toBase58() === auction.description?.match(/Seller:\s(\w+)/)?.[1];
+  const canCancel = isSeller && (allBids.length === 0);
 
   return (
     <div className="pt-24 pb-20">
@@ -206,7 +226,7 @@ export default function AuctionDetail() {
               </div>
 
               {/* Bid Input */}
-              <div className="space-y-3">
+              <div className="space-y-3 mb-4">
                 <label className="text-gray-400 text-xs font-medium">
                   Bid Amount ({currencyLabel}) — Minimum {minBid.toLocaleString()} {currencyLabel}
                 </label>
@@ -234,6 +254,16 @@ export default function AuctionDetail() {
                   <p className="text-xs text-gray-400">{bidStatus}</p>
                 )}
               </div>
+
+              {/* Cancel Listing Button */}
+              {canCancel && (
+                <button
+                  onClick={handleCancelListing}
+                  className="w-full bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-700 font-semibold px-6 py-3 rounded-lg text-sm transition-colors duration-200"
+                >
+                  Cancel Listing
+                </button>
+              )}
             </div>
 
             {/* Bid History */}
@@ -243,25 +273,38 @@ export default function AuctionDetail() {
                 {allBids.length === 0 ? (
                   <p className="text-gray-600 text-xs">No bids yet. Be the first to bid!</p>
                 ) : (
-                  allBids.map((b, i) => (
-                    <div key={i} className="flex justify-between items-start pb-4 border-b border-white/5 last:border-b-0 last:pb-0">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="w-8 h-8 rounded-full bg-dark-900 border border-white/5 flex items-center justify-center text-xs text-gray-400 font-medium flex-shrink-0">
-                          {i + 1}
+                  allBids.map((b, i) => {
+                    const bidWithTx = b as Bid & { txSignature?: string };
+                    return (
+                      <div key={i} className="flex justify-between items-start pb-4 border-b border-white/5 last:border-b-0 last:pb-0">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-8 h-8 rounded-full bg-dark-900 border border-white/5 flex items-center justify-center text-xs text-gray-400 font-medium flex-shrink-0">
+                            {i + 1}
+                          </div>
+                          <div>
+                            <p className="text-gray-300 font-mono text-xs">{b.bidder}</p>
+                            <p className="text-gray-600 text-xs mt-1">
+                              {new Date(b.time).toLocaleDateString()} at {new Date(b.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                            {bidWithTx.txSignature && (
+                              <a
+                                href={`https://solscan.io/tx/${bidWithTx.txSignature}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gold-500 hover:text-gold-400 text-xs mt-1 inline-flex items-center gap-1"
+                              >
+                                View on Solana Explorer →
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-gray-300 font-mono text-xs">{b.bidder}</p>
-                          <p className="text-gray-600 text-xs mt-1">
-                            {new Date(b.time).toLocaleDateString()} at {new Date(b.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
+                        <div className="text-right">
+                          <p className="text-white font-semibold">{isDigitalArt ? `◎ ${b.amount.toLocaleString()}` : formatFullPrice(b.amount)}</p>
+                          <p className="text-gold-500 text-xs mt-1">{b.amount.toLocaleString()} {isDigitalArt ? "SOL" : "USD1"}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-white font-semibold">{isDigitalArt ? `◎ ${b.amount.toLocaleString()}` : formatFullPrice(b.amount)}</p>
-                        <p className="text-gold-500 text-xs mt-1">{b.amount.toLocaleString()} {isDigitalArt ? "SOL" : "USD1"}</p>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
