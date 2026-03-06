@@ -159,7 +159,7 @@ export default function AuctionDetail() {
             {/* Header */}
             <div className="flex items-center justify-between gap-4 mb-4">
               <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">{auction.subtitle}</p>
-              <VerifiedBadge collectionName={auction.name} showLabel={true} />
+              <VerifiedBadge collectionName={auction.name} showLabel={true} verifiedBy={auction.verifiedBy} />
             </div>
             <h1 className="font-serif text-3xl md:text-4xl text-white mb-4 leading-tight">{auction.name}</h1>
             <p className="text-gray-400 text-base mb-8 leading-relaxed">{auction.description}</p>

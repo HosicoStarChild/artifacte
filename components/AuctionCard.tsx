@@ -26,7 +26,7 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
           <div>
             <div className="flex items-center justify-between gap-2 mb-3">
               <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">{auction.subtitle}</p>
-              <VerifiedBadge collectionName={auction.name} />
+              <VerifiedBadge collectionName={auction.name} verifiedBy={auction.verifiedBy} />
             </div>
             <h3 className="text-white font-medium text-sm mb-2">{auction.name}</h3>
           </div>

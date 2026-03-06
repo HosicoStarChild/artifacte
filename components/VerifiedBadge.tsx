@@ -7,12 +7,14 @@ interface VerifiedBadgeProps {
   collectionName?: string;
   mintAuthority?: string;
   showLabel?: boolean;
+  verifiedBy?: string;
 }
 
 export default function VerifiedBadge({
   collectionName,
   mintAuthority,
   showLabel = false,
+  verifiedBy,
 }: VerifiedBadgeProps) {
   const [isVerified, setIsVerified] = useState(false);
   const [collectionInfo, setCollectionInfo] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function VerifiedBadge({
     checkVerification();
   }, [collectionName, mintAuthority]);
 
-  if (!isVerified) return null;
+  if (!isVerified && !verifiedBy) return null;
 
   return (
     <div className="flex items-center gap-1 text-gold-500">
@@ -66,7 +68,7 @@ export default function VerifiedBadge({
           clipRule="evenodd"
         />
       </svg>
-      {showLabel && <span className="text-xs font-semibold">Verified</span>}
+      {(showLabel || verifiedBy) && <span className="text-xs font-semibold">{verifiedBy ? `${verifiedBy} Verified` : "Verified"}</span>}
     </div>
   );
 }

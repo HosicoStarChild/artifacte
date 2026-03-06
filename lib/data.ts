@@ -34,6 +34,7 @@ export interface Auction {
   image: string;
   bids: Bid[];
   description: string;
+  verifiedBy?: string;
 }
 
 export interface Bid {
@@ -50,6 +51,7 @@ export interface Listing {
   image: string;
   category?: Category;
   nftMint?: string;
+  verifiedBy?: string;
 }
 
 const now = Date.now();
@@ -140,7 +142,7 @@ export const auctions: Auction[] = [
     id: "a3", slug: "rare-whisky-cask",
     name: "Macallan 1990 Sherry Cask",
     subtitle: "RARE SPIRITS COLLECTION",
-    category: "SPIRITS", current_bid: 98500, start_price: 65000,
+    verifiedBy: "BAXUS", category: "SPIRITS", current_bid: 98500, start_price: 65000,
     end_time: new Date(now + 3 * day).toISOString(),
     image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=800",
     description: "Single cask Macallan 1990 vintage matured in first-fill Oloroso sherry butt. Cask #4567, yielding approximately 580 bottles. Stored in bonded warehouse.",
@@ -154,7 +156,7 @@ export const auctions: Auction[] = [
     id: "a8", slug: "blantons-1984-first-release",
     name: "Blanton's 1984 Bottling First Release",
     subtitle: "ULTRA-RARE BOURBON",
-    category: "SPIRITS", current_bid: 11200, start_price: 8000,
+    verifiedBy: "BAXUS", category: "SPIRITS", current_bid: 11200, start_price: 8000,
     end_time: new Date(now + 5 * day).toISOString(),
     image: "/blantons-1984.webp",
     description: "Blanton's 1984 Bottling First Release — one of the rarest bourbons in existence. First single barrel bourbon ever marketed. BAXUS authenticated and tokenized on Solana. NFT: AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2",
@@ -168,7 +170,7 @@ export const auctions: Auction[] = [
     id: "a4", slug: "picasso-lithograph",
     name: "Pablo Picasso Original Lithograph",
     subtitle: "FINE ART MASTERS",
-    category: "DIGITAL_ART", current_bid: 385, start_price: 250,
+    verifiedBy: "Metaplex", category: "DIGITAL_ART", current_bid: 385, start_price: 250,
     end_time: new Date(now + 7 * day).toISOString(),
     image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800",
     description: "Original lithograph by Pablo Picasso, 'Le Repos' (1952). Signed and numbered 23/50. Provenance: Christie's New York. Museum-quality framing.",
@@ -184,7 +186,7 @@ export const auctions: Auction[] = [
     id: "a5", slug: "charizard-holographic",
     name: "Charizard Holographic Base Set",
     subtitle: "POKEMON TCG RARE",
-    category: "TCG_CARDS", current_bid: 12500, start_price: 8000,
+    verifiedBy: "PSA", category: "TCG_CARDS", current_bid: 12500, start_price: 8000,
     end_time: new Date(now + 4 * day).toISOString(),
     image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=800",
     description: "1999 Pokémon Base Set Charizard Holographic (4/102). Graded PSA 8. Pristine condition with sharp corners and excellent centering.",
@@ -197,7 +199,7 @@ export const auctions: Auction[] = [
     id: "a6", slug: "michael-jordan-rookie",
     name: "Michael Jordan Rookie Card",
     subtitle: "SPORTS CARDS LEGEND",
-    category: "SPORTS_CARDS", current_bid: 85000, start_price: 55000,
+    verifiedBy: "PSA", category: "SPORTS_CARDS", current_bid: 85000, start_price: 55000,
     end_time: new Date(now + 6 * day).toISOString(),
     image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=800",
     description: "1986-87 Fleer Michael Jordan Rookie Card #57. Graded PSA 9. Iconic card in excellent condition.",
@@ -210,7 +212,7 @@ export const auctions: Auction[] = [
     id: "a7", slug: "rolex-submariner-gold",
     name: "Rolex Submariner Date Gold",
     subtitle: "LUXURY WATCHES",
-    category: "WATCHES", current_bid: 45000, start_price: 32000,
+    verifiedBy: "Chrono24", category: "WATCHES", current_bid: 45000, start_price: 32000,
     end_time: new Date(now + 8 * day).toISOString(),
     image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=800",
     description: "Rolex Submariner Date 16613 in 18K yellow gold. 1995 vintage. Excellent condition with original dial and hands. Complete with box and papers.",
@@ -228,11 +230,11 @@ export const listings: Listing[] = [
   { id: "l4", name: "Platinum Bar Collection", subtitle: "Physical Precious Metal Holdings", price: 450000, image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=400", category: "PRECIOUS_METALS" },
   { id: "l5", name: "Miami Oceanfront Penthouse", subtitle: "Luxury Real Estate NFT", price: 2000000, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400", category: "REAL_ESTATE" },
   { id: "l6", name: "Eternal Light Sculpture", subtitle: "Premium Digital Art NFT", price: 250, image: "https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=400", category: "DIGITAL_ART" },
-  { id: "l7", name: "Blastoise Holographic Card", subtitle: "Pokemon TCG Vintage", price: 8500, image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400", category: "TCG_CARDS" },
-  { id: "l8", name: "Babe Ruth Signed Baseball Card", subtitle: "Vintage Sports Memorabilia", price: 45000, image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400", category: "SPORTS_CARDS" },
-  { id: "l9", name: "Omega Speedmaster Professional", subtitle: "Chronograph Luxury Watch", price: 6500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", category: "WATCHES" },
-  { id: "l10", name: "Macallan 25 Year Single Malt", subtitle: "Rare Single Cask Whisky", price: 18000, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", category: "SPIRITS" },
-  { id: "l11", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2" },
+  { id: "l7", name: "Blastoise Holographic Card", subtitle: "Pokemon TCG Vintage", price: 8500, image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400", verifiedBy: "PSA", category: "TCG_CARDS" },
+  { id: "l8", name: "Babe Ruth Signed Baseball Card", subtitle: "Vintage Sports Memorabilia", price: 45000, image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS" },
+  { id: "l9", name: "Omega Speedmaster Professional", subtitle: "Chronograph Luxury Watch", price: 6500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
+  { id: "l10", name: "Macallan 25 Year Single Malt", subtitle: "Rare Single Cask Whisky", price: 18000, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", verifiedBy: "BAXUS", category: "SPIRITS" },
+  { id: "l11", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", verifiedBy: "BAXUS", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2" },
 ];
 
 export const categoryColors: Record<Category, string> = {
