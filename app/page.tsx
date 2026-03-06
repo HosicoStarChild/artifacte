@@ -110,36 +110,38 @@ export default function Home() {
               <h2 className="font-serif text-3xl md:text-4xl text-white">Available Now</h2>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listings.slice(0, 6).map((l) => (
-              <Link key={l.id} href={`/auctions?listing=${l.id}`} className="group">
-                <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
-                  <div className="aspect-square overflow-hidden bg-dark-900">
-                    <img
-                      src={l.image}
-                      alt={l.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                    />
-                  </div>
-                  <div className="p-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
-                        <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+          <div className="overflow-x-auto pb-4 -mx-4 px-4">
+            <div className="flex gap-6 snap-x">
+              {listings.slice(0, 6).map((l) => (
+                <Link key={l.id} href={`/auctions?listing=${l.id}`} className="flex-shrink-0 w-80 snap-start group">
+                  <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
+                    <div className="aspect-square overflow-hidden bg-dark-900">
+                      <img
+                        src={l.image}
+                        alt={l.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    </div>
+                    <div className="p-6 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
+                          <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                        </div>
+                        <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
+                        <p className="text-gray-500 text-xs mb-1">{l.subtitle}{l.verifiedBy ? ` • ${l.verifiedBy} Verified` : ""}</p>
+                        <p className="text-gray-600 text-xs mb-4">{l.category?.replace(/_/g, " ")}</p>
                       </div>
-                      <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
-                      <p className="text-gray-500 text-xs mb-1">{l.subtitle}{l.verifiedBy ? ` • ${l.verifiedBy} Verified` : ""}</p>
-                      <p className="text-gray-600 text-xs mb-4">{l.category?.replace(/_/g, " ")}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                      <p className="text-white font-serif text-2xl">{l.category === "DIGITAL_ART" ? `◎ ${l.price.toLocaleString()}` : formatFullPrice(l.price)}</p>
-                      <p className="text-gold-500 text-xs mt-1">{l.price.toLocaleString()} {l.category === "DIGITAL_ART" ? "SOL" : "USD1"}</p>
+                      <div>
+                        <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
+                        <p className="text-white font-serif text-2xl">{l.category === "DIGITAL_ART" ? `◎ ${l.price.toLocaleString()}` : formatFullPrice(l.price)}</p>
+                        <p className="text-gold-500 text-xs mt-1">{l.price.toLocaleString()} {l.category === "DIGITAL_ART" ? "SOL" : "USD1"}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>
