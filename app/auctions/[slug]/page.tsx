@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { auctions, formatFullPrice, Bid, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
 import Countdown from "@/components/Countdown";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import PriceHistory from "@/components/PriceHistory";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -297,6 +298,12 @@ export default function AuctionDetail() {
                 </button>
               )}
             </div>
+
+            {/* Price History Chart (TCG Cards & Watches only) */}
+            <PriceHistory
+              cardName={auction.name}
+              category={auction.category}
+            />
 
             {/* Bid History */}
             <div className="bg-dark-800 rounded-lg border border-white/5 p-8">
