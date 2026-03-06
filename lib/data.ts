@@ -229,17 +229,30 @@ export const auctions: Auction[] = [
 ];
 
 export const listings: Listing[] = [
-  { id: "l1", name: "Zambian Emerald 4ct", subtitle: "Certified Precious Gemstone", price: 28000, image: "https://images.unsplash.com/photo-1583937443566-6b064bd677e9?w=400", category: "PRECIOUS_METALS" },
-  { id: "l2", name: "SkyLink Jet Fleet", subtitle: "Yield-bearing aviation RWA", price: 5000000, image: "https://images.unsplash.com/photo-1474302770737-173ee21bab63?w=400", category: "AVIATION" },
-  { id: "l3", name: "Tuscany Vineyard Estate", subtitle: "Agricultural Asset NFT", price: 1500000, image: "https://images.unsplash.com/photo-1560493676-04071c5f467b?w=400", category: "AGRICULTURE" },
-  { id: "l4", name: "Platinum Bar Collection", subtitle: "Physical Precious Metal Holdings", price: 450000, image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=400", category: "PRECIOUS_METALS" },
-  { id: "l5", name: "Miami Oceanfront Penthouse", subtitle: "Luxury Real Estate NFT", price: 2000000, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400", category: "REAL_ESTATE" },
-  { id: "l6", name: "Eternal Light Sculpture", subtitle: "Premium Digital Art NFT", price: 250, image: "https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=400", category: "DIGITAL_ART" },
-  { id: "l7", name: "Blastoise Holographic Card", subtitle: "Pokemon TCG Vintage", price: 8500, image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400", verifiedBy: "PSA", category: "TCG_CARDS" },
-  { id: "l8", name: "Babe Ruth Signed Baseball Card", subtitle: "Vintage Sports Memorabilia", price: 45000, image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS" },
-  { id: "l9", name: "Omega Speedmaster Professional", subtitle: "Chronograph Luxury Watch", price: 6500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
-  { id: "l10", name: "Macallan 25 Year Single Malt", subtitle: "Rare Single Cask Whisky", price: 18000, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", verifiedBy: "BAXUS", category: "SPIRITS" },
-  { id: "l11", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", verifiedBy: "BAXUS", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2" },
+  // TCG Cards
+  { id: "l1", name: "Roronoa Zoro Alt Art OP05-119", subtitle: "One Piece TCG • PSA 10", price: 642, image: "https://tcgplayer-cdn.tcgplayer.com/product/516897_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS" },
+  { id: "l2", name: "Portgas D. Ace Manga Alt Art OP09-119", subtitle: "One Piece TCG • PSA 10", price: 5058, image: "https://tcgplayer-cdn.tcgplayer.com/product/578459_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS" },
+  { id: "l3", name: "Charizard Base Set 1st Edition", subtitle: "Pokemon TCG • PSA 10", price: 42000, image: "https://tcgplayer-cdn.tcgplayer.com/product/86937_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS" },
+  { id: "l4", name: "Nami Alt Art OP02-120", subtitle: "One Piece TCG • PSA 9", price: 320, image: "https://tcgplayer-cdn.tcgplayer.com/product/489977_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS" },
+  { id: "l5", name: "Pikachu Illustrator Promo", subtitle: "Pokemon TCG • CGC 9", price: 125000, image: "https://tcgplayer-cdn.tcgplayer.com/product/233498_200w.jpg", verifiedBy: "CGC", category: "TCG_CARDS" },
+  // Spirits
+  { id: "l6", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", verifiedBy: "BAXUS", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2" },
+  { id: "l7", name: "Macallan 25 Year Sherry Oak", subtitle: "Single Malt Scotch Whisky", price: 18000, image: "https://images.unsplash.com/photo-1602767039459-77d4233d2121?w=400", verifiedBy: "BAXUS", category: "SPIRITS" },
+  { id: "l8", name: "Pappy Van Winkle 23 Year", subtitle: "Family Reserve Bourbon", price: 8500, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", verifiedBy: "BAXUS", category: "SPIRITS" },
+  { id: "l9", name: "Yamazaki 18 Year Single Malt", subtitle: "Japanese Whisky • Limited Edition", price: 4200, image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=400", verifiedBy: "BAXUS", category: "SPIRITS" },
+  // Watches
+  { id: "l10", name: "Rolex Submariner Date 126610LN", subtitle: "Steel • 41mm • 2024", price: 14500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
+  { id: "l11", name: "Patek Philippe Nautilus 5711/1A", subtitle: "Steel • Blue Dial • 2021", price: 145000, image: "https://images.unsplash.com/photo-1594534475808-b18fc33b045e?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
+  { id: "l12", name: "Audemars Piguet Royal Oak 15500ST", subtitle: "Steel • 41mm • Blue Dial", price: 52000, image: "https://images.unsplash.com/photo-1614164185128-e4ec99c436d7?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
+  { id: "l13", name: "Omega Speedmaster Professional", subtitle: "Moonwatch • Hesalite • 2023", price: 6500, image: "https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=400", verifiedBy: "Chrono24", category: "WATCHES" },
+  // Sports Cards
+  { id: "l14", name: "Shohei Ohtani 2018 Topps Chrome RC", subtitle: "Rookie Card • PSA 10", price: 1800, image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS" },
+  { id: "l15", name: "Michael Jordan 1986 Fleer RC", subtitle: "Basketball • PSA 9", price: 35000, image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS" },
+  { id: "l16", name: "Luka Doncic 2018 Prizm Silver RC", subtitle: "Basketball • BGS 9.5", price: 4200, image: "https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=400", verifiedBy: "BGS", category: "SPORTS_CARDS" },
+  // Digital Art
+  { id: "l17", name: "Celestial Drift #42", subtitle: "Generative Art • 1/1", price: 12, image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART" },
+  { id: "l18", name: "Neon Dreamscape", subtitle: "Photography • Limited Edition", price: 5, image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART" },
+  { id: "l19", name: "Abstract Genesis #7", subtitle: "Mixed Media • 1/1", price: 25, image: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART" },
 ];
 
 export const categoryColors: Record<Category, string> = {
