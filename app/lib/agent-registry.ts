@@ -18,11 +18,12 @@ export interface AgentData {
   address: string;
 }
 
-function getProgram(wallet: WalletContextState, connection: Connection): Program {
+function getProgram(wallet: WalletContextState, connection: Connection): any {
   const provider = new AnchorProvider(connection, wallet as any, {
     commitment: "confirmed",
   });
-  return new Program(IDL as any, PROGRAM_ID as any, provider as any);
+  // @ts-ignore - Anchor version compatibility
+  return new Program(IDL as any, PROGRAM_ID, provider);
 }
 
 export async function registerAgent(
