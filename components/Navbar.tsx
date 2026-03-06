@@ -56,9 +56,6 @@ export default function Navbar() {
             <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Agents
             </Link>
-            <Link href="/digital-art" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Digital Art
-            </Link>
             <Link href="/apply" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Apply to List
             </Link>
@@ -103,9 +100,6 @@ export default function Navbar() {
             </Link>
             <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Agents
-            </Link>
-            <Link href="/digital-art" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Digital Art
             </Link>
             <Link href="/apply" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Apply to List
