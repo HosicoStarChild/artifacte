@@ -25,15 +25,19 @@ export default function AuctionCard({ auction }: { auction: Auction }) {
         <div className="p-5 flex-1 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2 mb-3">
-              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">{auction.subtitle}</p>
+              <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Live Auction</span>
               <VerifiedBadge collectionName={auction.name} verifiedBy={auction.verifiedBy} />
             </div>
-            <h3 className="text-white font-medium text-sm mb-1">{auction.name}</h3>
-            <p className="text-gray-500 text-xs">{auction.verifiedBy ? `${auction.verifiedBy} Verified` : ""}</p>
+            <h3 className="text-white font-medium text-base mb-1">{auction.name}</h3>
+            <p className="text-gray-500 text-xs mb-1">{auction.subtitle}{auction.verifiedBy ? ` • ${auction.verifiedBy} Verified` : ""}</p>
+            <p className="text-gray-600 text-xs mb-4">{auction.category?.replace(/_/g, " ")}</p>
           </div>
-          <div className="pt-4 border-t border-white/5">
-            <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">Current Bid</p>
-            <p className="text-white font-serif text-xl">{auction.category === "DIGITAL_ART" ? `◎ ${auction.current_bid.toLocaleString()}` : formatPrice(auction.current_bid)}</p>
+          <div className="space-y-4">
+            <div>
+              <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Current Bid</p>
+              <p className="text-white font-serif text-2xl">{auction.category === "DIGITAL_ART" ? `◎ ${auction.current_bid.toLocaleString()}` : formatPrice(auction.current_bid)}</p>
+              <p className="text-gold-500 text-xs mt-1">{auction.current_bid.toLocaleString()} {auction.category === "DIGITAL_ART" ? "SOL" : "USD1"}</p>
+            </div>
           </div>
         </div>
       </div>
