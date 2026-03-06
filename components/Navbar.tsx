@@ -39,7 +39,7 @@ export default function Navbar() {
             <div className="w-7 h-7 rounded-md bg-gold-500 flex items-center justify-center">
               <span className="text-dark-900 font-serif font-semibold text-sm">A</span>
             </div>
-            <span className="font-serif text-lg font-semibold text-white tracking-tight">Artifacte</span>
+            <span className="font-serif text-lg font-bold text-blue-900 dark:text-blue-100 tracking-tight italic" style={{ fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.02em", color: "#1e3a5f" }}>Artifacte</span>
           </Link>
 
           {/* Desktop Menu */}

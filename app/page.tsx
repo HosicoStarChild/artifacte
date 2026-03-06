@@ -58,18 +58,17 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: "Digital Art", emoji: "🎨", count: 24 },
-                { name: "Spirits", emoji: "🥃", count: 18 },
-                { name: "TCG Cards", emoji: "🃏", count: 32 },
-                { name: "Sports Cards", emoji: "⚽", count: 28 },
-                { name: "Watches", emoji: "⌚", count: 15 },
-                { name: "Vintage", emoji: "🏛️", count: 22 },
+                { name: "Digital Art", emoji: "🎨", slug: "digital-art" },
+                { name: "Spirits", emoji: "🥃", slug: "spirits" },
+                { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards" },
+                { name: "Sports Cards", emoji: "⚽", slug: "sports-cards" },
+                { name: "Watches", emoji: "⌚", slug: "watches" },
               ].map((cat, i) => (
-                <Link key={i} href="/auctions" className="group">
+                <Link key={i} href={`/auctions/categories/${cat.slug}`} className="group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">
-                    <div className="text-4xl mb-4">{cat.emoji}</div>
+                    <div className="text-5xl mb-6">{cat.emoji}</div>
                     <h3 className="font-serif text-xl text-white mb-2">{cat.name}</h3>
-                    <p className="text-gray-500 text-sm">{cat.count} Items</p>
+                    <p className="text-gray-400 text-sm">Explore collection →</p>
                   </div>
                 </Link>
               ))}
