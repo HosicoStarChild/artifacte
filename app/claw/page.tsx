@@ -10,32 +10,6 @@ import ClawChat from '@/components/ClawChat';
 const machines = [
   {
     id: 1,
-    name: 'Bronze Claw',
-    tier: '🥉',
-    price: 5,
-    itemsRemaining: 342,
-    odds: [
-      { rarity: 'Common', percent: 50 },
-      { rarity: 'Rare', percent: 40 },
-      { rarity: 'Ultra Rare', percent: 10 },
-    ],
-    description: 'Common-Rare cards, mostly base holos',
-  },
-  {
-    id: 2,
-    name: 'Silver Claw',
-    tier: '🥈',
-    price: 15,
-    itemsRemaining: 156,
-    odds: [
-      { rarity: 'Rare', percent: 40 },
-      { rarity: 'Ultra Rare', percent: 35 },
-      { rarity: 'Alt Art', percent: 25 },
-    ],
-    description: 'Rare-Ultra Rare, chance at Alt Arts',
-  },
-  {
-    id: 3,
     name: 'Gold Claw',
     tier: '🥇',
     price: 50,
@@ -49,7 +23,7 @@ const machines = [
     description: 'Ultra Rare-Secret Rare, Alt Arts & Manga variants',
   },
   {
-    id: 4,
+    id: 2,
     name: 'Diamond Claw',
     tier: '💎',
     price: 150,
@@ -118,9 +92,9 @@ const mockCards = [
 // Recent pulls data
 const recentPulls = [
   { user: '0x4f...2a', card: 'PSA 10 Luffy Gear 5 Alt Art', machine: 'Gold Claw', emoji: '🔥', value: 1250 },
-  { user: '0x7e...5c', card: 'PSA 9 Zoro Leader', machine: 'Silver Claw', emoji: '✨', value: 89 },
+  { user: '0x7e...5c', card: 'PSA 9 Zoro Leader', machine: 'Gold Claw', emoji: '✨', value: 89 },
   { user: '0x3b...8f', card: 'PSA 10 Ace Manga Alt Art', machine: 'Diamond Claw', emoji: '🌟', value: 5058 },
-  { user: '0x9d...1e', card: 'PSA 8 Nami Rare', machine: 'Bronze Claw', emoji: '💎', value: 45 },
+  { user: '0x9d...1e', card: 'PSA 10 Nami Alt Art', machine: 'Gold Claw', emoji: '💎', value: 320 },
   { user: '0x2c...7a', card: 'PSA 10 Sanji Alt Art', machine: 'Gold Claw', emoji: '🔥', value: 892 },
 ];
 
