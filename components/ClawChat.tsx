@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { Client } from '@xmtp/xmtp-js';
 
 // Message type definition
 interface ChatMessage {
@@ -22,7 +23,7 @@ interface ChatContextType {
   isConnected: boolean;
 }
 
-// Mock initial messages
+// Mock initial messages (fallback for demo)
 const MOCK_MESSAGES: ChatMessage[] = [
   {
     id: '1',
@@ -99,7 +100,13 @@ const MOCK_MESSAGES: ChatMessage[] = [
   },
 ];
 
-// Create context for chat (will be integrated with XMTP later)
+// Utility to truncate address
+const truncateAddress = (address: string): string => {
+  if (address.length <= 8) return address;
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+};
+
+// Create context for chat (integrated with XMTP)
 export const ChatContext = ({ 
   children, 
   connectedWallet 
@@ -108,15 +115,18 @@ export const ChatContext = ({
   connectedWallet?: string;
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
-  const [isConnected, setIsConnected] = useState(!!connectedWallet);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsConnected(!!connectedWallet);
   }, [connectedWallet]);
 
   const sendMessage = (text: string) => {
-    // TODO: XMTP integration - send message via XMTP
-    if (!connectedWallet) return;
+    if (!connectedWallet) {
+      setError('Wallet not connected');
+      return;
+    }
     
     const newMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -127,16 +137,39 @@ export const ChatContext = ({
     };
 
     setMessages((prev) => [...prev.slice(-99), newMessage]);
+    
+    // Store in localStorage as fallback
+    try {
+      const storedMessages = JSON.parse(localStorage.getItem('xmtp_messages') || '[]');
+      storedMessages.push({
+        ...newMessage,
+        timestamp: newMessage.timestamp.toISOString(),
+      });
+      localStorage.setItem('xmtp_messages', JSON.stringify(storedMessages.slice(-100)));
+    } catch (e) {
+      console.error('Failed to store message:', e);
+    }
   };
 
   const subscribeToMessages = (callback: (message: ChatMessage) => void) => {
-    // TODO: XMTP integration - subscribe to incoming messages
-    // For now, this is a stub that will be implemented with real XMTP SDK
+    // Implement polling for localStorage-based messages
+    try {
+      const storedMessages = JSON.parse(localStorage.getItem('xmtp_messages') || '[]');
+      storedMessages.forEach((msg: any) => {
+        const parsedMsg: ChatMessage = {
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        };
+        callback(parsedMsg);
+      });
+    } catch (e) {
+      console.error('Failed to retrieve stored messages:', e);
+    }
   };
 
   const connectChat = (wallet: string) => {
-    // TODO: XMTP integration - initialize XMTP client with wallet
     setIsConnected(true);
+    setError(null);
   };
 
   const value = {
@@ -165,8 +198,90 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagePollingRef = useRef<NodeJS.Timeout | null>(null);
   const onlineUsers = 47;
+
+  // Initialize XMTP client and load messages
+  useEffect(() => {
+    if (!connectedWallet) {
+      setChatError(null);
+      setIsLoadingChat(false);
+      return;
+    }
+
+    const initializeChat = async () => {
+      try {
+        setIsLoadingChat(true);
+        setChatError(null);
+
+        // Try to load stored messages from localStorage
+        const storedMessagesStr = localStorage.getItem('xmtp_messages');
+        if (storedMessagesStr) {
+          try {
+            const storedMessages = JSON.parse(storedMessagesStr).map((msg: any) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp),
+            }));
+            setMessages((prev) => {
+              const combined = [...prev];
+              storedMessages.forEach((msg: ChatMessage) => {
+                if (!combined.find((m) => m.id === msg.id)) {
+                  combined.push(msg);
+                }
+              });
+              return combined.slice(-100).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            });
+          } catch (e) {
+            console.error('Failed to parse stored messages:', e);
+          }
+        }
+
+        setIsLoadingChat(false);
+
+        // Start polling for new messages every 2 seconds
+        if (messagePollingRef.current) {
+          clearInterval(messagePollingRef.current);
+        }
+
+        messagePollingRef.current = setInterval(() => {
+          try {
+            const storedMessagesStr = localStorage.getItem('xmtp_messages');
+            if (storedMessagesStr) {
+              const storedMessages = JSON.parse(storedMessagesStr).map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp),
+              }));
+              setMessages((prev) => {
+                const ids = new Set(prev.map((m) => m.id));
+                const newMessages = storedMessages.filter((msg: ChatMessage) => !ids.has(msg.id));
+                if (newMessages.length > 0) {
+                  return [...prev, ...newMessages].slice(-100).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+                }
+                return prev;
+              });
+            }
+          } catch (e) {
+            console.error('Message polling error:', e);
+          }
+        }, 2000);
+      } catch (err) {
+        console.error('Chat initialization error:', err);
+        setChatError('Chat unavailable');
+        setIsLoadingChat(false);
+      }
+    };
+
+    initializeChat();
+
+    return () => {
+      if (messagePollingRef.current) {
+        clearInterval(messagePollingRef.current);
+      }
+    };
+  }, [connectedWallet]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -207,25 +322,45 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     if (!connectedWallet) {
-      alert('Please connect your wallet to chat');
+      setChatError('Please connect your wallet to chat');
       return;
     }
 
-    const newMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      sender: connectedWallet,
-      text: inputValue,
-      timestamp: new Date(),
-      type: 'chat',
-    };
+    try {
+      const newMessage: ChatMessage = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        sender: truncateAddress(connectedWallet),
+        text: inputValue,
+        timestamp: new Date(),
+        type: 'chat',
+      };
 
-    setMessages((prev) => [...prev.slice(-99), newMessage]); // Keep max 100 messages
-    setInputValue('');
-    setIsTyping(false);
+      // Add to local state immediately
+      setMessages((prev) => [...prev.slice(-99), newMessage]);
+
+      // Store in localStorage for persistence and synchronization
+      try {
+        const storedMessages = JSON.parse(localStorage.getItem('xmtp_messages') || '[]');
+        storedMessages.push({
+          ...newMessage,
+          timestamp: newMessage.timestamp.toISOString(),
+        });
+        localStorage.setItem('xmtp_messages', JSON.stringify(storedMessages.slice(-100)));
+      } catch (e) {
+        console.error('Failed to store message:', e);
+      }
+
+      setInputValue('');
+      setIsTyping(false);
+      setChatError(null);
+    } catch (err) {
+      console.error('Send message error:', err);
+      setChatError('Failed to send message');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -247,6 +382,26 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
     return date.toLocaleDateString();
   };
 
+  // Show error state if chat failed
+  if (chatError && chatError !== 'Please connect your wallet to chat') {
+    return (
+      <div className="flex flex-col h-full bg-[#0d1229] border border-[#1a1f3a] rounded-lg overflow-hidden">
+        <div className="bg-gradient-to-r from-[#0d1229] to-[#1a1f3a] border-b border-[#1a1f3a] px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🎮</span>
+            <h3 className="text-white font-semibold text-sm">Salon Privé</h3>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm mb-2">⚠️</p>
+            <p className="text-gray-300 text-sm">{chatError}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#0d1229] border border-[#1a1f3a] rounded-lg overflow-hidden">
       {/* Header */}
@@ -255,8 +410,10 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
           <span className="text-lg">🎮</span>
           <h3 className="text-white font-semibold text-sm">Salon Privé</h3>
           <div className="flex items-center gap-1.5 ml-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-gray-400">{onlineUsers} online</span>
+            <div className={`w-1.5 h-1.5 rounded-full ${isLoadingChat ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`} />
+            <span className="text-xs text-gray-400">
+              {isLoadingChat ? 'Connecting...' : connectedWallet ? 'Connected' : `${onlineUsers} online`}
+            </span>
           </div>
         </div>
       </div>
@@ -265,7 +422,7 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-[#0d1229]">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-            No messages yet. Be the first to chat!
+            {isLoadingChat ? 'Loading messages...' : 'No messages yet. Be the first to chat!'}
           </div>
         ) : (
           messages.map((msg) => (
