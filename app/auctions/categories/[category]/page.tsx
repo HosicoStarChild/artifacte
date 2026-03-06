@@ -53,7 +53,6 @@ export default function CategoryAuctionsPage() {
     ],
     SPIRITS: [
       { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Scotch", "Whisky", "Tequila", "Rum", "Cognac", "Wine"] },
-      { label: "Region", key: "region", options: ["All", "Kentucky", "Speyside", "Islay", "Highland", "Jalisco", "Cognac"] },
     ],
     WATCHES: [
       { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
