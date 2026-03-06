@@ -184,12 +184,21 @@ pub mod auction {
         // Calculate fees and payments
         let platform_fee = (listing.price * 250) / 10000; // 2.5% platform fee
         
+        // BAXUS 10% seller fee (temporary until they migrate to Metaplex standard)
+        let baxus_fee = if listing.baxus_fee {
+            (listing.price * 1000) / 10000 // 10%
+        } else {
+            0u64
+        };
+        
         // Get creator royalties from metadata (simplified to 0 if not readable)
         let creator_royalty = 0u64; // TODO: Read from Metaplex metadata
         
         let seller_amount = listing
             .price
             .checked_sub(platform_fee)
+            .ok_or(AuctionError::CalculationError)?
+            .checked_sub(baxus_fee)
             .ok_or(AuctionError::CalculationError)?
             .checked_sub(creator_royalty)
             .ok_or(AuctionError::CalculationError)?;
@@ -221,7 +230,7 @@ pub mod auction {
                 ctx.accounts.token_program.to_account_info(),
                 transfer_fee,
             ),
-            platform_fee,
+            platform_fee + baxus_fee, // BAXUS fee also goes to treasury
         )?;
 
         // Transfer creator royalty if applicable
@@ -351,12 +360,21 @@ pub mod auction {
             // Auction has bids: transfer to highest bidder and distribute payments
             let platform_fee = (listing.current_bid * 250) / 10000; // 2.5% platform fee
             
+            // BAXUS 10% seller fee
+            let baxus_fee = if listing.baxus_fee {
+                (listing.current_bid * 1000) / 10000
+            } else {
+                0u64
+            };
+            
             // Get creator royalties from metadata (simplified to 0 if not readable)
             let creator_royalty = 0u64; // TODO: Read from Metaplex metadata
             
             let seller_amount = listing
                 .current_bid
                 .checked_sub(platform_fee)
+                .ok_or(AuctionError::CalculationError)?
+                .checked_sub(baxus_fee)
                 .ok_or(AuctionError::CalculationError)?
                 .checked_sub(creator_royalty)
                 .ok_or(AuctionError::CalculationError)?;
@@ -388,7 +406,7 @@ pub mod auction {
                     ctx.accounts.token_program.to_account_info(),
                     transfer_fee,
                 ),
-                platform_fee,
+                platform_fee + baxus_fee,
             )?;
 
             // Transfer creator royalty if applicable
@@ -664,6 +682,7 @@ pub struct Listing {
     pub escrow_nft_account: Pubkey,
     pub current_bid: u64,
     pub highest_bidder: Pubkey,
+    pub baxus_fee: bool, // true = 10% additional seller fee for BAXUS items
     pub bump: u8,
 }
 
