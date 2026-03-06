@@ -150,6 +150,20 @@ export const auctions: Auction[] = [
     ],
   },
   {
+    id: "a8", slug: "blantons-1984-first-release",
+    name: "Blanton's 1984 Bottling First Release",
+    subtitle: "ULTRA-RARE BOURBON",
+    category: "SPIRITS", current_bid: 11200, start_price: 8000,
+    end_time: new Date(now + 5 * day).toISOString(),
+    image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=800",
+    description: "Blanton's 1984 Bottling First Release — one of the rarest bourbons in existence. First single barrel bourbon ever marketed. BAXUS authenticated and tokenized on Solana. NFT: AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2",
+    bids: [
+      { bidder: "Sin✨...c502", amount: 11200, time: new Date(now - 3600000).toISOString() },
+      { bidder: "7xK9...mP2q", amount: 10500, time: new Date(now - 14400000).toISOString() },
+      { bidder: "4fG2...nR8w", amount: 9800, time: new Date(now - 43200000).toISOString() },
+    ],
+  },
+  {
     id: "a4", slug: "picasso-lithograph",
     name: "Pablo Picasso Original Lithograph",
     subtitle: "FINE ART MASTERS",
@@ -217,6 +231,7 @@ export const listings: Listing[] = [
   { id: "l8", name: "Babe Ruth Signed Baseball Card", subtitle: "Vintage Sports Memorabilia", price: 45000, image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400", category: "SPORTS_CARDS" },
   { id: "l9", name: "Omega Speedmaster Professional", subtitle: "Chronograph Luxury Watch", price: 6500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", category: "WATCHES" },
   { id: "l10", name: "Macallan 25 Year Single Malt", subtitle: "Rare Single Cask Whisky", price: 18000, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", category: "SPIRITS" },
+  { id: "l11", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=400", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2" },
 ];
 
 export const categoryColors: Record<Category, string> = {
