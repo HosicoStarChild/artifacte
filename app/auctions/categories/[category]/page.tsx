@@ -56,7 +56,6 @@ export default function CategoryAuctionsPage() {
     ],
     WATCHES: [
       { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
-      { label: "Material", key: "material", options: ["All", "Steel", "Gold", "Platinum", "Titanium", "Rose Gold"] },
     ],
     SPORTS_CARDS: [
       { label: "Sport", key: "sport", options: ["All", "Baseball", "Basketball", "Football", "Soccer"] },
