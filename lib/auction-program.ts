@@ -23,7 +23,7 @@ export enum ItemCategory {
 }
 
 export class AuctionProgram {
-  private program: anchor.Program;
+  private program: any;
   private connection: Connection;
   private wallet: any;
 
@@ -31,7 +31,8 @@ export class AuctionProgram {
     this.connection = connection;
     this.wallet = wallet;
     const provider = new anchor.AnchorProvider(connection, wallet, {});
-    this.program = new anchor.Program(IDL as any, AUCTION_PROGRAM_ID, provider);
+    const idl = { ...IDL, address: AUCTION_PROGRAM_ID.toBase58() } as any;
+    this.program = new (anchor.Program as any)(idl, provider);
   }
 
   /**
