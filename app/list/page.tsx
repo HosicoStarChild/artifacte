@@ -6,6 +6,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAssetsByOwner, readNFTMetadata, determineCurrency, calculateSellerFee, type NFTMetadata } from "@/lib/metadata-reader";
 import { BAXUS_SELLER_FEE_ENABLED } from "@/lib/data";
+import { useAuctionProgram } from "@/hooks/useAuctionProgram";
+import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
+import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { showToast } from "@/components/ToastContainer";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -39,6 +44,7 @@ interface ListingData {
 
 export default function ListPage() {
   const { publicKey, connected } = useWallet();
+  const auctionProgram = useAuctionProgram();
   const [step, setStep] = useState<Step>("connect");
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,6 +143,51 @@ export default function ListPage() {
     setSubmitting(true);
     setError("");
     try {
+      let txSignature: string | undefined;
+      
+      // Call on-chain listItem if auctionProgram is available
+      if (auctionProgram && publicKey) {
+        try {
+          const nftMint = new PublicKey(listing.nftMint);
+          const paymentMint = new PublicKey(listing.currency === "SOL" 
+            ? "So11111111111111111111111111111111111111112"  // SOL mint
+            : listing.currency === "USD1"
+            ? "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"  // USD1 mint
+            : "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC mint
+          );
+          
+          const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey);
+          
+          // Map category string to ItemCategory enum
+          const categoryMap: Record<string, ItemCategory> = {
+            "DIGITAL_ART": ItemCategory.DigitalArt,
+            "SPIRITS": ItemCategory.Spirits,
+            "TCG_CARDS": ItemCategory.TCGCards,
+            "SPORTS_CARDS": ItemCategory.SportsCards,
+            "WATCHES": ItemCategory.Watches,
+          };
+          
+          const durationSeconds = listing.auctionEndDays 
+            ? listing.auctionEndDays * 24 * 60 * 60 
+            : undefined;
+          
+          showToast.info("Creating on-chain listing...");
+          txSignature = await auctionProgram.listItem(
+            nftMint,
+            sellerNftAccount,
+            paymentMint,
+            listing.listingType === "FIXED_PRICE" ? ListingType.FixedPrice : ListingType.Auction,
+            Math.round(listing.price * (listing.currency === "SOL" ? 1e9 : 1e6)),  // Convert to smallest unit
+            durationSeconds,
+            categoryMap[listing.category] || ItemCategory.DigitalArt
+          );
+        } catch (programErr: any) {
+          console.warn("AuctionProgram.listItem failed, continuing with backend listing:", programErr);
+          // Continue with backend listing creation even if on-chain fails
+        }
+      }
+      
+      // Also save to backend for UI display
       const response = await fetch("/api/listing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,6 +201,7 @@ export default function ListPage() {
           currency: listing.currency,
           verifiedBy: listing.verifiedBy,
           sellerAddress: publicKey?.toBase58(),
+          txSignature,
           auctionEnd: listing.auctionEndDays
             ? new Date(Date.now() + listing.auctionEndDays * 24 * 60 * 60 * 1000).toISOString()
             : undefined,
@@ -161,9 +213,21 @@ export default function ListPage() {
         throw new Error("Failed to create listing");
       }
 
+      showToast.success("✓ Listing created successfully!");
       setStep("success");
     } catch (err: any) {
-      setError(err.message || "Failed to submit listing");
+      const message = err.message || "Failed to submit listing";
+      
+      if (message.includes("User rejected")) {
+        showToast.error("Transaction rejected by user");
+        setError("Transaction was rejected. Please try again.");
+      } else if (message.includes("insufficient")) {
+        showToast.error("Insufficient balance to create listing");
+        setError("You don't have enough balance. Please check your wallet.");
+      } else {
+        showToast.error(message);
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -201,9 +265,18 @@ export default function ListPage() {
             <p className="text-gray-400 mb-8">
               To list an NFT, you'll need to connect your Solana wallet first.
             </p>
-            <div className="flex justify-center">
-              <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-sm !font-semibold !px-8" />
-            </div>
+            {connected ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin mb-4">
+                  <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
+                </div>
+                <p className="text-gray-400">Connecting wallet...</p>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-sm !font-semibold !px-8" />
+              </div>
+            )}
           </div>
         )}
 

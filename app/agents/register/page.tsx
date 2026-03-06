@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { registerAgent } from "@/app/lib/agent-registry";
 import { PublicKey } from "@solana/web3.js";
+import { showToast } from "@/components/ToastContainer";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -67,7 +68,6 @@ export default function RegisterAgentPage() {
   const [selectAllCategories, setSelectAllCategories] = useState(false);
   const [loading, setLoading] = useState(false);
   const [nftLoading, setNftLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
 
   // Client-side API key generation
@@ -204,33 +204,28 @@ export default function RegisterAgentPage() {
     };
   }, [connected, publicKey, connection]);
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
-
   const handleStepForward = () => {
     if (currentStep === 1) {
       if (!selectedNFT) {
-        showToast("Please select an NFT", "error");
+        showToast.error("Please select an NFT");
         return;
       }
       setCurrentStep(2);
     } else if (currentStep === 2) {
       if (!agentName.trim()) {
-        showToast("Please enter an agent name", "error");
+        showToast.error("Please enter an agent name");
         return;
       }
       setCurrentStep(3);
     } else if (currentStep === 3) {
       if (!Object.values(permissions).some((v) => v)) {
-        showToast("Please select at least one permission", "error");
+        showToast.error("Please select at least one permission");
         return;
       }
       setCurrentStep(4);
     } else if (currentStep === 4) {
       if (selectedCategories.size === 0) {
-        showToast("Please select at least one category", "error");
+        showToast.error("Please select at least one category");
         return;
       }
       setCurrentStep(5);
@@ -243,13 +238,13 @@ export default function RegisterAgentPage() {
     setLoading(true);
     try {
       if (!publicKey) {
-        showToast("Wallet not connected", "error");
+        showToast.error("Wallet not connected");
         setLoading(false);
         return;
       }
 
       if (!selectedNFT) {
-        showToast("Please select an NFT", "error");
+        showToast.error("Please select an NFT");
         setLoading(false);
         return;
       }
@@ -308,17 +303,17 @@ export default function RegisterAgentPage() {
       });
 
       if (!apiRes.ok) {
-        showToast("Agent registered on-chain but API key storage failed", "error");
+        showToast.error("Agent registered on-chain but API key storage failed");
         setLoading(false);
         return;
       }
 
       // Set API key for display
       setApiKey(newApiKey);
-      showToast("✓ Agent registered successfully! Your API key is ready.", "success");
+      showToast.success("✓ Agent registered successfully! Your API key is ready.");
     } catch (e: any) {
       console.error("Registration failed:", e);
-      showToast(e.message || "Failed to register agent", "error");
+      showToast.error(e.message || "Failed to register agent");
     } finally {
       setLoading(false);
     }
@@ -379,19 +374,6 @@ export default function RegisterAgentPage() {
 
   return (
     <div className="pt-24 pb-20 min-h-screen">
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
-            toast.type === "success"
-              ? "bg-green-600 text-white"
-              : "bg-red-600 text-white"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
-
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
@@ -901,7 +883,7 @@ export default function RegisterAgentPage() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(apiKey);
-                    showToast("API key copied to clipboard!", "success");
+                    showToast.success("API key copied to clipboard!");
                   }}
                   className="w-full px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition mb-4"
                 >

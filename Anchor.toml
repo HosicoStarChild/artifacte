@@ -5,8 +5,8 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-auction = "23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN"
-rwa_nft = "F9mkXqMrgF1sSV3wDtTUpTs82B5XJ5qz9A33nBAdcNqb"
+auction = "9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL"
+rwa_nft = "3F9p3LxwVzPVgzJZQ59dxxBwQiobhtXdokr8iF7ZETSH"
 
 [registry]
 url = "https://api.apr.dev"

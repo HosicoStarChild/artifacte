@@ -3,6 +3,7 @@ import "./globals.css";
 import { WalletProviderWrapper } from "@/components/WalletProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { ToastContainer } from "@/components/ToastContainer";
 
 export const metadata: Metadata = {
   title: "Artifacte — RWA Tokenization on Solana",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <Footer />
+          <ToastContainer />
         </WalletProviderWrapper>
       </body>
     </html>

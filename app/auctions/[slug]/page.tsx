@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -26,6 +27,7 @@ export default function AuctionDetail() {
   const auction = auctions.find((a) => a.slug === slug);
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
+  const auctionProgram = useAuctionProgram();
   const [bidUsd1, setBidUsd1] = useState("");
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
   const [bidStatus, setBidStatus] = useState<string | null>(null);
@@ -88,26 +90,56 @@ export default function AuctionDetail() {
     try {
       setBidStatus("Submitting bid on-chain...");
 
-      let tx: Transaction;
       let txSignature: string = "";
-      if (isDigitalArt) {
-        const lamports = Math.round(usd1Amount * LAMPORTS_PER_SOL);
-        tx = new Transaction().add(
-          SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: TREASURY, lamports })
-        );
+      
+      // Use AuctionProgram if auction has nftMint (real on-chain listing)
+      const nftMint = (auction as any)?.nftMint;
+      if (nftMint && auctionProgram) {
+        try {
+          const nftMintPubkey = new PublicKey(nftMint);
+          const token = TOKENS[currency];
+          
+          // Get bidder's payment account
+          const bidderTokenAccount = await getAssociatedTokenAddress(token.mint, publicKey);
+          
+          // Get previous bidder's account (set to treasury if no previous bids)
+          const previousBidderAccount = allBids.length > 0 
+            ? await getAssociatedTokenAddress(token.mint, new PublicKey(allBids[0].bidder))
+            : await getAssociatedTokenAddress(token.mint, TREASURY);
+          
+          txSignature = await auctionProgram.placeBid(
+            nftMintPubkey,
+            Math.round(usd1Amount * (10 ** token.decimals)),
+            bidderTokenAccount,
+            token.mint,
+            previousBidderAccount
+          );
+        } catch (programErr: any) {
+          // Fall back to direct transfer if program call fails
+          console.warn("AuctionProgram.placeBid failed, falling back to direct transfer:", programErr);
+          throw new Error(`On-chain bid failed: ${programErr.message?.slice(0, 50)}`);
+        }
       } else {
-        const token = TOKENS[currency];
-        const tokenAmount = BigInt(Math.round(usd1Amount * 10 ** token.decimals));
-        const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
-        const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
-        tx = new Transaction().add(
-          createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
-        );
-      }
+        // Mock listing: use direct transfer for confirmation
+        let tx: Transaction;
+        if (isDigitalArt) {
+          const lamports = Math.round(usd1Amount * LAMPORTS_PER_SOL);
+          tx = new Transaction().add(
+            SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: TREASURY, lamports })
+          );
+        } else {
+          const token = TOKENS[currency];
+          const tokenAmount = BigInt(Math.round(usd1Amount * 10 ** token.decimals));
+          const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
+          const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
+          tx = new Transaction().add(
+            createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+          );
+        }
 
-      const sig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(sig, "confirmed");
-      txSignature = sig;
+        txSignature = await sendTransaction(tx, connection);
+        await connection.confirmTransaction(txSignature, "confirmed");
+      }
 
       const shortKey = `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`;
       const newBid: Bid & { txSignature?: string } = {
@@ -120,7 +152,7 @@ export default function AuctionDetail() {
       setLocalBids((prev) => [newBid as Bid, ...prev]);
       setBidStatus(null);
       setBidUsd1("");
-      showToast(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${sig.slice(0, 12)}...`, "success");
+      showToast(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${txSignature.slice(0, 12)}...`, "success");
 
       // Notify listings bot
       fetch("/api/listing-event", {

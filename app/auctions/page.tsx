@@ -10,6 +10,7 @@ import { PublicKey, Transaction } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { showToast } from "@/components/ToastContainer";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -28,16 +29,10 @@ export default function AuctionsPage() {
   const { connection } = useConnection();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
 
   const handleBuyNow = async (listingId: string, priceUsd: number) => {
     if (!connected || !publicKey) {
-      showToast("Please connect your wallet first", "error");
+      showToast.error("Please connect your wallet first");
       return;
     }
 
@@ -61,9 +56,17 @@ export default function AuctionsPage() {
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
 
-      showToast(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`, "success");
+      showToast.success(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`);
     } catch (err: any) {
-      showToast(`Error: ${err.message?.slice(0, 80) || "Transaction failed"}`, "error");
+      const message = err.message || "Transaction failed";
+      
+      if (message.includes("User rejected")) {
+        showToast.error("Transaction rejected by user");
+      } else if (message.includes("insufficient")) {
+        showToast.error(`Insufficient balance. Required: ${priceUsd} ${currency}`);
+      } else {
+        showToast.error(`Error: ${message.slice(0, 80)}`);
+      }
     } finally {
       setBuyingId(null);
     }
@@ -71,15 +74,6 @@ export default function AuctionsPage() {
 
   return (
     <div className="pt-24 pb-20">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-24 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
-          toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
-        }`}>
-          {toast.message}
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">

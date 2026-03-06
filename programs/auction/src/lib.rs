@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN");
+declare_id!("9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL");
 
 // Treasury wallet
 const TREASURY: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 
 // Standard token mints
-const SOL_MINT: &str = "11111111111111111111111111111111"; // System program (native SOL)
+const SOL_MINT: &str = "So11111111111111111111111111111111111111112"; // Wrapped SOL mint
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 

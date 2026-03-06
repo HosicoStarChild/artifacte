@@ -162,7 +162,7 @@ export default function PortfolioPage() {
               </svg>
             </div>
             <p className="text-gray-400 text-sm">Connect your Solana wallet to view your NFTs and RWAs</p>
-            <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-sm !font-medium" />
+            <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-sm !font-medium" />
           </div>
         ) : loading && nfts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">

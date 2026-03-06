@@ -4,7 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { IDL } from "./auction-idl";
 
 // Program IDs and constants
-const AUCTION_PROGRAM_ID = new PublicKey("23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN");
+const AUCTION_PROGRAM_ID = new PublicKey("9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL");
 const TREASURY_WALLET = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
 const USD1_MINT = new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");

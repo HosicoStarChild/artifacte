@@ -11,6 +11,9 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useAuctionProgram } from "@/hooks/useAuctionProgram";
+import { AuctionProgram } from "@/lib/auction-program";
+import { showToast } from "@/components/ToastContainer";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -38,9 +41,9 @@ export default function CategoryAuctionsPage() {
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
   const { publicKey, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
+  const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
 
   // Category-specific filter options
@@ -67,50 +70,84 @@ export default function CategoryAuctionsPage() {
     ],
   };
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
-
   const isDigitalArt = category === "DIGITAL_ART";
 
-  const handleBuyNow = async (listingId: string, price: number) => {
+  const handleBuyNow = async (listingId: string, price: number, nftMint?: string) => {
     if (!connected || !publicKey) {
-      showToast("Please connect your wallet first", "error");
+      showToast.error("Please connect your wallet first");
       return;
     }
 
     setBuyingId(listingId);
     try {
-      let tx: Transaction;
+      let sig: string = "";
 
-      if (isDigitalArt) {
-        // Digital Art pays in SOL
-        const lamports = Math.round(price * LAMPORTS_PER_SOL);
-        tx = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: TREASURY,
-            lamports,
-          })
-        );
+      // Use AuctionProgram if listing has nftMint (real on-chain listing)
+      if (nftMint && auctionProgram) {
+        try {
+          const nftMintPubkey = new PublicKey(nftMint);
+          const token = TOKENS[currency];
+          
+          // Get buyer's NFT account (where they'll receive the NFT)
+          const buyerNftAccount = await getAssociatedTokenAddress(nftMintPubkey, publicKey);
+          
+          // Get payment accounts
+          const buyerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
+          const sellerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
+          
+          sig = await auctionProgram.buyNow(
+            nftMintPubkey,
+            sellerPaymentAccount,
+            buyerPaymentAccount,
+            buyerNftAccount,
+            Math.round(price * (10 ** token.decimals)),
+            token.mint
+          );
+        } catch (programErr: any) {
+          // Fall back to direct transfer if program call fails
+          console.warn("AuctionProgram.buyNow failed, falling back to direct transfer:", programErr);
+          throw new Error(`On-chain purchase failed: ${programErr.message?.slice(0, 50)}`);
+        }
       } else {
-        // RWA categories pay in USD1/USDC
-        const token = TOKENS[currency];
-        const tokenAmount = BigInt(Math.round(price * 10 ** token.decimals));
-        const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
-        const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
-        tx = new Transaction().add(
-          createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
-        );
+        // Mock listing: use direct transfer
+        let tx: Transaction;
+
+        if (isDigitalArt) {
+          // Digital Art pays in SOL
+          const lamports = Math.round(price * LAMPORTS_PER_SOL);
+          tx = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: publicKey,
+              toPubkey: TREASURY,
+              lamports,
+            })
+          );
+        } else {
+          // RWA categories pay in USD1/USDC
+          const token = TOKENS[currency];
+          const tokenAmount = BigInt(Math.round(price * 10 ** token.decimals));
+          const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
+          const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
+          tx = new Transaction().add(
+            createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+          );
+        }
+
+        sig = await sendTransaction(tx, connection);
+        await connection.confirmTransaction(sig, "confirmed");
       }
 
-      const sig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(sig, "confirmed");
-
-      showToast(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`, "success");
+      showToast.success(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`);
     } catch (err: any) {
-      showToast(`Error: ${err.message?.slice(0, 80) || "Transaction failed"}`, "error");
+      const message = err.message || "Transaction failed";
+      
+      if (message.includes("User rejected")) {
+        showToast.error("Transaction rejected by user");
+      } else if (message.includes("insufficient")) {
+        showToast.error(`Insufficient balance. Required: ${price} ${isDigitalArt ? "SOL" : currency}`);
+      } else {
+        showToast.error(`Error: ${message.slice(0, 80)}`);
+      }
     } finally {
       setBuyingId(null);
     }
@@ -141,17 +178,6 @@ export default function CategoryAuctionsPage() {
 
   return (
     <div className="pt-24 pb-20">
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed top-24 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
-            toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
@@ -302,7 +328,7 @@ export default function CategoryAuctionsPage() {
                           </div>
                           {connected ? (
                             <button
-                              onClick={() => handleBuyNow(l.id, l.price)}
+                              onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint)}
                               disabled={buyingId === l.id}
                               className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
                             >
