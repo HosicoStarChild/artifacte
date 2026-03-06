@@ -267,7 +267,7 @@ export default function ClawPage() {
               {
                 step: '03',
                 title: 'Hold or Swap',
-                description: 'Mint to your wallet as an NFT, or swap instantly for cash at oracle price.',
+                description: 'Keep the card in your collection, or swap instantly for cash at oracle market price.',
               },
             ].map((item, i) => (
               <div key={i} className="text-center group">
