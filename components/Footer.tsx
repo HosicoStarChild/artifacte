@@ -47,7 +47,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-gray-600">© 2026 Artifacte. All rights reserved.</p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">A</span>
             <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-16 rounded opacity-80 hover:opacity-100 transition" />
             <span className="text-sm text-gray-500">project</span>
