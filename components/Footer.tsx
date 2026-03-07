@@ -49,7 +49,7 @@ export default function Footer() {
           <p className="text-xs text-gray-600">© 2026 Artifacte. All rights reserved.</p>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">A</span>
-            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-10 rounded opacity-80 hover:opacity-100 transition" />
+            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-16 rounded opacity-80 hover:opacity-100 transition" />
             <span className="text-sm text-gray-500">project</span>
           </div>
         </div>
