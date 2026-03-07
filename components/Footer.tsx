@@ -31,7 +31,7 @@ export default function Footer() {
               <ul className="space-y-2 text-sm text-gray-500">
                 <li><a href="/digital-art" className="hover:text-white transition">Digital Art</a></li>
                 <li><a href="/apply" className="hover:text-white transition">Apply to List</a></li>
-                <li><a href="https://github.com" className="hover:text-white transition">GitHub</a></li>
+                <li><a href="https://github.com/HosicoStarChild" className="hover:text-white transition" target="_blank" rel="noopener noreferrer">GitHub</a></li>
               </ul>
             </div>
           </div>
@@ -47,7 +47,11 @@ export default function Footer() {
         {/* Bottom */}
         <div className="pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-gray-600">© 2026 Artifacte. All rights reserved.</p>
-          <p className="text-xs text-gray-600">Institutional-grade RWA tokenization</p>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-600">A</span>
+            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-6 rounded opacity-60 hover:opacity-100 transition" />
+            <span className="text-xs text-gray-600">project</span>
+          </div>
         </div>
       </div>
     </footer>

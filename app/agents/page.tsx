@@ -99,9 +99,13 @@ export default function AgentsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
-          <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">
-            AI Agents
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">
+              AI Agents
+            </p>
+            <span className="text-gray-600 text-xs">powered by</span>
+            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-8 rounded" />
+          </div>
           <h1 className="font-serif text-4xl md:text-5xl text-white mb-3">Agent Dashboard</h1>
           <p className="text-gray-400 text-base">
             Discover and interact with registered AI agents on the Artifacte platform
