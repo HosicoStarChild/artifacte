@@ -104,7 +104,7 @@ export default function AgentsPage() {
               AI Agents
             </p>
             <span className="text-gray-600 text-xs">powered by</span>
-            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-8 rounded" />
+            <img src="/hosico-labs.jpg" alt="Hosico Labs" className="h-14 rounded" />
           </div>
           <h1 className="font-serif text-4xl md:text-5xl text-white mb-3">Agent Dashboard</h1>
           <p className="text-gray-400 text-base">
