@@ -55,7 +55,7 @@ export default function CategoryAuctionsPage() {
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
     ],
     SPIRITS: [
-      { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Scotch", "Whisky", "Tequila", "Rum", "Cognac", "Wine"] },
+      { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
     ],
     WATCHES: [
       { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
@@ -155,7 +155,42 @@ export default function CategoryAuctionsPage() {
 
   // Filter auctions and listings by category
   const categoryAuctions = category ? auctions.filter((a) => a.category === category) : [];
-  const categoryListings = category ? listings.filter((l) => l.category === category) : [];
+  const categoryListingsBase = category ? listings.filter((l) => l.category === category) : [];
+
+  // Apply dropdown filters
+  const categoryListings = categoryListingsBase.filter((l: any) => {
+    for (const [key, value] of Object.entries(filters)) {
+      if (!value || value === "All") continue;
+      // Map filter keys to listing fields
+      if (key === "spiritType") {
+        const st = (l.spirit_type || l.subtitle || "").toLowerCase();
+        if (!st.includes(value.toLowerCase())) return false;
+      } else if (key === "brand") {
+        const name = (l.name || "").toLowerCase();
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!name.includes(value.toLowerCase()) && !sub.includes(value.toLowerCase())) return false;
+      } else if (key === "tcg") {
+        const name = (l.name || "").toLowerCase() + " " + (l.subtitle || "").toLowerCase();
+        if (!name.includes(value.toLowerCase())) return false;
+      } else if (key === "rarity") {
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!sub.includes(value.toLowerCase())) return false;
+      } else if (key === "grade") {
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!sub.includes(value.toLowerCase())) return false;
+      } else if (key === "language") {
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!sub.includes(value.toLowerCase())) return false;
+      } else if (key === "sport") {
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!sub.includes(value.toLowerCase())) return false;
+      } else if (key === "collection") {
+        const sub = (l.subtitle || "").toLowerCase();
+        if (!sub.includes(value.toLowerCase())) return false;
+      }
+    }
+    return true;
+  });
 
   if (!category) {
     return (
