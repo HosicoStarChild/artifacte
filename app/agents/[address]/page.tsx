@@ -102,10 +102,10 @@ export default function AgentProfilePage() {
           }
 
           setAgent({
-            address: agentData.assetPubkey.toBase58(),
+            address: agentData.assetPubkey,
             name: agentData.name,
             description: agentData.description,
-            ownerWallet: agentData.owner.toBase58(),
+            ownerWallet: agentData.owner,
             avatarImage: agentData.imageUri || `https://picsum.photos/400/400?seed=${address}`,
             services: agentData.services,
             reputation: reputationScore,
@@ -114,7 +114,7 @@ export default function AgentProfilePage() {
           });
 
           // Load API key info if this is the owner
-          if (publicKey && publicKey.toBase58() === agentData.owner.toBase58()) {
+          if (publicKey && publicKey.toBase58() === agentData.owner) {
             const apiRes = await fetch("/api/agents");
             const apiData = await apiRes.json();
             const agentRecord = apiData.agents?.find(

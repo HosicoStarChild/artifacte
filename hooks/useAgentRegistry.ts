@@ -3,9 +3,10 @@
 import { useCallback, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { SolanaSDK, IPFSClient, buildRegistrationFileJson, ServiceType } from '8004-solana';
 
-// mainnet program IDs from 8004
+// 8004-solana uses node:fs — can't import directly in client code
+// All SDK calls go through API routes (server-side)
+
 const AGENT_REGISTRY_PROGRAM_ID = '8oo4dC4JvBLwy5tGgiH3WwK4B9PWxL9Z4XjA2jzkQMbQ';
 const ATOM_ENGINE_PROGRAM_ID = 'AToMw53aiPQ8j7iHVb4fGt6nzUNxUhcPc3tbPBZuzVVb';
 
@@ -16,8 +17,11 @@ export interface Agent8004Data {
   services: Array<{ type: string; value: string }>;
   skills?: string[];
   domains?: string[];
-  owner: PublicKey;
-  assetPubkey: PublicKey;
+  owner: string;
+  assetPubkey: string;
+  reputationScore?: number;
+  totalFeedbacks?: number;
+  trustTier?: number;
 }
 
 export interface ReputableFeedback {
@@ -35,6 +39,7 @@ export interface ReputationSummary {
 
 /**
  * Hook for interacting with the ERC-8004 Solana Agent Registry
+ * SDK calls proxied through /api/agents/8004 routes (server-side only)
  */
 export function useAgentRegistry() {
   const wallet = useWallet();
@@ -42,42 +47,6 @@ export function useAgentRegistry() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Get or create the 8004 SDK instance
-   */
-  const getSDK = useCallback(async (signerRequired: boolean = false) => {
-    if (signerRequired && !wallet.publicKey) {
-      throw new Error('Wallet not connected');
-    }
-
-    // Initialize IPFS client (optional - for production add Pinata JWT)
-    const ipfs = new IPFSClient({
-      pinataEnabled: false, // Set to true and add JWT for production
-    });
-
-    // If wallet is connected, create SDK with signer
-    if (wallet.publicKey && wallet.signMessage && signerRequired) {
-      // For browser wallet, we use the SignerWalletAdapter pattern
-      const sdk = new SolanaSDK({
-        connection,
-        wallet: wallet as any, // Solana wallet adapters are compatible
-        ipfsClient: ipfs,
-      });
-      return sdk;
-    }
-
-    // Read-only SDK without signer
-    const sdk = new SolanaSDK({
-      connection,
-      ipfsClient: ipfs,
-    });
-
-    return sdk;
-  }, [wallet, connection]);
-
-  /**
-   * Register a new agent on 8004
-   */
   const registerAgent = useCallback(
     async (
       name: string,
@@ -92,240 +61,120 @@ export function useAgentRegistry() {
         setLoading(true);
         setError(null);
 
-        if (!wallet.publicKey) {
-          throw new Error('Wallet not connected');
-        }
+        if (!wallet.publicKey) throw new Error('Wallet not connected');
 
-        const sdk = await getSDK(true);
-
-        // Build metadata JSON
-        const metadata = buildRegistrationFileJson({
-          name,
-          description,
-          image: imageUri,
-          services,
-          skills: skills || [],
-          domains: domains || [],
+        const res = await fetch('/api/agents/8004/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name, description, imageUri, services,
+            collectionPointer, skills, domains,
+            owner: wallet.publicKey.toBase58(),
+          }),
         });
 
-        // Upload metadata to IPFS
-        const cid = await (sdk as any).ipfsClient.addJson(metadata);
-
-        // Register agent on chain
-        const result = await (sdk as any).registerAgent(`ipfs://${cid}`, {
-          collectionPointer: collectionPointer || undefined,
-        });
-
-        return result.asset.toBase58();
+        if (!res.ok) throw new Error((await res.json()).error || 'Registration failed');
+        const data = await res.json();
+        return data.assetAddress;
       } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to register agent';
-        setError(errorMsg);
+        setError(err?.message || 'Failed to register agent');
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [wallet.publicKey, getSDK]
+    [wallet.publicKey]
   );
 
-  /**
-   * Load agent data from 8004
-   */
   const loadAgent = useCallback(
-    async (assetPubkey: PublicKey | string): Promise<Agent8004Data | null> => {
+    async (assetPubkey: string): Promise<Agent8004Data | null> => {
       try {
         setLoading(true);
         setError(null);
 
-        const sdk = await getSDK(false);
-        const assetKey =
-          typeof assetPubkey === 'string' ? new PublicKey(assetPubkey) : assetPubkey;
-
-        const agent = await (sdk as any).loadAgent(assetKey);
-
-        if (!agent) {
-          return null;
-        }
-
-        return {
-          name: agent.nft_name || '',
-          description: agent.description || '',
-          imageUri: agent.image_uri || '',
-          services: agent.services || [],
-          skills: agent.skills,
-          domains: agent.domains,
-          owner: agent.getOwnerPublicKey(),
-          assetPubkey: assetKey,
-        };
+        const res = await fetch(`/api/agents/8004/load?asset=${assetPubkey}`);
+        if (!res.ok) return null;
+        return await res.json();
       } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to load agent';
-        setError(errorMsg);
+        setError(err?.message || 'Failed to load agent');
         return null;
       } finally {
         setLoading(false);
       }
     },
-    [getSDK]
+    []
   );
 
-  /**
-   * Set the operational wallet for an agent
-   */
-  const setAgentWallet = useCallback(
-    async (assetPubkey: PublicKey | string, newWallet: PublicKey): Promise<void> => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const sdk = await getSDK(true);
-        const assetKey =
-          typeof assetPubkey === 'string' ? new PublicKey(assetPubkey) : assetPubkey;
-
-        await (sdk as any).setAgentWallet(assetKey, newWallet);
-      } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to set agent wallet';
-        setError(errorMsg);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [getSDK]
-  );
-
-  /**
-   * Give feedback/reputation to an agent
-   */
   const giveFeedback = useCallback(
-    async (
-      assetPubkey: PublicKey | string,
-      feedback: ReputableFeedback
-    ): Promise<void> => {
+    async (assetPubkey: string, feedback: ReputableFeedback): Promise<void> => {
       try {
         setLoading(true);
         setError(null);
 
-        const sdk = await getSDK(true);
-        const assetKey =
-          typeof assetPubkey === 'string' ? new PublicKey(assetPubkey) : assetPubkey;
+        if (!wallet.publicKey) throw new Error('Wallet not connected');
 
-        await (sdk as any).giveFeedback(assetKey, feedback);
+        const res = await fetch('/api/agents/8004/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetPubkey, feedback, signer: wallet.publicKey.toBase58() }),
+        });
+
+        if (!res.ok) throw new Error((await res.json()).error || 'Feedback failed');
       } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to give feedback';
-        setError(errorMsg);
+        setError(err?.message || 'Failed to give feedback');
         throw err;
       } finally {
         setLoading(false);
       }
     },
-    [getSDK]
+    [wallet.publicKey]
   );
 
-  /**
-   * Get reputation summary for an agent
-   */
   const getSummary = useCallback(
-    async (assetPubkey: PublicKey | string): Promise<ReputationSummary | null> => {
+    async (assetPubkey: string): Promise<ReputationSummary | null> => {
       try {
         setLoading(true);
         setError(null);
 
-        const sdk = await getSDK(false);
-        const assetKey =
-          typeof assetPubkey === 'string' ? new PublicKey(assetPubkey) : assetPubkey;
-
-        const summary = await (sdk as any).getSummary(assetKey);
-
-        if (!summary) {
-          return null;
-        }
-
-        return {
-          averageScore: parseFloat(summary.averageScore || '0'),
-          totalFeedbacks: summary.totalFeedbacks || 0,
-          trustTier: summary.trustTier,
-        };
+        const res = await fetch(`/api/agents/8004/reputation?asset=${assetPubkey}`);
+        if (!res.ok) return null;
+        return await res.json();
       } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to get reputation summary';
-        setError(errorMsg);
+        setError(err?.message || 'Failed to get reputation');
         return null;
       } finally {
         setLoading(false);
       }
     },
-    [getSDK]
+    []
   );
 
-  /**
-   * Get all agents from the registry (reads from on-chain)
-   */
-  const getAllAgents = useCallback(async (): Promise<Agent8004Data[]> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const sdk = await getSDK(false);
-      const agents = await (sdk as any).getAllAgents();
-
-      return (agents || []).map((agent: any) => ({
-        name: agent.nft_name || '',
-        description: agent.description || '',
-        imageUri: agent.image_uri || '',
-        services: agent.services || [],
-        skills: agent.skills,
-        domains: agent.domains,
-        owner: agent.getOwnerPublicKey(),
-        assetPubkey: agent.asset,
-      }));
-    } catch (err: any) {
-      const errorMsg = err?.message || 'Failed to fetch agents';
-      setError(errorMsg);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, [getSDK]);
-
-  /**
-   * Get agents in a specific collection
-   */
   const getCollectionAgents = useCallback(
-    async (collectionPointer: string): Promise<Agent8004Data[]> => {
+    async (collectionPointer?: string): Promise<Agent8004Data[]> => {
       try {
         setLoading(true);
         setError(null);
 
-        const sdk = await getSDK(false);
-        const agents = await (sdk as any).getCollectionAgents(collectionPointer);
-
-        return (agents || []).map((agent: any) => ({
-          name: agent.nft_name || '',
-          description: agent.description || '',
-          imageUri: agent.image_uri || '',
-          services: agent.services || [],
-          skills: agent.skills,
-          domains: agent.domains,
-          owner: agent.getOwnerPublicKey(),
-          assetPubkey: agent.asset,
-        }));
+        const params = collectionPointer ? `?collection=${collectionPointer}` : '';
+        const res = await fetch(`/api/agents/8004/list${params}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.agents || [];
       } catch (err: any) {
-        const errorMsg = err?.message || 'Failed to fetch collection agents';
-        setError(errorMsg);
+        setError(err?.message || 'Failed to fetch agents');
         return [];
       } finally {
         setLoading(false);
       }
     },
-    [getSDK]
+    []
   );
 
   return {
     registerAgent,
     loadAgent,
-    setAgentWallet,
     giveFeedback,
     getSummary,
-    getAllAgents,
     getCollectionAgents,
     loading,
     error,

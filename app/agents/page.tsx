@@ -50,7 +50,7 @@ export default function AgentsPage() {
         // Transform 8004 data to UI format and fetch reputation
         const transformedAgents: Agent[] = await Promise.all(
           agentData.map(async (agent) => {
-            const assetAddr = agent.assetPubkey.toBase58();
+            const assetAddr = agent.assetPubkey;
             const apiKeyInfo: any = apiKeyMap.get(assetAddr);
 
             // Fetch reputation from ATOM engine
@@ -70,7 +70,7 @@ export default function AgentsPage() {
               address: assetAddr,
               name: agent.name,
               description: agent.description,
-              ownerWallet: `${agent.owner.toBase58().slice(0, 8)}...${agent.owner.toBase58().slice(-4)}`,
+              ownerWallet: `${agent.owner.slice(0, 8)}...${agent.owner.slice(-4)}`,
               avatarImage: agent.imageUri || `https://picsum.photos/200/200?seed=${assetAddr}`,
               permissions: [] as ("Trade" | "Bid" | "Chat")[],
               reputation: reputationScore,
