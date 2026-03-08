@@ -186,7 +186,7 @@ pub mod auction {
         );
 
         // Calculate fees and payments
-        let platform_fee = (listing.price * 250) / 10000; // 2.5% platform fee
+        let platform_fee = (listing.price * 200) / 10000; // 2% platform fee
         
         // BAXUS 10% seller fee (temporary until they migrate to Metaplex standard)
         let baxus_fee = if listing.baxus_fee {
@@ -362,7 +362,7 @@ pub mod auction {
 
         if listing.current_bid > 0 {
             // Auction has bids: transfer to highest bidder and distribute payments
-            let platform_fee = (listing.current_bid * 250) / 10000; // 2.5% platform fee
+            let platform_fee = (listing.current_bid * 200) / 10000; // 2% platform fee
             
             // BAXUS 10% seller fee
             let baxus_fee = if listing.baxus_fee {
