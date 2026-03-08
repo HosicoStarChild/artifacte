@@ -4,7 +4,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { registerAgent } from "@/app/lib/agent-registry";
+import { useAgentRegistry } from "@/hooks/useAgentRegistry";
 import { PublicKey } from "@solana/web3.js";
 import { showToast } from "@/components/ToastContainer";
 
@@ -35,6 +35,7 @@ export default function RegisterAgentPage() {
   const wallet = useWallet();
   const { publicKey, connected } = wallet;
   const { connection } = useConnection();
+  const { registerAgent: registerAgentOn8004 } = useAgentRegistry();
 
   // Category options
   const ARTIFACT_CATEGORIES: Category[] = [
@@ -249,15 +250,22 @@ export default function RegisterAgentPage() {
         return;
       }
 
-      // Call on-chain register function - use the current wallet context
-      const signature = await registerAgent(
-        wallet,
-        connection,
-        new PublicKey(selectedNFT.mint),
+      // Prepare services array with MCP endpoint
+      const mcpEndpoint = process.env.NEXT_PUBLIC_MCP_ENDPOINT || 'https://artifacte.io/mcp';
+      const services = [
+        { type: 'MCP', value: mcpEndpoint }
+      ];
+
+      // Register agent on 8004 (via 8004-solana SDK)
+      const collectionPointer = process.env.NEXT_PUBLIC_8004_COLLECTION_POINTER;
+      const agentAssetAddress = await registerAgentOn8004(
         agentName,
-        permissions.Trade,
-        permissions.Bid,
-        permissions.Chat
+        `AI Agent: ${agentName}`,
+        `https://picsum.photos/200/200?seed=${publicKey.toBase58()}`, // Use a placeholder image
+        services,
+        collectionPointer,
+        [], // skills
+        [] // domains
       );
 
       // Generate API key
@@ -287,7 +295,7 @@ export default function RegisterAgentPage() {
         },
       };
 
-      // Register API key in backend
+      // Register API key in backend (Artifacte-specific data)
       const apiRes = await fetch("/api/agents/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -296,6 +304,7 @@ export default function RegisterAgentPage() {
           agentName,
           apiKey: newApiKey,
           nftMint: selectedNFT.mint,
+          agentAssetAddress, // 8004 asset address
           permissions,
           categories: Array.from(selectedCategories),
           spendingLimits: formattedSpendingLimits,
@@ -303,14 +312,14 @@ export default function RegisterAgentPage() {
       });
 
       if (!apiRes.ok) {
-        showToast.error("Agent registered on-chain but API key storage failed");
+        showToast.error("Agent registered on 8004 but local storage failed");
         setLoading(false);
         return;
       }
 
       // Set API key for display
       setApiKey(newApiKey);
-      showToast.success("✓ Agent registered successfully! Your API key is ready.");
+      showToast.success("✓ Agent registered successfully on 8004! Your API key is ready.");
     } catch (e: any) {
       console.error("Registration failed:", e);
       showToast.error(e.message || "Failed to register agent");

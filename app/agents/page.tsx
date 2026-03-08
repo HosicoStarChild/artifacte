@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { fetchAllAgents } from "@/app/lib/agent-registry";
+import { PublicKey } from "@solana/web3.js";
+import { useAgentRegistry } from "@/hooks/useAgentRegistry";
 
 interface Agent {
   address: string;
   name: string;
   ownerWallet: string;
   avatarImage: string;
+  description: string;
   permissions: ("Trade" | "Bid" | "Chat")[];
+  reputation: number;
+  totalFeedbacks: number;
   createdDate: string;
   hasApiKey: boolean;
   connectionStatus: "connected" | "disconnected";
@@ -21,45 +24,63 @@ export default function AgentsPage() {
   const [filterPermission, setFilterPermission] = useState<"Trade" | "Bid" | "Chat" | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getCollectionAgents, getSummary } = useAgentRegistry();
 
   useEffect(() => {
     async function loadAgents() {
       try {
         setLoading(true);
-        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-        const agentData = await fetchAllAgents(connection);
-        
-        // Fetch API key data from API endpoint
+
+        // Fetch agents from 8004 collection
+        const collectionPointer = process.env.NEXT_PUBLIC_8004_COLLECTION_POINTER;
+        const agentData = collectionPointer
+          ? await getCollectionAgents(collectionPointer)
+          : [];
+
+        // Fetch API key data from API endpoint (for Artifacte-specific data)
         const apiRes = await fetch("/api/agents");
         const apiData = await apiRes.json();
         const apiAgents = apiData.agents || [];
 
-        // Create a map of wallet address to API key info
+        // Create a map of agent asset address to API key info
         const apiKeyMap = new Map<string, any>(
-          apiAgents.map((ak: any) => [ak.walletAddress, ak])
+          apiAgents.map((ak: any) => [ak.agentAssetAddress, ak])
         );
 
-        // Transform on-chain data to UI format
-        const transformedAgents: Agent[] = agentData.map((agent) => {
-          const permissions: ("Trade" | "Bid" | "Chat")[] = [];
-          if (agent.canTrade) permissions.push("Trade");
-          if (agent.canBid) permissions.push("Bid");
-          if (agent.canChat) permissions.push("Chat");
+        // Transform 8004 data to UI format and fetch reputation
+        const transformedAgents: Agent[] = await Promise.all(
+          agentData.map(async (agent) => {
+            const assetAddr = agent.assetPubkey.toBase58();
+            const apiKeyInfo: any = apiKeyMap.get(assetAddr);
 
-          const walletAddr = agent.owner.toBase58();
-          const apiKeyInfo: any = apiKeyMap.get(walletAddr);
+            // Fetch reputation from ATOM engine
+            let reputationScore = 0;
+            let totalFeedbacks = 0;
+            try {
+              const summary = await getSummary(agent.assetPubkey);
+              if (summary) {
+                reputationScore = summary.averageScore;
+                totalFeedbacks = summary.totalFeedbacks;
+              }
+            } catch (e) {
+              console.error("Failed to fetch reputation:", e);
+            }
 
-          return {
-            address: agent.address,
-            name: agent.name,
-            ownerWallet: `${walletAddr.slice(0, 8)}...${walletAddr.slice(-4)}`,
-            avatarImage: `https://picsum.photos/200/200?seed=${agent.address}`,
-            permissions,
-            createdDate: new Date(agent.createdAt * 1000).toISOString().split("T")[0],
-            hasApiKey: !!apiKeyInfo,
-            connectionStatus: apiKeyInfo?.connectionStatus || "disconnected",
-          };
-        });
+            return {
+              address: assetAddr,
+              name: agent.name,
+              description: agent.description,
+              ownerWallet: `${agent.owner.toBase58().slice(0, 8)}...${agent.owner.toBase58().slice(-4)}`,
+              avatarImage: agent.imageUri || `https://picsum.photos/200/200?seed=${assetAddr}`,
+              permissions: [] as ("Trade" | "Bid" | "Chat")[],
+              reputation: reputationScore,
+              totalFeedbacks,
+              createdDate: new Date().toISOString().split("T")[0],
+              hasApiKey: !!apiKeyInfo,
+              connectionStatus: apiKeyInfo?.connectionStatus || "disconnected",
+            };
+          })
+        );
 
         setAgents(transformedAgents);
       } catch (error) {
@@ -71,7 +92,7 @@ export default function AgentsPage() {
     }
 
     loadAgents();
-  }, []);
+  }, [getCollectionAgents, getSummary]);
 
   const filteredAgents = useMemo(() => {
     return agents.filter((agent) => {
@@ -206,23 +227,23 @@ export default function AgentsPage() {
                   <div className="p-6">
                     <h3 className="text-white font-serif text-lg">{agent.name}</h3>
 
+                    {/* Description */}
+                    <p className="text-gray-500 text-xs mt-2 line-clamp-2">
+                      {agent.description || "No description"}
+                    </p>
+
                     {/* Wallet */}
-                    <p className="text-gray-500 text-xs mt-3 font-mono">
+                    <p className="text-gray-600 text-xs mt-3 font-mono">
                       Owner: {agent.ownerWallet}
                     </p>
 
-                    {/* Permissions */}
+                    {/* Reputation Score */}
                     <div className="flex flex-wrap gap-2 mt-4 mb-6">
-                      {agent.permissions.map((perm) => (
-                        <span
-                          key={perm}
-                          className={`px-2.5 py-1 rounded-md text-xs font-medium border ${permissionBadgeColor(
-                            perm
-                          )}`}
-                        >
-                          {perm}
-                        </span>
-                      ))}
+                      <div className="px-3 py-1.5 rounded-md text-xs font-medium bg-gold-500/20 border border-gold-500/30 text-gold-300 flex items-center gap-1">
+                        <span>⭐</span>
+                        <span>{agent.reputation.toFixed(1)}</span>
+                        <span className="text-gray-500 text-xs">({agent.totalFeedbacks})</span>
+                      </div>
                     </div>
 
                     {/* Date and Status */}
@@ -230,11 +251,14 @@ export default function AgentsPage() {
                       <p className="text-gray-600 text-xs">
                         {new Date(agent.createdDate).toLocaleDateString()}
                       </p>
-                      {agent.hasApiKey && (
-                        <span className="text-xs text-gray-500">
-                          {agent.connectionStatus === "connected" ? "✓ Connected" : "○ Registered"}
-                        </span>
-                      )}
+                      <a
+                        href={`https://8004scan.io/agents/${agent.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-gold-400 hover:text-gold-300 transition"
+                      >
+                        View on 8004scan ↗
+                      </a>
                     </div>
                   </div>
                 </div>

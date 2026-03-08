@@ -24,6 +24,7 @@ export interface AgentRecord {
   agentName: string;
   apiKey: string;
   nftMint: string;
+  agentAssetAddress?: string; // 8004 agent asset address
   permissions: {
     Trade: boolean;
     Bid: boolean;
@@ -155,7 +156,8 @@ export function registerAgentApiKey(
   nftMint: string,
   permissions: { Trade: boolean; Bid: boolean; Chat: boolean },
   categories: string[] = [],
-  spendingLimits?: SpendingLimits
+  spendingLimits?: SpendingLimits,
+  agentAssetAddress?: string
 ): AgentRecord {
   const data = loadAgents();
 
@@ -164,6 +166,7 @@ export function registerAgentApiKey(
     agentName,
     apiKey,
     nftMint,
+    agentAssetAddress,
     permissions,
     categories: categories.length > 0 ? categories : ["Digital Art"],
     createdAt: Date.now(),

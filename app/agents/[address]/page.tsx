@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { fetchAgent } from "@/app/lib/agent-registry";
+import { PublicKey } from "@solana/web3.js";
+import { useAgentRegistry } from "@/hooks/useAgentRegistry";
 
 interface SpendingLimit {
   enabled: boolean;
@@ -24,9 +24,12 @@ interface SpendingLimits {
 interface Agent {
   address: string;
   name: string;
+  description: string;
   ownerWallet: string;
   avatarImage: string;
-  permissions: ("Trade" | "Bid" | "Chat")[];
+  services: Array<{ type: string; value: string }>;
+  reputation: number;
+  totalFeedbacks: number;
   createdDate: string;
 }
 
@@ -34,11 +37,13 @@ interface ApiKeyInfo {
   walletAddress: string;
   agentName: string;
   nftMint: string;
+  agentAssetAddress?: string;
   permissions: {
     Trade: boolean;
     Bid: boolean;
     Chat: boolean;
   };
+  categories: string[];
   connectionStatus: "connected" | "disconnected";
   spendingLimits?: SpendingLimits;
 }
@@ -52,15 +57,11 @@ interface BudgetStatus {
   };
 }
 
-const permissionColors: Record<string, string> = {
-  Trade: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  Bid: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  Chat: "bg-green-500/20 text-green-300 border-green-500/30",
-};
-
 export default function AgentProfilePage() {
   const params = useParams();
   const { publicKey } = useWallet();
+  const { loadAgent, getSummary, giveFeedback } = useAgentRegistry();
+
   const [agent, setAgent] = useState<Agent | null>(null);
   const [apiKeyInfo, setApiKeyInfo] = useState<ApiKeyInfo | null>(null);
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus | null>(null);
@@ -71,79 +72,91 @@ export default function AgentProfilePage() {
   const [editingLimits, setEditingLimits] = useState(false);
   const [editedLimits, setEditedLimits] = useState<SpendingLimits | null>(null);
   const [savingLimits, setSavingLimits] = useState(false);
+  const [feedbackScore, setFeedbackScore] = useState(5);
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const address = params.address as string;
   const isOwner = publicKey && apiKeyInfo && publicKey.toBase58() === apiKeyInfo.walletAddress;
 
   useEffect(() => {
-    async function loadAgent() {
+    async function loadAgentData() {
       try {
         setLoading(true);
-        const connection = new Connection("https://api.devnet.solana.com", "confirmed");
-        
-        try {
-          const ownerPubkey = new PublicKey(address);
-          const agentData = await fetchAgent(connection, ownerPubkey);
 
-          if (agentData) {
-            const permissions: ("Trade" | "Bid" | "Chat")[] = [];
-            if (agentData.canTrade) permissions.push("Trade");
-            if (agentData.canBid) permissions.push("Bid");
-            if (agentData.canChat) permissions.push("Chat");
+        // Load agent from 8004
+        const agentData = await loadAgent(address);
 
-            setAgent({
-              address: agentData.address,
-              name: agentData.name,
-              ownerWallet: agentData.owner.toBase58(),
-              avatarImage: `https://picsum.photos/400/400?seed=${agentData.address}`,
-              permissions,
-              createdDate: new Date(agentData.createdAt * 1000).toISOString().split("T")[0],
-            });
+        if (agentData) {
+          // Fetch reputation from ATOM engine
+          let reputationScore = 0;
+          let totalFeedbacks = 0;
+          try {
+            const summary = await getSummary(agentData.assetPubkey);
+            if (summary) {
+              reputationScore = summary.averageScore;
+              totalFeedbacks = summary.totalFeedbacks;
+            }
+          } catch (e) {
+            console.error("Failed to fetch reputation:", e);
+          }
 
-            // Load API key info if this is the owner
-            if (publicKey && publicKey.toBase58() === agentData.owner.toBase58()) {
-              const apiRes = await fetch("/api/agents");
-              const apiData = await apiRes.json();
-              const agentRecord = apiData.agents?.find(
-                (a: any) => a.walletAddress === agentData.owner.toBase58()
+          setAgent({
+            address: agentData.assetPubkey.toBase58(),
+            name: agentData.name,
+            description: agentData.description,
+            ownerWallet: agentData.owner.toBase58(),
+            avatarImage: agentData.imageUri || `https://picsum.photos/400/400?seed=${address}`,
+            services: agentData.services,
+            reputation: reputationScore,
+            totalFeedbacks,
+            createdDate: new Date().toISOString().split("T")[0],
+          });
+
+          // Load API key info if this is the owner
+          if (publicKey && publicKey.toBase58() === agentData.owner.toBase58()) {
+            const apiRes = await fetch("/api/agents");
+            const apiData = await apiRes.json();
+            const agentRecord = apiData.agents?.find(
+              (a: any) => a.agentAssetAddress === address
+            );
+            if (agentRecord) {
+              setApiKeyInfo({
+                walletAddress: agentRecord.walletAddress,
+                agentName: agentRecord.agentName,
+                nftMint: agentRecord.nftMint,
+                agentAssetAddress: agentRecord.agentAssetAddress,
+                permissions: agentRecord.permissions,
+                categories: agentRecord.categories || [],
+                connectionStatus: agentRecord.connectionStatus,
+                spendingLimits: agentRecord.spendingLimits,
+              });
+
+              // Load budget status
+              const budgetRes = await fetch(
+                `/api/agents/budget?address=${agentRecord.walletAddress}`
               );
-              if (agentRecord) {
-                setApiKeyInfo({
-                  walletAddress: agentRecord.walletAddress,
-                  agentName: agentRecord.agentName,
-                  nftMint: agentRecord.nftMint,
-                  permissions: agentRecord.permissions,
-                  connectionStatus: agentRecord.connectionStatus,
-                  spendingLimits: agentRecord.spendingLimits,
-                });
-
-                // Load budget status
-                const budgetRes = await fetch(
-                  `/api/agents/budget?address=${agentRecord.walletAddress}`
-                );
-                if (budgetRes.ok) {
-                  const budgetData = await budgetRes.json();
-                  setBudgetStatus(budgetData);
-                }
+              if (budgetRes.ok) {
+                const budgetData = await budgetRes.json();
+                setBudgetStatus(budgetData);
               }
             }
-          } else {
-            setAgent(null);
           }
-        } catch (e) {
-          console.error("Failed to fetch agent:", e);
+        } else {
           setAgent(null);
         }
+      } catch (error) {
+        console.error("Failed to fetch agent:", error);
+        setAgent(null);
       } finally {
         setLoading(false);
       }
     }
 
     if (address) {
-      loadAgent();
+      loadAgentData();
     }
-  }, [address, publicKey]);
+  }, [address, publicKey, loadAgent, getSummary]);
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -204,7 +217,7 @@ export default function AgentProfilePage() {
 
   const handleRegenerateApiKey = async () => {
     if (!isOwner) return;
-    
+
     setRegeneratingKey(true);
     try {
       const res = await fetch("/api/agents/regenerate", {
@@ -223,8 +236,11 @@ export default function AgentProfilePage() {
         walletAddress: data.agent.walletAddress,
         agentName: data.agent.agentName,
         nftMint: data.agent.nftMint,
+        agentAssetAddress: data.agent.agentAssetAddress,
         permissions: data.agent.permissions,
+        categories: data.agent.categories || [],
         connectionStatus: data.agent.connectionStatus,
+        spendingLimits: data.agent.spendingLimits,
       });
       showToast("API key regenerated successfully", "success");
       setShowApiKey(true);
@@ -233,6 +249,40 @@ export default function AgentProfilePage() {
       showToast("Failed to regenerate API key", "error");
     } finally {
       setRegeneratingKey(false);
+    }
+  };
+
+  const handleGiveFeedback = async () => {
+    if (!publicKey || !agent) {
+      showToast("Please connect your wallet", "error");
+      return;
+    }
+
+    setSubmittingFeedback(true);
+    try {
+      await giveFeedback(agent.address, {
+        value: feedbackScore.toString(),
+        tag1: "quality",
+        tag2: "feedback",
+      });
+
+      showToast("Feedback submitted successfully", "success");
+      setFeedbackScore(5);
+
+      // Refresh reputation
+      const summary = await getSummary(agent.address);
+      if (summary && agent) {
+        setAgent({
+          ...agent,
+          reputation: summary.averageScore,
+          totalFeedbacks: summary.totalFeedbacks,
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to submit feedback:", error);
+      showToast(error?.message || "Failed to submit feedback", "error");
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -299,396 +349,320 @@ export default function AgentProfilePage() {
           ← Back to Agents
         </Link>
 
-        {/* Main Profile Card */}
-        <div className="bg-navy-800 rounded-2xl border border-white/5 overflow-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-            {/* Avatar Section */}
-            <div className="flex flex-col items-center">
-              <div className="w-full max-w-xs aspect-square rounded-xl overflow-hidden mb-6 border border-white/10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Profile Card */}
+          <div className="lg:col-span-1">
+            <div className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden sticky top-32">
+              {/* Avatar */}
+              <div className="aspect-square overflow-hidden bg-dark-900">
                 <img
                   src={agent.avatarImage}
                   alt={agent.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
-                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'%3E%3Crect fill='%230f1628' width='400' height='400'/%3E%3Ctext x='50%' y='50%' font-size='80' fill='%23c9952c' text-anchor='middle' dominant-baseline='middle'%3E🤖%3C/text%3E%3C/svg%3E";
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23141419' width='200' height='200'/%3E%3Ctext x='50%' y='50%' font-size='40' fill='%23C9A55C' text-anchor='middle' dominant-baseline='middle'%3E🤖%3C/text%3E%3C/svg%3E";
                   }}
                 />
               </div>
 
-              {/* Stats */}
-              <div className="w-full grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center bg-navy-900 rounded-lg p-4">
-                  <p className="text-gray-500 text-xs uppercase tracking-wider">Trades</p>
-                  <p className="text-white font-bold text-xl mt-1">24</p>
-                </div>
-                <div className="text-center bg-navy-900 rounded-lg p-4">
-                  <p className="text-gray-500 text-xs uppercase tracking-wider">Bids</p>
-                  <p className="text-white font-bold text-xl mt-1">12</p>
-                </div>
-                <div className="text-center bg-navy-900 rounded-lg p-4">
-                  <p className="text-gray-500 text-xs uppercase tracking-wider">Success</p>
-                  <p className="text-white font-bold text-xl mt-1">95%</p>
-                </div>
-              </div>
-
-              {/* Edit Button */}
-              {isOwner && (
-                <button className="w-full px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-lg text-sm font-semibold transition">
-                  Edit Agent
-                </button>
-              )}
-            </div>
-
-            {/* Info Section */}
-            <div>
-              <h1 className="font-serif text-4xl text-white mb-2">{agent.name}</h1>
-
-              {/* Owner */}
-              <div className="mb-6">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
-                  Owner Wallet
+              {/* Info */}
+              <div className="p-6">
+                <h1 className="font-serif text-2xl text-white">{agent.name}</h1>
+                <p className="text-gray-500 text-xs font-mono mt-3 break-all">
+                  {agent.address}
                 </p>
-                <p className="text-white font-mono text-sm break-all">
-                  {truncatedWallet}
-                </p>
-              </div>
 
-              {/* Created Date */}
-              <div className="mb-6">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
-                  Created
-                </p>
-                <p className="text-white">
-                  {new Date(agent.createdDate).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
+                {/* 8004 Link */}
+                <a
+                  href={`https://8004scan.io/agents/${agent.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-4 px-4 py-2 bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/30 text-gold-300 rounded-lg text-xs font-medium transition"
+                >
+                  View on 8004scan ↗
+                </a>
 
-              {/* Permissions */}
-              <div className="mb-6">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-3">
-                  Permissions
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {agent.permissions.map((perm) => (
-                    <span
-                      key={perm}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
-                        permissionColors[perm]
-                      }`}
-                    >
-                      {perm}
-                    </span>
-                  ))}
-                </div>
-              </div>
+                {/* Stats */}
+                <div className="space-y-3 mt-6 pt-6 border-t border-white/5">
+                  <div>
+                    <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+                      Reputation
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold text-gold-400">
+                        {agent.reputation.toFixed(1)}
+                      </span>
+                      <span className="text-gray-500 text-sm">
+                        ({agent.totalFeedbacks} feedbacks)
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Connection Status */}
-              {apiKeyInfo && (
-                <div className="bg-navy-900 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        apiKeyInfo.connectionStatus === "connected"
-                          ? "bg-green-500"
-                          : "bg-gray-500"
-                      }`}
-                    ></div>
-                    <span
-                      className={
-                        apiKeyInfo.connectionStatus === "connected"
-                          ? "text-green-400 text-sm font-medium"
-                          : "text-gray-400 text-sm font-medium"
-                      }
-                    >
-                      {apiKeyInfo.connectionStatus === "connected"
-                        ? "Connected to MCP Server"
-                        : "Not Connected"}
-                    </span>
+                  <div>
+                    <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+                      Owner
+                    </p>
+                    <p className="text-white font-mono text-xs">{truncatedWallet}</p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* Budget Section */}
-        {isOwner && budgetStatus && (
-          <div className="mt-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-serif text-2xl text-white">Budget</h2>
-              {!editingLimits && (
-                <button
-                  onClick={handleEditLimits}
-                  className="px-4 py-2.5 bg-navy-700 hover:bg-navy-600 text-white border border-white/10 rounded-lg text-sm font-medium transition"
-                >
-                  Edit Limits
-                </button>
-              )}
-            </div>
-
-            {!editingLimits ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {(["daily", "weekly", "monthly"] as const).map((period) => {
-                  const limit = budgetStatus.limits[period];
-                  const progress = budgetStatus.progress[period];
-                  const isOver = limit.enabled && progress > 100;
-
-                  return (
-                    <div
-                      key={period}
-                      className={`rounded-xl border p-6 ${
-                        isOver
-                          ? "bg-red-500/10 border-red-500/30"
-                          : "bg-navy-800 border-white/5"
-                      }`}
-                    >
-                      <div className="mb-4">
-                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-1 capitalize">
-                          {period} Limit
+                {/* Services */}
+                {agent.services && agent.services.length > 0 && (
+                  <div className="space-y-3 mt-6 pt-6 border-t border-white/5">
+                    <p className="text-gray-500 text-xs uppercase tracking-wider">
+                      Services
+                    </p>
+                    {agent.services.map((svc, idx) => (
+                      <div key={idx} className="text-xs">
+                        <p className="text-gray-400 uppercase">{svc.type}</p>
+                        <p className="text-gold-300 break-all text-xs mt-1 font-mono">
+                          {svc.value}
                         </p>
-                        {limit.enabled ? (
-                          <p className={`text-lg font-semibold ${isOver ? "text-red-300" : "text-white"}`}>
-                            {limit.spent.toFixed(2)} / {limit.limit.toFixed(2)} {limit.currency}
-                          </p>
-                        ) : (
-                          <p className="text-lg font-semibold text-gray-400">Unlimited</p>
-                        )}
-                      </div>
-
-                      {limit.enabled && (
-                        <>
-                          <div className="w-full bg-navy-900 rounded-full h-2.5 overflow-hidden mb-3">
-                            <div
-                              className={`h-full transition-all ${
-                                progress > 100 ? "bg-red-500" : "bg-gold-500"
-                              }`}
-                              style={{
-                                width: `${Math.min(progress, 100)}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={isOver ? "text-red-300" : "text-gray-400"}>
-                              {progress > 100 ? "⚠️ Over budget" : `${progress.toFixed(0)}%`}
-                            </span>
-                            <span className="text-gray-500">
-                              {(limit.limit - limit.spent).toFixed(2)} remaining
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="bg-navy-800 rounded-xl border border-white/5 p-8">
-                <p className="text-gray-400 text-sm mb-6">Edit spending limits for each period:</p>
-                <div className="space-y-6 mb-6">
-                  {editedLimits &&
-                    (["daily", "weekly", "monthly"] as const).map((period) => (
-                      <div key={period} className="bg-navy-900 rounded-lg p-5">
-                        <div className="flex items-start gap-4">
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={editedLimits[period].enabled}
-                              onChange={(e) =>
-                                setEditedLimits({
-                                  ...editedLimits,
-                                  [period]: {
-                                    ...editedLimits[period],
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-5 h-5 rounded accent-gold-500"
-                            />
-                            <p className="text-white font-medium text-sm capitalize">
-                              {period} Limit
-                            </p>
-                          </label>
-                        </div>
-
-                        {editedLimits[period].enabled && (
-                          <div className="mt-4 space-y-3 pl-8">
-                            <div>
-                              <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
-                                Amount
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editedLimits[period].limit}
-                                onChange={(e) =>
-                                  setEditedLimits({
-                                    ...editedLimits,
-                                    [period]: {
-                                      ...editedLimits[period],
-                                      limit: parseFloat(e.target.value) || 0,
-                                    },
-                                  })
-                                }
-                                className="w-full px-4 py-2.5 bg-navy-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-gold-500 transition"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-gray-400 text-xs uppercase tracking-wider block mb-2">
-                                Currency
-                              </label>
-                              <select
-                                value={editedLimits[period].currency}
-                                onChange={(e) =>
-                                  setEditedLimits({
-                                    ...editedLimits,
-                                    [period]: {
-                                      ...editedLimits[period],
-                                      currency: e.target.value as "SOL" | "USD1",
-                                    },
-                                  })
-                                }
-                                className="w-full px-4 py-2.5 bg-navy-800 border border-white/10 rounded-lg text-white focus:outline-none focus:border-gold-500 transition"
-                              >
-                                <option value="SOL">SOL</option>
-                                <option value="USD1">USD1</option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
-                </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setEditingLimits(false)}
-                    disabled={savingLimits}
-                    className="px-6 py-2.5 bg-navy-700 border border-white/10 text-white rounded-lg text-sm font-medium hover:border-white/20 disabled:opacity-50 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveLimits}
-                    disabled={savingLimits}
-                    className="flex-1 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-navy-900 rounded-lg text-sm font-semibold transition"
-                  >
-                    {savingLimits ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
+          {/* Right: Details & Owner Controls */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Description */}
+            {agent.description && (
+              <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                <h2 className="text-white font-serif text-lg mb-3">About</h2>
+                <p className="text-gray-400 text-sm leading-relaxed">{agent.description}</p>
               </div>
             )}
-          </div>
-        )}
 
-        {/* API Key Section (Owner Only) */}
-        {isOwner && apiKeyInfo && (
-          <div className="mt-12">
-            <h2 className="font-serif text-2xl text-white mb-6">API Key Management</h2>
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
+            {/* Reputation Section */}
+            <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+              <h2 className="text-white font-serif text-lg mb-4">Reputation & Feedback</h2>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-dark-900 rounded-lg border border-white/5">
                   <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
-                    API Key Status
+                    Score
                   </p>
-                  <p className="text-white text-lg font-semibold">
-                    {showApiKey ? "Visible" : "Hidden for Security"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="px-4 py-2.5 bg-navy-700 hover:bg-navy-600 text-white border border-white/10 rounded-lg text-sm font-medium transition"
-                >
-                  {showApiKey ? "Hide" : "Show"}
-                </button>
-              </div>
-
-              {showApiKey && apiKeyInfo && (
-                <>
-                  <div className="bg-navy-900 rounded-lg border border-white/5 p-4 mb-6 font-mono text-sm text-gray-300 overflow-x-auto break-all">
-                    <span className="text-gray-500">(API key is stored securely and hidden for security)</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-3xl font-bold text-gold-400">
+                      {agent.reputation.toFixed(1)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="w-full bg-dark-800 rounded-full h-2 mb-1">
+                        <div
+                          className="bg-gradient-to-r from-gold-500 to-gold-400 h-2 rounded-full transition-all"
+                          style={{
+                            width: `${Math.min((agent.reputation / 5) * 100, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-gray-500 text-xs">
+                        {agent.totalFeedbacks} verified feedbacks
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-6">
-                    <p className="text-amber-200 text-xs">
-                      ⚠️ Store your API key securely. Never share it publicly or commit it to version control.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-3">
-                <div className="bg-navy-900 rounded-lg p-4">
-                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">How to Connect</p>
-                  <p className="text-gray-300 text-sm">
-                    Use your API key to authenticate with the MCP server. Include it in your agent configuration 
-                    to enable trading, bidding, and other operations on Artifacte.
-                  </p>
                 </div>
 
-                <button
-                  onClick={handleRegenerateApiKey}
-                  disabled={regeneratingKey}
-                  className="w-full px-6 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition"
-                >
-                  {regeneratingKey ? "Regenerating..." : "Regenerate API Key"}
-                </button>
+                {/* Give Feedback */}
+                <div className="p-4 bg-dark-900 rounded-lg border border-white/5">
+                  <p className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+                    Give Feedback
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-gray-400 text-xs block mb-2">
+                        Score: {feedbackScore}/5
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="0.5"
+                        value={feedbackScore}
+                        onChange={(e) => setFeedbackScore(parseFloat(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <button
+                      onClick={handleGiveFeedback}
+                      disabled={submittingFeedback}
+                      className="w-full px-4 py-2 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-medium transition"
+                    >
+                      {submittingFeedback ? "Submitting..." : "Submit Feedback"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Activity Feed */}
-        <div className="mt-12">
-          <h2 className="font-serif text-2xl text-white mb-6">Activity Feed</h2>
-          <div className="bg-navy-800 rounded-xl border border-white/5 p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-navy-900 flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-400 text-sm">No activity yet</p>
-            <p className="text-gray-600 text-xs mt-2">
-              Agent activity will appear here once it starts executing actions
-            </p>
-          </div>
-        </div>
+            {/* Owner-Only Controls */}
+            {isOwner && (
+              <>
+                {/* API Key Section */}
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                  <h2 className="text-white font-serif text-lg mb-4">API Key</h2>
 
-        {/* Agent Details */}
-        <div className="mt-12">
-          <h2 className="font-serif text-2xl text-white mb-6">Agent Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-6">
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
-                Agent Address
-              </p>
-              <p className="text-white font-mono text-sm break-all">{agent.address}</p>
-            </div>
-            <div className="bg-navy-800 rounded-xl border border-white/5 p-6">
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
-                Status
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <p className="text-white">Active</p>
-              </div>
-            </div>
+                  {showApiKey && apiKeyInfo && (
+                    <div className="p-4 bg-dark-900 rounded-lg border border-white/5 mb-4">
+                      <p className="text-amber-300 text-xs font-medium mb-3">
+                        ⚠️ Keep this secret!
+                      </p>
+                      <div className="bg-dark-800 rounded border border-white/5 p-3 mb-3 overflow-hidden">
+                        <code className="text-white font-mono text-xs break-all">
+                          {apiKeyInfo.agentName}
+                        </code>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(apiKeyInfo.agentName);
+                          setApiKeyCopied(true);
+                          setTimeout(() => setApiKeyCopied(false), 2000);
+                        }}
+                        className="w-full px-4 py-2 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-xs font-medium transition"
+                      >
+                        {apiKeyCopied ? "✓ Copied!" : "Copy API Key"}
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleRegenerateApiKey}
+                    disabled={regeneratingKey}
+                    className="w-full px-4 py-2 bg-dark-700 hover:bg-dark-600 border border-white/5 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    {regeneratingKey ? "Regenerating..." : "Regenerate API Key"}
+                  </button>
+                </div>
+
+                {/* Spending Limits Section */}
+                {budgetStatus && (
+                  <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-white font-serif text-lg">Spending Limits</h2>
+                      {!editingLimits && (
+                        <button
+                          onClick={handleEditLimits}
+                          className="text-gold-400 hover:text-gold-300 text-xs font-medium transition"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      {(["daily", "weekly", "monthly"] as const).map((period) => {
+                        const limit = editingLimits
+                          ? editedLimits?.[period]
+                          : budgetStatus.limits[period];
+                        const progress = budgetStatus.progress[period];
+
+                        return (
+                          <div
+                            key={period}
+                            className="p-4 bg-dark-900 rounded-lg border border-white/5"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-gray-400 text-sm capitalize font-medium">
+                                {period} Limit
+                              </p>
+                              {limit?.enabled ? (
+                                <span className="text-gold-300 text-xs font-medium">
+                                  {limit.spent?.toFixed(2) || 0} / {limit.limit?.toFixed(2) || 0}{" "}
+                                  {limit.currency}
+                                </span>
+                              ) : (
+                                <span className="text-gray-500 text-xs">Unlimited</span>
+                              )}
+                            </div>
+
+                            {limit?.enabled && (
+                              <div className="w-full bg-dark-800 rounded-full h-1.5">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all ${
+                                    progress > 80
+                                      ? "bg-red-500"
+                                      : progress > 50
+                                      ? "bg-yellow-500"
+                                      : "bg-gold-500"
+                                  }`}
+                                  style={{ width: `${Math.min(progress, 100)}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {editingLimits && editedLimits && (
+                      <div className="flex gap-3 mt-4">
+                        <button
+                          onClick={() => setEditingLimits(false)}
+                          className="flex-1 px-4 py-2 bg-dark-700 hover:bg-dark-600 border border-white/5 text-white rounded-lg text-sm font-medium transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveLimits}
+                          disabled={savingLimits}
+                          className="flex-1 px-4 py-2 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-medium transition"
+                        >
+                          {savingLimits ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Agent Info */}
+                {apiKeyInfo && (
+                  <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                    <h2 className="text-white font-serif text-lg mb-4">Agent Configuration</h2>
+
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
+                          Permissions
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {["Trade", "Bid", "Chat"].map((perm) => (
+                            <span
+                              key={perm}
+                              className={`px-3 py-1 rounded-md text-xs font-medium border ${
+                                (apiKeyInfo.permissions as any)[perm]
+                                  ? "bg-gold-500/20 text-gold-300 border-gold-500/30"
+                                  : "bg-dark-900 text-gray-500 border-white/5"
+                              }`}
+                            >
+                              {perm}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
+                          Categories
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {apiKeyInfo.categories.map((cat) => (
+                            <span
+                              key={cat}
+                              className="px-3 py-1 rounded-md text-xs font-medium bg-gold-500/20 text-gold-300 border border-gold-500/30"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

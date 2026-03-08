@@ -13,7 +13,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { walletAddress, agentName, apiKey, nftMint, permissions, spendingLimits } = body;
+    const { walletAddress, agentName, apiKey, nftMint, agentAssetAddress, permissions, categories, spendingLimits } = body;
 
     if (!walletAddress || !agentName || !apiKey || !nftMint) {
       return NextResponse.json(
@@ -28,8 +28,9 @@ export async function POST(req: NextRequest) {
       apiKey,
       nftMint,
       permissions || { Trade: false, Bid: false, Chat: false },
-      [], // categories default
-      spendingLimits as SpendingLimits | undefined
+      categories || [],
+      spendingLimits as SpendingLimits | undefined,
+      agentAssetAddress // 8004 asset address
     );
 
     return NextResponse.json(
