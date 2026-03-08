@@ -255,7 +255,7 @@ const nativeListings: Listing[] = [
   { id: "l4", name: "Nami Alt Art OP02-120", subtitle: "One Piece TCG • PSA 9", price: 320, image: "https://tcgplayer-cdn.tcgplayer.com/product/489977_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS", source: "native" },
   { id: "l5", name: "Pikachu Illustrator Promo", subtitle: "Pokemon TCG • CGC 9", price: 125000, image: "https://tcgplayer-cdn.tcgplayer.com/product/233498_200w.jpg", verifiedBy: "CGC", category: "TCG_CARDS", source: "native" },
   // Spirits
-  { id: "l6", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", verifiedBy: "BAXUS", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2", source: "native" },
+  // Blanton's removed — real BAXUS bottles from API now
   // Fake spirits removed — BAXUS bottles are the real data now
   // Watches
   { id: "l10", name: "Rolex Submariner Date 126610LN", subtitle: "Steel • 41mm • 2024", price: 14500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
