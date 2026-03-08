@@ -2,6 +2,15 @@
 
 All NFTs minted on Artifacte follow this metadata schema. Built on Metaplex Token Metadata with category-specific extensions.
 
+## Royalty & Creator Config
+
+All Artifacte-minted pNFTs use:
+- **Seller fee basis points**: `200` (2%)
+- **Creator**: `DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX` (treasury, 100% share, verified)
+- **Token standard**: `ProgrammableNonFungible` (pNFT — royalties enforced on-chain)
+
+This ensures Artifacte receives 2% royalty on ALL resales across any pNFT-compatible marketplace (Magic Eden, Tensor, etc.).
+
 ## Universal Fields (Required)
 
 | Field | Type | Description |
