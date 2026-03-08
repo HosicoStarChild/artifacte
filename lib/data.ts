@@ -256,9 +256,7 @@ const nativeListings: Listing[] = [
   { id: "l5", name: "Pikachu Illustrator Promo", subtitle: "Pokemon TCG • CGC 9", price: 125000, image: "https://tcgplayer-cdn.tcgplayer.com/product/233498_200w.jpg", verifiedBy: "CGC", category: "TCG_CARDS", source: "native" },
   // Spirits
   { id: "l6", name: "Blanton's 1984 Bottling First Release", subtitle: "Ultra-Rare Bourbon • BAXUS Verified", price: 12500, image: "/blantons-1984.webp", verifiedBy: "BAXUS", category: "SPIRITS", nftMint: "AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2", source: "native" },
-  { id: "l7", name: "Macallan 25 Year Sherry Oak", subtitle: "Single Malt Scotch Whisky", price: 18000, image: "https://images.unsplash.com/photo-1602767039459-77d4233d2121?w=400", verifiedBy: "BAXUS", category: "SPIRITS", source: "native" },
-  { id: "l8", name: "Pappy Van Winkle 23 Year", subtitle: "Family Reserve Bourbon", price: 8500, image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400", verifiedBy: "BAXUS", category: "SPIRITS", source: "native" },
-  { id: "l9", name: "Yamazaki 18 Year Single Malt", subtitle: "Japanese Whisky • Limited Edition", price: 4200, image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=400", verifiedBy: "BAXUS", category: "SPIRITS", source: "native" },
+  // Fake spirits removed — BAXUS bottles are the real data now
   // Watches
   { id: "l10", name: "Rolex Submariner Date 126610LN", subtitle: "Steel • 41mm • 2024", price: 14500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
   { id: "l11", name: "Patek Philippe Nautilus 5711/1A", subtitle: "Steel • Blue Dial • 2021", price: 145000, image: "https://images.unsplash.com/photo-1594534475808-b18fc33b045e?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
