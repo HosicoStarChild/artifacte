@@ -30,10 +30,24 @@ async function fetchAllListings() {
   return listed;
 }
 
+function fixCcCategory(item) {
+  // CC miscategorizes many One Piece cards as Pokemon or CCG
+  const name = (item.itemName || '').toLowerCase();
+  if (
+    name.includes('one piece') ||
+    /\bop\d{2}[-\s]/i.test(name) ||
+    /\bst[012]\d[-\s]/i.test(name) && (name.includes('luffy') || name.includes('zoro') || name.includes('nami') || name.includes('one piece'))
+  ) {
+    return 'One Piece';
+  }
+  return item.category;
+}
+
 function transformListing(item) {
   const l = item.listing;
   const basePrice = l.price;
   const markedUpPrice = Math.ceil(basePrice * (1 + MARKUP_PCT) * 100) / 100;
+  const correctedCategory = fixCcCategory(item);
   
   return {
     // CC identifiers
@@ -45,8 +59,8 @@ function transformListing(item) {
     
     // Display info
     name: item.itemName,
-    category: mapCategory(item.category),
-    ccCategory: item.category,
+    category: mapCategory(correctedCategory),
+    ccCategory: correctedCategory,
     year: item.year,
     set: item.set,
     serial: item.serial,
