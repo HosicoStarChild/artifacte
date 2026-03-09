@@ -5,41 +5,57 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
 
 export default function Home() {
-  // Get featured auction (first one) for hero
-  const featured = auctions[0];
+  // Featured BAXUS listing for hero
+  const featuredBaxus = listings.find(l => l.source === 'baxus' && l.name?.includes('Pappy Van Winkle 20'));
+  const heroListing = featuredBaxus || listings.find(l => l.source === 'baxus');
 
   return (
     <div>
       {/* Hero Section */}
       <section className="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {featured && (
+          {heroListing && (
             <div className="relative rounded-lg overflow-hidden mb-16">
               {/* Hero Image */}
-              <div className="relative h-[500px] md:h-[600px] overflow-hidden group">
+              <div className="relative h-[500px] md:h-[600px] overflow-hidden group bg-dark-800">
                 <img
-                  src={featured.image}
-                  alt={featured.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+                  src={heroListing.image}
+                  alt={heroListing.name}
+                  className="w-full h-full object-contain group-hover:scale-105 transition duration-700"
                 />
                 {/* Dark overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/40 to-transparent" />
                 
                 {/* Content overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
-                  <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-3">Featured Auction</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">Featured Listing</p>
+                    <span className="text-xs px-2 py-0.5 bg-gold-500/20 text-gold-400 rounded font-medium">BAXUS Verified</span>
+                  </div>
                   <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 max-w-2xl leading-tight">
-                    {featured.name}
+                    {heroListing.name}
                   </h1>
-                  <p className="text-gray-300 text-base max-w-xl mb-6 leading-relaxed">
-                    {featured.description}
+                  <p className="text-gray-300 text-base max-w-xl mb-2 leading-relaxed">
+                    {heroListing.subtitle}
                   </p>
-                  <Link
-                    href={`/auctions/${featured.slug}`}
-                    className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
-                  >
-                    Place a Bid →
-                  </Link>
+                  <p className="text-white font-serif text-3xl mb-6">{formatFullPrice(heroListing.price)}</p>
+                  {heroListing.externalUrl ? (
+                    <a
+                      href={heroListing.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
+                    >
+                      Buy on BAXUS →
+                    </a>
+                  ) : (
+                    <Link
+                      href="/auctions/categories/spirits"
+                      className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
+                    >
+                      View Spirits →
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
