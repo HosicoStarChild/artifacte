@@ -4,8 +4,19 @@ import path from "path";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
-const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
+
+const BUNDLED_COLLECTIONS = [
+  "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w",
+  "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
+  "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W",
+  "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac",
+  "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK",
+  "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
+  "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ",
+  "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q",
+  "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H",
+];
 
 interface PendingListing {
   id: string;
@@ -56,7 +67,7 @@ async function isCollectionAllowed(collectionAddress: string): Promise<boolean> 
       c.collectionAddress === collectionAddress || c.mintAuthority === collectionAddress
     );
   } catch {
-    return false;
+    return BUNDLED_COLLECTIONS.includes(collectionAddress);
   }
 }
 

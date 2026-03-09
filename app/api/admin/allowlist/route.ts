@@ -5,10 +5,26 @@ import path from "path";
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
+// Bundled fallback for Vercel (fs.readFile fails in serverless)
+const BUNDLED_COLLECTIONS = [
+  { collectionAddress: "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w", name: "Mad Lads", category: "Digital Art", image: "https://madlads-collection.s3.us-west-2.amazonaws.com/_collection.png", supply: 9968, verified: true },
+  { collectionAddress: "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH", name: "SMB Gen3", category: "Digital Art", image: "https://gateway.irys.xyz/CAqfaUJzwbwmmyommhgHWqwQVcxuRtqnNrprm88YDquj", supply: 5000, verified: true },
+  { collectionAddress: "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W", name: "SMB Gen2", category: "Digital Art", image: "https://arweave.net/lZ5FdIVagNoNvI4QFoHhB6Xyn4oVGLV9xOTW32WBC20", supply: 4992, verified: true },
+  { collectionAddress: "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac", name: "Famous Fox Federation", category: "Digital Art", image: "https://arweave.net/mgvMZbiis8AE_Kkj1Om5clxpseOiZB-2Q4QFUVavD10", supply: 9992, verified: true },
+  { collectionAddress: "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK", name: "Claynosaurz", category: "Digital Art", image: "https://nftstorage.link/ipfs/bafybeiese3bgyfewt2r3dxvgups2blc3rwh2utvidirxgxq527mhcv3ydy", supply: 10232, verified: true },
+  { collectionAddress: "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r", name: "Taiyo Robotics", category: "Digital Art", image: "https://nftstorage.link/ipfs/bafybeibtvj6cudhrllobbfpctvx5wfnvkyrusajsyaj36bhoxfpqzai26y/0.png", supply: 2348, verified: true },
+  { collectionAddress: "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ", name: "Claynosaurz: Call of Saga", category: "Digital Art", image: "https://arweave.net/oXUNrsF8ohrCPh8A0ok-AJlILZXPtcOX66dgRfhNqLI?ext=gif", supply: 1999, verified: true },
+  { collectionAddress: "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q", name: "Galactic Gecko", category: "Digital Art", image: "https://arweave.net/NFC1-rgJ9tE1BkfJjirVlQ1_-cNbj6Mwm_BGmQryaYk", supply: 10000, verified: true },
+  { collectionAddress: "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H", name: "little swag world", category: "Digital Art", image: "https://nftstorage.link/ipfs/bafybeiddn3ujufppfg3azha6xrv34kw7t4uznwitve25egygq2v73uagq4", supply: 3328, verified: true },
+];
+
 interface AllowlistEntry {
-  mintAuthority: string;
+  mintAuthority?: string;
+  collectionAddress?: string;
   name: string;
   category: string;
+  image?: string;
+  supply?: number;
   addedAt: number;
   addedBy: string;
   verified: boolean;
@@ -23,7 +39,7 @@ async function readAllowlist(): Promise<AllowlistData> {
     const content = await fs.readFile(ALLOWLIST_FILE, "utf-8");
     return JSON.parse(content);
   } catch {
-    return { collections: [] };
+    return { collections: BUNDLED_COLLECTIONS as any[] };
   }
 }
 
