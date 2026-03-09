@@ -4,6 +4,7 @@ import path from "path";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
+const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
 const BUNDLED_COLLECTIONS = [
