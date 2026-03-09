@@ -166,7 +166,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-12">
             <div>
               <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Top Listings</p>
-              <h2 className="font-serif text-3xl md:text-4xl text-white">One Piece TCG 🏴‍☠️</h2>
+              <h2 className="font-serif text-3xl md:text-4xl text-white">TCG Cards 🃏</h2>
             </div>
             <Link href="/auctions/categories/tcg-cards" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
               View All TCG →
@@ -175,9 +175,9 @@ export default function Home() {
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
               {listings
-                .filter(l => l.source === 'collector-crypt' && (l as any).ccCategory === 'One Piece')
+                .filter(l => l.source === 'collector-crypt' && ((l as any).ccCategory === 'One Piece' || (l as any).ccCategory === 'Pokemon'))
                 .sort((a, b) => b.price - a.price)
-                .slice(0, 8)
+                .slice(0, 10)
                 .map((l) => (
                 <Link key={l.id} href="/auctions/categories/tcg-cards" className="flex-shrink-0 w-72 snap-start group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
