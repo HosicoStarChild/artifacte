@@ -291,7 +291,7 @@ const ccTransformedListings: Listing[] = ccListings
   .map((item: any) => ({
     id: `cc-${item.ccId}`,
     name: item.name,
-    subtitle: `${item.ccCategory} • ${item.gradingCompany} ${item.gradeNum} • ${item.vault || 'Vault'}`,
+    subtitle: `${item.ccCategory} • ${item.gradingCompany} ${item.gradeNum} • ${item.vault === 'PWCC' ? 'PWCC Vault' : item.vault || 'Vault'}`,
     price: item.price,
     image: item.image,
     category: ccCategoryMap[item.category] || ('TCG_CARDS' as Category),
