@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export default function Home() {
   // Featured BAXUS listing for hero
-  const featuredBaxus = listings.find(l => l.source === 'baxus' && l.name?.includes('Pappy Van Winkle 20'));
+  const featuredBaxus = listings.find(l => l.source === 'baxus' && l.name?.toLowerCase().includes('pappy'));
   const heroListing = featuredBaxus || listings.find(l => l.source === 'baxus');
 
   return (
