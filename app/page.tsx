@@ -160,41 +160,49 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Recent Listings Section */}
+      {/* One Piece TCG Highlights */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-12">
             <div>
-              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Fixed Price</p>
-              <h2 className="font-serif text-3xl md:text-4xl text-white">Available Now</h2>
+              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Top Listings</p>
+              <h2 className="font-serif text-3xl md:text-4xl text-white">One Piece TCG 🏴‍☠️</h2>
             </div>
+            <Link href="/auctions/categories/tcg-cards" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+              View All TCG →
+            </Link>
           </div>
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
-              {listings.slice(0, 6).map((l) => (
-                <Link key={l.id} href={`/auctions?listing=${l.id}`} className="flex-shrink-0 w-80 snap-start group">
+              {listings
+                .filter(l => l.source === 'collector-crypt' && (l as any).ccCategory === 'One Piece')
+                .sort((a, b) => b.price - a.price)
+                .slice(0, 8)
+                .map((l) => (
+                <Link key={l.id} href="/auctions/categories/tcg-cards" className="flex-shrink-0 w-72 snap-start group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
                     <div className="aspect-square overflow-hidden bg-dark-900">
                       <img
                         src={l.image}
                         alt={l.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-500"
                       />
                     </div>
-                    <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div className="p-5 flex-1 flex flex-col justify-between">
                       <div>
-                        <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
                           <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
                         </div>
-                        <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
-                        <p className="text-gray-500 text-xs mb-1">{l.subtitle}{l.verifiedBy ? ` • ${l.verifiedBy} Verified` : ""}</p>
-                        <p className="text-gray-600 text-xs mb-4">{l.category?.replace(/_/g, " ")}</p>
+                        <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{l.name}</h3>
+                        <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                        <p className="text-white font-serif text-2xl">{l.category === "DIGITAL_ART" ? `◎ ${l.price.toLocaleString()}` : formatFullPrice(l.price)}</p>
-                        <p className="text-gold-500 text-xs mt-1">{l.price.toLocaleString()} {l.category === "DIGITAL_ART" ? "SOL" : "USD1"}</p>
+                        <p className="text-white font-serif text-xl">
+                          {(l as any).currency === 'SOL' ? `◎ ${l.price.toLocaleString()}` : `$${l.price.toLocaleString()}`}
+                        </p>
+                        <p className="text-gold-500 text-xs mt-1">{(l as any).currency}</p>
                       </div>
                     </div>
                   </div>
