@@ -58,13 +58,13 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: "Digital Art", emoji: "🎨", slug: "digital-art" },
-                { name: "Spirits", emoji: "🥃", slug: "spirits" },
-                { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards" },
-                { name: "Sports Cards", emoji: "⚽", slug: "sports-cards" },
-                { name: "Watches", emoji: "⌚", slug: "watches" },
+                { name: "Digital Art", emoji: "🎨", slug: "digital-art", href: "/digital-art" },
+                { name: "Spirits", emoji: "🥃", slug: "spirits", href: "/auctions/categories/spirits" },
+                { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards", href: "/auctions/categories/tcg-cards" },
+                { name: "Sports Cards", emoji: "⚽", slug: "sports-cards", href: "/auctions/categories/sports-cards" },
+                { name: "Watches", emoji: "⌚", slug: "watches", href: "/auctions/categories/watches" },
               ].map((cat, i) => (
-                <Link key={i} href={`/auctions/categories/${cat.slug}`} className="group">
+                <Link key={i} href={cat.href} className="group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">
                     <div className="text-5xl mb-6">{cat.emoji}</div>
                     <h3 className="font-serif text-xl text-white mb-2">{cat.name}</h3>
