@@ -47,6 +47,7 @@ export default function CategoryAuctionsPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
+  const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
   const ITEMS_PER_PAGE = 24;
 
   // Category-specific filter options
@@ -253,6 +254,15 @@ export default function CategoryAuctionsPage() {
     if (currencyFilter === "All") return true;
     const lCurrency = l.currency || (l.category === "DIGITAL_ART" ? "SOL" : "USDC");
     return lCurrency === currencyFilter;
+  }).sort((a: any, b: any) => {
+    if (sortBy === "price-high") return b.price - a.price;
+    if (sortBy === "price-low") return a.price - b.price;
+    if (sortBy === "newest") {
+      const aId = a.id || '';
+      const bId = b.id || '';
+      return bId > aId ? 1 : -1;
+    }
+    return 0;
   });
 
   if (!category) {
@@ -376,6 +386,24 @@ export default function CategoryAuctionsPage() {
             )}
           </div>
         )}
+
+        {/* Sort */}
+        <div className="flex items-center gap-3 mb-8">
+          <span className="text-gray-500 text-xs font-medium tracking-wider">Sort:</span>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value as any); setPage(1); }}
+              className="appearance-none bg-dark-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2.5 pr-8 focus:border-gold-500 focus:outline-none transition-colors cursor-pointer hover:border-white/20"
+            >
+              <option value="default" className="bg-dark-900">Default</option>
+              <option value="price-high" className="bg-dark-900">Price: High to Low</option>
+              <option value="price-low" className="bg-dark-900">Price: Low to High</option>
+              <option value="newest" className="bg-dark-900">Newest Listing</option>
+            </select>
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-xs">▼</div>
+          </div>
+        </div>
 
         {/* Fixed Price Tab */}
         {tab === "fixed" && (
