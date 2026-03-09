@@ -36,30 +36,17 @@ export default function ListNFTPage() {
   const [error, setError] = useState("");
   const [allowedCollections, setAllowedCollections] = useState<Record<string, string>>({});
 
-  // Check wallet whitelist
+  // Digital Art = collection gate only, no wallet whitelist needed
   useEffect(() => {
     if (!connected || !publicKey) {
       setWhitelistStatus({ walletOk: false, loading: false });
       return;
     }
-    checkWhitelist();
+    // For digital collectibles, anyone with an approved collection NFT can list
+    setWhitelistStatus({ walletOk: true, loading: false });
+    loadAllowedCollections();
+    loadNFTs();
   }, [connected, publicKey]);
-
-  async function checkWhitelist() {
-    try {
-      const res = await fetch("/api/admin/wallet-whitelist");
-      const data = await res.json();
-      const addr = publicKey!.toBase58();
-      const found = data.wallets?.some((w: any) => w.address === addr && w.enabled);
-      setWhitelistStatus({ walletOk: found, loading: false });
-      if (found) {
-        loadAllowedCollections();
-        loadNFTs();
-      }
-    } catch {
-      setWhitelistStatus({ walletOk: false, loading: false });
-    }
-  }
 
   async function loadAllowedCollections() {
     try {
@@ -186,30 +173,7 @@ export default function ListNFTPage() {
     );
   }
 
-  if (!whitelistStatus.walletOk) {
-    return (
-      <main className="min-h-screen pt-32 pb-20">
-        <div className="max-w-2xl mx-auto px-4">
-          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
-            <div className="text-5xl mb-4">🔒</div>
-            <h2 className="font-serif text-2xl text-white mb-4">Seller Access Required</h2>
-            <p className="text-gray-400 mb-6">
-              Your wallet is not approved for listing on Artifacte. This is a curated marketplace — sellers must be approved.
-            </p>
-            <p className="text-gray-500 text-sm mb-6">
-              Wallet: <span className="text-white font-mono text-xs">{publicKey?.toBase58()}</span>
-            </p>
-            <Link
-              href="/submit"
-              className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition"
-            >
-              Apply for Seller Access
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  // Wallet whitelist check removed for Digital Art — collection gate is sufficient
 
   if (submitted) {
     return (
