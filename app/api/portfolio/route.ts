@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Portfolio API Route
+ *
+ * Fetches portfolio data from Collector Crypt API and transforms it
+ * with additional metrics and analysis.
+ *
+ * Currently shows Collector Crypt insured valuations.
+ * Oracle market pricing integration coming soon via /api/portfolio/oracle
+ */
+
 interface CCCard {
   itemName: string;
   grade: string;

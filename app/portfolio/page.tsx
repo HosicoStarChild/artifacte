@@ -191,12 +191,43 @@ export default function PortfolioPage() {
             {/* Portfolio Summary Header */}
             <div className="mb-12">
               <div className="text-center mb-8">
-                <p className="text-gold-400 text-sm font-semibold mb-2">
-                  Total Insured Portfolio Value
+                <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
+                  Collector Crypt Insured Value
                 </p>
-                <h2 className="font-serif text-5xl text-white font-bold">
+                <h2 className="font-serif text-5xl text-white font-bold mb-2">
                   {formatFullPrice(portfolioData.totalInsuredValue)}
                 </h2>
+                <p className="text-gray-600 text-xs">
+                  CC insured valuations across {portfolioData.totalCards} cards
+                </p>
+              </div>
+
+              {/* Oracle Market Valuation Coming Soon Banner */}
+              <div className="bg-gradient-to-r from-dark-800 to-dark-900 rounded-xl border border-gold-400/20 p-6 mb-12">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 mt-1">
+                    <svg
+                      className="w-5 h-5 text-gold-400"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gold-400 mb-1">
+                      Oracle Market Valuation
+                    </h3>
+                    <p className="text-gray-400 text-sm">
+                      Real-time market pricing from Alt.xyz oracle coming soon.
+                      Currently showing Collector Crypt insured valuations.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* 3 Stat Cards */}
@@ -237,7 +268,7 @@ export default function PortfolioPage() {
                       portfolioData.totalInsuredValue -
                         portfolioData.totalListedValue
                     )}{" "}
-                    value
+                    insured value
                   </p>
                 </div>
               </div>
@@ -247,31 +278,36 @@ export default function PortfolioPage() {
                 {/* On Artifacte */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <h3 className="font-serif text-lg text-white mb-4">
-                    On Artifacte
+                    On Artifacte Marketplace
                   </h3>
                   <div className="flex items-end gap-4">
                     <div>
                       <p className="font-serif text-2xl text-gold-400 font-bold">
                         {portfolioData.listedCards}
                       </p>
-                      <p className="text-gray-500 text-xs mt-1">Listed cards</p>
+                      <p className="text-gray-500 text-xs mt-1">Cards listed</p>
+                      <p className="text-gray-600 text-[10px] mt-2">
+                        {formatCurrency(portfolioData.totalListedValue)} listed
+                        value
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* On Collector Crypt */}
+                {/* Total Portfolio (CC Insured) */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <h3 className="font-serif text-lg text-white mb-4">
-                    Total Portfolio
+                    Total Portfolio (CC Insured)
                   </h3>
                   <div className="flex items-end gap-4">
                     <div>
                       <p className="font-serif text-2xl text-gold-400 font-bold">
                         {portfolioData.totalCards}
                       </p>
-                      <p className="text-gray-500 text-xs mt-1">
-                        Total insured value:{" "}
-                        {formatCurrency(portfolioData.totalInsuredValue)}
+                      <p className="text-gray-500 text-xs mt-1">Total cards</p>
+                      <p className="text-gray-600 text-[10px] mt-2">
+                        {formatCurrency(portfolioData.totalInsuredValue)} insured
+                        value
                       </p>
                     </div>
                   </div>
@@ -281,9 +317,12 @@ export default function PortfolioPage() {
               {/* Portfolio Value by Category Chart */}
               {Object.keys(portfolioData.categoriesByValue).length > 0 && (
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
-                  <h3 className="font-serif text-lg text-white mb-6">
-                    Portfolio Value by Category
+                  <h3 className="font-serif text-lg text-white mb-2">
+                    Insured Value by Category
                   </h3>
+                  <p className="text-gray-500 text-xs mb-4">
+                    Based on Collector Crypt valuations
+                  </p>
                   <div className="space-y-4">
                     {Object.entries(portfolioData.categoriesByValue)
                       .sort(([, a], [, b]) => b - a)
@@ -404,13 +443,18 @@ export default function PortfolioPage() {
                       </div>
                     )}
 
-                    {/* Insured Value */}
-                    <p className="text-gold-400 font-semibold text-sm mt-2">
-                      {formatCurrency(card.insuredValueNum)}
-                    </p>
+                    {/* Insured Value (Primary) */}
+                    <div className="mt-3">
+                      <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
+                        Insured Value
+                      </p>
+                      <p className="text-gold-400 font-serif text-lg font-bold">
+                        {formatCurrency(card.insuredValueNum)}
+                      </p>
+                    </div>
 
                     {/* Listed Status */}
-                    <p className="text-gray-500 text-[10px] mt-2">
+                    <p className="text-gray-500 text-[10px] mt-3">
                       {card.listing ? (
                         <span className="text-green-400">
                           Listed @ {formatCurrency(card.listing.price)}
@@ -430,12 +474,16 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Net Worth Line */}
+            {/* Summary Footer */}
             <div className="border-t border-white/5 pt-8 mt-8">
+              <p className="text-gray-600 text-xs mb-4">
+                All values shown are Collector Crypt insured valuations. Oracle
+                market pricing will be integrated soon.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Portfolio Value
+                    Total Insured Value
                   </p>
                   <p className="font-serif text-2xl text-gold-400 font-bold">
                     {formatFullPrice(portfolioData.totalInsuredValue)}
@@ -444,7 +492,7 @@ export default function PortfolioPage() {
 
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Average Card Value
+                    Average Card Insured Value
                   </p>
                   <p className="font-serif text-2xl text-gold-400 font-bold">
                     {formatCurrency(
@@ -456,7 +504,7 @@ export default function PortfolioPage() {
 
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Unlisted Value
+                    Unlisted Insured Value
                   </p>
                   <p className="font-serif text-2xl text-gold-400 font-bold">
                     {formatCurrency(
