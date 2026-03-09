@@ -78,7 +78,6 @@ export default function Home() {
                 { name: "Spirits", emoji: "🥃", slug: "spirits", href: "/auctions/categories/spirits" },
                 { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards", href: "/auctions/categories/tcg-cards" },
                 { name: "Sports Cards", emoji: "⚽", slug: "sports-cards", href: "/auctions/categories/sports-cards" },
-                { name: "Watches", emoji: "⌚", slug: "watches", href: "/auctions/categories/watches" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">
