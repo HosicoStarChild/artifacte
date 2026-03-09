@@ -1,0 +1,18 @@
+{
+  "wallets": [
+    {
+      "address": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "name": "Artifacte Treasury",
+      "role": "admin",
+      "addedAt": 1704067200000,
+      "enabled": true
+    },
+    {
+      "address": "Csxbu2BWrYKaN728HZv2NgGpDgDeFqDYgvofWufUVjJi",
+      "name": "Sin",
+      "role": "seller",
+      "addedAt": 1704067200000,
+      "enabled": true
+    }
+  ]
+}

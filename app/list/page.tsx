@@ -1,337 +1,305 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getAssetsByOwner, readNFTMetadata, determineCurrency, calculateSellerFee, type NFTMetadata } from "@/lib/metadata-reader";
-import { BAXUS_SELLER_FEE_ENABLED } from "@/lib/data";
-import { useAuctionProgram } from "@/hooks/useAuctionProgram";
-import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
-import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { showToast } from "@/components/ToastContainer";
 
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
-);
-
-const CATEGORIES = [
-  { value: "DIGITAL_ART", label: "Digital Art" },
-  { value: "SPIRITS", label: "Spirits" },
-  { value: "TCG_CARDS", label: "TCG Cards" },
-  { value: "SPORTS_CARDS", label: "Sports Cards" },
-  { value: "WATCHES", label: "Watches" },
-];
-
-const BAXUS_AUTHORITY = "BAXUz8YJsRtZVZuMaespnrDPMapvu83USD6PXh4GgHjg";
-
-type Step = "connect" | "select-nft" | "set-price" | "review" | "success";
-
-interface ListingData {
-  nftMint: string;
-  name: string;
-  image: string;
-  category: string;
-  listingType: "FIXED_PRICE" | "AUCTION";
-  price: number;
-  auctionEndDays?: number;
-  currency: "SOL" | "USDC" | "USD1";
-  verifiedBy: string;
-  sellerFee: number;
+interface NFTAsset {
+  id: string;
+  content: {
+    metadata: { name: string; symbol: string; description: string };
+    links?: { image?: string };
+    files?: { uri?: string }[];
+    json_uri?: string;
+  };
+  grouping?: { group_key: string; group_value: string }[];
+  ownership: { owner: string };
 }
 
-export default function ListPage() {
-  const { publicKey, connected } = useWallet();
-  const auctionProgram = useAuctionProgram();
-  const [step, setStep] = useState<Step>("connect");
-  const [assets, setAssets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
-  const [selectedAsset, setSelectedAsset] = useState<NFTMetadata | null>(null);
-  const [listing, setListing] = useState<ListingData>({
-    nftMint: "",
-    name: "",
-    image: "",
-    category: "DIGITAL_ART",
-    listingType: "FIXED_PRICE",
-    price: 0,
-    currency: "SOL",
-    verifiedBy: "",
-    sellerFee: 0,
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [customImageUrl, setCustomImageUrl] = useState("");
-  const [showImageInput, setShowImageInput] = useState(false);
+interface WhitelistStatus {
+  walletOk: boolean;
+  loading: boolean;
+}
 
-  // Fetch NFTs when wallet is connected
+export default function ListNFTPage() {
+  const { publicKey, connected } = useWallet();
+  const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
+  const [nfts, setNfts] = useState<NFTAsset[]>([]);
+  const [loadingNfts, setLoadingNfts] = useState(false);
+  const [selectedNft, setSelectedNft] = useState<NFTAsset | null>(null);
+  const [price, setPrice] = useState("");
+  const [listingType, setListingType] = useState<"fixed" | "auction">("fixed");
+  const [auctionDuration, setAuctionDuration] = useState("72");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [allowedCollections, setAllowedCollections] = useState<Record<string, string>>({});
+
+  // Check wallet whitelist
   useEffect(() => {
-    if (connected && publicKey) {
-      fetchNFTs();
-      setStep("select-nft");
-    } else {
-      setStep("connect");
+    if (!connected || !publicKey) {
+      setWhitelistStatus({ walletOk: false, loading: false });
+      return;
     }
+    checkWhitelist();
   }, [connected, publicKey]);
 
-  async function fetchNFTs() {
-    setLoading(true);
-    setError("");
+  async function checkWhitelist() {
     try {
-      const nfts = await getAssetsByOwner(publicKey!.toBase58());
-      setAssets(nfts);
-      if (nfts.length === 0) {
-        setError("No NFTs found in your wallet.");
+      const res = await fetch("/api/admin/wallet-whitelist");
+      const data = await res.json();
+      const addr = publicKey!.toBase58();
+      const found = data.wallets?.some((w: any) => w.address === addr && w.enabled);
+      setWhitelistStatus({ walletOk: found, loading: false });
+      if (found) {
+        loadAllowedCollections();
+        loadNFTs();
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch NFTs");
-    } finally {
-      setLoading(false);
+    } catch {
+      setWhitelistStatus({ walletOk: false, loading: false });
     }
   }
 
-  function selectNFT(asset: any) {
-    const metadata = readNFTMetadata(asset);
-    setSelectedAsset(metadata);
-    
-    const currency = determineCurrency(listing.category, metadata.verifiedBy);
-    const sellerFee = calculateSellerFee(listing.price, metadata.verifiedBy, BAXUS_SELLER_FEE_ENABLED);
-    
-    setListing({
-      nftMint: metadata.mint,
-      name: metadata.name,
-      image: metadata.image || "",
-      category: listing.category,
-      listingType: listing.listingType,
-      price: listing.price,
-      currency,
-      verifiedBy: metadata.verifiedBy,
-      sellerFee,
-    });
-    setStep("set-price");
-  }
-
-  function updateListingType(type: "FIXED_PRICE" | "AUCTION") {
-    setListing({ ...listing, listingType: type });
-  }
-
-  function updatePrice(price: number) {
-    const sellerFee = calculateSellerFee(price, listing.verifiedBy, BAXUS_SELLER_FEE_ENABLED);
-    setListing({ ...listing, price, sellerFee });
-  }
-
-  function updateCategory(category: string) {
-    const currency = determineCurrency(category, listing.verifiedBy);
-    setListing({ ...listing, category, currency });
-  }
-
-  function proceedToReview() {
-    if (!listing.price || listing.price <= 0) {
-      setError("Please set a valid price");
-      return;
-    }
-    if (listing.listingType === "AUCTION" && !listing.auctionEndDays) {
-      setError("Please set auction end date");
-      return;
-    }
-    setError("");
-    setStep("review");
-  }
-
-  async function submitListing() {
-    setSubmitting(true);
-    setError("");
+  async function loadAllowedCollections() {
     try {
-      let txSignature: string | undefined;
-      
-      // Call on-chain listItem if auctionProgram is available
-      if (auctionProgram && publicKey) {
-        try {
-          const nftMint = new PublicKey(listing.nftMint);
-          const paymentMint = new PublicKey(listing.currency === "SOL" 
-            ? "So11111111111111111111111111111111111111112"  // SOL mint
-            : listing.currency === "USD1"
-            ? "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"  // USD1 mint
-            : "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  // USDC mint
-          );
-          
-          const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey);
-          
-          // Map category string to ItemCategory enum
-          const categoryMap: Record<string, ItemCategory> = {
-            "DIGITAL_ART": ItemCategory.DigitalArt,
-            "SPIRITS": ItemCategory.Spirits,
-            "TCG_CARDS": ItemCategory.TCGCards,
-            "SPORTS_CARDS": ItemCategory.SportsCards,
-            "WATCHES": ItemCategory.Watches,
-          };
-          
-          const durationSeconds = listing.auctionEndDays 
-            ? listing.auctionEndDays * 24 * 60 * 60 
-            : undefined;
-          
-          showToast.info("Creating on-chain listing...");
-          txSignature = await auctionProgram.listItem(
-            nftMint,
-            sellerNftAccount,
-            paymentMint,
-            listing.listingType === "FIXED_PRICE" ? ListingType.FixedPrice : ListingType.Auction,
-            Math.round(listing.price * (listing.currency === "SOL" ? 1e9 : 1e6)),  // Convert to smallest unit
-            durationSeconds,
-            categoryMap[listing.category] || ItemCategory.DigitalArt
-          );
-        } catch (programErr: any) {
-          console.warn("AuctionProgram.listItem failed, continuing with backend listing:", programErr);
-          // Continue with backend listing creation even if on-chain fails
-        }
+      const res = await fetch("/api/admin/allowlist");
+      const data = await res.json();
+      const map: Record<string, string> = {};
+      for (const c of data.collections || []) {
+        if (c.collectionAddress) map[c.collectionAddress] = c.name;
+        if (c.mintAuthority) map[c.mintAuthority] = c.name;
       }
-      
-      // Also save to backend for UI display
-      const response = await fetch("/api/listing", {
+      setAllowedCollections(map);
+    } catch {}
+  }
+
+  async function loadNFTs() {
+    if (!publicKey) return;
+    setLoadingNfts(true);
+    try {
+      const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: listing.name,
-          category: listing.category,
-          nftMint: listing.nftMint,
-          image: customImageUrl || listing.image,
-          listingType: listing.listingType,
-          price: listing.price,
-          currency: listing.currency,
-          verifiedBy: listing.verifiedBy,
-          sellerAddress: publicKey?.toBase58(),
-          txSignature,
-          auctionEnd: listing.auctionEndDays
-            ? new Date(Date.now() + listing.auctionEndDays * 24 * 60 * 60 * 1000).toISOString()
-            : undefined,
-          description: `${listing.verifiedBy}-verified ${listing.category} NFT. Mint: ${listing.nftMint}`,
+          jsonrpc: "2.0",
+          id: "list-nfts",
+          method: "getAssetsByOwner",
+          params: {
+            ownerAddress: publicKey.toBase58(),
+            page: 1,
+            limit: 1000,
+            displayOptions: { showFungible: false, showNativeBalance: false },
+          },
         }),
       });
+      const data = await res.json();
+      const items: NFTAsset[] = (data.result?.items || []).filter((item: any) => {
+        // Filter: not burnt, not compressed, not fungible
+        if (item.burnt) return false;
+        if (item.compression?.compressed) return false;
+        if (item.interface === "FungibleToken" || item.interface === "FungibleAsset") return false;
+        return true;
+      });
+      setNfts(items);
+    } catch (err) {
+      console.error("Failed to load NFTs:", err);
+    } finally {
+      setLoadingNfts(false);
+    }
+  }
 
-      if (!response.ok) {
-        throw new Error("Failed to create listing");
-      }
+  function getNftImage(nft: NFTAsset): string {
+    return nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
+  }
 
-      showToast.success("✓ Listing created successfully!");
-      setStep("success");
+  function getNftCollection(nft: NFTAsset): { address: string; name: string } | null {
+    const group = nft.grouping?.find(g => g.group_key === "collection");
+    if (!group) return null;
+    const name = allowedCollections[group.group_value];
+    return name ? { address: group.group_value, name } : null;
+  }
+
+  function getFilteredNfts(): NFTAsset[] {
+    return nfts.filter(nft => {
+      const collection = getNftCollection(nft);
+      return collection !== null;
+    });
+  }
+
+  async function handleSubmit() {
+    if (!selectedNft || !price || !publicKey) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const collection = getNftCollection(selectedNft);
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nftMint: selectedNft.id,
+          nftName: selectedNft.content?.metadata?.name || "Unknown",
+          nftImage: getNftImage(selectedNft),
+          collectionName: collection?.name || "Unknown",
+          collectionAddress: collection?.address || "",
+          seller: publicKey.toBase58(),
+          price: parseFloat(price),
+          listingType,
+          auctionDuration: listingType === "auction" ? parseInt(auctionDuration) : undefined,
+          description,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit");
+      setSubmitted(true);
     } catch (err: any) {
-      const message = err.message || "Failed to submit listing";
-      
-      if (message.includes("User rejected")) {
-        showToast.error("Transaction rejected by user");
-        setError("Transaction was rejected. Please try again.");
-      } else if (message.includes("insufficient")) {
-        showToast.error("Insufficient balance to create listing");
-        setError("You don't have enough balance. Please check your wallet.");
-      } else {
-        showToast.error(message);
-        setError(message);
-      }
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
   }
 
-  return (
-    <main className="min-h-screen bg-dark-900 pt-32 pb-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-12">
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-white mb-4">Create a Listing</h1>
-          <p className="text-gray-400 text-lg">List your NFT on Artifacte marketplace</p>
+  if (!connected) {
+    return (
+      <main className="min-h-screen pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+            <div className="text-5xl mb-4">🔗</div>
+            <h2 className="font-serif text-2xl text-white mb-4">Connect Your Wallet</h2>
+            <p className="text-gray-400">Connect your Solana wallet to list NFTs on Artifacte.</p>
+          </div>
         </div>
+      </main>
+    );
+  }
 
-        {/* Step Indicator */}
-        <div className="mb-12 flex justify-between items-center">
-          {(["connect", "select-nft", "set-price", "review", "success"] as Step[]).map((s, i) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                  step === s ? "bg-gold-500 text-dark-900" : step > s ? "bg-gray-600 text-white" : "bg-dark-800 text-gray-500"
-                }`}
-              >
-                {i + 1}
-              </div>
-              {i < 4 && <div className={`h-1 flex-1 mx-2 ${step > s ? "bg-gold-500" : "bg-dark-800"}`} />}
-            </div>
-          ))}
+  if (whitelistStatus.loading) {
+    return (
+      <main className="min-h-screen pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4 text-center">
+          <div className="inline-block animate-spin mb-4">
+            <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
+          </div>
+          <p className="text-gray-400">Checking access...</p>
         </div>
+      </main>
+    );
+  }
 
-        {/* Content */}
-        {step === "connect" && (
-          <div className="bg-dark-800 border border-white/10 rounded-xl p-8 md:p-12 text-center">
-            <h2 className="font-serif text-2xl font-bold text-white mb-4">Connect Your Wallet</h2>
-            <p className="text-gray-400 mb-8">
-              To list an NFT, you'll need to connect your Solana wallet first.
+  if (!whitelistStatus.walletOk) {
+    return (
+      <main className="min-h-screen pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+            <div className="text-5xl mb-4">🔒</div>
+            <h2 className="font-serif text-2xl text-white mb-4">Seller Access Required</h2>
+            <p className="text-gray-400 mb-6">
+              Your wallet is not approved for listing on Artifacte. This is a curated marketplace — sellers must be approved.
             </p>
-            {connected ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin mb-4">
-                  <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
-                </div>
-                <p className="text-gray-400">Connecting wallet...</p>
-              </div>
-            ) : (
-              <div className="flex justify-center">
-                <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-sm !font-semibold !px-8" />
-              </div>
-            )}
+            <p className="text-gray-500 text-sm mb-6">
+              Wallet: <span className="text-white font-mono text-xs">{publicKey?.toBase58()}</span>
+            </p>
+            <Link
+              href="/submit"
+              className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition"
+            >
+              Apply for Seller Access
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <main className="min-h-screen pt-32 pb-20">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="font-serif text-2xl text-white mb-2">Listing Submitted</h2>
+            <p className="text-gray-400 mb-6">
+              Your NFT listing is pending review. Once approved, it will go live on Artifacte and your NFT will be escrowed on-chain.
+            </p>
+            <button
+              onClick={() => { setSubmitted(false); setSelectedNft(null); setPrice(""); setDescription(""); }}
+              className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm hover:bg-white/10 transition"
+            >
+              List Another NFT
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const eligibleNfts = getFilteredNfts();
+
+  return (
+    <main className="min-h-screen pt-32 pb-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-10">
+          <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">List NFT</p>
+          <h1 className="font-serif text-4xl text-white mb-3">List Your Digital Collectible</h1>
+          <p className="text-gray-400 text-base">
+            Select an NFT from an approved collection and set your price. Listings are reviewed before going live.
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6 text-red-400 text-sm">
+            {error}
           </div>
         )}
 
-        {step === "select-nft" && (
+        {/* Step 1: Select NFT */}
+        {!selectedNft ? (
           <div>
-            <h2 className="font-serif text-2xl font-bold text-white mb-6">Select NFT to List</h2>
-            
-            {loading && (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin">
-                  <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
-                </div>
-                <p className="text-gray-400 mt-4">Loading your NFTs...</p>
-              </div>
-            )}
+            <h2 className="font-serif text-xl text-white mb-4">
+              Select NFT
+              <span className="text-gray-500 text-sm ml-3 font-sans">
+                {loadingNfts ? "Loading..." : `${eligibleNfts.length} eligible from approved collections`}
+              </span>
+            </h2>
 
-            {error && (
-              <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-6 text-red-400">
-                {error}
+            {loadingNfts ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="bg-dark-800 border border-white/5 rounded-xl h-64 animate-pulse" />
+                ))}
               </div>
-            )}
-
-            {!loading && assets.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {assets.map((asset) => {
-                  const metadata = readNFTMetadata(asset);
+            ) : eligibleNfts.length === 0 ? (
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+                <div className="text-4xl mb-4">📭</div>
+                <p className="text-gray-400 mb-2">No eligible NFTs found</p>
+                <p className="text-gray-500 text-sm">
+                  You need NFTs from an approved collection. Currently approved: {Object.values(allowedCollections).join(", ") || "None"}.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {eligibleNfts.map((nft) => {
+                  const collection = getNftCollection(nft);
                   return (
                     <button
-                      key={asset.id}
-                      onClick={() => selectNFT(asset)}
-                      className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500 transition-all card-hover text-left"
+                      key={nft.id}
+                      onClick={() => setSelectedNft(nft)}
+                      className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden text-left hover:border-gold-500/50 transition group"
                     >
-                      <div className="aspect-square bg-dark-700 overflow-hidden relative">
-                        {metadata.image ? (
-                          <img
-                            src={metadata.image}
-                            alt={metadata.name}
-                            className="w-full h-full object-cover image-hover"
-                            onError={(e) => {
-                              e.currentTarget.src = "https://via.placeholder.com/400?text=No+Image";
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500">
-                            No image
-                          </div>
-                        )}
+                      <div className="aspect-square bg-dark-700 relative overflow-hidden">
+                        <img
+                          src={getNftImage(nft)}
+                          alt={nft.content?.metadata?.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+                        />
                       </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-white truncate mb-1">{metadata.name}</h3>
-                        <p className="text-xs text-gray-500 truncate mb-2">Mint: {asset.id.slice(0, 8)}...</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gold-500">{metadata.verifiedBy}</span>
-                          <span className="text-xs text-gray-500">{metadata.symbol || "N/A"}</span>
-                        </div>
+                      <div className="p-3">
+                        <p className="text-white text-sm font-semibold truncate">
+                          {nft.content?.metadata?.name || "Unnamed"}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1 truncate">{collection?.name}</p>
                       </div>
                     </button>
                   );
@@ -339,305 +307,149 @@ export default function ListPage() {
               </div>
             )}
 
-            {!loading && assets.length === 0 && !error && (
-              <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
-                <p className="text-gray-400 mb-4">No NFTs found in your wallet</p>
-                <button
-                  onClick={fetchNFTs}
-                  className="text-gold-500 hover:text-gold-400 font-medium"
-                >
-                  Try again
-                </button>
-              </div>
+            {nfts.length > eligibleNfts.length && (
+              <p className="text-gray-600 text-xs mt-4 text-center">
+                {nfts.length - eligibleNfts.length} NFTs hidden (not from approved collections)
+              </p>
             )}
           </div>
-        )}
-
-        {step === "set-price" && selectedAsset && (
+        ) : (
+          /* Step 2: Set price and details */
           <div className="max-w-2xl">
-            <div className="bg-dark-800 border border-white/10 rounded-xl p-8 mb-8">
-              <h2 className="font-serif text-2xl font-bold text-white mb-6">Set Listing Details</h2>
+            <button
+              onClick={() => setSelectedNft(null)}
+              className="text-gray-400 text-sm hover:text-white mb-6 flex items-center gap-2 transition"
+            >
+              ← Back to NFT selection
+            </button>
 
-              {/* NFT Preview */}
-              <div className="mb-8 pb-8 border-b border-white/10">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Selected NFT</h3>
-                <div className="flex gap-6">
-                  <div className="w-24 h-24 rounded-lg bg-dark-700 overflow-hidden flex-shrink-0">
-                    {listing.image ? (
-                      <img
-                        src={listing.image}
-                        alt={listing.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://via.placeholder.com/100?text=No+Image";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-white mb-1">{listing.name}</h4>
-                    <p className="text-sm text-gray-500 mb-2">Verified by: {listing.verifiedBy}</p>
-                    <p className="text-xs text-gray-600 break-all">Mint: {listing.nftMint}</p>
-                  </div>
+            <div className="bg-dark-800 border border-white/5 rounded-xl p-6">
+              {/* Selected NFT preview */}
+              <div className="flex gap-4 mb-6 pb-6 border-b border-white/5">
+                <img
+                  src={getNftImage(selectedNft)}
+                  alt={selectedNft.content?.metadata?.name}
+                  className="w-24 h-24 rounded-lg object-cover"
+                />
+                <div>
+                  <h3 className="text-white font-semibold text-lg">
+                    {selectedNft.content?.metadata?.name || "Unnamed"}
+                  </h3>
+                  <p className="text-gray-500 text-sm">{getNftCollection(selectedNft)?.name}</p>
+                  <p className="text-gray-600 text-xs font-mono mt-1">{selectedNft.id}</p>
                 </div>
               </div>
 
-              {/* Category */}
-              <div className="mb-8">
-                <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 block">
-                  Category
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.value}
-                      onClick={() => updateCategory(cat.value)}
-                      className={`py-3 px-4 rounded-lg border transition-all font-medium text-sm ${
-                        listing.category === cat.value
-                          ? "bg-gold-500 text-dark-900 border-gold-500"
-                          : "bg-dark-700 text-gray-300 border-white/10 hover:border-white/20"
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Listing Type */}
-              <div className="mb-8">
-                <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 block">
-                  Listing Type
-                </label>
-                <div className="grid grid-cols-2 gap-4">
+              {/* Listing type */}
+              <div className="mb-5">
+                <label className="block text-sm text-gray-400 mb-2 font-medium">Listing Type</label>
+                <div className="flex gap-3">
                   <button
-                    onClick={() => updateListingType("FIXED_PRICE")}
-                    className={`py-4 px-6 rounded-lg border transition-all text-left ${
-                      listing.listingType === "FIXED_PRICE"
-                        ? "bg-gold-500 text-dark-900 border-gold-500"
-                        : "bg-dark-700 text-gray-300 border-white/10 hover:border-white/20"
+                    onClick={() => setListingType("fixed")}
+                    className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
+                      listingType === "fixed"
+                        ? "border-gold-500 bg-gold-500/10 text-gold-400"
+                        : "border-white/10 text-gray-400 hover:border-white/20"
                     }`}
                   >
-                    <div className="font-semibold mb-1">Fixed Price</div>
-                    <div className="text-xs opacity-75">Set a fixed selling price</div>
+                    Fixed Price
                   </button>
                   <button
-                    onClick={() => updateListingType("AUCTION")}
-                    className={`py-4 px-6 rounded-lg border transition-all text-left ${
-                      listing.listingType === "AUCTION"
-                        ? "bg-gold-500 text-dark-900 border-gold-500"
-                        : "bg-dark-700 text-gray-300 border-white/10 hover:border-white/20"
+                    onClick={() => setListingType("auction")}
+                    className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
+                      listingType === "auction"
+                        ? "border-gold-500 bg-gold-500/10 text-gold-400"
+                        : "border-white/10 text-gray-400 hover:border-white/20"
                     }`}
                   >
-                    <div className="font-semibold mb-1">Auction</div>
-                    <div className="text-xs opacity-75">Let buyers bid on your NFT</div>
+                    Auction
                   </button>
                 </div>
               </div>
 
               {/* Price */}
-              <div className="mb-8">
-                <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 block">
-                  Price ({listing.currency})
+              <div className="mb-5">
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">
+                  {listingType === "fixed" ? "Price" : "Starting Price"} (SOL)
                 </label>
-                <input
-                  type="number"
-                  value={listing.price}
-                  onChange={(e) => updatePrice(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500 outline-none transition-all"
-                  step="0.01"
-                  min="0"
+                <div className="relative">
+                  <span className="absolute left-4 top-2.5 text-gray-500">◎</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={price}
+                    onChange={e => setPrice(e.target.value)}
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Auction duration */}
+              {listingType === "auction" && (
+                <div className="mb-5">
+                  <label className="block text-sm text-gray-400 mb-1.5 font-medium">Auction Duration</label>
+                  <select
+                    value={auctionDuration}
+                    onChange={e => setAuctionDuration(e.target.value)}
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                  >
+                    <option value="24">24 hours</option>
+                    <option value="48">48 hours</option>
+                    <option value="72">3 days</option>
+                    <option value="168">7 days</option>
+                    <option value="336">14 days</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="mb-6">
+                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Description (optional)</label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition resize-none"
+                  placeholder="Add any details about this NFT..."
                 />
               </div>
 
-              {/* Auction Duration */}
-              {listing.listingType === "AUCTION" && (
-                <div className="mb-8">
-                  <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 block">
-                    Auction Duration (days)
-                  </label>
-                  <input
-                    type="number"
-                    value={listing.auctionEndDays || ""}
-                    onChange={(e) => setListing({ ...listing, auctionEndDays: parseInt(e.target.value) || undefined })}
-                    placeholder="e.g. 7"
-                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500 outline-none transition-all"
-                    min="1"
-                    max="90"
-                  />
+              {/* Fee info */}
+              <div className="bg-dark-700 rounded-lg p-4 mb-6 border border-white/5">
+                <p className="text-gray-400 text-xs font-medium mb-2">Fee Summary</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Platform fee</span>
+                  <span className="text-white">2%</span>
                 </div>
-              )}
-
-              {/* Image Override */}
-              {listing.image && (
-                <div className="mb-8">
-                  <button
-                    onClick={() => setShowImageInput(!showImageInput)}
-                    className="text-sm text-gold-500 hover:text-gold-400 font-medium"
-                  >
-                    {showImageInput ? "Hide image URL input" : "Use custom image URL?"}
-                  </button>
-                  {showImageInput && (
-                    <input
-                      type="url"
-                      value={customImageUrl}
-                      onChange={(e) => setCustomImageUrl(e.target.value)}
-                      placeholder="https://example.com/image.jpg"
-                      className="w-full mt-3 bg-dark-700 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500 outline-none transition-all text-sm"
-                    />
-                  )}
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-gray-500">Creator royalty</span>
+                  <span className="text-white">2%</span>
                 </div>
-              )}
-
-              {/* Fee Notice */}
-              {listing.verifiedBy === "BAXUS" && BAXUS_SELLER_FEE_ENABLED && listing.sellerFee > 0 && (
-                <div className="mb-8 bg-amber-900/20 border border-amber-700 rounded-lg p-4">
-                  <p className="text-sm text-amber-400">
-                    <span className="font-semibold">BAXUS Seller Fee:</span> 10% of sale price (
-                    {listing.currency} {listing.sellerFee.toFixed(2)})
-                  </p>
-                </div>
-              )}
-
-              {error && (
-                <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-8 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setStep("select-nft")}
-                  className="flex-1 px-6 py-3 rounded-lg border border-white/10 text-white hover:bg-dark-700 transition-all font-semibold"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={proceedToReview}
-                  className="flex-1 px-6 py-3 rounded-lg bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold transition-all"
-                >
-                  Review Listing
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === "review" && (
-          <div className="max-w-2xl">
-            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
-              <h2 className="font-serif text-2xl font-bold text-white mb-8">Review Your Listing</h2>
-
-              {/* Preview Card */}
-              <div className="bg-dark-700 rounded-lg p-6 mb-8">
-                <div className="flex gap-6">
-                  <div className="w-32 h-32 rounded-lg bg-dark-600 overflow-hidden flex-shrink-0">
-                    {listing.image ? (
-                      <img
-                        src={customImageUrl || listing.image}
-                        alt={listing.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = "https://via.placeholder.com/150?text=No+Image";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-600">No image</div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-white text-lg mb-2">{listing.name}</h3>
-                    <p className="text-gray-400 text-sm mb-4">{CATEGORIES.find(c => c.value === listing.category)?.label}</p>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Verified by:</span>
-                        <span className="text-gold-500 font-semibold">{listing.verifiedBy}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Listing Type:</span>
-                        <span className="text-white font-semibold">
-                          {listing.listingType === "FIXED_PRICE" ? "Fixed Price" : "Auction"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-lg border-t border-white/10 pt-2 mt-2">
-                        <span className="text-gray-400">Price:</span>
-                        <span className="text-gold-500 font-bold">
-                          {listing.currency} {listing.price.toFixed(2)}
-                        </span>
-                      </div>
-                      {listing.sellerFee > 0 && (
-                        <div className="flex justify-between text-sm text-amber-400">
-                          <span>Seller Fee (10%):</span>
-                          <span>{listing.currency} {listing.sellerFee.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {listing.auctionEndDays && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-400">Duration:</span>
-                          <span className="text-white">{listing.auctionEndDays} days</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
+                  <span className="text-gray-500">You receive</span>
+                  <span className="text-gold-400 font-semibold">
+                    {price ? `◎ ${(parseFloat(price) * 0.96).toFixed(2)}` : "—"}
+                  </span>
                 </div>
               </div>
 
-              {error && (
-                <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 mb-8 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setStep("set-price")}
-                  className="flex-1 px-6 py-3 rounded-lg border border-white/10 text-white hover:bg-dark-700 transition-all font-semibold"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={submitListing}
-                  disabled={submitting}
-                  className="flex-1 px-6 py-3 rounded-lg bg-gold-500 hover:bg-gold-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-dark-900 font-semibold transition-all"
-                >
-                  {submitting ? "Creating listing..." : "Create Listing"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === "success" && (
-          <div className="bg-dark-800 border border-white/10 rounded-xl p-8 md:p-12 text-center max-w-2xl mx-auto">
-            <div className="w-16 h-16 rounded-full bg-green-900/20 border border-green-700 flex items-center justify-center mx-auto mb-6">
-              <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="font-serif text-3xl font-bold text-white mb-4">Listing Created!</h2>
-            <p className="text-gray-400 mb-8">
-              Your NFT has been listed on Artifacte. You can view it on the marketplace or check your listings.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/auctions"
-                className="flex-1 px-6 py-3 rounded-lg bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold transition-all text-center"
+              {/* Submit */}
+              <button
+                onClick={handleSubmit}
+                disabled={!price || parseFloat(price) <= 0 || submitting}
+                className={`w-full py-3 rounded-lg font-semibold text-sm transition ${
+                  !price || parseFloat(price) <= 0 || submitting
+                    ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                    : "bg-gold-500 hover:bg-gold-600 text-dark-900"
+                }`}
               >
-                View Marketplace
-              </Link>
-              <Link
-                href="/my-listings"
-                className="flex-1 px-6 py-3 rounded-lg border border-white/10 text-white hover:bg-dark-700 transition-all font-semibold text-center"
-              >
-                My Listings
-              </Link>
+                {submitting ? "Submitting..." : "Submit for Review"}
+              </button>
+              <p className="text-gray-600 text-xs text-center mt-3">
+                Your NFT stays in your wallet until the listing is approved and the escrow transaction is signed.
+              </p>
             </div>
           </div>
         )}

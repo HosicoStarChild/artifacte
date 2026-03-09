@@ -9,7 +9,7 @@ interface AdminListing {
   name: string;
   image: string;
   price: number;
-  status: "pending" | "active" | "completed" | "cancelled";
+  status: "pending" | "active" | "approved" | "completed" | "cancelled" | "rejected";
   seller: string;
   createdAt: string;
 }
@@ -36,7 +36,10 @@ export default function AdminPage() {
     totalVolume: 0,
   });
   const [baxusFeesEnabled, setBaxusFeesEnabled] = useState(BAXUS_SELLER_FEE_ENABLED);
-  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings">("overview");
+  const [whitelistedWallets, setWhitelistedWallets] = useState<any[]>([]);
+  const [newWalletAddr, setNewWalletAddr] = useState("");
+  const [newWalletName, setNewWalletName] = useState("");
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -53,65 +56,39 @@ export default function AdminPage() {
   async function loadAdminData() {
     setLoading(true);
     try {
-      // Mock data for demonstration
-      const mockListings: AdminListing[] = [
-        {
-          id: "a1",
-          name: "Rare Digital Artwork",
-          image: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400",
-          price: 5.5,
-          status: "active",
-          seller: "7xK9...mP2q",
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "a2",
-          name: "Vintage Sports Card",
-          image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400",
-          price: 2500,
-          status: "pending",
-          seller: "3nR5...vL8w",
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "a3",
-          name: "Collector's Watch",
-          image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400",
-          price: 8500,
-          status: "active",
-          seller: "9pT2...hJ4x",
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "a4",
-          name: "TCG Holographic Card",
-          image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400",
-          price: 1200,
-          status: "completed",
-          seller: "5mQ8...bN1y",
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: "a5",
-          name: "BAXUS Verified Spirits",
-          image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=400",
-          price: 18000,
-          status: "active",
-          seller: "2kL7...qR9z",
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
+      // Fetch real pending listings from API
+      const res = await fetch("/api/listings");
+      const data = await res.json();
+      const apiListings: AdminListing[] = (data.listings || []).map((l: any) => ({
+        id: l.id,
+        name: l.nftName || l.name || "Unknown",
+        image: l.nftImage || l.image || "",
+        price: l.price,
+        status: l.status || "pending",
+        seller: l.seller,
+        createdAt: l.submittedAt ? new Date(l.submittedAt).toISOString() : new Date().toISOString(),
+        nftMint: l.nftMint,
+        collectionName: l.collectionName,
+        listingType: l.listingType,
+      }));
+      setListings(apiListings);
 
-      const mockStats: PlatformStats = {
-        totalSales: 47500,
-        totalFees: 4750,
-        activeListingsCount: 3,
-        completedListings: 2,
-        totalVolume: 315600,
-      };
+      const pending = apiListings.filter(l => l.status === "pending").length;
+      const active = apiListings.filter(l => l.status === "approved" || l.status === "active").length;
+      const completed = apiListings.filter(l => l.status === "completed").length;
 
-      setListings(mockListings);
-      setStats(mockStats);
+      setStats({
+        totalSales: 0,
+        totalFees: 0,
+        activeListingsCount: active,
+        completedListings: completed,
+        totalVolume: 0,
+      });
+
+      // Load wallet whitelist
+      const wlRes = await fetch("/api/admin/wallet-whitelist");
+      const wlData = await wlRes.json();
+      setWhitelistedWallets(wlData.wallets || []);
     } catch (err: any) {
       setError("Failed to load admin data");
     } finally {
@@ -121,21 +98,33 @@ export default function AdminPage() {
 
   async function approveListing(id: string) {
     try {
+      const res = await fetch("/api/listings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "approve", adminWallet: publicKey?.toBase58() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       const updated = listings.map((l) => (l.id === id ? { ...l, status: "active" as const } : l));
       setListings(updated);
-      alert(`Listing ${id} approved`);
     } catch (err: any) {
-      setError("Failed to approve listing");
+      setError("Failed to approve listing: " + err.message);
     }
   }
 
   async function rejectListing(id: string) {
     try {
+      const res = await fetch("/api/listings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "reject", adminWallet: publicKey?.toBase58() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       const updated = listings.map((l) => (l.id === id ? { ...l, status: "cancelled" as const } : l));
       setListings(updated);
-      alert(`Listing ${id} rejected`);
     } catch (err: any) {
-      setError("Failed to reject listing");
+      setError("Failed to reject listing: " + err.message);
     }
   }
 
@@ -192,7 +181,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="mb-8 flex gap-4 border-b border-white/10">
-          {(["overview", "listings", "settings"] as const).map((tab) => (
+          {(["overview", "listings", "whitelist", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -348,6 +337,103 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {!loading && activeTab === "whitelist" && (
+          <div className="space-y-8">
+            {/* Add Wallet */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+              <h3 className="font-serif text-xl font-bold text-white mb-6">Add Wallet to Whitelist</h3>
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm text-gray-400 mb-1.5">Wallet Address</label>
+                  <input
+                    type="text"
+                    value={newWalletAddr}
+                    onChange={e => setNewWalletAddr(e.target.value)}
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition font-mono"
+                    placeholder="Solana wallet address..."
+                  />
+                </div>
+                <div className="w-48">
+                  <label className="block text-sm text-gray-400 mb-1.5">Name</label>
+                  <input
+                    type="text"
+                    value={newWalletName}
+                    onChange={e => setNewWalletName(e.target.value)}
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    placeholder="Seller name..."
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!newWalletAddr || !newWalletName) return;
+                    try {
+                      const res = await fetch("/api/admin/wallet-whitelist", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ address: newWalletAddr, name: newWalletName, role: "seller", adminWallet: publicKey?.toBase58() }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error);
+                      setWhitelistedWallets([...whitelistedWallets, data.wallet]);
+                      setNewWalletAddr("");
+                      setNewWalletName("");
+                    } catch (err: any) {
+                      setError(err.message);
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm whitespace-nowrap"
+                >
+                  Add Wallet
+                </button>
+              </div>
+            </div>
+
+            {/* Current Whitelist */}
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+              <h3 className="font-serif text-xl font-bold text-white mb-6">
+                Whitelisted Wallets ({whitelistedWallets.length})
+              </h3>
+              {whitelistedWallets.length === 0 ? (
+                <p className="text-gray-500">No wallets whitelisted yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {whitelistedWallets.map((w: any) => (
+                    <div key={w.address} className="flex items-center justify-between p-4 bg-dark-700 rounded-lg border border-white/5">
+                      <div>
+                        <p className="text-white font-semibold text-sm">{w.name}</p>
+                        <p className="text-gray-500 text-xs font-mono mt-1">{w.address}</p>
+                        <p className="text-gray-600 text-xs mt-1">
+                          {w.role} • Added {new Date(w.addedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {w.role !== "admin" && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch("/api/admin/wallet-whitelist", {
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ address: w.address, adminWallet: publicKey?.toBase58() }),
+                              });
+                              if (!res.ok) throw new Error("Failed to remove");
+                              setWhitelistedWallets(whitelistedWallets.filter((wl: any) => wl.address !== w.address));
+                            } catch (err: any) {
+                              setError(err.message);
+                            }
+                          }}
+                          className="text-xs px-3 py-1 bg-red-900/40 text-red-400 border border-red-700 rounded hover:bg-red-900/60 transition"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

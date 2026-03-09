@@ -2,7 +2,56 @@
   "collections": [
     {
       "mintAuthority": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
-      "name": "Artifacte Premium Collection",
+      "name": "Metaplex Certified",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "note": "Metaplex standard — covers most Solana NFTs"
+    },
+    {
+      "collectionAddress": "SMBtHCSD6RwwwFi1hBVWyKZfc4dcCenBCbPMSnAyoUk",
+      "name": "SMB Gen 2",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
+      "name": "SMB Gen 3",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "6mszaj17KSfVqADrQQAeJhPYFtDfSRXEUYQMfjMqFYbT",
+      "name": "Claynosaurz",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w",
+      "name": "Mad Lads",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "BUjZjAS2vbbb65g7Z1WaSiR3YbtQpPwGRqsMCkVLYfpP",
+      "name": "Famous Fox Federation",
+      "category": "Digital Art",
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "8RMqBV79p8sb51nMaKMWR94XKjUvD2kuUSAkpEJTmxyx",
+      "name": "Galactic Gecko",
       "category": "Digital Art",
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
