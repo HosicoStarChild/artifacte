@@ -74,7 +74,7 @@ export default function CategoryAuctionsPage() {
 
   const isDigitalArt = category === "DIGITAL_ART";
 
-  const handleBuyNow = async (listingId: string, price: number, nftMint?: string) => {
+  const handleBuyNow = async (listingId: string, price: number, nftMint?: string, listing?: any) => {
     if (!connected || !publicKey) {
       showToast.error("Please connect your wallet first");
       return;
@@ -83,6 +83,54 @@ export default function CategoryAuctionsPage() {
     setBuyingId(listingId);
     try {
       let sig: string = "";
+
+      // Collector Crypt proxy buy flow
+      if (listing?.source === 'collector-crypt') {
+        let tx: Transaction;
+        const ccCurrency = listing.currency;
+
+        if (ccCurrency === 'SOL') {
+          const lamports = Math.round(price * LAMPORTS_PER_SOL);
+          tx = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: publicKey,
+              toPubkey: TREASURY,
+              lamports,
+            })
+          );
+        } else {
+          // USDC
+          const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+          const tokenAmount = BigInt(Math.round(price * 1e6));
+          const senderAta = await getAssociatedTokenAddress(usdcMint, publicKey);
+          const treasuryAta = await getAssociatedTokenAddress(usdcMint, TREASURY);
+          tx = new Transaction().add(
+            createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+          );
+        }
+
+        sig = await sendTransaction(tx, connection);
+        await connection.confirmTransaction(sig, "confirmed");
+
+        // Notify backend to fulfill the order
+        try {
+          await fetch('/api/cc-buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ccId: listingId.replace('cc-', ''),
+              buyerWallet: publicKey.toBase58(),
+              paymentSignature: sig,
+            }),
+          });
+        } catch (apiErr) {
+          console.warn('CC buy API notification failed:', apiErr);
+        }
+
+        showToast.success(`✓ Payment confirmed! NFT will be transferred to your wallet shortly. TX: ${sig.slice(0, 12)}...`);
+        setBuyingId(null);
+        return;
+      }
 
       // Use AuctionProgram if listing has nftMint (real on-chain listing)
       if (nftMint && auctionProgram) {
@@ -362,7 +410,7 @@ export default function CategoryAuctionsPage() {
                         <img
                           src={l.image}
                           alt={l.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                          className={`w-full h-full ${l.source === 'collector-crypt' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                         />
                       </div>
                       {/* Details */}
@@ -417,7 +465,7 @@ export default function CategoryAuctionsPage() {
                             </a>
                           ) : connected ? (
                             <button
-                              onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint)}
+                              onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint, l)}
                               disabled={buyingId === l.id}
                               className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
                             >
