@@ -57,7 +57,7 @@ export interface Listing {
   category?: Category;
   nftMint?: string;
   verifiedBy?: string;
-  source?: 'baxus' | 'native';
+  source?: 'baxus' | 'native' | 'collector-crypt';
   externalUrl?: string;
   // BAXUS-specific fields
   abv?: number | null;
@@ -66,10 +66,31 @@ export interface Listing {
   region?: string | null;
   volume_ml?: number | null;
   spirit_type?: string;
+  // Collector Crypt fields
+  currency?: string; // SOL or USDC
+  ccPrice?: number; // original CC price before markup
+  nftAddress?: string;
+  grade?: string;
+  gradeNum?: number;
+  gradingCompany?: string;
+  vault?: string;
+  set?: string;
+  year?: number;
+  ccCategory?: string; // original CC category (Pokemon, One Piece, etc.)
+  ccUrl?: string;
 }
 
 const now = Date.now();
 const day = 86400000;
+
+// Load Collector Crypt listings
+let ccListings: any[] = [];
+try {
+  const ccData = require('../data/cc-listings.json');
+  ccListings = Array.isArray(ccData) ? ccData : [];
+} catch (err) {
+  console.warn('Could not load CC listings data:', err instanceof Error ? err.message : String(err));
+}
 
 // Load BAXUS bottles data
 let baxusBottles: any[] = [];
@@ -294,10 +315,41 @@ const baxusListings: Listing[] = baxusBottles
     spirit_type: bottle.spirit_type,
   }));
 
-// Combine native and BAXUS listings
+// Create listings from Collector Crypt data
+const ccCategoryMap: Record<string, Category> = {
+  'TCG Cards': 'TCG_CARDS',
+  'Sports Cards': 'SPORTS_CARDS',
+};
+
+const ccTransformedListings: Listing[] = ccListings
+  .filter((item: any) => item.image && item.price > 0)
+  .map((item: any) => ({
+    id: `cc-${item.ccId}`,
+    name: item.name,
+    subtitle: `${item.ccCategory} • ${item.gradingCompany} ${item.gradeNum} • ${item.vault || 'Vault'}`,
+    price: item.price,
+    image: item.image,
+    category: ccCategoryMap[item.category] || ('TCG_CARDS' as Category),
+    verifiedBy: item.gradingCompany || 'Collector Crypt',
+    source: 'collector-crypt' as const,
+    currency: item.currency,
+    ccPrice: item.ccPrice,
+    nftAddress: item.nftAddress,
+    grade: item.grade,
+    gradeNum: item.gradeNum,
+    gradingCompany: item.gradingCompany,
+    vault: item.vault,
+    set: item.set,
+    year: item.year,
+    ccCategory: item.ccCategory,
+    ccUrl: item.ccUrl,
+  }));
+
+// Combine native, BAXUS, and Collector Crypt listings
 export const listings: Listing[] = [
   ...nativeListings,
   ...baxusListings,
+  ...ccTransformedListings,
 ];
 
 export const categoryColors: Record<Category, string> = {
