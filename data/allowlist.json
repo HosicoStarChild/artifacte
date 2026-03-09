@@ -1,6 +1,26 @@
 {
   "collections": [
     {
+      "collectionAddress": "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w",
+      "name": "Mad Lads",
+      "category": "Digital Art",
+      "image": "https://madlads-collection.s3.us-west-2.amazonaws.com/_collection.png",
+      "supply": 9968,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
+      "name": "SMB Gen3",
+      "category": "Digital Art",
+      "image": "https://gateway.irys.xyz/CAqfaUJzwbwmmyommhgHWqwQVcxuRtqnNrprm88YDquj",
+      "supply": 5000,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
       "collectionAddress": "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W",
       "name": "SMB Gen2",
       "category": "Digital Art",
