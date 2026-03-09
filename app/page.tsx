@@ -105,14 +105,9 @@ export default function Home() {
               View All Auctions →
             </Link>
           </div>
-          <div className="overflow-x-auto pb-4 -mx-4 px-4">
-            <div className="flex gap-6 snap-x">
-              {auctions.slice(0, 5).map((a) => (
-                <div key={a.id} className="flex-shrink-0 w-80 snap-start">
-                  <AuctionCard auction={a} />
-                </div>
-              ))}
-            </div>
+          <div className="text-center py-16">
+            <p className="text-gray-400 text-lg font-serif">Coming Soon</p>
+            <p className="text-gray-500 text-sm mt-2">Live auctions are being prepared. Stay tuned.</p>
           </div>
         </div>
       </section>
