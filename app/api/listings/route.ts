@@ -97,15 +97,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Collection not approved for listing on Artifacte." }, { status: 403 });
     }
 
-    // For RWA categories (non-Digital Art), also require wallet whitelist
-    const category = body.category || "DIGITAL_ART";
-    const isDigitalArt = category === "DIGITAL_ART";
-    if (!isDigitalArt) {
-      const walletOk = await isWalletWhitelisted(seller);
-      if (!walletOk) {
-        return NextResponse.json({ error: "Wallet not whitelisted. Apply for seller access first." }, { status: 403 });
-      }
-    }
+    // No wallet whitelist — anyone with an approved collection NFT can submit
+    // Admin approval queue is the final gate
 
     const data = await readListings();
     
