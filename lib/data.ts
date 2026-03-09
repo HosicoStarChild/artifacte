@@ -227,32 +227,7 @@ export const auctions: Auction[] = [
       { bidder: "8wN3...tF6a", amount: 260, time: new Date(now - 172800000).toISOString() },
     ],
   },
-  {
-    id: "a5", slug: "charizard-holographic",
-    name: "Charizard Holographic Base Set",
-    subtitle: "POKEMON TCG RARE",
-    verifiedBy: "PSA", category: "TCG_CARDS", current_bid: 12500, start_price: 8000,
-    end_time: new Date(now + 4 * day).toISOString(),
-    image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=800",
-    description: "1999 Pokémon Base Set Charizard Holographic (4/102). Graded PSA 8. Pristine condition with sharp corners and excellent centering.",
-    bids: [
-      { bidder: "5kL2...dF9w", amount: 12500, time: new Date(now - 7200000).toISOString() },
-      { bidder: "2tR4...bN6x", amount: 11000, time: new Date(now - 14400000).toISOString() },
-    ],
-  },
-  {
-    id: "a6", slug: "michael-jordan-rookie",
-    name: "Michael Jordan Rookie Card",
-    subtitle: "SPORTS CARDS LEGEND",
-    verifiedBy: "PSA", category: "SPORTS_CARDS", current_bid: 85000, start_price: 55000,
-    end_time: new Date(now + 6 * day).toISOString(),
-    image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=800",
-    description: "1986-87 Fleer Michael Jordan Rookie Card #57. Graded PSA 9. Iconic card in excellent condition.",
-    bids: [
-      { bidder: "9hJ3...cQ8z", amount: 85000, time: new Date(now - 3600000).toISOString() },
-      { bidder: "4mW7...xT5n", amount: 72000, time: new Date(now - 18000000).toISOString() },
-    ],
-  },
+  // TCG and Sports Card auctions removed — real CC listings now
   {
     id: "a7", slug: "rolex-submariner-gold",
     name: "Rolex Submariner Date Gold",
@@ -269,24 +244,14 @@ export const auctions: Auction[] = [
 ];
 
 const nativeListings: Listing[] = [
-  // TCG Cards
-  { id: "l1", name: "Roronoa Zoro Alt Art OP05-119", subtitle: "One Piece TCG • PSA 10", price: 642, image: "https://tcgplayer-cdn.tcgplayer.com/product/516897_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS", source: "native" },
-  { id: "l2", name: "Portgas D. Ace Manga Alt Art OP09-119", subtitle: "One Piece TCG • PSA 10", price: 5058, image: "https://tcgplayer-cdn.tcgplayer.com/product/578459_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS", source: "native" },
-  { id: "l3", name: "Charizard Base Set 1st Edition", subtitle: "Pokemon TCG • PSA 10", price: 42000, image: "https://tcgplayer-cdn.tcgplayer.com/product/86937_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS", source: "native" },
-  { id: "l4", name: "Nami Alt Art OP02-120", subtitle: "One Piece TCG • PSA 9", price: 320, image: "https://tcgplayer-cdn.tcgplayer.com/product/489977_200w.jpg", verifiedBy: "PSA", category: "TCG_CARDS", source: "native" },
-  { id: "l5", name: "Pikachu Illustrator Promo", subtitle: "Pokemon TCG • CGC 9", price: 125000, image: "https://tcgplayer-cdn.tcgplayer.com/product/233498_200w.jpg", verifiedBy: "CGC", category: "TCG_CARDS", source: "native" },
-  // Spirits
-  // Blanton's removed — real BAXUS bottles from API now
-  // Fake spirits removed — BAXUS bottles are the real data now
+  // TCG Cards — removed, real CC listings now
+  // Sports Cards — removed, real CC listings now
+  // Spirits — removed, real BAXUS bottles now
   // Watches
   { id: "l10", name: "Rolex Submariner Date 126610LN", subtitle: "Steel • 41mm • 2024", price: 14500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
   { id: "l11", name: "Patek Philippe Nautilus 5711/1A", subtitle: "Steel • Blue Dial • 2021", price: 145000, image: "https://images.unsplash.com/photo-1594534475808-b18fc33b045e?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
   { id: "l12", name: "Audemars Piguet Royal Oak 15500ST", subtitle: "Steel • 41mm • Blue Dial", price: 52000, image: "https://images.unsplash.com/photo-1614164185128-e4ec99c436d7?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
   { id: "l13", name: "Omega Speedmaster Professional", subtitle: "Moonwatch • Hesalite • 2023", price: 6500, image: "https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
-  // Sports Cards
-  { id: "l14", name: "Shohei Ohtani 2018 Topps Chrome RC", subtitle: "Rookie Card • PSA 10", price: 1800, image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS", source: "native" },
-  { id: "l15", name: "Michael Jordan 1986 Fleer RC", subtitle: "Basketball • PSA 9", price: 35000, image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400", verifiedBy: "PSA", category: "SPORTS_CARDS", source: "native" },
-  { id: "l16", name: "Luka Doncic 2018 Prizm Silver RC", subtitle: "Basketball • BGS 9.5", price: 4200, image: "https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=400", verifiedBy: "BGS", category: "SPORTS_CARDS", source: "native" },
   // Digital Art
   { id: "l17", name: "Celestial Drift #42", subtitle: "Generative Art • 1/1", price: 12, image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART", source: "native" },
   { id: "l18", name: "Neon Dreamscape", subtitle: "Photography • Limited Edition", price: 5, image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART", source: "native" },
