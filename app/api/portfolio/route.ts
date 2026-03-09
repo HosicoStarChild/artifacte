@@ -37,6 +37,8 @@ interface CCResponse {
 
 interface PortfolioCard extends CCCard {
   insuredValueNum: number;
+  altAssetId?: string;
+  altResearchUrl?: string;
 }
 
 interface PortfolioResponse {
@@ -52,6 +54,20 @@ interface PortfolioResponse {
   unlistedCards: number;
   totalListedValue: number;
   error?: string;
+}
+
+// Load oracle lookup (ccName uppercase -> altAssetId)
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+
+let oracleLookup: Record<string, string> = {};
+try {
+  const lookupPath = join(process.cwd(), "data", "oracle-lookup.json");
+  if (existsSync(lookupPath)) {
+    oracleLookup = JSON.parse(readFileSync(lookupPath, "utf8"));
+  }
+} catch {
+  // Oracle lookup not available
 }
 
 // Simple in-memory cache with 5-minute TTL
@@ -83,10 +99,16 @@ async function fetchFromCollectorCrypt(wallet: string): Promise<CCResponse> {
 }
 
 function transformCCData(data: CCResponse, wallet: string): PortfolioResponse {
-  const cards: PortfolioCard[] = (data.filterNFtCard || []).map((card) => ({
-    ...card,
-    insuredValueNum: parseFloat(card.insuredValue || "0"),
-  }));
+  const cards: PortfolioCard[] = (data.filterNFtCard || []).map((card) => {
+    const nameKey = (card.itemName || "").toUpperCase().trim();
+    const altAssetId = oracleLookup[nameKey] || undefined;
+    return {
+      ...card,
+      insuredValueNum: parseFloat(card.insuredValue || "0"),
+      altAssetId,
+      altResearchUrl: altAssetId ? `https://alt.xyz/itm/${altAssetId}/research` : undefined,
+    };
+  });
 
   // Calculate totals
   const totalInsuredValue = cards.reduce(
