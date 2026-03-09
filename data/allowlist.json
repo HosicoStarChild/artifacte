@@ -1,17 +1,81 @@
 {
   "collections": [
     {
-      "collectionAddress": "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w",
-      "name": "Mad Lads",
+      "collectionAddress": "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W",
+      "name": "SMB Gen2",
       "category": "Digital Art",
+      "image": "https://arweave.net/lZ5FdIVagNoNvI4QFoHhB6Xyn4oVGLV9xOTW32WBC20",
+      "supply": 4992,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
     },
     {
       "collectionAddress": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
-      "name": "SMB Gen 3",
+      "name": "SMB Gen3",
       "category": "Digital Art",
+      "image": "https://gateway.irys.xyz/CAqfaUJzwbwmmyommhgHWqwQVcxuRtqnNrprm88YDquj",
+      "supply": 5000,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w",
+      "name": "Mad Lads",
+      "category": "Digital Art",
+      "image": "https://madlads-collection.s3.us-west-2.amazonaws.com/_collection.png",
+      "supply": 9968,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac",
+      "name": "Famous Fox Federation",
+      "category": "Digital Art",
+      "image": "https://arweave.net/mgvMZbiis8AE_Kkj1Om5clxpseOiZB-2Q4QFUVavD10",
+      "supply": 9992,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK",
+      "name": "Claynosaurz",
+      "category": "Digital Art",
+      "image": "https://nftstorage.link/ipfs/bafybeiese3bgyfewt2r3dxvgups2blc3rwh2utvidirxgxq527mhcv3ydy",
+      "supply": 10232,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ",
+      "name": "Claynosaurz: Call of Saga",
+      "category": "Digital Art",
+      "image": "https://arweave.net/oXUNrsF8ohrCPh8A0ok-AJlILZXPtcOX66dgRfhNqLI?ext=gif",
+      "supply": 1999,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
+      "name": "Taiyo Robotics",
+      "category": "Digital Art",
+      "image": "https://nftstorage.link/ipfs/bafybeibtvj6cudhrllobbfpctvx5wfnvkyrusajsyaj36bhoxfpqzai26y/0.png",
+      "supply": 2348,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q",
+      "name": "Galactic Gecko",
+      "category": "Digital Art",
+      "image": "https://arweave.net/NFC1-rgJ9tE1BkfJjirVlQ1_-cNbj6Mwm_BGmQryaYk",
+      "supply": 10000,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
