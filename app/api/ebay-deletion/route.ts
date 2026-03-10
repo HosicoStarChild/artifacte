@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     // eBay verification challenge — echo back the challenge code
     // In production, this should be hashed with your verification token
     const crypto = await import("crypto");
-    const verificationToken = process.env.EBAY_VERIFICATION_TOKEN || "artifacte_ebay_2026";
+    const verificationToken = process.env.EBAY_VERIFICATION_TOKEN || "artifacte_ebay_marketplace_deletion_token_2026";
     const endpoint = "https://artifacte.io/api/ebay-deletion";
     
     const hash = crypto.createHash("sha256");
