@@ -282,10 +282,10 @@ export default function PortfolioPage() {
                   </div>
                 </div>
 
-                {/* Total Portfolio (CC Insured) */}
+                {/* Total Portfolio */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                   <h3 className="font-serif text-lg text-white mb-4">
-                    Total Portfolio (CC Insured)
+                    Total Portfolio
                   </h3>
                   <div className="flex items-end gap-4">
                     <div>
@@ -293,10 +293,6 @@ export default function PortfolioPage() {
                         {portfolioData.totalCards}
                       </p>
                       <p className="text-gray-500 text-xs mt-1">Total cards</p>
-                      <p className="text-gray-600 text-[10px] mt-2">
-                        {formatCurrency(portfolioData.totalInsuredValue)} insured
-                        value
-                      </p>
                     </div>
                   </div>
                 </div>
