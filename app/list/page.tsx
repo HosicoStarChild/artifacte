@@ -385,6 +385,7 @@ export default function ListNFTPage() {
                     {price ? `◎ ${(parseFloat(price) * 0.96).toFixed(2)}` : "—"}
                   </span>
                 </div>
+                <p className="text-gray-600 text-[10px] mt-3">Fees are only charged when your item sells. No sale, no fee.</p>
               </div>
 
               {/* Submit */}
