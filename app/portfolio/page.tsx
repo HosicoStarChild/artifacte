@@ -384,13 +384,13 @@ export default function PortfolioPage() {
                               <p className="text-sm text-gray-300">
                                 {category}
                               </p>
-                              <p className="text-xs text-gold-400 font-semibold">
+                              <p className="text-xs text-white/40 font-semibold">
                                 {formatCurrency(value)}
                               </p>
                             </div>
                             <div className="w-full bg-dark-900 rounded-full h-2">
                               <div
-                                className="bg-gradient-to-r from-gold-400 to-gold-600 h-2 rounded-full transition-all duration-500"
+                                className="bg-gradient-to-r from-white/30 to-white/50 h-2 rounded-full transition-all duration-500"
                                 style={{ width: `${percentage}%` }}
                               />
                             </div>
