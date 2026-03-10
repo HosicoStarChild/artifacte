@@ -47,21 +47,22 @@ export async function GET(req: NextRequest) {
     } else if (endpoint === "chart") {
       const set = searchParams.get("set");
       const number = searchParams.get("number");
-      const language = searchParams.get("language") || "EN";
+      const q = searchParams.get("q");
+      const language = searchParams.get("language") || "";
       const variant = searchParams.get("variant") || "";
       const grade = searchParams.get("grade") || "";
 
-      if (!set || !number) {
-        return NextResponse.json({ error: "Missing set or number parameter" }, { status: 400 });
-      }
+      const params = new URLSearchParams();
+      if (set) params.set("set", set);
+      if (number) params.set("number", number);
+      if (q) params.set("q", q);
+      if (language) params.set("language", language);
+      if (variant) params.set("variant", variant);
+      if (grade) params.set("grade", grade);
 
-      const params = new URLSearchParams({
-        set,
-        number,
-        language,
-      });
-      if (variant) params.append("variant", variant);
-      if (grade) params.append("grade", grade);
+      if (!set && !number && !q) {
+        return NextResponse.json({ error: "Missing set+number or q parameter" }, { status: 400 });
+      }
 
       url = `${ORACLE_API}/api/live/chart?${params.toString()}`;
       responseType = "image";

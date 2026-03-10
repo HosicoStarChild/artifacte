@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
 interface PriceHistoryProps {
   cardName?: string;
@@ -9,175 +8,134 @@ interface PriceHistoryProps {
   grade?: string;
 }
 
-interface SearchResult {
-  id?: string;
-  name?: string;
-  set?: string;
-  number?: string;
-  variants?: string[];
-  [key: string]: any;
-}
-
-interface ChartData {
-  avgPrice?: number;
-  trend?: string;
-  salesCount?: number;
-  [key: string]: any;
-}
-
 export default function PriceHistory({ cardName, category, grade }: PriceHistoryProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartUrl, setChartUrl] = useState<string | null>(null);
-  const [chartData, setChartData] = useState<ChartData | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [salesCount, setSalesCount] = useState<number | null>(null);
 
-  // Show for TCG_CARDS, SPORTS_CARDS, and WATCHES
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
   useEffect(() => {
     if (!shouldShow || !cardName) {
       setChartUrl(null);
-      setChartData(null);
       return;
     }
 
-    const fetchPriceHistory = async () => {
+    const fetchChart = async () => {
       setLoading(true);
       setError(null);
       setImageLoaded(false);
-      setChartData(null);
+      setChartUrl(null);
+      setSalesCount(null);
 
       try {
-        // Search pre-computed market data by card name
-        const searchResponse = await fetch(
-          `/api/oracle?endpoint=market-search&q=${encodeURIComponent(cardName)}`,
-          { method: "GET", signal: AbortSignal.timeout(15000) }
+        // Step 1: Search for card variants
+        const searchRes = await fetch(
+          `/api/oracle?endpoint=search&q=${encodeURIComponent(cardName)}`,
+          { signal: AbortSignal.timeout(15000) }
         );
+        if (!searchRes.ok) throw new Error("Search failed");
+        const searchData = await searchRes.json();
 
-        if (!searchResponse.ok) {
-          throw new Error("Failed to search oracle");
-        }
-
-        const data = await searchResponse.json();
-
-        if (!data.prices || data.prices.length === 0) {
-          setError("Card not found in oracle database");
+        if (!searchData.variants || searchData.variants.length === 0) {
+          // Fallback: try with just card name keywords
+          setError("No price data found");
           setLoading(false);
           return;
         }
 
-        // Use the best match
-        const match = data.prices[0];
-        setChartData({
-          avgPrice: match.marketValue,
-          trend: match.lastSalePrice && match.marketValue
-            ? (match.marketValue >= match.lastSalePrice ? "↑ Stable" : "↓ Declining")
-            : undefined,
-          salesCount: match.salesCount,
-        });
+        const chosen = searchData.variants[0];
 
-        // No chart image for now — show stats only
-        setChartUrl(null);
+        // Step 2: Get transaction count
+        if (chosen.assetId) {
+          try {
+            const txRes = await fetch(
+              `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(chosen.assetId)}`,
+              { signal: AbortSignal.timeout(10000) }
+            );
+            if (txRes.ok) {
+              const txData = await txRes.json();
+              setSalesCount(txData.count || txData.transactions?.length || null);
+            }
+          } catch {}
+        }
+
+        // Step 3: Build chart URL (rendered server-side as PNG)
+        const chartParams = new URLSearchParams();
+        chartParams.set("endpoint", "chart");
+        chartParams.set("q", cardName);
+        // Don't pass grade filter — too restrictive, often returns 0 results
+        
+        setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
       } catch (err: any) {
         console.error("Price history error:", err);
         setError(err.message || "Unable to load price data");
         setChartUrl(null);
-        setChartData(null);
         setLoading(false);
       }
     };
 
-    fetchPriceHistory();
+    fetchChart();
   }, [cardName, category, grade, shouldShow]);
 
-  if (!shouldShow) {
-    return null;
-  }
+  if (!shouldShow) return null;
 
-  if (loading && !chartUrl) {
+  if (loading) {
     return (
       <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white font-serif text-xl">Price History</h2>
-        </div>
+        <h2 className="text-white font-serif text-xl mb-4">Price History</h2>
         <div className="animate-pulse space-y-4">
           <div className="h-64 bg-dark-900 rounded-lg"></div>
-          <div className="h-4 bg-dark-900 rounded w-3/4"></div>
-          <div className="h-4 bg-dark-900 rounded w-1/2"></div>
         </div>
       </div>
     );
   }
 
-  if (error && !chartData) {
+  if (error && !chartUrl) {
     return (
       <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
         <h2 className="text-white font-serif text-xl mb-4">Price History</h2>
         <div className="text-gray-400 text-sm p-6 bg-dark-900 rounded-lg border border-white/5 text-center">
           <p>📊 Price data unavailable</p>
-          {error && <p className="text-xs text-gray-500 mt-2">{error}</p>}
+          <p className="text-xs text-gray-500 mt-2">{error}</p>
         </div>
       </div>
     );
   }
 
+  if (!chartUrl) return null;
+
   return (
     <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <h2 className="text-white font-serif text-xl">Price History</h2>
-        <span className="text-xs text-gray-500 font-medium">Powered by Artifacte Oracle</span>
+        <div className="flex items-center gap-3">
+          {salesCount !== null && (
+            <span className="text-xs text-gray-500">{salesCount} sales tracked</span>
+          )}
+          <span className="text-xs text-gray-500 font-medium">Powered by Artifacte Oracle</span>
+        </div>
       </div>
 
-      {/* Chart Image */}
-      {chartUrl && (
-        <div className="mb-6 rounded-lg overflow-hidden border border-white/5 bg-dark-900 flex items-center justify-center">
-          <img
-            src={chartUrl}
-            alt="Price History Chart"
-            onLoad={() => setImageLoaded(true)}
-            className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
-            style={{ minHeight: "300px" }}
-          />
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-dark-900">
-              <div className="animate-pulse text-gray-500 text-sm">Loading chart...</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Stats */}
-      {chartData && (
-        <div className="grid grid-cols-3 gap-4">
-          {chartData.avgPrice !== undefined && (
-            <div className="bg-dark-900 rounded-lg p-4 border border-white/5">
-              <p className="text-gray-500 text-xs font-medium tracking-wide mb-2">Avg Price</p>
-              <p className="text-white font-serif text-lg">
-                {typeof chartData.avgPrice === "number"
-                  ? `$${chartData.avgPrice.toFixed(2)}`
-                  : "—"}
-              </p>
-            </div>
-          )}
-          {chartData.trend && (
-            <div className="bg-dark-900 rounded-lg p-4 border border-white/5">
-              <p className="text-gray-500 text-xs font-medium tracking-wide mb-2">3-Mo Trend</p>
-              <p className={`font-serif text-lg ${chartData.trend.includes("↑") ? "text-green-400" : "text-red-400"}`}>
-                {chartData.trend}
-              </p>
-            </div>
-          )}
-          {chartData.salesCount !== undefined && (
-            <div className="bg-dark-900 rounded-lg p-4 border border-white/5">
-              <p className="text-gray-500 text-xs font-medium tracking-wide mb-2">Sales</p>
-              <p className="text-white font-serif text-lg">{chartData.salesCount}</p>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={chartUrl}
+          alt="Price History Chart"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setError("Chart unavailable")}
+          className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+          style={{ minHeight: "200px" }}
+        />
+        {!imageLoaded && !error && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="animate-pulse text-gray-500 text-sm">Generating chart...</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
