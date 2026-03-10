@@ -281,12 +281,14 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Oracle Price History */}
+            {/* Oracle Price History — skip for merchandise */}
+            {card.category !== 'MERCHANDISE' && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined} 
             />
+            )}
 
             {/* NFT Details */}
             <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
