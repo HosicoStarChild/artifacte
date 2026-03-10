@@ -86,6 +86,17 @@ export default function CategoryAuctionsPage() {
     if (currencyFilter !== 'All') params.set('currency', currencyFilter);
     const searchFilter = filters['search'];
     if (searchFilter) params.set('q', searchFilter);
+    // Additional filters
+    const rarityFilter = filters['rarity'];
+    if (rarityFilter && rarityFilter !== 'All') params.set('rarity', rarityFilter);
+    const langFilter = filters['language'];
+    if (langFilter && langFilter !== 'All') params.set('language', langFilter);
+    const sportFilter = filters['sport'];
+    if (sportFilter && sportFilter !== 'All') params.set('sport', sportFilter);
+    const brandFilter = filters['brand'];
+    if (brandFilter && brandFilter !== 'All') params.set('brand', brandFilter);
+    const spiritFilter = filters['spiritType'];
+    if (spiritFilter && spiritFilter !== 'All') params.set('spiritType', spiritFilter);
 
     fetch(`/api/me-listings?${params}`)
       .then(r => r.json())
