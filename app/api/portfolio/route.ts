@@ -115,9 +115,10 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
   let marketPriceMap: Record<string, { price: number; source: string }> = {};
   try {
     const nftAddresses = cards.map(c => c.nftAddress).filter(Boolean);
+    const cardNames = cards.map(c => c.itemName || '');
     if (nftAddresses.length > 0) {
       const res = await fetch(
-        `https://artifacte-oracle-production.up.railway.app/api/market/portfolio?nfts=${nftAddresses.join(',')}`,
+        `https://artifacte-oracle-production.up.railway.app/api/market/portfolio?nfts=${nftAddresses.join(',')}&names=${encodeURIComponent(cardNames.join('||'))}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.ok) {
