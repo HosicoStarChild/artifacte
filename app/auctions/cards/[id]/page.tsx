@@ -213,7 +213,39 @@ export default function CardDetailPage() {
                 {card.gradingId && (
                   <div className="col-span-2">
                     <p className="text-gray-500 text-xs mb-1">Certificate #</p>
-                    <p className="text-white text-sm font-mono">{card.gradingId}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-white text-sm font-mono">{card.gradingId}</p>
+                      {card.gradingCompany === 'PSA' && (
+                        <a
+                          href={`https://www.psacard.com/cert/${card.gradingId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gold-500 hover:text-gold-400 transition"
+                        >
+                          Verify on PSA →
+                        </a>
+                      )}
+                      {(card.gradingCompany === 'BGS' || card.gradingCompany === 'BVG') && (
+                        <a
+                          href={`https://www.beckett.com/grading/card-lookup/${card.gradingId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gold-500 hover:text-gold-400 transition"
+                        >
+                          Verify on Beckett →
+                        </a>
+                      )}
+                      {card.gradingCompany === 'CGC' && (
+                        <a
+                          href={`https://www.cgccards.com/certlookup/${card.gradingId}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gold-500 hover:text-gold-400 transition"
+                        >
+                          Verify on CGC →
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
