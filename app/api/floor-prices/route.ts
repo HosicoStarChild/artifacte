@@ -11,6 +11,8 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   '1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ': { symbol: 'saga', name: 'Claynosaurz: Call of Saga' },
   'J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q': { symbol: 'galactic_geckos', name: 'Galactic Gecko' },
   'CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H': { symbol: 'littleswagworld', name: 'little swag world' },
+  'BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko': { symbol: 'quekz', name: 'Quekz' },
+  '2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay': { symbol: 'quekz', name: 'Quekz' },
 };
 
 // Cache floor prices for 15 minutes

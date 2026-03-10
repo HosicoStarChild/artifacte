@@ -79,7 +79,7 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
-    }
+    },
     {
       "collectionAddress": "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H",
       "name": "little swag world",
@@ -89,6 +89,27 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
+    },
+    {
+      "collectionAddress": "BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko",
+      "name": "Quekz",
+      "category": "Digital Art",
+      "image": "https://arweave.net/50vikPQfiZl2PQzInHfWSyhaZubcsDosLU9zOhA_v04",
+      "supply": 5000,
+      "addedAt": 1710100000000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    },
+    {
+      "collectionAddress": "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay",
+      "name": "Quekz",
+      "category": "Digital Art",
+      "image": "https://arweave.net/50vikPQfiZl2PQzInHfWSyhaZubcsDosLU9zOhA_v04",
+      "supply": 5000,
+      "addedAt": 1710100000000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "matchBy": "authority"
     }
   ]
 }

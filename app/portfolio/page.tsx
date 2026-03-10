@@ -116,6 +116,8 @@ export default function PortfolioPage() {
     "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ", // Claynosaurz: Call of Saga
     "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q", // Galactic Gecko
     "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H", // little swag world
+    "BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko", // Quekz (old collection)
+    "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay", // Quekz (WNS authority)
   ]);
 
   useEffect(() => {
@@ -171,9 +173,16 @@ export default function PortfolioPage() {
             const digitalItems: typeof digitalNfts = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
-              const grouping = asset.grouping?.find(g => g.group_key === "collection");
-              if (grouping && WHITELISTED_COLLECTIONS.has(grouping.group_value)) {
-                const fp = localFloorPrices[grouping.group_value];
+              // Match by collection grouping (standard) or authority (WNS/Token-2022)
+              const grouping = asset.grouping?.find((g: any) => g.group_key === "collection");
+              let matchedAddress = grouping?.group_value;
+              if (!matchedAddress || !WHITELISTED_COLLECTIONS.has(matchedAddress)) {
+                // Check authorities for WNS NFTs
+                const auth = (asset as any).authorities?.find((a: any) => WHITELISTED_COLLECTIONS.has(a.address));
+                matchedAddress = auth?.address;
+              }
+              if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
+                const fp = localFloorPrices[matchedAddress];
                 const floor = fp?.floor || 0;
                 totalDigitalValue += floor;
                 digitalItems.push({
@@ -185,7 +194,7 @@ export default function PortfolioPage() {
                     if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
                     return u;
                   })(),
-                  collection: fp?.name || grouping.group_value.slice(0, 8),
+                  collection: fp?.name || matchedAddress?.slice(0, 8) || "Unknown",
                   floorPrice: floor,
                 });
               }

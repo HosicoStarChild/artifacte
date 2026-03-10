@@ -109,10 +109,21 @@ export default function ListNFTPage() {
   }
 
   function getNftCollection(nft: NFTAsset): { address: string; name: string } | null {
-    const group = nft.grouping?.find(g => g.group_key === "collection");
-    if (!group) return null;
-    const name = allowedCollections[group.group_value];
-    return name ? { address: group.group_value, name } : null;
+    // Standard: check collection grouping
+    const group = nft.grouping?.find((g: any) => g.group_key === "collection");
+    if (group) {
+      const name = allowedCollections[group.group_value];
+      if (name) return { address: group.group_value, name };
+    }
+    // WNS/Token-2022: check authorities (no collection grouping)
+    const authorities = (nft as any).authorities;
+    if (authorities?.length) {
+      for (const auth of authorities) {
+        const name = allowedCollections[auth.address];
+        if (name) return { address: auth.address, name };
+      }
+    }
+    return null;
   }
 
   function getFilteredNfts(): NFTAsset[] {
