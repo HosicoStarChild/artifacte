@@ -219,48 +219,6 @@ export default function PortfolioPage() {
               </div>
 
               {/* 3 Stat Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                {/* Total Cards */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-3">
-                    Total Cards
-                  </p>
-                  <p className="font-serif text-3xl text-gold-400 font-bold">
-                    {portfolioData.totalCards}
-                  </p>
-                </div>
-
-                {/* Listed on ME */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-3">
-                    Listed on Marketplace
-                  </p>
-                  <p className="font-serif text-3xl text-gold-400 font-bold">
-                    {portfolioData.listedCards}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-2">
-                    {formatCurrency(portfolioData.totalListedValue)} total
-                  </p>
-                </div>
-
-                {/* Unlisted/Held */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-3">
-                    Unlisted/Held
-                  </p>
-                  <p className="font-serif text-3xl text-gold-400 font-bold">
-                    {portfolioData.unlistedCards}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-2">
-                    {formatCurrency(
-                      portfolioData.totalInsuredValue -
-                        portfolioData.totalListedValue
-                    )}{" "}
-                    insured value
-                  </p>
-                </div>
-              </div>
-
               {/* Platform Breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
                 {/* On Artifacte */}
