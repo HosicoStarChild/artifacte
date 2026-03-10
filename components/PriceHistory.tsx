@@ -32,8 +32,8 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Only show for TCG_CARDS and WATCHES
-  const shouldShow = category === "TCG_CARDS" || category === "WATCHES";
+  // Show for TCG_CARDS, SPORTS_CARDS, and WATCHES
+  const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
   useEffect(() => {
     if (!shouldShow || !cardName) {
@@ -49,73 +49,36 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
       setChartData(null);
 
       try {
-        // Step 1: Search for the card/asset using oracle search API
+        // Search pre-computed market data by card name
         const searchResponse = await fetch(
-          `/api/oracle?endpoint=search&q=${encodeURIComponent(cardName)}`,
-          { method: "GET", signal: AbortSignal.timeout(30000) }
+          `/api/oracle?endpoint=market-search&q=${encodeURIComponent(cardName)}`,
+          { method: "GET", signal: AbortSignal.timeout(15000) }
         );
 
         if (!searchResponse.ok) {
-          throw new Error("Failed to search for card");
+          throw new Error("Failed to search oracle");
         }
 
-        const searchResult: SearchResult = await searchResponse.json();
+        const data = await searchResponse.json();
 
-        if (!searchResult || !searchResult.set || !searchResult.number) {
+        if (!data.prices || data.prices.length === 0) {
           setError("Card not found in oracle database");
           setLoading(false);
           return;
         }
 
-        // Step 2: Get the chart image from oracle
-        const chartParams = new URLSearchParams({
-          set: searchResult.set,
-          number: searchResult.number,
-          language: "EN",
+        // Use the best match
+        const match = data.prices[0];
+        setChartData({
+          avgPrice: match.marketValue,
+          trend: match.lastSalePrice && match.marketValue
+            ? (match.marketValue >= match.lastSalePrice ? "↑ Stable" : "↓ Declining")
+            : undefined,
+          salesCount: match.salesCount,
         });
 
-        if (searchResult.variants && searchResult.variants.length > 0) {
-          chartParams.append("variant", searchResult.variants[0]);
-        }
-
-        if (grade) {
-          chartParams.append("grade", grade);
-        }
-
-        const chartImageUrl = `/api/oracle?endpoint=chart&${chartParams.toString()}`;
-        setChartUrl(chartImageUrl);
-
-        // Step 3: Get transactions for stats (optional, but improves UI)
-        try {
-          if (searchResult.id) {
-            const statsParams = new URLSearchParams({
-              assetId: searchResult.id,
-            });
-            if (grade) {
-              statsParams.append("grade", grade);
-            }
-
-            const statsResponse = await fetch(
-              `/api/oracle?endpoint=transactions&${statsParams.toString()}`,
-              { method: "GET", signal: AbortSignal.timeout(30000) }
-            );
-
-            if (statsResponse.ok) {
-              const transactionData = await statsResponse.json();
-              if (transactionData) {
-                setChartData({
-                  avgPrice: transactionData.avgPrice,
-                  trend: transactionData.trend,
-                  salesCount: transactionData.count,
-                });
-              }
-            }
-          }
-        } catch (statsErr) {
-          // Stats are optional, don't fail if they're unavailable
-          console.warn("Failed to fetch stats:", statsErr);
-        }
-
+        // No chart image for now — show stats only
+        setChartUrl(null);
         setLoading(false);
       } catch (err: any) {
         console.error("Price history error:", err);
@@ -148,7 +111,7 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
     );
   }
 
-  if (error || !chartUrl) {
+  if (error && !chartData) {
     return (
       <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
         <h2 className="text-white font-serif text-xl mb-4">Price History</h2>

@@ -32,7 +32,13 @@ export async function GET(req: NextRequest) {
     let responseType: "json" | "image" = "json";
 
     // Route requests to appropriate oracle endpoints
-    if (endpoint === "search") {
+    if (endpoint === "market-search") {
+      const q = searchParams.get("q");
+      if (!q) {
+        return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
+      }
+      url = `${ORACLE_API}/api/market/prices?card=${encodeURIComponent(q)}&limit=1`;
+    } else if (endpoint === "search") {
       const q = searchParams.get("q");
       if (!q) {
         return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
