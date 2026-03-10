@@ -83,14 +83,8 @@ export interface Listing {
 const now = Date.now();
 const day = 86400000;
 
-// Load Collector Crypt listings
+// CC listings now served live from Railway oracle — no static bundle
 let ccListings: any[] = [];
-try {
-  const ccData = require('../data/cc-listings.json');
-  ccListings = Array.isArray(ccData) ? ccData : [];
-} catch (err) {
-  console.warn('Could not load CC listings data:', err instanceof Error ? err.message : String(err));
-}
 
 // Load BAXUS bottles data
 let baxusBottles: any[] = [];
