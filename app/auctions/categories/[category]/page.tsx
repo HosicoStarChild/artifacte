@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { auctions, listings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
+import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -49,6 +49,28 @@ export default function CategoryAuctionsPage() {
   const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
   const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
   const ITEMS_PER_PAGE = 24;
+  const [meListings, setMeListings] = useState<any[]>([]);
+  const [meLoading, setMeLoading] = useState(false);
+  const [meTotal, setMeTotal] = useState(0);
+
+  // Fetch from ME API for TCG and Sports cards
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS";
+
+  useEffect(() => {
+    if (!useMeApi || !category) return;
+    setMeLoading(true);
+    fetch(`/api/me-listings?category=${category}&perPage=10000`)
+      .then(r => r.json())
+      .then(data => {
+        setMeListings(data.listings || []);
+        setMeTotal(data.total || 0);
+        setMeLoading(false);
+      })
+      .catch(() => setMeLoading(false));
+  }, [useMeApi, category]);
+
+  // Use ME listings for TCG/Sports, static for everything else
+  const listings = useMeApi ? meListings : staticListings;
 
   // Category-specific filter options
   const categoryFilters: Record<string, { label: string; key: string; options: string[] }[]> = {
@@ -207,7 +229,9 @@ export default function CategoryAuctionsPage() {
 
   // Filter auctions and listings by category
   const categoryAuctions = category ? auctions.filter((a) => a.category === category) : [];
-  const categoryListingsBase = category ? listings.filter((l) => l.category === category) : [];
+  const categoryListingsBase = category
+    ? (useMeApi ? meListings : listings.filter((l: any) => l.category === category))
+    : [];
 
   // Apply dropdown filters
   const categoryListings = categoryListingsBase.filter((l: any) => {
@@ -408,7 +432,12 @@ export default function CategoryAuctionsPage() {
         {/* Fixed Price Tab */}
         {tab === "fixed" && (
           <>
-            {categoryListings.length > 0 ? (
+            {meLoading && useMeApi ? (
+              <div className="text-center py-20">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gold-500 border-t-transparent mb-4"></div>
+                <p className="text-gray-400">Loading listings from marketplace...</p>
+              </div>
+            ) : categoryListings.length > 0 ? (
               <>
               {categoryListings.length > ITEMS_PER_PAGE && (
                 <div className="flex items-center justify-between mb-6">
