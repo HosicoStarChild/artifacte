@@ -50,9 +50,6 @@ export default function Navbar() {
             <Link href="/portfolio" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Portfolio
             </Link>
-            <Link href="/auctions" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Auctions
-            </Link>
             <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Agents
             </Link>
@@ -104,9 +101,6 @@ export default function Navbar() {
             </Link>
             <Link href="/portfolio" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Portfolio
-            </Link>
-            <Link href="/auctions" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Auctions
             </Link>
             <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Agents
