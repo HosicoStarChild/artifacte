@@ -182,8 +182,7 @@ export default function PortfolioPage() {
                   image: (() => {
                     let u = asset.content?.links?.image || "";
                     if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
-                    const m = u.match(/https?:\/\/(?:www\.)?arweave\.net\/([a-zA-Z0-9_-]+)/);
-                    if (m) u = `https://gateway.irys.xyz/${m[1]}`;
+                    if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
                     return u;
                   })(),
                   collection: fp?.name || grouping.group_value.slice(0, 8),
