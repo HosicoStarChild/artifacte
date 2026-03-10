@@ -147,7 +147,7 @@ export default function PortfolioPage() {
         <h1 className="font-serif text-3xl text-white mb-2">My Portfolio</h1>
         <p className="text-gray-400 text-sm mb-8">
           {connected
-            ? `${publicKey!.toBase58().slice(0, 4)}...${publicKey!.toBase58().slice(-4)} — NFTs & Collectibles`
+            ? `${publicKey!.toBase58().slice(0, 4)}...${publicKey!.toBase58().slice(-4)} — RWAs & Digital Collectibles`
             : "Connect your wallet to view your assets"}
         </p>
 
