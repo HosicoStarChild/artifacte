@@ -132,6 +132,13 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
     // Oracle lookup failed — continue without market prices
   }
 
+  // Attach oracle market value to each card
+  const enrichedCards = cards.map(card => ({
+    ...card,
+    oracleValue: marketPriceMap[card.nftAddress]?.price || null,
+    oracleSource: marketPriceMap[card.nftAddress]?.source || null,
+  }));
+
   // Calculate totals
   const totalInsuredValue = cards.reduce(
     (sum, card) => sum + card.insuredValueNum,
@@ -175,7 +182,7 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
     timestamp: Date.now(),
     totalCards: cards.length,
     totalInsuredValue,
-    cards: cards.sort((a, b) => b.insuredValueNum - a.insuredValueNum),
+    cards: enrichedCards.sort((a, b) => b.insuredValueNum - a.insuredValueNum),
     categoriesByValue,
     gradeDistribution,
     listedCards,

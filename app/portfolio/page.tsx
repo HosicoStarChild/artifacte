@@ -539,14 +539,30 @@ export default function PortfolioPage() {
                       </div>
                     )}
 
-                    {/* Insured Value (Primary) */}
+                    {/* Market / Insured Value */}
                     <div className="mt-3">
-                      <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
-                        Insured Value
-                      </p>
-                      <p className="text-gold-400 font-serif text-lg font-bold">
-                        {formatCurrency(card.insuredValueNum)}
-                      </p>
+                      {(card as any).oracleValue ? (
+                        <>
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
+                            Market Value
+                          </p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">
+                            {formatCurrency((card as any).oracleValue)}
+                          </p>
+                          <p className="text-gray-600 text-[9px] mt-0.5">
+                            Insured: {formatCurrency(card.insuredValueNum)}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
+                            Insured Value
+                          </p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">
+                            {formatCurrency(card.insuredValueNum)}
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     {/* Listed Status */}
