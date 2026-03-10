@@ -33,6 +33,7 @@ const categoryEmojis: Record<string, string> = {
   "sports-cards": "⚽",
   "watches": "⌚",
   "sealed": "📦",
+  "merchandise": "🛍️",
 };
 
 export default function CategoryAuctionsPage() {
@@ -58,7 +59,7 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE";
 
   useEffect(() => {
     if (!useMeApi || !category) return;
