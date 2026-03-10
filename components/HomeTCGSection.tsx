@@ -15,7 +15,7 @@ interface MEListing {
   ccCategory: string;
 }
 
-function TCGCarousel({ title, emoji, items, bg }: { title: string; emoji: string; items: MEListing[]; bg?: string }) {
+function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { title: string; emoji: string; items: MEListing[]; bg?: string; viewAllHref?: string; viewAllLabel?: string }) {
   return (
     <section className={`${bg || ''} py-20 px-4 sm:px-6 lg:px-8`}>
       <div className="max-w-7xl mx-auto">
@@ -24,8 +24,8 @@ function TCGCarousel({ title, emoji, items, bg }: { title: string; emoji: string
             <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Top Listings</p>
             <h2 className="font-serif text-3xl md:text-4xl text-white">{title} {emoji}</h2>
           </div>
-          <Link href="/auctions/categories/tcg-cards" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-            View All TCG →
+          <Link href={viewAllHref || "/auctions/categories/tcg-cards"} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+            {viewAllLabel || "View All TCG"} →
           </Link>
         </div>
         {items.length === 0 ? (
@@ -86,18 +86,22 @@ function TCGCarousel({ title, emoji, items, bg }: { title: string; emoji: string
 export function HomeTCGSection() {
   const [onePiece, setOnePiece] = useState<MEListing[]>([]);
   const [pokemon, setPokemon] = useState<MEListing[]>([]);
+  const [sealed, setSealed] = useState<MEListing[]>([]);
 
   useEffect(() => {
-    // Fetch top One Piece cards
     fetch('/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8')
       .then(r => r.json())
       .then(data => setOnePiece(data.listings || []))
       .catch(() => {});
 
-    // Fetch top Pokemon cards
     fetch('/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10')
       .then(r => r.json())
       .then(data => setPokemon(data.listings || []))
+      .catch(() => {});
+
+    fetch('/api/me-listings?category=SEALED&sort=price-desc&perPage=10')
+      .then(r => r.json())
+      .then(data => setSealed(data.listings || []))
       .catch(() => {});
   }, []);
 
@@ -105,6 +109,7 @@ export function HomeTCGSection() {
     <>
       <TCGCarousel title="One Piece TCG" emoji="🏴‍☠️" items={onePiece} />
       <TCGCarousel title="Pokémon TCG" emoji="⚡" items={pokemon} bg="bg-dark-800/30 border-t border-white/5" />
+      <TCGCarousel title="Sealed Product" emoji="📦" items={sealed} viewAllHref="/auctions/categories/sealed" viewAllLabel="View All Sealed" />
     </>
   );
 }
