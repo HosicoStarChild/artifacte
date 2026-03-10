@@ -625,8 +625,8 @@ export default function CategoryAuctionsPage() {
             ) : (
               <div className="text-center py-20">
                 <p className="text-gray-400 text-lg mb-4">No fixed price items available in this category</p>
-                <Link href="/auctions" className="text-gold-500 hover:text-gold-400 font-medium">
-                  View all auctions →
+                <Link href="/" className="text-gold-500 hover:text-gold-400 font-medium">
+                  Home →
                 </Link>
               </div>
             )}
@@ -645,8 +645,8 @@ export default function CategoryAuctionsPage() {
             ) : (
               <div className="text-center py-20">
                 <p className="text-gray-400 text-lg mb-4">No live auctions available in this category</p>
-                <Link href="/auctions" className="text-gold-500 hover:text-gold-400 font-medium">
-                  View all auctions →
+                <Link href="/" className="text-gold-500 hover:text-gold-400 font-medium">
+                  Home →
                 </Link>
               </div>
             )}
