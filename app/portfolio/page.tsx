@@ -346,7 +346,7 @@ export default function PortfolioPage() {
                             key={grade}
                             className={`${getGradeBgColor(company)} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2`}
                           >
-                            {grade.split("-")[1]} <span>{count}</span>
+                            {grade.replace("-", " ")} <span className="opacity-70">×{count}</span>
                           </div>
                         );
                       })}
