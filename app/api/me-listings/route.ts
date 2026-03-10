@@ -7,11 +7,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   // Forward all query params to Railway
-  const params = new URLSearchParams();
-  for (const [key, value] of searchParams.entries()) {
-    // Map 'q' search param
-    params.set(key, value);
-  }
+  const params = new URLSearchParams(searchParams.toString());
 
   try {
     const res = await fetch(`${ORACLE_API}/api/listings?${params}`, {
