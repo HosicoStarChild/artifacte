@@ -376,7 +376,7 @@ export default function CategoryAuctionsPage() {
           </div>
 
           {/* Currency Filter */}
-          {category === "TCG_CARDS" || category === "SPORTS_CARDS" ? (
+          {category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" ? (
             <div className="flex items-center gap-3">
               <span className="text-gray-500 text-xs font-medium tracking-wider">Currency:</span>
               <div className="flex gap-2 bg-dark-800 rounded-lg p-1 border border-white/5">
