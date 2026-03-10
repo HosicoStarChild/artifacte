@@ -22,6 +22,33 @@ interface PlatformStats {
   totalVolume: number;
 }
 
+interface Submission {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  photos: string[];
+  sellerWallet: string;
+  contact: string;
+  status: "pending" | "approved" | "rejected" | "minted" | "delivered";
+  adminNotes?: string;
+  submittedAt: number;
+  reviewedAt?: number;
+  nftName?: string;
+  nftSymbol?: string;
+  nftImageUri?: string;
+  nftMetadata?: Record<string, any>;
+  mintedAt?: number;
+}
+
+interface MintingForm {
+  submissionId: string;
+  nftName: string;
+  nftSymbol: string;
+  nftImageUri: string;
+  attributes: Array<{ key: string; value: string }>;
+}
+
 export default function AdminPage() {
   const { publicKey, connected } = useWallet();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -36,10 +63,26 @@ export default function AdminPage() {
     totalVolume: 0,
   });
   const [baxusFeesEnabled, setBaxusFeesEnabled] = useState(BAXUS_SELLER_FEE_ENABLED);
-  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings" | "submissions">("overview");
   const [whitelistedWallets, setWhitelistedWallets] = useState<any[]>([]);
   const [newWalletAddr, setNewWalletAddr] = useState("");
   const [newWalletName, setNewWalletName] = useState("");
+
+  // Submissions state
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [showMintForm, setShowMintForm] = useState(false);
+  const [mintingSubmissionId, setMintingSubmissionId] = useState<string>("");
+  const [rejectReason, setRejectReason] = useState<string>("");
+  const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
+  const [mintForm, setMintForm] = useState<MintingForm>({
+    submissionId: "",
+    nftName: "",
+    nftSymbol: "Artifacte",
+    nftImageUri: "",
+    attributes: [{ key: "", value: "" }],
+  });
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -89,10 +132,31 @@ export default function AdminPage() {
       const wlRes = await fetch("/api/admin/wallet-whitelist");
       const wlData = await wlRes.json();
       setWhitelistedWallets(wlData.wallets || []);
+
+      // Load submissions
+      await loadSubmissions();
     } catch (err: any) {
       setError("Failed to load admin data");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadSubmissions() {
+    setSubmissionsLoading(true);
+    try {
+      const res = await fetch("/api/submissions", {
+        headers: {
+          "x-admin-wallet": publicKey?.toBase58() || "",
+        },
+      });
+      if (!res.ok) throw new Error("Failed to load submissions");
+      const data = await res.json();
+      setSubmissions(data.submissions || []);
+    } catch (err: any) {
+      setError("Failed to load submissions: " + err.message);
+    } finally {
+      setSubmissionsLoading(false);
     }
   }
 
@@ -125,6 +189,95 @@ export default function AdminPage() {
       setListings(updated);
     } catch (err: any) {
       setError("Failed to reject listing: " + err.message);
+    }
+  }
+
+  async function updateSubmissionStatus(submissionId: string, status: string, notes?: string) {
+    try {
+      const res = await fetch("/api/submissions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-wallet": publicKey?.toBase58() || "",
+        },
+        body: JSON.stringify({
+          id: submissionId,
+          status,
+          adminNotes: notes,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+
+      const data = await res.json();
+      setSubmissions(
+        submissions.map((s) =>
+          s.id === submissionId ? data.submission : s
+        )
+      );
+
+      setShowRejectForm(null);
+      setRejectReason("");
+    } catch (err: any) {
+      setError("Failed to update submission: " + err.message);
+    }
+  }
+
+  async function submitMintForm() {
+    try {
+      if (!mintForm.nftName || !mintForm.nftImageUri) {
+        setError("NFT name and image URI are required");
+        return;
+      }
+
+      const metadata = Object.fromEntries(
+        mintForm.attributes
+          .filter((attr) => attr.key && attr.value)
+          .map((attr) => [attr.key, attr.value])
+      );
+
+      const res = await fetch("/api/submissions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-wallet": publicKey?.toBase58() || "",
+        },
+        body: JSON.stringify({
+          id: mintingSubmissionId,
+          status: "minted",
+          nftName: mintForm.nftName,
+          nftSymbol: mintForm.nftSymbol,
+          nftImageUri: mintForm.nftImageUri,
+          nftMetadata: metadata,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+
+      const data = await res.json();
+      setSubmissions(
+        submissions.map((s) =>
+          s.id === mintingSubmissionId ? data.submission : s
+        )
+      );
+
+      setShowMintForm(false);
+      setMintingSubmissionId("");
+      setMintForm({
+        submissionId: "",
+        nftName: "",
+        nftSymbol: "Artifacte",
+        nftImageUri: "",
+        attributes: [{ key: "", value: "" }],
+      });
+    } catch (err: any) {
+      setError("Failed to mint submission: " + err.message);
     }
   }
 
@@ -180,12 +333,12 @@ export default function AdminPage() {
         )}
 
         {/* Tabs */}
-        <div className="mb-8 flex gap-4 border-b border-white/10">
-          {(["overview", "listings", "whitelist", "settings"] as const).map((tab) => (
+        <div className="mb-8 flex gap-4 border-b border-white/10 overflow-x-auto">
+          {(["overview", "listings", "submissions", "whitelist", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-4 font-semibold transition-all border-b-2 capitalize ${
+              className={`px-6 py-4 font-semibold transition-all border-b-2 capitalize whitespace-nowrap ${
                 activeTab === tab
                   ? "border-gold-500 text-gold-500"
                   : "border-transparent text-gray-400 hover:text-white"
@@ -337,6 +490,356 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {!loading && activeTab === "submissions" && (
+          <div className="space-y-6">
+            {submissionsLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin">
+                  <div className="w-8 h-8 border-4 border-gray-700 border-t-gold-500 rounded-full" />
+                </div>
+                <p className="text-gray-400 mt-4">Loading submissions...</p>
+              </div>
+            ) : submissions.length === 0 ? (
+              <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+                <p className="text-gray-400">No submissions yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {submissions.map((submission) => (
+                  <div
+                    key={submission.id}
+                    className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden"
+                  >
+                    {/* Submission Header */}
+                    <button
+                      onClick={() =>
+                        setExpandedSubmissionId(
+                          expandedSubmissionId === submission.id ? null : submission.id
+                        )
+                      }
+                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-dark-700 transition-all"
+                    >
+                      <div className="flex items-center gap-4 text-left flex-1">
+                        {submission.photos.length > 0 && (
+                          <img
+                            src={submission.photos[0]}
+                            alt={submission.name}
+                            className="w-12 h-12 rounded object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="text-white font-semibold">{submission.name}</h3>
+                          <p className="text-gray-500 text-sm">
+                            {submission.category} • {new Date(submission.submittedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            submission.status === "pending"
+                              ? "bg-yellow-900/40 text-yellow-300 border border-yellow-700"
+                              : submission.status === "approved"
+                              ? "bg-blue-900/40 text-blue-300 border border-blue-700"
+                              : submission.status === "minted"
+                              ? "bg-green-900/40 text-green-300 border border-green-700"
+                              : submission.status === "delivered"
+                              ? "bg-emerald-900/40 text-emerald-300 border border-emerald-700"
+                              : "bg-red-900/40 text-red-300 border border-red-700"
+                          }`}
+                        >
+                          {submission.status}
+                        </span>
+                        <div className="w-5 h-5 text-gray-400">
+                          {expandedSubmissionId === submission.id ? "▼" : "▶"}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Submission Details */}
+                    {expandedSubmissionId === submission.id && (
+                      <div className="border-t border-white/10 px-6 py-6 space-y-6 bg-dark-700/50">
+                        {/* Basic Info */}
+                        <div>
+                          <h4 className="text-gold-400 font-semibold mb-3">Details</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-gray-500 text-sm">Seller Wallet</p>
+                              <p className="text-white text-sm font-mono break-all">{submission.sellerWallet}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500 text-sm">Contact</p>
+                              <p className="text-white text-sm">{submission.contact}</p>
+                            </div>
+                          </div>
+                          <div className="mt-4">
+                            <p className="text-gray-500 text-sm">Description</p>
+                            <p className="text-white text-sm mt-1">{submission.description}</p>
+                          </div>
+                          {submission.adminNotes && (
+                            <div className="mt-4">
+                              <p className="text-gray-500 text-sm">Admin Notes</p>
+                              <p className="text-white text-sm mt-1">{submission.adminNotes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Photos */}
+                        {submission.photos.length > 0 && (
+                          <div>
+                            <h4 className="text-gold-400 font-semibold mb-3">Photos</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              {submission.photos.map((photo, idx) => (
+                                <a
+                                  key={idx}
+                                  href={photo}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="relative group"
+                                >
+                                  <img
+                                    src={photo}
+                                    alt={`Photo ${idx + 1}`}
+                                    className="w-full h-24 rounded object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src =
+                                        "https://via.placeholder.com/100?text=Image+Error";
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 rounded bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                    <span className="text-white text-xs">View</span>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Minting Info */}
+                        {submission.status === "minted" && (
+                          <div>
+                            <h4 className="text-gold-400 font-semibold mb-3">Minting Details</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-gray-500 text-sm">NFT Name</p>
+                                <p className="text-white text-sm">{submission.nftName}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 text-sm">NFT Symbol</p>
+                                <p className="text-white text-sm">{submission.nftSymbol}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-3">
+                          {submission.status === "pending" && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setMintingSubmissionId(submission.id);
+                                  setMintForm({
+                                    submissionId: submission.id,
+                                    nftName: submission.name,
+                                    nftSymbol: "Artifacte",
+                                    nftImageUri: submission.photos[0] || "",
+                                    attributes: [{ key: "", value: "" }],
+                                  });
+                                  setShowMintForm(true);
+                                }}
+                                className="flex-1 px-4 py-2 bg-green-900/40 text-green-400 border border-green-700 rounded hover:bg-green-900/60 transition-all font-semibold text-sm"
+                              >
+                                Approve & Mint
+                              </button>
+                              <button
+                                onClick={() => setShowRejectForm(submission.id)}
+                                className="flex-1 px-4 py-2 bg-red-900/40 text-red-400 border border-red-700 rounded hover:bg-red-900/60 transition-all font-semibold text-sm"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {submission.status === "approved" && (
+                            <button
+                              onClick={() => {
+                                setMintingSubmissionId(submission.id);
+                                setMintForm({
+                                  submissionId: submission.id,
+                                  nftName: submission.nftName || submission.name,
+                                  nftSymbol: submission.nftSymbol || "Artifacte",
+                                  nftImageUri: submission.nftImageUri || submission.photos[0] || "",
+                                  attributes: submission.nftMetadata
+                                    ? Object.entries(submission.nftMetadata).map(([k, v]) => ({
+                                        key: k,
+                                        value: String(v),
+                                      }))
+                                    : [{ key: "", value: "" }],
+                                });
+                                setShowMintForm(true);
+                              }}
+                              className="flex-1 px-4 py-2 bg-purple-900/40 text-purple-400 border border-purple-700 rounded hover:bg-purple-900/60 transition-all font-semibold text-sm"
+                            >
+                              Proceed to Mint
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Reject Form */}
+                        {showRejectForm === submission.id && (
+                          <div className="bg-dark-800 rounded-lg p-4 border border-red-700/50">
+                            <p className="text-white font-semibold mb-3">Reject Submission</p>
+                            <textarea
+                              placeholder="Enter rejection reason (optional)..."
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              className="w-full bg-dark-900 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-red-500 outline-none mb-3 resize-none"
+                              rows={3}
+                            />
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => updateSubmissionStatus(submission.id, "rejected", rejectReason)}
+                                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-semibold text-sm transition-all"
+                              >
+                                Confirm Reject
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setShowRejectForm(null);
+                                  setRejectReason("");
+                                }}
+                                className="flex-1 px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white border border-white/10 rounded font-semibold text-sm transition-all"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mint Form Modal */}
+        {showMintForm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-dark-800 border border-white/10 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+              <h2 className="font-serif text-2xl text-white mb-6">Mint NFT</h2>
+
+              <div className="space-y-6">
+                {/* NFT Name */}
+                <div>
+                  <label className="block text-sm text-gold-400 mb-2 font-medium">NFT Name *</label>
+                  <input
+                    type="text"
+                    value={mintForm.nftName}
+                    onChange={(e) => setMintForm({ ...mintForm, nftName: e.target.value })}
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    placeholder="NFT name..."
+                  />
+                </div>
+
+                {/* NFT Symbol */}
+                <div>
+                  <label className="block text-sm text-gold-400 mb-2 font-medium">NFT Symbol</label>
+                  <input
+                    type="text"
+                    value={mintForm.nftSymbol}
+                    onChange={(e) => setMintForm({ ...mintForm, nftSymbol: e.target.value })}
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    placeholder="Symbol (default: Artifacte)"
+                  />
+                </div>
+
+                {/* Image URI */}
+                <div>
+                  <label className="block text-sm text-gold-400 mb-2 font-medium">Image URI *</label>
+                  <input
+                    type="url"
+                    value={mintForm.nftImageUri}
+                    onChange={(e) => setMintForm({ ...mintForm, nftImageUri: e.target.value })}
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    placeholder="https://example.com/image.png"
+                  />
+                </div>
+
+                {/* Attributes */}
+                <div>
+                  <label className="block text-sm text-gold-400 mb-2 font-medium">Metadata Attributes</label>
+                  <div className="space-y-3">
+                    {mintForm.attributes.map((attr, idx) => (
+                      <div key={idx} className="flex gap-3">
+                        <input
+                          type="text"
+                          value={attr.key}
+                          onChange={(e) => {
+                            const newAttrs = [...mintForm.attributes];
+                            newAttrs[idx].key = e.target.value;
+                            setMintForm({ ...mintForm, attributes: newAttrs });
+                          }}
+                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          placeholder="Attribute key (e.g., Rarity)"
+                        />
+                        <input
+                          type="text"
+                          value={attr.value}
+                          onChange={(e) => {
+                            const newAttrs = [...mintForm.attributes];
+                            newAttrs[idx].value = e.target.value;
+                            setMintForm({ ...mintForm, attributes: newAttrs });
+                          }}
+                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          placeholder="Attribute value (e.g., Rare)"
+                        />
+                        {idx === mintForm.attributes.length - 1 && (
+                          <button
+                            onClick={() =>
+                              setMintForm({
+                                ...mintForm,
+                                attributes: [...mintForm.attributes, { key: "", value: "" }],
+                              })
+                            }
+                            className="px-3 py-2 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded font-semibold text-sm whitespace-nowrap"
+                          >
+                            + Add
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-4 pt-4">
+                  <button
+                    onClick={submitMintForm}
+                    className="flex-1 px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition-all"
+                  >
+                    Mark as Minted
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMintForm(false);
+                      setMintingSubmissionId("");
+                    }}
+                    className="flex-1 px-6 py-3 bg-dark-700 hover:bg-dark-600 text-white border border-white/10 font-semibold rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

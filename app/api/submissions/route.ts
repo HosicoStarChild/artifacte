@@ -50,7 +50,7 @@ function isAdminWallet(wallet?: string): boolean {
 export async function GET(req: NextRequest) {
   try {
     const wallet = req.nextUrl.searchParams.get("wallet");
-    const adminWallet = req.headers.get("x-admin-wallet");
+    const adminWallet = req.headers.get("x-admin-wallet") || undefined;
     const data = await readSubmissions();
 
     // If requesting user's own submissions, no admin check needed
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 // PATCH — update submission status (admin only)
 export async function PATCH(req: NextRequest) {
   try {
-    const adminWallet = req.headers.get("x-admin-wallet");
+    const adminWallet = req.headers.get("x-admin-wallet") || undefined;
 
     if (!isAdminWallet(adminWallet)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
