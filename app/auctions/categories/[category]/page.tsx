@@ -52,6 +52,7 @@ export default function CategoryAuctionsPage() {
   const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
   const [meLoading, setMeLoading] = useState(true);
+  const [meFilterLoading, setMeFilterLoading] = useState(false);
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
@@ -59,7 +60,9 @@ export default function CategoryAuctionsPage() {
 
   useEffect(() => {
     if (!useMeApi || !category) return;
-    setMeLoading(true);
+    // Only show full spinner on initial load; filter changes keep old results visible
+    if (meListings.length === 0) setMeLoading(true);
+    else setMeFilterLoading(true);
     // Server-side filtering + pagination
     const params = new URLSearchParams({
       category,
@@ -104,8 +107,9 @@ export default function CategoryAuctionsPage() {
         setMeListings(data.listings || []);
         setMeTotal(data.total || 0);
         setMeLoading(false);
+        setMeFilterLoading(false);
       })
-      .catch(() => setMeLoading(false));
+      .catch(() => { setMeLoading(false); setMeFilterLoading(false); });
   }, [useMeApi, category, filters, currencyFilter, page, sortBy]);
 
   // Use ME listings for TCG/Sports, static for everything else
@@ -484,7 +488,7 @@ export default function CategoryAuctionsPage() {
                   </div>
                 </div>
               ) : null; })()}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 transition-opacity duration-200 ${meFilterLoading ? 'opacity-40' : ''}`}>
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const usd1Amount = l.price.toLocaleString();
                   return (
