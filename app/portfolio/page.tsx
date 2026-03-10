@@ -179,7 +179,7 @@ export default function PortfolioPage() {
                 digitalItems.push({
                   id: asset.id,
                   name: asset.content?.metadata?.name || "Unknown",
-                  image: asset.content?.links?.image || "",
+                  image: (asset.content?.links?.image || "").replace(/^ipfs:\/\//, "https://cf-ipfs.com/ipfs/"),
                   collection: fp?.name || grouping.group_value.slice(0, 8),
                   floorPrice: floor,
                 });

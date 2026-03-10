@@ -97,7 +97,12 @@ export default function ListNFTPage() {
   }
 
   function getNftImage(nft: NFTAsset): string {
-    return nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
+    let url = nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
+    // Proxy IPFS through a reliable gateway
+    if (url.startsWith("ipfs://")) {
+      url = url.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
+    }
+    return url;
   }
 
   function getNftCollection(nft: NFTAsset): { address: string; name: string } | null {
