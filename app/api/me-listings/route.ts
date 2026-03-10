@@ -53,7 +53,7 @@ function transformListing(item: any) {
   return {
     id: `cc-${ccId}`,
     name: item.token?.name || 'Unknown',
-    subtitle: `${ccCategory} • ${gradingCompany} ${gradeNum || ''} • ${vault ? vault + ' Vault' : 'Vault'}`.trim(),
+    subtitle: `${ccCategory} • ${gradingCompany} ${gradeNum || ''} • ${vault ? (vault.toLowerCase().includes('vault') ? vault : vault + ' Vault') : 'Vault'}`.trim(),
     price: markupPrice,
     image: item.token?.image || '',
     category,
