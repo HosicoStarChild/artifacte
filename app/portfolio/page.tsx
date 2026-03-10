@@ -333,35 +333,33 @@ export default function PortfolioPage() {
 
               {/* 3 Stat Cards */}
               {/* Platform Breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                {/* On Artifacte */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <h3 className="font-serif text-lg text-white mb-4">
-                    On Artifacte Marketplace
-                  </h3>
-                  <div className="flex items-end gap-4">
-                    <div>
-                      <p className="font-serif text-2xl text-gold-400 font-bold">
-                        {portfolioData.listedCards}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">Cards listed</p>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+                {/* RWAs */}
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">RWAs</p>
+                  <p className="font-serif text-2xl text-gold-400 font-bold">{portfolioData.totalCards}</p>
+                  <p className="text-gray-600 text-xs mt-1">{portfolioData.listedCards} listed · {portfolioData.unlistedCards} unlisted</p>
+                </div>
+
+                {/* Digital Collectibles */}
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Digital Collectibles</p>
+                  <p className="font-serif text-2xl text-blue-400 font-bold">{digitalNfts.length}</p>
+                  <p className="text-gray-600 text-xs mt-1">Floor-priced NFTs</p>
                 </div>
 
                 {/* Total Portfolio */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <h3 className="font-serif text-lg text-white mb-4">
-                    Total Portfolio
-                  </h3>
-                  <div className="flex items-end gap-4">
-                    <div>
-                      <p className="font-serif text-2xl text-gold-400 font-bold">
-                        {portfolioData.totalCards}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">Total cards</p>
-                    </div>
-                  </div>
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
+                  <p className="font-serif text-2xl text-white font-bold">{portfolioData.totalCards + digitalNfts.length}</p>
+                  <p className="text-gray-600 text-xs mt-1">RWAs + Digital</p>
+                </div>
+
+                {/* On Marketplace */}
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">On Marketplace</p>
+                  <p className="font-serif text-2xl text-gold-400 font-bold">{portfolioData.listedCards}</p>
+                  <p className="text-gray-600 text-xs mt-1">Cards listed</p>
                 </div>
               </div>
 
