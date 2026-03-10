@@ -145,16 +145,15 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
   const listedCards = cards.filter((card) => card.listing !== null).length;
   const unlistedCards = cards.length - listedCards;
 
-  // Market value: use Railway oracle prices (covers both listed and unlisted)
+  // Market value: use Railway oracle prices, fall back to insured value
   let totalMarketValue = 0;
   const marketCategoriesByValue: Record<string, number> = {};
   cards.forEach((card) => {
     const market = marketPriceMap[card.nftAddress];
-    if (market) {
-      totalMarketValue += market.price;
-      const cat = market.category || card.category || 'Other';
-      marketCategoriesByValue[cat] = (marketCategoriesByValue[cat] || 0) + market.price;
-    }
+    const value = market ? market.price : card.insuredValueNum;
+    totalMarketValue += value;
+    const cat = market?.category || card.category || 'Other';
+    marketCategoriesByValue[cat] = (marketCategoriesByValue[cat] || 0) + value;
   });
 
   const totalListedValue = totalMarketValue;
