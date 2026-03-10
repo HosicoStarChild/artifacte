@@ -527,6 +527,7 @@ export default function CategoryAuctionsPage() {
                           src={l.image}
                           alt={l.name}
                           className={`w-full h-full ${l.source === 'collector-crypt' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
                         />
                       </div>
                       </Link>

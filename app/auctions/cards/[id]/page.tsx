@@ -145,6 +145,7 @@ export default function CardDetailPage() {
               src={card.image}
               alt={card.name}
               className="max-h-[600px] w-auto object-contain rounded-lg"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
             />
           </div>
 
