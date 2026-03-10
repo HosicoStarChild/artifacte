@@ -95,25 +95,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Live Auctions Section */}
-      <section className="bg-dark-800/30 border-t border-white/5 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Active Auctions</p>
-              <h2 className="font-serif text-3xl md:text-4xl text-white">Live Now</h2>
-            </div>
-            <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-              View All Auctions →
-            </Link>
-          </div>
-          <div className="text-center py-16">
-            <p className="text-gray-400 text-lg font-serif">Coming Soon</p>
-            <p className="text-gray-500 text-sm mt-2">Live auctions are being prepared. Stay tuned.</p>
-          </div>
-        </div>
-      </section>
-
       {/* Spirits Section - BAXUS Bottles */}
       <section className="bg-dark-800/30 border-t border-white/5 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -196,6 +177,25 @@ export default function Home() {
                 <p className="text-gray-400 text-sm leading-relaxed">{item.description}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Live Auctions Section */}
+      <section className="bg-dark-800/30 border-t border-white/5 py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Active Auctions</p>
+              <h2 className="font-serif text-3xl md:text-4xl text-white">Live Now</h2>
+            </div>
+            <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+              View All Auctions →
+            </Link>
+          </div>
+          <div className="text-center py-16">
+            <p className="text-gray-400 text-lg font-serif">Coming Soon</p>
+            <p className="text-gray-500 text-sm mt-2">Live auctions are being prepared. Stay tuned.</p>
           </div>
         </div>
       </section>
