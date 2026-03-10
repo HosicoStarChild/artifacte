@@ -111,25 +111,19 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
     };
   });
 
-  // Fetch market prices from Railway oracle for all portfolio NFTs
-  let marketPriceMap: Record<string, { price: number; currency: string; category: string }> = {};
+  // Fetch market prices from oracle (sold comps) for all portfolio NFTs
+  let marketPriceMap: Record<string, { price: number; source: string }> = {};
   try {
     const nftAddresses = cards.map(c => c.nftAddress).filter(Boolean);
     if (nftAddresses.length > 0) {
-      const res = await fetch(`https://artifacte-oracle-production.up.railway.app/api/listings?perPage=10000&page=1`, {
-        signal: AbortSignal.timeout(10000),
-      });
+      const res = await fetch(
+        `https://artifacte-oracle-production.up.railway.app/api/market/portfolio?nfts=${nftAddresses.join(',')}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
       if (res.ok) {
         const data = await res.json();
-        const allListings = data.listings || [];
-        allListings.forEach((l: any) => {
-          if (l.nftAddress) {
-            marketPriceMap[l.nftAddress] = {
-              price: l.currency === 'USDC' ? l.price / 1000000 : l.price,
-              currency: l.currency || 'USDC',
-              category: l.category || 'TCG_CARDS',
-            };
-          }
+        Object.entries(data.values || {}).forEach(([nft, v]: [string, any]) => {
+          marketPriceMap[nft] = { price: v.marketValue, source: v.source };
         });
       }
     }
@@ -145,14 +139,14 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
   const listedCards = cards.filter((card) => card.listing !== null).length;
   const unlistedCards = cards.length - listedCards;
 
-  // Market value: use Railway oracle prices, fall back to insured value
+  // Market value: use oracle sold comps, fall back to insured value
   let totalMarketValue = 0;
   const marketCategoriesByValue: Record<string, number> = {};
   cards.forEach((card) => {
     const market = marketPriceMap[card.nftAddress];
     const value = market ? market.price : card.insuredValueNum;
     totalMarketValue += value;
-    const cat = market?.category || card.category || 'Other';
+    const cat = card.category || 'Other';
     marketCategoriesByValue[cat] = (marketCategoriesByValue[cat] || 0) + value;
   });
 
