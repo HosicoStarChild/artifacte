@@ -192,16 +192,30 @@ export default function PortfolioPage() {
           <>
             {/* Portfolio Summary Header */}
             <div className="mb-12">
-              <div className="text-center mb-8">
-                <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
-                  Collector Crypt Insured Value
-                </p>
-                <h2 className="font-serif text-5xl text-white font-bold mb-2">
-                  {formatFullPrice(portfolioData.totalInsuredValue)}
-                </h2>
-                <p className="text-gray-600 text-xs">
-                  CC insured valuations across {portfolioData.totalCards} cards
-                </p>
+              <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 mb-8">
+                <div className="text-center">
+                  <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
+                    Market Value
+                  </p>
+                  <h2 className="font-serif text-5xl text-gold-400 font-bold mb-2">
+                    {formatFullPrice(portfolioData.totalListedValue || 0)}
+                  </h2>
+                  <p className="text-gray-600 text-xs">
+                    Based on current listing prices
+                  </p>
+                </div>
+                <div className="hidden md:block w-px h-16 bg-white/10" />
+                <div className="text-center">
+                  <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
+                    Insured Value
+                  </p>
+                  <h2 className="font-serif text-4xl text-white/60 font-bold mb-2">
+                    {formatFullPrice(portfolioData.totalInsuredValue)}
+                  </h2>
+                  <p className="text-gray-600 text-xs">
+                    CC insured across {portfolioData.totalCards} cards
+                  </p>
+                </div>
               </div>
 
               {/* 3 Stat Cards */}
