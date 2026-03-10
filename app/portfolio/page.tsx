@@ -229,9 +229,14 @@ export default function PortfolioPage() {
     return true;
   }) || [];
 
-  const maxCategoryValue = portfolioData
-    ? Math.max(...Object.values(portfolioData.categoriesByValue || {}), 1)
-    : 1;
+  // Safe defaults for rendering when portfolioData is null but digitalNfts exist
+  const pd = portfolioData || {
+    totalListedValue: 0, totalInsuredValue: 0, totalCards: 0,
+    listedCards: 0, unlistedCards: 0, cards: [] as any[],
+    categoriesByValue: {} as Record<string, number>, gradeDistribution: {} as Record<string, number>, marketCategoriesByValue: {} as Record<string, number>,
+  };
+
+  const maxCategoryValue = Math.max(...Object.values(pd.categoriesByValue || {}), 1);
 
   return (
     <div className="pt-24 min-h-screen bg-dark-900">
@@ -279,10 +284,10 @@ export default function PortfolioPage() {
           <div className="text-center py-24">
             <p className="text-red-400 text-sm">{error}</p>
           </div>
-        ) : !portfolioData?.cards || portfolioData.cards.length === 0 ? (
+        ) : !portfolioData?.cards?.length && !digitalNfts.length ? (
           <div className="text-center py-24">
             <p className="text-gray-400 text-sm">
-              No cards found in your portfolio
+              No assets found in your portfolio
             </p>
           </div>
         ) : (
@@ -295,7 +300,7 @@ export default function PortfolioPage() {
                     RWA Market Value
                   </p>
                   <h2 className="font-serif text-5xl text-gold-400 font-bold mb-2">
-                    {formatFullPrice(portfolioData.totalListedValue || 0)}
+                    {formatFullPrice(pd.totalListedValue || 0)}
                   </h2>
                   <p className="text-gray-600 text-xs">
                     Powered by Artifacte Oracle
@@ -323,10 +328,10 @@ export default function PortfolioPage() {
                     Insured Value
                   </p>
                   <h2 className="font-serif text-4xl text-white/60 font-bold mb-2">
-                    {formatFullPrice(portfolioData.totalInsuredValue)}
+                    {formatFullPrice(pd.totalInsuredValue)}
                   </h2>
                   <p className="text-gray-600 text-xs">
-                    CC insured across {portfolioData.totalCards} cards
+                    CC insured across {pd.totalCards} cards
                   </p>
                 </div>
               </div>
@@ -337,8 +342,8 @@ export default function PortfolioPage() {
                 {/* RWAs */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">RWAs</p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">{portfolioData.totalCards}</p>
-                  <p className="text-gray-600 text-xs mt-1">{portfolioData.listedCards} listed · {portfolioData.unlistedCards} unlisted</p>
+                  <p className="font-serif text-2xl text-gold-400 font-bold">{pd.totalCards}</p>
+                  <p className="text-gray-600 text-xs mt-1">{pd.listedCards} listed · {pd.unlistedCards} unlisted</p>
                 </div>
 
                 {/* Digital Collectibles */}
@@ -351,14 +356,14 @@ export default function PortfolioPage() {
                 {/* On Marketplace */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">On Marketplace</p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">{portfolioData.listedCards}</p>
+                  <p className="font-serif text-2xl text-gold-400 font-bold">{pd.listedCards}</p>
                   <p className="text-gray-600 text-xs mt-1">Cards listed</p>
                 </div>
 
                 {/* Total Portfolio */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
-                  <p className="font-serif text-2xl text-white font-bold">{portfolioData.totalCards + digitalNfts.length}</p>
+                  <p className="font-serif text-2xl text-white font-bold">{pd.totalCards + digitalNfts.length}</p>
                   <p className="text-gray-600 text-xs mt-1">RWAs + Digital Collectibles</p>
                 </div>
               </div>
@@ -409,7 +414,7 @@ export default function PortfolioPage() {
               })()}
 
               {/* Insured Value by Category */}
-              {Object.keys(portfolioData.categoriesByValue).length > 0 && (
+              {Object.keys(pd.categoriesByValue).length > 0 && (
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
                   <h3 className="font-serif text-lg text-white mb-2">
                     Insured Value by Category
@@ -418,7 +423,7 @@ export default function PortfolioPage() {
                     Based on Collector Crypt valuations
                   </p>
                   <div className="space-y-4">
-                    {Object.entries(portfolioData.categoriesByValue)
+                    {Object.entries(pd.categoriesByValue)
                       .sort(([, a], [, b]) => b - a)
                       .slice(0, 10)
                       .map(([category, value]) => {
@@ -443,13 +448,13 @@ export default function PortfolioPage() {
               )}
 
               {/* Grade Distribution */}
-              {Object.keys(portfolioData.gradeDistribution).length > 0 && (
+              {Object.keys(pd.gradeDistribution).length > 0 && (
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
                   <h3 className="font-serif text-lg text-white mb-4">
                     Grade Distribution
                   </h3>
                   <div className="flex flex-wrap gap-3">
-                    {Object.entries(portfolioData.gradeDistribution)
+                    {Object.entries(pd.gradeDistribution)
                       .sort(([, a], [, b]) => b - a)
                       .map(([grade, count]) => {
                         const [company] = grade.split("-");
