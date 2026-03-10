@@ -593,7 +593,6 @@ export default function CategoryAuctionsPage() {
                   </button>
                 </div>
               ) : null; })()}
-              )}
               </>
             ) : (
               <div className="text-center py-20">
