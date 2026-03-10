@@ -2,6 +2,46 @@
 
 import { useState, useEffect } from "react";
 
+/**
+ * Extract search-friendly query from verbose CC/ME card names.
+ * E.g. "2015 Pokemon Japanese XY Promo Poncho-wearing Pikachu #150/XY-P PSA 10"
+ *   → "Pikachu Poncho 150 XY-P"
+ * E.g. "2023 One Piece OP05 Awakening SEC Monkey D. Luffy #OP05-119 PSA 10"
+ *   → "OP05-119"
+ */
+function buildSearchQuery(name: string): string {
+  // Try to extract card number like #OP05-119, #150/XY-P, #4, SV06-061
+  const cardNumMatch = name.match(/#?((?:OP|ST|EB|PRB?|SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d+[-/]?\d+[-/]?[A-Z]*\d*)/i);
+  if (cardNumMatch) {
+    return cardNumMatch[1];
+  }
+
+  // Try OP/set format without # prefix
+  const opMatch = name.match(/\b(OP\d+-\d+)\b/i);
+  if (opMatch) return opMatch[1];
+
+  // Strip common noise words and grading info
+  let q = name
+    .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '') // Remove grades
+    .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '')
+    .replace(/\b(Holo|Reverse Holo|Full Art|Alt Art|Secret Rare|Rare|Common|Uncommon)\b/gi, '')
+    .replace(/#\d+\/?\w*/g, (m) => m) // Keep card numbers
+    .replace(/\b\d{4}\b/g, '') // Remove years
+    .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes)\b/gi, '')
+    .replace(/\b(Japanese|English|Chinese|Korean)\b/gi, '')
+    .replace(/\b(1st Edition|Unlimited|Shadowless)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // If still too long, take first 5 meaningful words
+  const words = q.split(' ').filter(w => w.length > 2);
+  if (words.length > 6) {
+    q = words.slice(0, 6).join(' ');
+  }
+
+  return q || name.slice(0, 50);
+}
+
 interface PriceHistoryProps {
   cardName?: string;
   category?: string;
@@ -31,9 +71,12 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
       setSalesCount(null);
 
       try {
+        // Extract search-friendly query from full card name
+        const searchQuery = buildSearchQuery(cardName);
+
         // Step 1: Search for card variants
         const searchRes = await fetch(
-          `/api/oracle?endpoint=search&q=${encodeURIComponent(cardName)}`,
+          `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
           { signal: AbortSignal.timeout(15000) }
         );
         if (!searchRes.ok) throw new Error("Search failed");
@@ -65,7 +108,7 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
         // Step 3: Build chart URL (rendered server-side as PNG)
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
-        chartParams.set("q", cardName);
+        chartParams.set("q", searchQuery);
         // Don't pass grade filter — too restrictive, often returns 0 results
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
