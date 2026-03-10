@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
@@ -49,6 +49,8 @@ export default function CategoryAuctionsPage() {
   const [page, setPage] = useState(1);
   const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
   const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
+  const [searchInput, setSearchInput] = useState("");
+  const searchTimer = useRef<NodeJS.Timeout>();
   const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
   const [meLoading, setMeLoading] = useState(true);
@@ -401,6 +403,27 @@ export default function CategoryAuctionsPage() {
               <span className="text-white text-sm font-medium bg-dark-800 px-4 py-2 rounded-lg border border-white/5">USDC</span>
             </div>
           )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <input
+              type="text"
+              placeholder="Search by name, set, number..."
+              value={searchInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchInput(val);
+                clearTimeout(searchTimer.current);
+                searchTimer.current = setTimeout(() => { setFilters(prev => ({ ...prev, search: val })); setPage(1); }, 400);
+              }}
+              className="w-full bg-dark-800 border border-white/10 text-white text-sm rounded-lg pl-10 pr-4 py-2.5 focus:border-gold-500 focus:outline-none transition-colors placeholder-gray-500"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
         </div>
 
         {/* Category Filters */}
