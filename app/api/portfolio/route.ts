@@ -53,6 +53,7 @@ interface PortfolioResponse {
   listedCards: number;
   unlistedCards: number;
   totalListedValue: number;
+  marketCategoriesByValue?: Record<string, number>;
   error?: string;
 }
 
@@ -98,7 +99,7 @@ async function fetchFromCollectorCrypt(wallet: string): Promise<CCResponse> {
   return response.json();
 }
 
-function transformCCData(data: CCResponse, wallet: string): PortfolioResponse {
+async function transformCCData(data: CCResponse, wallet: string): Promise<PortfolioResponse> {
   const cards: PortfolioCard[] = (data.filterNFtCard || []).map((card) => {
     const nameKey = (card.itemName || "").toUpperCase().trim();
     const altAssetId = oracleLookup[nameKey] || undefined;
@@ -110,6 +111,32 @@ function transformCCData(data: CCResponse, wallet: string): PortfolioResponse {
     };
   });
 
+  // Fetch market prices from Railway oracle for all portfolio NFTs
+  let marketPriceMap: Record<string, { price: number; currency: string; category: string }> = {};
+  try {
+    const nftAddresses = cards.map(c => c.nftAddress).filter(Boolean);
+    if (nftAddresses.length > 0) {
+      const res = await fetch(`https://artifacte-oracle-production.up.railway.app/api/listings?perPage=10000&page=1`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const allListings = data.listings || [];
+        allListings.forEach((l: any) => {
+          if (l.nftAddress) {
+            marketPriceMap[l.nftAddress] = {
+              price: l.currency === 'USDC' ? l.price / 1000000 : l.price,
+              currency: l.currency || 'USDC',
+              category: l.category || 'TCG_CARDS',
+            };
+          }
+        });
+      }
+    }
+  } catch {
+    // Oracle lookup failed — continue without market prices
+  }
+
   // Calculate totals
   const totalInsuredValue = cards.reduce(
     (sum, card) => sum + card.insuredValueNum,
@@ -117,9 +144,20 @@ function transformCCData(data: CCResponse, wallet: string): PortfolioResponse {
   );
   const listedCards = cards.filter((card) => card.listing !== null).length;
   const unlistedCards = cards.length - listedCards;
-  const totalListedValue = cards
-    .filter((card) => card.listing !== null)
-    .reduce((sum, card) => sum + (card.listing?.price || 0), 0);
+
+  // Market value: use Railway oracle prices (covers both listed and unlisted)
+  let totalMarketValue = 0;
+  const marketCategoriesByValue: Record<string, number> = {};
+  cards.forEach((card) => {
+    const market = marketPriceMap[card.nftAddress];
+    if (market) {
+      totalMarketValue += market.price;
+      const cat = market.category || card.category || 'Other';
+      marketCategoriesByValue[cat] = (marketCategoriesByValue[cat] || 0) + market.price;
+    }
+  });
+
+  const totalListedValue = totalMarketValue;
 
   // Group by category for value distribution
   const categoriesByValue: Record<string, number> = {};
@@ -149,6 +187,7 @@ function transformCCData(data: CCResponse, wallet: string): PortfolioResponse {
     listedCards,
     unlistedCards,
     totalListedValue,
+    marketCategoriesByValue,
   };
 }
 
@@ -185,7 +224,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     // Fetch fresh data from Collector Crypt
     const ccData = await fetchFromCollectorCrypt(wallet);
-    const portfolioData = transformCCData(ccData, wallet);
+    const portfolioData = await transformCCData(ccData, wallet);
 
     // Store in cache
     portfolioCache.set(wallet, {

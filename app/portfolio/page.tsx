@@ -43,6 +43,7 @@ interface PortfolioData {
   listedCards: number;
   unlistedCards: number;
   totalListedValue: number;
+  marketCategoriesByValue?: Record<string, number>;
   error?: string;
 }
 
@@ -291,14 +292,8 @@ export default function PortfolioPage() {
               )}
 
               {/* Portfolio Value by Category (Oracle) */}
-              {portfolioData.cards.length > 0 && (() => {
-                const catValues: Record<string, number> = {};
-                portfolioData.cards.forEach(c => {
-                  if (c.listing?.price) {
-                    const cat = c.category || 'Other';
-                    catValues[cat] = (catValues[cat] || 0) + (c.listing.price / (c.listing.currency === 'USDC' ? 1000000 : 1));
-                  }
-                });
+              {(() => {
+                const catValues = portfolioData.marketCategoriesByValue || {};
                 const maxVal = Math.max(...Object.values(catValues), 1);
                 return Object.keys(catValues).length > 0 ? (
                   <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
