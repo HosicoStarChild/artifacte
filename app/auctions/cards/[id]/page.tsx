@@ -128,8 +128,13 @@ export default function CardDetailPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="mb-8">
-          <Link href="/auctions/categories/tcg-cards" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-            ← Back to {card.ccCategory || 'TCG Cards'}
+          <Link href={`/auctions/categories/${
+            card.category === 'MERCHANDISE' ? 'merchandise' :
+            card.category === 'SEALED' ? 'sealed' :
+            card.category === 'SPORTS_CARDS' ? 'sports-cards' :
+            'tcg-cards'
+          }`} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+            ← Back to {card.category === 'MERCHANDISE' ? 'Merchandise' : card.category === 'SEALED' ? 'Sealed Product' : card.category === 'SPORTS_CARDS' ? 'Sports Cards' : (card.ccCategory || 'TCG Cards')}
           </Link>
         </div>
 
