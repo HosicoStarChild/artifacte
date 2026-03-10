@@ -15,6 +15,12 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   '2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay': { symbol: 'quekz', name: 'Quekz' },
 };
 
+// Tensor-only collections (not on ME) — manually updated floors
+const TENSOR_ONLY_FLOORS: Record<string, number> = {
+  'BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko': 0.45, // Quekz (old)
+  '2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay': 0.45, // Quekz (WNS)
+};
+
 // Cache floor prices for 15 minutes
 let cache: { data: Record<string, number>; timestamp: number } | null = null;
 const CACHE_TTL = 15 * 60 * 1000;
@@ -44,6 +50,11 @@ async function fetchFloorPrices(): Promise<Record<string, number>> {
       }
     })
   );
+
+  // Add Tensor-only floors as fallback
+  for (const [addr, floor] of Object.entries(TENSOR_ONLY_FLOORS)) {
+    if (!floors[addr]) floors[addr] = floor;
+  }
 
   cache = { data: floors, timestamp: Date.now() };
   return floors;
