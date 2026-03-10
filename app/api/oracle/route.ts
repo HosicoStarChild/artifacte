@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ORACLE_API = "http://localhost:4567";
+const ORACLE_API = "https://artifacte-oracle-production.up.railway.app";
 const TIMEOUT_MS = 10000;
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = TIMEOUT_MS): Promise<Response> {
