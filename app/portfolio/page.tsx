@@ -179,7 +179,13 @@ export default function PortfolioPage() {
                 digitalItems.push({
                   id: asset.id,
                   name: asset.content?.metadata?.name || "Unknown",
-                  image: (asset.content?.links?.image || "").replace(/^ipfs:\/\//, "https://cf-ipfs.com/ipfs/"),
+                  image: (() => {
+                    let u = asset.content?.links?.image || "";
+                    if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
+                    const m = u.match(/https?:\/\/(?:www\.)?arweave\.net\/([a-zA-Z0-9_-]+)/);
+                    if (m) u = `https://gateway.irys.xyz/${m[1]}`;
+                    return u;
+                  })(),
                   collection: fp?.name || grouping.group_value.slice(0, 8),
                   floorPrice: floor,
                 });

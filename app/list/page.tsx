@@ -98,9 +98,14 @@ export default function ListNFTPage() {
 
   function getNftImage(nft: NFTAsset): string {
     let url = nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
-    // Proxy IPFS through a reliable gateway
+    // Proxy IPFS through Cloudflare gateway
     if (url.startsWith("ipfs://")) {
       url = url.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
+    }
+    // Route Arweave through Irys gateway (arweave.net 302s → 404 on many NFTs)
+    const arweaveMatch = url.match(/https?:\/\/(?:www\.)?arweave\.net\/([a-zA-Z0-9_-]+)/);
+    if (arweaveMatch) {
+      url = `https://gateway.irys.xyz/${arweaveMatch[1]}`;
     }
     return url;
   }
