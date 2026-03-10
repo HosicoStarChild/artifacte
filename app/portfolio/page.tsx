@@ -290,6 +290,46 @@ export default function PortfolioPage() {
                 </div>
               )}
 
+              {/* Portfolio Value by Category (Oracle) */}
+              {portfolioData.cards.length > 0 && (() => {
+                const catValues: Record<string, number> = {};
+                portfolioData.cards.forEach(c => {
+                  if (c.listing?.price) {
+                    const cat = c.category || 'Other';
+                    catValues[cat] = (catValues[cat] || 0) + (c.listing.price / (c.listing.currency === 'USDC' ? 1000000 : 1));
+                  }
+                });
+                const maxVal = Math.max(...Object.values(catValues), 1);
+                return Object.keys(catValues).length > 0 ? (
+                  <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
+                    <h3 className="font-serif text-lg text-white mb-2">
+                      Portfolio Value by Category
+                    </h3>
+                    <p className="text-gray-500 text-xs mb-4">
+                      Powered by the Artifacte Oracle
+                    </p>
+                    <div className="space-y-4">
+                      {Object.entries(catValues)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([category, value]) => (
+                          <div key={category}>
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="text-sm text-gray-300">{category}</p>
+                              <p className="text-xs text-gold-400 font-semibold">{formatCurrency(value)}</p>
+                            </div>
+                            <div className="w-full bg-dark-900 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-gold-400 to-gold-600 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${(value / maxVal) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
               {/* Grade Distribution */}
               {Object.keys(portfolioData.gradeDistribution).length > 0 && (
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
