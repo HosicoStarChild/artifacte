@@ -494,7 +494,8 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Card Grid */}
+            {/* RWAs */}
+            {filteredCards.length > 0 && <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
               {filteredCards.map((card) => (
                 <div
