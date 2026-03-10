@@ -204,34 +204,6 @@ export default function PortfolioPage() {
                 </p>
               </div>
 
-              {/* Oracle Market Valuation Coming Soon Banner */}
-              <div className="bg-gradient-to-r from-dark-800 to-dark-900 rounded-xl border border-gold-400/20 p-6 mb-12">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <svg
-                      className="w-5 h-5 text-gold-400"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gold-400 mb-1">
-                      Oracle Market Valuation
-                    </h3>
-                    <p className="text-gray-400 text-sm">
-                      Real-time market pricing from Alt.xyz oracle coming soon.
-                      Currently showing Collector Crypt insured valuations.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               {/* 3 Stat Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                 {/* Total Cards */}
