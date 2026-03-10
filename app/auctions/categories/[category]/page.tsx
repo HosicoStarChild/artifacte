@@ -275,11 +275,10 @@ export default function CategoryAuctionsPage() {
     ? (useMeApi ? meListings : listings.filter((l: any) => l.category === category))
     : [];
 
-  // Apply dropdown filters
-  const categoryListings = categoryListingsBase.filter((l: any) => {
+  // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
+  const categoryListings = (useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
     for (const [key, value] of Object.entries(filters)) {
       if (!value || value === "All") continue;
-      // Map filter keys to listing fields
       if (key === "spiritType") {
         const st = (l.spirit_type || l.subtitle || "").toLowerCase();
         if (!st.includes(value.toLowerCase())) return false;
@@ -287,29 +286,6 @@ export default function CategoryAuctionsPage() {
         const name = (l.name || "").toLowerCase();
         const sub = (l.subtitle || "").toLowerCase();
         if (!name.includes(value.toLowerCase()) && !sub.includes(value.toLowerCase())) return false;
-      } else if (key === "tcg") {
-        const name = (l.name || "").toLowerCase() + " " + (l.subtitle || "").toLowerCase() + " " + ((l as any).ccCategory || "").toLowerCase();
-        const val = value.toLowerCase();
-        // Handle "Magic" matching "Magic The Gathering" and "Magic the Gathering"
-        if (val === "magic") {
-          if (!name.includes("magic")) return false;
-        } else if (val === "yu-gi-oh") {
-          if (!name.includes("yu-gi-oh") && !name.includes("yugioh")) return false;
-        } else {
-          if (!name.includes(val)) return false;
-        }
-      } else if (key === "rarity") {
-        const sub = (l.subtitle || "").toLowerCase();
-        if (!sub.includes(value.toLowerCase())) return false;
-      } else if (key === "grade") {
-        const sub = (l.subtitle || "").toLowerCase() + " " + ((l as any).grade || "").toLowerCase();
-        if (!sub.includes(value.toLowerCase())) return false;
-      } else if (key === "language") {
-        const sub = (l.subtitle || "").toLowerCase();
-        if (!sub.includes(value.toLowerCase())) return false;
-      } else if (key === "sport") {
-        const sub = (l.subtitle || "").toLowerCase();
-        if (!sub.includes(value.toLowerCase())) return false;
       } else if (key === "collection") {
         const sub = (l.subtitle || "").toLowerCase();
         if (!sub.includes(value.toLowerCase())) return false;
@@ -320,7 +296,7 @@ export default function CategoryAuctionsPage() {
     if (currencyFilter === "All") return true;
     const lCurrency = l.currency || (l.category === "DIGITAL_ART" ? "SOL" : "USDC");
     return lCurrency === currencyFilter;
-  }).sort((a: any, b: any) => {
+  })).sort((a: any, b: any) => {
     if (sortBy === "price-high") return b.price - a.price;
     if (sortBy === "price-low") return a.price - b.price;
     if (sortBy === "newest") {
