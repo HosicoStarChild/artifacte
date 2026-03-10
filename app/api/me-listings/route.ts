@@ -137,7 +137,9 @@ function transformCCListing(item: any) {
     ccCategory: correctedCategory,
     ccId: item.id,
     insuredValue: item.insuredValue ? parseFloat(String(item.insuredValue)) : undefined,
-    ccUrl: item.nftAddress ? `https://collectorcrypt.com/marketplace/${item.nftAddress}` : undefined,
+    gradingId: item.gradingID || item.gradingId || undefined,
+    vaultId: item.vaultId || undefined,
+    serialNumber: item.serial || undefined,
   };
 }
 

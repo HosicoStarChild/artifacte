@@ -10,6 +10,7 @@ import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
+import PriceHistory from "@/components/PriceHistory";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -284,6 +285,13 @@ export default function CardDetailPage() {
               </div>
             </div>
 
+            {/* Oracle Price History */}
+            <PriceHistory 
+              cardName={card.name} 
+              category={card.category} 
+              grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined} 
+            />
+
             {/* NFT Details */}
             <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
               <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">NFT Details</h3>
@@ -318,16 +326,7 @@ export default function CardDetailPage() {
                     View on Explorer →
                   </a>
                 )}
-                {card.ccUrl && (
-                  <a
-                    href={card.ccUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-gold-500 hover:text-gold-400 transition"
-                  >
-                    View on Collector Crypt →
-                  </a>
-                )}
+{/* CC link removed */}
               </div>
             </div>
           </div>
