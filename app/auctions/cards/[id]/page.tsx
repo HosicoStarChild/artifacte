@@ -298,12 +298,7 @@ export default function CardDetailPage() {
                     <p className="text-white text-xs font-mono break-all">{card.nftAddress}</p>
                   </div>
                 )}
-                {card.ccId && (
-                  <div>
-                    <p className="text-gray-500 text-xs mb-1">Collector Crypt ID</p>
-                    <p className="text-white text-xs font-mono">{card.ccId}</p>
-                  </div>
-                )}
+{/* CC ID removed */}
                 {card.seller && (
                   <div>
                     <p className="text-gray-500 text-xs mb-1">Seller</p>
