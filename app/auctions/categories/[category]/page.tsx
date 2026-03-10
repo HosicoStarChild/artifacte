@@ -60,7 +60,34 @@ export default function CategoryAuctionsPage() {
   useEffect(() => {
     if (!useMeApi || !category) return;
     setMeLoading(true);
-    fetch(`/api/me-listings?category=${category}&perPage=10000`)
+    // Server-side filtering + pagination
+    const params = new URLSearchParams({
+      category,
+      perPage: String(ITEMS_PER_PAGE),
+      page: String(page),
+      sort: sortBy === 'price-high' ? 'price-desc' : sortBy === 'price-low' ? 'price-asc' : 'price-desc',
+    });
+    // Pass filters to server
+    const tcgFilter = filters['tcg'];
+    if (tcgFilter && tcgFilter !== 'All') {
+      const ccCatMap: Record<string, string> = {
+        'pokemon': 'Pokemon',
+        'one piece': 'One Piece',
+        'yu-gi-oh': 'Yu-Gi-Oh,Yu-Gi-Oh!',
+        'magic': 'Magic: The Gathering',
+        'dragon ball z': 'Dragon Ball Z,Dragon Ball Super',
+        'lorcana': 'Lorcana',
+      };
+      const mapped = ccCatMap[tcgFilter.toLowerCase()];
+      if (mapped) params.set('ccCategory', mapped);
+    }
+    const gradeFilter = filters['grade'];
+    if (gradeFilter && gradeFilter !== 'All') params.set('grade', gradeFilter);
+    if (currencyFilter !== 'All') params.set('currency', currencyFilter);
+    const searchFilter = filters['search'];
+    if (searchFilter) params.set('q', searchFilter);
+
+    fetch(`/api/me-listings?${params}`)
       .then(r => r.json())
       .then(data => {
         setMeListings(data.listings || []);
@@ -68,7 +95,7 @@ export default function CategoryAuctionsPage() {
         setMeLoading(false);
       })
       .catch(() => setMeLoading(false));
-  }, [useMeApi, category]);
+  }, [useMeApi, category, filters, currencyFilter, page, sortBy]);
 
   // Use ME listings for TCG/Sports, static for everything else
   const listings = useMeApi ? meListings : staticListings;
@@ -443,9 +470,12 @@ export default function CategoryAuctionsPage() {
               </div>
             ) : categoryListings.length > 0 ? (
               <>
-              {categoryListings.length > ITEMS_PER_PAGE && (
+              {(() => {
+                const totalItems = useMeApi ? meTotal : categoryListings.length;
+                const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+                return totalItems > ITEMS_PER_PAGE ? (
                 <div className="flex items-center justify-between mb-6">
-                  <p className="text-gray-400 text-sm">{categoryListings.length.toLocaleString()} items</p>
+                  <p className="text-gray-400 text-sm">{totalItems.toLocaleString()} items</p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { setPage(Math.max(1, page - 1)); window.scrollTo(0, 0); }}
@@ -455,20 +485,20 @@ export default function CategoryAuctionsPage() {
                       ← Prev
                     </button>
                     <span className="text-gray-400 text-sm px-2">
-                      Page {page} of {Math.ceil(categoryListings.length / ITEMS_PER_PAGE)}
+                      Page {page} of {totalPages}
                     </span>
                     <button
-                      onClick={() => { setPage(Math.min(Math.ceil(categoryListings.length / ITEMS_PER_PAGE), page + 1)); window.scrollTo(0, 0); }}
-                      disabled={page >= Math.ceil(categoryListings.length / ITEMS_PER_PAGE)}
+                      onClick={() => { setPage(Math.min(totalPages, page + 1)); window.scrollTo(0, 0); }}
+                      disabled={page >= totalPages}
                       className="px-3 py-1.5 bg-dark-800 border border-white/10 rounded text-sm text-white disabled:opacity-30 hover:border-gold-500 transition"
                     >
                       Next →
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null; })()}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                {categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((l) => {
+                {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const usd1Amount = l.price.toLocaleString();
                   return (
                     <div
@@ -552,7 +582,10 @@ export default function CategoryAuctionsPage() {
                   );
                 })}
               </div>
-              {categoryListings.length > ITEMS_PER_PAGE && (
+              {(() => {
+                const totalItems = useMeApi ? meTotal : categoryListings.length;
+                const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+                return totalItems > ITEMS_PER_PAGE ? (
                 <div className="flex items-center justify-center gap-2 mt-10">
                   <button
                     onClick={() => { setPage(Math.max(1, page - 1)); window.scrollTo(0, 0); }}
@@ -562,16 +595,17 @@ export default function CategoryAuctionsPage() {
                     ← Prev
                   </button>
                   <span className="text-gray-400 text-sm px-4">
-                    Page {page} of {Math.ceil(categoryListings.length / ITEMS_PER_PAGE)}
+                    Page {page} of {totalPages}
                   </span>
                   <button
-                    onClick={() => { setPage(Math.min(Math.ceil(categoryListings.length / ITEMS_PER_PAGE), page + 1)); window.scrollTo(0, 0); }}
-                    disabled={page >= Math.ceil(categoryListings.length / ITEMS_PER_PAGE)}
+                    onClick={() => { setPage(Math.min(totalPages, page + 1)); window.scrollTo(0, 0); }}
+                    disabled={page >= totalPages}
                     className="px-4 py-2 bg-dark-800 border border-white/10 rounded text-sm text-white disabled:opacity-30 hover:border-gold-500 transition"
                   >
                     Next →
                   </button>
                 </div>
+              ) : null; })()}
               )}
               </>
             ) : (
