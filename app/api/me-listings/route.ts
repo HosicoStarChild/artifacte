@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   try {
     const res = await fetch(`${ORACLE_API}/api/listings?${params}`, {
       signal: AbortSignal.timeout(15000),
-      next: { revalidate: 10 }, // ISR: revalidate every 10s
+      cache: 'no-store', // Don't cache — Railway is fast, each request has unique filters
     });
 
     if (!res.ok) {
