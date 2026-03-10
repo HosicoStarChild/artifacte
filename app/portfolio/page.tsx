@@ -47,6 +47,22 @@ interface PortfolioData {
   error?: string;
 }
 
+interface HeliumAsset {
+  id: string;
+  content?: {
+    metadata?: {
+      name: string;
+    };
+    links?: {
+      image?: string;
+    };
+  };
+  grouping?: Array<{
+    group_key: string;
+    group_value: string;
+  }>;
+}
+
 type FilterType = "all" | "listed" | "unlisted";
 
 const getGradeBgColor = (company: string): string => {
@@ -75,16 +91,36 @@ const formatFullPrice = (num: number): string => {
   })}`;
 };
 
+const formatSolPrice = (num: number): string => {
+  return `◎${num.toFixed(2)}`;
+};
+
 export default function PortfolioPage() {
   const { publicKey, connected } = useWallet();
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [floorPrices, setFloorPrices] = useState<Record<string, { name: string; floor: number }>>({});
+  const [digitalCollectiblesValue, setDigitalCollectiblesValue] = useState(0);
+  
+  // Whitelisted collection addresses for digital collectibles
+  const WHITELISTED_COLLECTIONS = new Set([
+    "J1S9H3QjnRtBbbuD4HjPV6RpRhwuk4zKbxsnCHuTgh9w", // Mad Lads
+    "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH", // SMB Gen3
+    "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W", // SMB Gen2
+    "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac", // Famous Fox Federation
+    "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK", // Claynosaurz
+    "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r", // Taiyo Robotics
+    "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ", // Claynosaurz: Call of Saga
+    "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q", // Galactic Gecko
+    "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H", // little swag world
+  ]);
 
   useEffect(() => {
     if (!connected || !publicKey) {
       setPortfolioData(null);
+      setDigitalCollectiblesValue(0);
       return;
     }
 
@@ -96,7 +132,58 @@ export default function PortfolioPage() {
 
       try {
         const wallet = publicKey!.toBase58();
-        const response = await fetch(`/api/portfolio?wallet=${wallet}`);
+        const [response, floorRes, nftRes] = await Promise.all([
+          fetch(`/api/portfolio?wallet=${wallet}`),
+          fetch('/api/floor-prices').catch(() => null),
+          fetch("https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: "my-id",
+              method: "getAssetsByOwner",
+              params: {
+                ownerAddress: wallet,
+                page: 1,
+                limit: 1000,
+              },
+            }),
+          }).catch(() => null),
+        ]);
+
+        // Process floor prices
+        if (floorRes?.ok) {
+          const floorData = await floorRes.json();
+          if (floorData.collections) setFloorPrices(floorData.collections);
+        }
+
+        // Process NFT data and calculate digital collectibles value
+        if (nftRes?.ok) {
+          const nftData = await nftRes.json();
+          if (nftData.result?.items) {
+            const collectionCounts: Record<string, number> = {};
+            
+            nftData.result.items.forEach((asset: HeliumAsset) => {
+              const grouping = asset.grouping?.find(g => g.group_key === "collection");
+              if (grouping && WHITELISTED_COLLECTIONS.has(grouping.group_value)) {
+                collectionCounts[grouping.group_value] = (collectionCounts[grouping.group_value] || 0) + 1;
+              }
+            });
+
+            // Calculate total digital collectibles value in SOL
+            let totalDigitalValue = 0;
+            Object.entries(collectionCounts).forEach(([collection, count]) => {
+              const floorPrice = floorPrices[collection];
+              if (floorPrice) {
+                totalDigitalValue += count * floorPrice.floor;
+              }
+            });
+
+            if (!cancelled) {
+              setDigitalCollectiblesValue(totalDigitalValue);
+            }
+          }
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch portfolio data");
@@ -198,11 +285,20 @@ export default function PortfolioPage() {
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
                     Market Value
                   </p>
-                  <h2 className="font-serif text-5xl text-gold-400 font-bold mb-2">
-                    {formatFullPrice(portfolioData.totalListedValue || 0)}
-                  </h2>
+                  <div className="mb-2">
+                    <h2 className="font-serif text-5xl text-gold-400 font-bold">
+                      {formatFullPrice(portfolioData.totalListedValue || 0)}
+                    </h2>
+                    {digitalCollectiblesValue > 0 && (
+                      <p className="font-serif text-3xl text-blue-400 font-bold mt-2">
+                        {formatSolPrice(digitalCollectiblesValue)}
+                      </p>
+                    )}
+                  </div>
                   <p className="text-gray-600 text-xs">
-                    Powered by Artifacte Oracle
+                    {digitalCollectiblesValue > 0 
+                      ? "RWA & Digital Collectibles"
+                      : "Powered by Artifacte Oracle"}
                   </p>
                 </div>
                 <div className="hidden md:block w-px h-16 bg-white/10" />
@@ -293,7 +389,10 @@ export default function PortfolioPage() {
 
               {/* Portfolio Value by Category (Oracle) */}
               {(() => {
-                const catValues = portfolioData.marketCategoriesByValue || {};
+                const catValues = { ...(portfolioData?.marketCategoriesByValue || {}) };
+                if (digitalCollectiblesValue > 0) {
+                  catValues["Digital Collectibles"] = digitalCollectiblesValue;
+                }
                 const maxVal = Math.max(...Object.values(catValues), 1);
                 return Object.keys(catValues).length > 0 ? (
                   <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
@@ -301,7 +400,9 @@ export default function PortfolioPage() {
                       Portfolio Value by Category
                     </h3>
                     <p className="text-gray-500 text-xs mb-4">
-                      Powered by the Artifacte Oracle
+                      {digitalCollectiblesValue > 0 
+                        ? "RWA via Artifacte Oracle & Digital Collectibles Floor Prices"
+                        : "Powered by the Artifacte Oracle"}
                     </p>
                     <div className="space-y-4">
                       {Object.entries(catValues)
@@ -310,11 +411,17 @@ export default function PortfolioPage() {
                           <div key={category}>
                             <div className="flex justify-between items-center mb-2">
                               <p className="text-sm text-gray-300">{category}</p>
-                              <p className="text-xs text-gold-400 font-semibold">{formatCurrency(value)}</p>
+                              <p className={`text-xs font-semibold ${category === "Digital Collectibles" ? "text-blue-400" : "text-gold-400"}`}>
+                                {category === "Digital Collectibles" ? formatSolPrice(value) : formatCurrency(value)}
+                              </p>
                             </div>
                             <div className="w-full bg-dark-900 rounded-full h-2">
                               <div
-                                className="bg-gradient-to-r from-gold-400 to-gold-600 h-2 rounded-full transition-all duration-500"
+                                className={`h-2 rounded-full transition-all duration-500 ${
+                                  category === "Digital Collectibles"
+                                    ? "bg-gradient-to-r from-blue-400 to-blue-600"
+                                    : "bg-gradient-to-r from-gold-400 to-gold-600"
+                                }`}
                                 style={{ width: `${(value / maxVal) * 100}%` }}
                               />
                             </div>
