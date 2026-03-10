@@ -201,7 +201,7 @@ export default function PortfolioPage() {
                     {formatFullPrice(portfolioData.totalListedValue || 0)}
                   </h2>
                   <p className="text-gray-600 text-xs">
-                    Based on current listing prices
+                    Powered by Artifacte Oracle
                   </p>
                 </div>
                 <div className="hidden md:block w-px h-16 bg-white/10" />
