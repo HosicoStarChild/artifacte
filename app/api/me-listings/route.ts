@@ -5,8 +5,8 @@ const COLLECTION = 'collector_crypt';
 const PAGE_SIZE = 20;
 const MARKUP = 1.05; // 5% markup
 const CACHE_TTL = 5 * 60 * 1000; // 5 min
-const PARALLEL = 20; // 20 concurrent ME requests per round
-const ROUND_DELAY = 500; // ms between rounds
+const PARALLEL = 10; // 10 concurrent ME requests per round
+const ROUND_DELAY = 300; // ms between rounds
 
 // In-memory cache
 let cachedListings: any[] | null = null;
