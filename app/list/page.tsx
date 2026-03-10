@@ -368,18 +368,6 @@ export default function ListNFTPage() {
                 </div>
               )}
 
-              {/* Description */}
-              <div className="mb-6">
-                <label className="block text-sm text-gray-400 mb-1.5 font-medium">Description (optional)</label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition resize-none"
-                  placeholder="Add any details about this NFT..."
-                />
-              </div>
-
               {/* Fee info */}
               <div className="bg-dark-700 rounded-lg p-4 mb-6 border border-white/5">
                 <p className="text-gray-400 text-xs font-medium mb-2">Fee Summary</p>

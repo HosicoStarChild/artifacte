@@ -103,6 +103,7 @@ export default function PortfolioPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [floorPrices, setFloorPrices] = useState<Record<string, { name: string; floor: number }>>({});
   const [digitalCollectiblesValue, setDigitalCollectiblesValue] = useState(0);
+  const [digitalNfts, setDigitalNfts] = useState<Array<{ id: string; name: string; image: string; collection: string; floorPrice: number }>>([]);
   
   // Whitelisted collection addresses for digital collectibles
   const WHITELISTED_COLLECTIONS = new Set([
@@ -165,26 +166,29 @@ export default function PortfolioPage() {
         if (nftRes?.ok) {
           const nftData = await nftRes.json();
           if (nftData.result?.items) {
-            const collectionCounts: Record<string, number> = {};
+            // Build digital NFTs list with floor prices
+            let totalDigitalValue = 0;
+            const digitalItems: typeof digitalNfts = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
               const grouping = asset.grouping?.find(g => g.group_key === "collection");
               if (grouping && WHITELISTED_COLLECTIONS.has(grouping.group_value)) {
-                collectionCounts[grouping.group_value] = (collectionCounts[grouping.group_value] || 0) + 1;
-              }
-            });
-
-            // Calculate total digital collectibles value in SOL
-            let totalDigitalValue = 0;
-            Object.entries(collectionCounts).forEach(([collection, count]) => {
-              const fp = localFloorPrices[collection];
-              if (fp) {
-                totalDigitalValue += count * fp.floor;
+                const fp = localFloorPrices[grouping.group_value];
+                const floor = fp?.floor || 0;
+                totalDigitalValue += floor;
+                digitalItems.push({
+                  id: asset.id,
+                  name: asset.content?.metadata?.name || "Unknown",
+                  image: asset.content?.links?.image || "",
+                  collection: fp?.name || grouping.group_value.slice(0, 8),
+                  floorPrice: floor,
+                });
               }
             });
 
             if (!cancelled) {
               setDigitalCollectiblesValue(totalDigitalValue);
+              setDigitalNfts(digitalItems);
             }
           }
         }
@@ -237,6 +241,7 @@ export default function PortfolioPage() {
           Investor Profile
         </p>
         <h1 className="font-serif text-3xl text-white mb-2">My Portfolio</h1>
+        <a href="/" className="text-gold-400 hover:text-gold-300 text-sm mb-4 inline-block">← Home</a>
         <p className="text-gray-400 text-sm mb-8">
           {connected
             ? `${publicKey!.toBase58().slice(0, 4)}...${publicKey!.toBase58().slice(-4)} — RWAs & Digital Collectibles`
@@ -572,6 +577,34 @@ export default function PortfolioPage() {
                 </div>
               ))}
             </div>
+
+            {/* Digital Collectibles Grid */}
+            {digitalNfts.length > 0 && (
+              <div className="mt-12">
+                <h2 className="font-serif text-2xl text-white mb-6">Digital Collectibles</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {digitalNfts.map((nft) => (
+                    <div key={nft.id} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group">
+                      <div className="aspect-square overflow-hidden bg-dark-700">
+                        {nft.image ? (
+                          <img src={nft.image} alt={nft.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
+                        <p className="text-gray-500 text-[10px] mt-1">{nft.collection}</p>
+                        <div className="mt-3">
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Floor Price</p>
+                          <p className="text-blue-400 font-serif text-lg font-bold">◎ {nft.floorPrice.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* End of portfolio */}
           </>

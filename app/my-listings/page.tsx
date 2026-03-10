@@ -44,58 +44,8 @@ export default function MyListingsPage() {
     setLoading(true);
     setError("");
     try {
-      // In production, this would fetch from your backend
-      // For now, we'll use mock data filtered by seller address
-      const mockListings: MyListing[] = [
-        {
-          id: "ml1",
-          name: "Rare Digital Artwork",
-          image: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400",
-          category: "DIGITAL_ART",
-          price: 5.5,
-          status: "active",
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          endsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-          currentBid: 6.2,
-          bidsCount: 4,
-          seller: publicKey!.toBase58(),
-        },
-        {
-          id: "ml2",
-          name: "Vintage Sports Card",
-          image: "https://images.unsplash.com/photo-1518611505868-48aeb845e7c6?w=400",
-          category: "SPORTS_CARDS",
-          price: 2500,
-          status: "active",
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          endsAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-          currentBid: 2800,
-          bidsCount: 12,
-          seller: publicKey!.toBase58(),
-        },
-        {
-          id: "ml3",
-          name: "Collector's Watch",
-          image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400",
-          category: "WATCHES",
-          price: 8500,
-          status: "completed",
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          seller: publicKey!.toBase58(),
-        },
-        {
-          id: "ml4",
-          name: "TCG Holographic Card",
-          image: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=400",
-          category: "TCG_CARDS",
-          price: 1200,
-          status: "cancelled",
-          createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-          seller: publicKey!.toBase58(),
-        },
-      ];
-
-      setMyListings(mockListings);
+      // No listings yet — will fetch from on-chain program in production
+      setMyListings([]);
     } catch (err: any) {
       setError(err.message || "Failed to fetch listings");
     } finally {
