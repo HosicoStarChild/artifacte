@@ -52,7 +52,7 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
         // Step 1: Search for the card/asset using oracle search API
         const searchResponse = await fetch(
           `/api/oracle?endpoint=search&q=${encodeURIComponent(cardName)}`,
-          { method: "GET", signal: AbortSignal.timeout(10000) }
+          { method: "GET", signal: AbortSignal.timeout(30000) }
         );
 
         if (!searchResponse.ok) {
@@ -97,7 +97,7 @@ export default function PriceHistory({ cardName, category, grade }: PriceHistory
 
             const statsResponse = await fetch(
               `/api/oracle?endpoint=transactions&${statsParams.toString()}`,
-              { method: "GET", signal: AbortSignal.timeout(8000) }
+              { method: "GET", signal: AbortSignal.timeout(30000) }
             );
 
             if (statsResponse.ok) {

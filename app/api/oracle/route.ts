@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ORACLE_API = "https://artifacte-oracle-production.up.railway.app";
-const TIMEOUT_MS = 10000;
+const TIMEOUT_MS = 45000;
+
+export const maxDuration = 60;
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
