@@ -75,7 +75,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: "Digital Art", emoji: "🎨", slug: "digital-art", href: "/digital-art" },
+                { name: "Digital Collectibles", emoji: "🎨", slug: "digital-art", href: "/digital-art" },
                 { name: "Spirits", emoji: "🥃", slug: "spirits", href: "/auctions/categories/spirits" },
                 { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards", href: "/auctions/categories/tcg-cards" },
                 { name: "Sports Cards", emoji: "⚽", slug: "sports-cards", href: "/auctions/categories/sports-cards" },
