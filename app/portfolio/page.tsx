@@ -292,24 +292,31 @@ export default function PortfolioPage() {
               <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 mb-8">
                 <div className="text-center">
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
-                    Market Value
+                    RWA Market Value
                   </p>
-                  <div className="mb-2">
-                    <h2 className="font-serif text-5xl text-gold-400 font-bold">
-                      {formatFullPrice(portfolioData.totalListedValue || 0)}
-                    </h2>
-                    {digitalCollectiblesValue > 0 && (
-                      <p className="font-serif text-3xl text-blue-400 font-bold mt-2">
-                        {formatSolPrice(digitalCollectiblesValue)}
-                      </p>
-                    )}
-                  </div>
+                  <h2 className="font-serif text-5xl text-gold-400 font-bold mb-2">
+                    {formatFullPrice(portfolioData.totalListedValue || 0)}
+                  </h2>
                   <p className="text-gray-600 text-xs">
-                    {digitalCollectiblesValue > 0 
-                      ? "RWA & Digital Collectibles"
-                      : "Powered by Artifacte Oracle"}
+                    Powered by Artifacte Oracle
                   </p>
                 </div>
+                {digitalCollectiblesValue > 0 && (
+                  <>
+                    <div className="hidden md:block w-px h-16 bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
+                        Digital Collectibles
+                      </p>
+                      <h2 className="font-serif text-5xl text-blue-400 font-bold mb-2">
+                        {formatSolPrice(digitalCollectiblesValue)}
+                      </h2>
+                      <p className="text-gray-600 text-xs">
+                        Floor price via Magic Eden
+                      </p>
+                    </div>
+                  </>
+                )}
                 <div className="hidden md:block w-px h-16 bg-white/10" />
                 <div className="text-center">
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-1">
