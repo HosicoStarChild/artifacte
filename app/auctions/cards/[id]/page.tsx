@@ -292,7 +292,8 @@ export default function CardDetailPage() {
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
-              grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined} 
+              grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
+              year={card.year}
             />
             )}
 

@@ -10,34 +10,39 @@ import { useState, useEffect } from "react";
  *   → "OP05-119"
  */
 function buildSearchQuery(name: string): string {
-  // Try to extract card number like #OP05-119, #150/XY-P, #4, SV06-061
-  const cardNumMatch = name.match(/#?((?:OP|ST|EB|PRB?|SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d+[-/]?\d+[-/]?[A-Z]*\d*)/i);
-  if (cardNumMatch) {
-    return cardNumMatch[1];
-  }
-
-  // Try OP/set format without # prefix
-  const opMatch = name.match(/\b(OP\d+-\d+)\b/i);
+  // 1. Extract card number like #OP05-119, OP11-118, ST01-012
+  const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i);
   if (opMatch) return opMatch[1];
 
-  // Strip common noise words and grading info
+  // 2. Extract Pokemon set codes: SV06-061, SWSH12-150, XY-150
+  const pkMatch = name.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d*[-/]\d+[-/]?[A-Z]*)/i);
+  if (pkMatch) return pkMatch[1];
+
+  // 3. Extract card number with # prefix: #4, #118, #150/XY-P
+  const hashMatch = name.match(/#(\d+(?:\/[\w-]+)?)/);
+  if (hashMatch) {
+    // Include character name for disambiguation
+    const charMatch = name.match(/\b(Charizard|Pikachu|Luffy|Zoro|Nami|Gengar|Mewtwo|Blastoise|Venusaur|Mew)\b/i);
+    const setMatch = name.match(/\b(Base Set|Jungle|Fossil|Team Rocket|Neo|Gym|Skyridge|Aquapolis|Expedition)\b/i);
+    const parts = [hashMatch[1]];
+    if (charMatch) parts.unshift(charMatch[1]);
+    if (setMatch) parts.push(setMatch[1]);
+    return parts.join(' ');
+  }
+
+  // 4. Clean up name for freetext search
   let q = name
-    .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '') // Remove grades
+    .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
     .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '')
-    .replace(/\b(Holo|Reverse Holo|Full Art|Alt Art|Secret Rare|Rare|Common|Uncommon)\b/gi, '')
-    .replace(/#\d+\/?\w*/g, (m) => m) // Keep card numbers
-    .replace(/\b\d{4}\b/g, '') // Remove years
-    .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes)\b/gi, '')
-    .replace(/\b(Japanese|English|Chinese|Korean)\b/gi, '')
-    .replace(/\b(1st Edition|Unlimited|Shadowless)\b/gi, '')
+    .replace(/\b\d{4}\b/g, '') // years
+    .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes|TCG)\b/gi, '')
+    .replace(/\b(Japanese|English|Chinese|Korean|JPN|EN)\b/gi, '')
+    .replace(/\b(1st Edition|Unlimited|Shadowless|Holo|Reverse)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  // If still too long, take first 5 meaningful words
   const words = q.split(' ').filter(w => w.length > 2);
-  if (words.length > 6) {
-    q = words.slice(0, 6).join(' ');
-  }
+  if (words.length > 5) q = words.slice(0, 5).join(' ');
 
   return q || name.slice(0, 50);
 }
@@ -46,9 +51,10 @@ interface PriceHistoryProps {
   cardName?: string;
   category?: string;
   grade?: string;
+  year?: number | string;
 }
 
-export default function PriceHistory({ cardName, category, grade }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, category, grade, year }: PriceHistoryProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartUrl, setChartUrl] = useState<string | null>(null);
