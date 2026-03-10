@@ -210,6 +210,12 @@ export default function CardDetailPage() {
                     <p className="text-white text-sm font-medium">{card.year}</p>
                   </div>
                 )}
+                {card.gradingId && (
+                  <div className="col-span-2">
+                    <p className="text-gray-500 text-xs mb-1">Certificate #</p>
+                    <p className="text-white text-sm font-mono">{card.gradingId}</p>
+                  </div>
+                )}
               </div>
             </div>
 

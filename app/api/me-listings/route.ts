@@ -76,6 +76,9 @@ function transformMEListing(item: any) {
     ccId,
     insuredValue: insuredValue ? parseFloat(insuredValue) : undefined,
     seller: item.seller,
+    gradingId: getAttr(attrs, 'Grading ID') || undefined,
+    vaultId: getAttr(attrs, 'Vault ID') || undefined,
+    serialNumber: getAttr(attrs, 'Serial Number') || undefined,
   };
 }
 
