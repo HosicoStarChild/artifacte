@@ -348,18 +348,18 @@ export default function PortfolioPage() {
                   <p className="text-gray-600 text-xs mt-1">Floor-priced NFTs</p>
                 </div>
 
-                {/* Total Portfolio */}
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
-                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
-                  <p className="font-serif text-2xl text-white font-bold">{portfolioData.totalCards + digitalNfts.length}</p>
-                  <p className="text-gray-600 text-xs mt-1">RWAs + Digital</p>
-                </div>
-
                 {/* On Marketplace */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">On Marketplace</p>
                   <p className="font-serif text-2xl text-gold-400 font-bold">{portfolioData.listedCards}</p>
                   <p className="text-gray-600 text-xs mt-1">Cards listed</p>
+                </div>
+
+                {/* Total Portfolio */}
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
+                  <p className="font-serif text-2xl text-white font-bold">{portfolioData.totalCards + digitalNfts.length}</p>
+                  <p className="text-gray-600 text-xs mt-1">RWAs + Digital</p>
                 </div>
               </div>
 
