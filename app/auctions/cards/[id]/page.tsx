@@ -164,11 +164,7 @@ export default function CardDetailPage() {
                 </p>
                 <span className="text-gold-500 text-sm font-medium">{card.currency}</span>
               </div>
-              {card.ccPrice && (
-                <p className="text-gray-600 text-xs mb-4">
-                  Original: {card.currency === 'SOL' ? `◎ ${card.ccPrice}` : `$${card.ccPrice.toLocaleString()}`} + 5% platform fee
-                </p>
-              )}
+{/* price markup info removed */}
 
               {connected ? (
                 <button
