@@ -47,7 +47,9 @@ function transformMEListing(item: any) {
   const insuredValue = getAttr(attrs, 'Insured Value');
   const ccId = getAttr(attrs, 'Collector Crypt ID') || item.tokenMint;
   const location = getAttr(attrs, 'Location') || '';
-  const category = categoryMap[ccCategory] || 'TCG_CARDS';
+  const itemType = getAttr(attrs, 'Type') || 'Card';
+  // Sealed and Merch get their own category regardless of ccCategory
+  const category = itemType === 'Sealed' ? 'SEALED' : (categoryMap[ccCategory] || 'TCG_CARDS');
 
   const solPrice = item.price;
   const markupPrice = Math.round(solPrice * MARKUP * 10000) / 10000;
@@ -103,7 +105,9 @@ function transformCCListing(item: any) {
 
   const markupPrice = Math.ceil(basePrice * MARKUP * 100) / 100;
   const correctedCategory = fixCcCategory(item.itemName || '', item.category || '');
-  const category = categoryMap[correctedCategory] || 'TCG_CARDS';
+  const name = (item.itemName || '').toLowerCase();
+  const isSealed = /booster (box|pack|bundle)|sealed|etb|elite trainer box|display box/i.test(name);
+  const category = isSealed ? 'SEALED' : (categoryMap[correctedCategory] || 'TCG_CARDS');
 
   const gradingCompany = item.gradingCompany || '';
   const gradeNum = item.gradeNum;

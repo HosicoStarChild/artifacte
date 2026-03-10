@@ -32,6 +32,7 @@ const categoryEmojis: Record<string, string> = {
   "tcg-cards": "🃏",
   "sports-cards": "⚽",
   "watches": "⌚",
+  "sealed": "📦",
 };
 
 export default function CategoryAuctionsPage() {
@@ -54,7 +55,7 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED";
 
   useEffect(() => {
     if (!useMeApi || !category) return;
@@ -93,6 +94,9 @@ export default function CategoryAuctionsPage() {
     ],
     DIGITAL_ART: [
       { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
+    ],
+    SEALED: [
+      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     ],
   };
 
