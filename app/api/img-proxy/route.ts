@@ -12,8 +12,15 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Domain not allowed", { status: 403 });
   }
 
+  // Rewrite arweave.net to Irys gateway (arweave subdomain gateway returns 404)
+  let fetchUrl = url;
+  const arweaveMatch = url.match(/https?:\/\/(?:www\.)?arweave\.net\/([a-zA-Z0-9_-]+)/);
+  if (arweaveMatch) {
+    fetchUrl = `https://gateway.irys.xyz/${arweaveMatch[1]}`;
+  }
+
   try {
-    const res = await fetch(url, {
+    const res = await fetch(fetchUrl, {
       headers: { "Accept": "image/*" },
       redirect: "follow",
     });
