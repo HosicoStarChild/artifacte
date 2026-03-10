@@ -89,13 +89,13 @@ export function HomeTCGSection() {
 
   useEffect(() => {
     // Fetch top One Piece cards
-    fetch('/api/me-listings?ccCategory=One Piece&sort=price-desc&perPage=8')
+    fetch('/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8')
       .then(r => r.json())
       .then(data => setOnePiece(data.listings || []))
       .catch(() => {});
 
     // Fetch top Pokemon cards
-    fetch('/api/me-listings?ccCategory=Pokemon&sort=price-desc&perPage=10')
+    fetch('/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10')
       .then(r => r.json())
       .then(data => setPokemon(data.listings || []))
       .catch(() => {});
