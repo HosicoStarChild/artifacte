@@ -152,9 +152,13 @@ export default function PortfolioPage() {
         ]);
 
         // Process floor prices
+        let localFloorPrices: Record<string, { name: string; floor: number }> = {};
         if (floorRes?.ok) {
           const floorData = await floorRes.json();
-          if (floorData.collections) setFloorPrices(floorData.collections);
+          if (floorData.collections) {
+            localFloorPrices = floorData.collections;
+            setFloorPrices(localFloorPrices);
+          }
         }
 
         // Process NFT data and calculate digital collectibles value
@@ -173,9 +177,9 @@ export default function PortfolioPage() {
             // Calculate total digital collectibles value in SOL
             let totalDigitalValue = 0;
             Object.entries(collectionCounts).forEach(([collection, count]) => {
-              const floorPrice = floorPrices[collection];
-              if (floorPrice) {
-                totalDigitalValue += count * floorPrice.floor;
+              const fp = localFloorPrices[collection];
+              if (fp) {
+                totalDigitalValue += count * fp.floor;
               }
             });
 
