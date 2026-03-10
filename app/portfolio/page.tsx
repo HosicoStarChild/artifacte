@@ -427,47 +427,7 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Summary Footer */}
-            <div className="border-t border-white/5 pt-8 mt-8">
-              <p className="text-gray-600 text-xs mb-4">
-                All values shown are Collector Crypt insured valuations. Oracle
-                market pricing will be integrated soon.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Total Insured Value
-                  </p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">
-                    {formatFullPrice(portfolioData.totalInsuredValue)}
-                  </p>
-                </div>
-
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Average Card Insured Value
-                  </p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">
-                    {formatCurrency(
-                      portfolioData.totalInsuredValue /
-                        portfolioData.totalCards
-                    )}
-                  </p>
-                </div>
-
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                  <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase mb-2">
-                    Unlisted Insured Value
-                  </p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">
-                    {formatCurrency(
-                      portfolioData.totalInsuredValue -
-                        portfolioData.totalListedValue
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* End of portfolio */}
           </>
         )}
       </div>
