@@ -46,7 +46,7 @@ function TCGCarousel({ title, emoji, items, bg }: { title: string; emoji: string
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
               {items.map((l) => (
-                <Link key={l.id} href="/auctions/categories/tcg-cards" className="flex-shrink-0 w-72 snap-start group">
+                <Link key={l.id} href={`/auctions/cards/${l.id}`} className="flex-shrink-0 w-72 snap-start group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
                     <div className="aspect-square overflow-hidden bg-dark-900">
                       <img

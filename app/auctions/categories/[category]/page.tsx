@@ -472,6 +472,7 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : '#'} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900">
                         <img
                           src={l.image}
@@ -479,6 +480,7 @@ export default function CategoryAuctionsPage() {
                           className={`w-full h-full ${l.source === 'collector-crypt' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                         />
                       </div>
+                      </Link>
                       {/* Details */}
                       <div className="p-6 flex-1 flex flex-col justify-between">
                         <div>
