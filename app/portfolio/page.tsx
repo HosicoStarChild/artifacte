@@ -363,44 +363,6 @@ export default function PortfolioPage() {
                 </div>
               </div>
 
-              {/* Portfolio Value by Category Chart */}
-              {Object.keys(portfolioData.categoriesByValue).length > 0 && (
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
-                  <h3 className="font-serif text-lg text-white mb-2">
-                    Insured Value by Category
-                  </h3>
-                  <p className="text-gray-500 text-xs mb-4">
-                    Based on Collector Crypt valuations
-                  </p>
-                  <div className="space-y-4">
-                    {Object.entries(portfolioData.categoriesByValue)
-                      .sort(([, a], [, b]) => b - a)
-                      .slice(0, 10)
-                      .map(([category, value]) => {
-                        const percentage = (value / maxCategoryValue) * 100;
-                        return (
-                          <div key={category}>
-                            <div className="flex justify-between items-center mb-2">
-                              <p className="text-sm text-gray-300">
-                                {category}
-                              </p>
-                              <p className="text-xs text-white/40 font-semibold">
-                                {formatCurrency(value)}
-                              </p>
-                            </div>
-                            <div className="w-full bg-dark-900 rounded-full h-2">
-                              <div
-                                className="bg-gradient-to-r from-white/30 to-white/50 h-2 rounded-full transition-all duration-500"
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
               {/* Portfolio Value by Category (Oracle) */}
               {(() => {
                 const catValues = { ...(portfolioData?.marketCategoriesByValue || {}) };
@@ -445,6 +407,40 @@ export default function PortfolioPage() {
                   </div>
                 ) : null;
               })()}
+
+              {/* Insured Value by Category */}
+              {Object.keys(portfolioData.categoriesByValue).length > 0 && (
+                <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
+                  <h3 className="font-serif text-lg text-white mb-2">
+                    Insured Value by Category
+                  </h3>
+                  <p className="text-gray-500 text-xs mb-4">
+                    Based on Collector Crypt valuations
+                  </p>
+                  <div className="space-y-4">
+                    {Object.entries(portfolioData.categoriesByValue)
+                      .sort(([, a], [, b]) => b - a)
+                      .slice(0, 10)
+                      .map(([category, value]) => {
+                        const percentage = (value / maxCategoryValue) * 100;
+                        return (
+                          <div key={category}>
+                            <div className="flex justify-between items-center mb-2">
+                              <p className="text-sm text-gray-300">{category}</p>
+                              <p className="text-xs text-white/40 font-semibold">{formatCurrency(value)}</p>
+                            </div>
+                            <div className="w-full bg-dark-900 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-white/30 to-white/50 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
               {/* Grade Distribution */}
               {Object.keys(portfolioData.gradeDistribution).length > 0 && (
