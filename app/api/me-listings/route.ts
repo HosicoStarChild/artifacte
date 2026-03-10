@@ -90,26 +90,36 @@ async function fetchPage(offset: number): Promise<any[]> {
 async function fetchAllFromME(): Promise<any[]> {
   const all: any[] = [];
   let offset = 0;
+  let emptyRounds = 0;
 
   while (offset < 15000) {
     const offsets = Array.from({ length: PARALLEL }, (_, i) => offset + i * PAGE_SIZE);
     const batches = await Promise.all(offsets.map(fetchPage));
 
-    let hitEnd = false;
+    let roundItems = 0;
+    let lastBatchShort = false;
     for (const batch of batches) {
-      if (!batch.length) { hitEnd = true; break; }
+      if (!Array.isArray(batch)) continue;
       for (const item of batch) {
         if (item.token?.image && item.price > 0) {
           all.push(transformListing(item));
+          roundItems++;
         }
       }
-      if (batch.length < PAGE_SIZE) { hitEnd = true; break; }
+      if (batch.length < PAGE_SIZE) lastBatchShort = true;
     }
 
-    if (hitEnd) break;
-    offset += PARALLEL * PAGE_SIZE;
+    if (roundItems === 0) {
+      emptyRounds++;
+      if (emptyRounds >= 2) break; // 2 consecutive empty rounds = done
+    } else {
+      emptyRounds = 0;
+    }
 
-    // Pause between rounds to avoid rate limiting
+    // If the last batch in the round was short, we've reached the end
+    if (lastBatchShort && roundItems > 0) break;
+
+    offset += PARALLEL * PAGE_SIZE;
     await new Promise(r => setTimeout(r, ROUND_DELAY));
   }
 
