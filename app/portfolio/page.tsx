@@ -601,8 +601,8 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Digital Collectibles Grid */}
-            {digitalNfts.length > 0 && (
+            {/* Digital Collectibles Grid — hide when "Listed" filter active */}
+            {digitalNfts.length > 0 && filter !== "listed" && (
               <div className="mt-12">
                 <h2 className="font-serif text-2xl text-white mb-6">Digital Collectibles</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
