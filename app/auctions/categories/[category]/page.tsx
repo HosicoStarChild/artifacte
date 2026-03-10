@@ -51,7 +51,7 @@ export default function CategoryAuctionsPage() {
   const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
   const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
-  const [meLoading, setMeLoading] = useState(false);
+  const [meLoading, setMeLoading] = useState(true);
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
