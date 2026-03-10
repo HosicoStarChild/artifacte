@@ -207,7 +207,7 @@ export default function ListNFTPage() {
           <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">List NFT</p>
           <h1 className="font-serif text-4xl text-white mb-3">List Your Digital Collectible</h1>
           <p className="text-gray-400 text-base">
-            Select an NFT from an approved collection and set your price. Listings are reviewed before going live.
+            Select an NFT from an approved collection and set your price.
           </p>
         </div>
 
@@ -398,10 +398,10 @@ export default function ListNFTPage() {
                     : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                 }`}
               >
-                {submitting ? "Submitting..." : "Submit for Review"}
+                {submitting ? "Listing..." : "List Item"}
               </button>
               <p className="text-gray-600 text-xs text-center mt-3">
-                Your NFT stays in your wallet until the listing is approved and the escrow transaction is signed.
+                Your NFT stays in your wallet until the escrow transaction is signed.
               </p>
             </div>
           </div>
