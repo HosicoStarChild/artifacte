@@ -18,7 +18,12 @@ export default function DigitalArtPage() {
     fetch("/api/admin/allowlist")
       .then(res => res.json())
       .then(data => {
-        setCollections(data.collections || []);
+        // Deduplicate by name (e.g. Quekz has old collection + new WNS authority)
+        const seen = new Map<string, Collection>();
+        for (const c of (data.collections || [])) {
+          if (!seen.has(c.name)) seen.set(c.name, c);
+        }
+        setCollections(Array.from(seen.values()));
         setLoading(false);
       })
       .catch(() => setLoading(false));
