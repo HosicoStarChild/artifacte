@@ -39,12 +39,27 @@ function buildSearchQuery(name: string): string {
       const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec)\b/i);
       return variant ? `${cardNum} ${variant[0]}` : cardNum;
     }
-    // Include character name for disambiguation
-    const charMatch = name.match(/\b(Charizard|Pikachu|Luffy|Zoro|Nami|Gengar|Mewtwo|Blastoise|Venusaur|Mew|Buggy|Shanks|Ace)\b/i);
-    const setMatch = name.match(/\b(Base Set|Jungle|Fossil|Team Rocket|Neo|Gym|Skyridge|Aquapolis|Expedition)\b/i);
-    const parts = [hashMatch[1]];
-    if (charMatch) parts.unshift(charMatch[1]);
-    if (setMatch) parts.push(setMatch[1]);
+    // Build query from card number + name context
+    const parts: string[] = [];
+    // Extract character/card name (first 1-3 capitalized words before common keywords)
+    const cleanName = name
+      .replace(/\b\d{4}\b/g, '')
+      .replace(/#\d+/g, '')
+      .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
+      .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, '')
+      .replace(/\b(Japanese|English|JPN|EN)\b/gi, '')
+      .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
+      .replace(/\b(Promos?|Promo)\b/gi, '')
+      .trim();
+    // Get meaningful words (likely character name)
+    const words = cleanName.split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w));
+    if (words.length > 0) parts.push(...words.slice(0, 3));
+    parts.push(hashMatch[1]);
+    // Add TCG context
+    if (/one piece/i.test(name)) parts.push('one piece');
+    else if (/pokemon/i.test(name)) parts.push('pokemon');
+    else if (/dragon ball/i.test(name)) parts.push('dragon ball');
+    else if (/yu-?gi-?oh/i.test(name)) parts.push('yugioh');
     return parts.join(' ');
   }
 
