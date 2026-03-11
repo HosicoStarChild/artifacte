@@ -140,7 +140,7 @@ export default function CardDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Left: Image */}
-          <div className="bg-dark-800 rounded-xl border border-white/5 p-6 flex items-start justify-center self-start sticky top-28">
+          <div className="bg-dark-800 rounded-xl border border-white/5 p-6 flex items-start justify-center self-start lg:sticky lg:top-28">
             <img
               src={card.image}
               alt={card.name}
