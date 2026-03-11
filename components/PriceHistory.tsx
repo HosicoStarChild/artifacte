@@ -28,11 +28,19 @@ function buildSearchQuery(name: string): string {
   const pkMatch = name.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d*[-/]\d+[-/]?[A-Z]*)/i);
   if (pkMatch) return pkMatch[1];
 
-  // 3. Extract card number with # prefix: #4, #118, #150/XY-P
+  // 3. Extract card number with # prefix: #051, #118, #150/XY-P
   const hashMatch = name.match(/#(\d+(?:\/[\w-]+)?)/);
   if (hashMatch) {
+    // Check if set code like OP09, ST01, EB01 exists in the name (e.g. "OP09-Emperors in the New World")
+    const setPrefix = name.match(/\b(OP|ST|EB|PRB?)\d{2}/i);
+    if (setPrefix) {
+      // Combine: OP09 + #051 → OP09-051
+      const cardNum = `${setPrefix[0]}-${hashMatch[1]}`;
+      const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec)\b/i);
+      return variant ? `${cardNum} ${variant[0]}` : cardNum;
+    }
     // Include character name for disambiguation
-    const charMatch = name.match(/\b(Charizard|Pikachu|Luffy|Zoro|Nami|Gengar|Mewtwo|Blastoise|Venusaur|Mew)\b/i);
+    const charMatch = name.match(/\b(Charizard|Pikachu|Luffy|Zoro|Nami|Gengar|Mewtwo|Blastoise|Venusaur|Mew|Buggy|Shanks|Ace)\b/i);
     const setMatch = name.match(/\b(Base Set|Jungle|Fossil|Team Rocket|Neo|Gym|Skyridge|Aquapolis|Expedition)\b/i);
     const parts = [hashMatch[1]];
     if (charMatch) parts.unshift(charMatch[1]);
