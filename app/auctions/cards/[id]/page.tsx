@@ -6,8 +6,7 @@ import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
@@ -17,8 +16,8 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 );
 
-// Escrow wallet for payments (M2 proxy buy flow)
-const ESCROW_WALLET = new PublicKey("JDUtwNFcTQwbxDrmGHqwZThHQ1mb3nbC8ZX6WahaMVxQ");
+// Treasury wallet for platform fees
+const TREASURY_WALLET = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
 
 export default function CardDetailPage() {
   const params = useParams();
@@ -44,75 +43,53 @@ export default function CardDetailPage() {
 
   const handleBuy = async () => {
     if (!connected || !publicKey || !card) return;
+    if (!card.nftAddress) {
+      showToast.error("NFT mint address not available");
+      return;
+    }
     setBuying(true);
 
     try {
-      // Step 1: Send payment to escrow wallet
-      showToast.info("💳 Payment sent... Please confirm in your wallet");
+      // Step 1: Ask our API to build the full transaction
+      showToast.info("Building transaction...");
       
-      let paymentTx: Transaction;
-
-      if (card.currency === 'SOL') {
-        const lamports = Math.round(card.price * LAMPORTS_PER_SOL);
-        paymentTx = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: ESCROW_WALLET,
-            lamports,
-          })
-        );
-      } else {
-        // USDC payment
-        const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-        const tokenAmount = BigInt(Math.round(card.price * 1e6));
-        const senderAta = await getAssociatedTokenAddress(usdcMint, publicKey);
-        const escrowAta = await getAssociatedTokenAddress(usdcMint, ESCROW_WALLET);
-        paymentTx = new Transaction().add(
-          createTransferInstruction(senderAta, escrowAta, publicKey, tokenAmount)
-        );
-      }
-
-      const paymentSig = await sendTransaction(paymentTx, connection);
-      await connection.confirmTransaction(paymentSig, "confirmed");
-
-      showToast.success(`✓ Payment confirmed! TX: ${paymentSig.slice(0, 12)}...`);
-      
-      // Step 2: Call API to execute M2 buy and transfer
-      showToast.info("🔄 Purchasing NFT...");
-      
-      const buyResponse = await fetch('/api/cc-buy', {
+      const buildRes = await fetch('/api/me-buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ccId: card.ccId,
-          nftAddress: card.nftAddress,
-          buyerWallet: publicKey.toBase58(),
-          paymentSignature: paymentSig,
-          price: card.price,
-          currency: card.currency,
-          sellerWallet: card.seller,
+          mint: card.nftAddress,
+          buyer: publicKey.toBase58(),
         }),
       });
 
-      if (!buyResponse.ok) {
-        const errorData = await buyResponse.json();
-        throw new Error(errorData.error || 'NFT purchase failed');
+      if (!buildRes.ok) {
+        const errData = await buildRes.json();
+        throw new Error(errData.error || 'Failed to build transaction');
       }
 
-      const buyResult = await buyResponse.json();
+      const { transaction: txBase64, price, fee } = await buildRes.json();
+      
+      // Step 2: Deserialize and send for signing
+      const txBytes = Buffer.from(txBase64, 'base64');
+      const tx = Transaction.from(txBytes);
 
-      showToast.success(
-        `✓ NFT purchased and transferred! TX: ${buyResult.buySignature?.slice(0, 12) || paymentSig.slice(0, 12)}...`
-      );
+      showToast.info(`💳 Confirm in wallet — ${price} SOL + ${fee.toFixed(4)} SOL fee`);
+      
+      const sig = await sendTransaction(tx, connection);
+      
+      showToast.info("⏳ Confirming transaction...");
+      await connection.confirmTransaction(sig, "confirmed");
+
+      showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
     } catch (err: any) {
       if (err.message?.includes("User rejected")) {
-        showToast.error("Transaction rejected");
+        showToast.error("Transaction cancelled");
       } else if (err.message?.includes("insufficient")) {
-        showToast.error(`Insufficient balance`);
-      } else if (err.message?.includes("Payment verification failed")) {
-        showToast.error("Payment not confirmed. Please try again.");
+        showToast.error("Insufficient balance");
+      } else if (err.message?.includes("No active listing")) {
+        showToast.error("This item is no longer available");
       } else {
-        showToast.error(`Error: ${(err.message || "").slice(0, 80)}`);
+        showToast.error(`Error: ${(err.message || "").slice(0, 100)}`);
       }
     } finally {
       setBuying(false);
