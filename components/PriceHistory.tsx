@@ -12,7 +12,11 @@ import { useState, useEffect } from "react";
 function buildSearchQuery(name: string): string {
   // 1. Extract card number like #OP05-119, OP11-118, ST01-012
   const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i);
-  if (opMatch) return opMatch[1];
+  if (opMatch) {
+    // Include variant keywords for disambiguation (manga art vs alt art vs standard)
+    const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|super\s*pre.?release|winner|sp|sec)\b/i);
+    return variant ? `${opMatch[1]} ${variant[0]}` : opMatch[1];
+  }
 
   // 2. Extract Pokemon set codes: SV06-061, SWSH12-150, XY-150
   const pkMatch = name.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d*[-/]\d+[-/]?[A-Z]*)/i);
