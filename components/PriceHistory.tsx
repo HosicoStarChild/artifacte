@@ -42,10 +42,21 @@ function buildSearchQuery(name: string): string {
     // Check if set code like OP09, ST01, EB01 exists in the name (e.g. "OP09-Emperors in the New World")
     const setPrefix = name.match(/\b(OP|ST|EB|PRB?)\d{2}/i);
     if (setPrefix) {
-      // Combine: OP09 + #051 → OP09-051
+      // Combine: OP09 + #051 → OP09-051, plus character name + variant for disambiguation
       const cardNum = `${setPrefix[0]}-${hashMatch[1]}`;
-      const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec)\b/i);
-      return variant ? `${cardNum} ${variant[0]}` : cardNum;
+      const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec|3rd\s*anniversary|gold|serialized|tournament)\b/i);
+      // Also extract character name
+      const charWords = name
+        .replace(/\b\d{4}\b/g, '').replace(/#\d+/g, '')
+        .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
+        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|Japanese|English|JPN|EN)\b/gi, '')
+        .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
+        .replace(/\b(OP|ST|EB)\d+[-\w]*/gi, '')
+        .replace(/[\/|,-]/g, ' ')
+        .trim().split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w)).slice(0, 3);
+      const parts = [cardNum, ...charWords];
+      if (variant) parts.push(variant[0]);
+      return parts.join(' ');
     }
     // Build query from card number + name context
     const parts: string[] = [];
