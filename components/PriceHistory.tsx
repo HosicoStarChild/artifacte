@@ -51,13 +51,14 @@ function buildSearchQuery(name: string): string {
     const parts: string[] = [];
     // Extract character/card name (first 1-3 capitalized words before common keywords)
     const cleanName = name
+      .replace(/[\/|]/g, ' ')
       .replace(/\b\d{4}\b/g, '')
       .replace(/#\d+/g, '')
       .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
       .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, '')
       .replace(/\b(Japanese|English|JPN|EN)\b/gi, '')
       .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
-      .replace(/\b(Promos?|Promo)\b/gi, '')
+      .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, '')
       .trim();
     // Get meaningful words (likely character name)
     const words = cleanName.split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w));
