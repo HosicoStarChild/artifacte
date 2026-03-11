@@ -60,6 +60,7 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
   const [chartUrl, setChartUrl] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [salesCount, setSalesCount] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
@@ -169,7 +170,11 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
         </div>
       </div>
 
-      <div className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900">
+      <div
+        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer"
+        onClick={() => setExpanded(true)}
+        title="Tap to expand"
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={chartUrl}
@@ -184,7 +189,35 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
             <div className="animate-pulse text-gray-500 text-sm">Generating chart...</div>
           </div>
         )}
+        {imageLoaded && (
+          <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-dark-900/80 px-2 py-1 rounded">
+            Tap to expand
+          </div>
+        )}
       </div>
+
+      {/* Fullscreen overlay */}
+      {expanded && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setExpanded(false)}
+        >
+          <div className="relative w-full max-w-5xl">
+            <button
+              onClick={() => setExpanded(false)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white text-sm"
+            >
+              ✕ Close
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={chartUrl}
+              alt="Price History Chart"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
