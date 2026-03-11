@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse(buffer, {
         headers: {
           "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET",
         },
