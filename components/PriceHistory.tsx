@@ -233,10 +233,14 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
           } catch {}
         }
 
-        // Build chart URL using the search query
+        // Build chart URL using the chosen assetId (guarantees correct variant)
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
-        chartParams.set("q", searchQuery);
+        if (chosen.assetId) {
+          chartParams.set("assetId", chosen.assetId);
+        } else {
+          chartParams.set("q", searchQuery);
+        }
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
