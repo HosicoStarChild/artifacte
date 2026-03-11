@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -38,6 +38,7 @@ const categoryEmojis: Record<string, string> = {
 
 export default function CategoryAuctionsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
@@ -46,7 +47,8 @@ export default function CategoryAuctionsPage() {
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const initialTcg = searchParams.get('tcg') || '';
+  const [filters, setFilters] = useState<Record<string, string>>(initialTcg ? { tcg: initialTcg } : {});
   const [page, setPage] = useState(1);
   const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
   const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");

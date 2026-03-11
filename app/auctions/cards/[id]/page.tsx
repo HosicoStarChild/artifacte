@@ -133,7 +133,7 @@ export default function CardDetailPage() {
             card.category === 'SEALED' ? 'sealed' :
             card.category === 'SPORTS_CARDS' ? 'sports-cards' :
             'tcg-cards'
-          }`} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+          }${card.ccCategory && card.category === 'TCG_CARDS' ? `?tcg=${encodeURIComponent(card.ccCategory)}` : ''}`} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
             ← Back to {card.category === 'MERCHANDISE' ? 'Merchandise' : card.category === 'SEALED' ? 'Sealed Product' : card.category === 'SPORTS_CARDS' ? 'Sports Cards' : (card.ccCategory || 'TCG Cards')}
           </Link>
         </div>
