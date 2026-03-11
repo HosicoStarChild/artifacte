@@ -3,13 +3,6 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-function proxyImage(url: string): string {
-  if (!url) return "/placeholder.png";
-  if (url.includes("arweave.net") || url.includes("irys.xyz") || url.includes("ipfs")) {
-    return `/api/img-proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
 
 interface Collection {
   collectionAddress: string;
@@ -72,7 +65,7 @@ export default function DigitalArtPage() {
               >
                 <div className="aspect-square overflow-hidden bg-dark-700 relative">
                   <img
-                    src={proxyImage(collection.image)}
+                    src={collection.image}
                     alt={collection.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                     onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}

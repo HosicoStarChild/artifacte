@@ -4,13 +4,6 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
-function proxyImage(url: string): string {
-  if (!url) return "/placeholder.png";
-  if (url.includes("arweave.net") || url.includes("irys.xyz") || url.includes("ipfs")) {
-    return `/api/img-proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
 
 interface CollectionInfo {
   collectionAddress: string;
@@ -97,7 +90,7 @@ export default function CollectionPage() {
         {/* Collection Header */}
         <div className="flex items-center gap-5 mb-10">
           <img
-            src={proxyImage(collection.image)}
+            src={collection.image}
             alt={collection.name}
             className="w-20 h-20 rounded-xl object-cover border border-white/10"
             onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
@@ -147,7 +140,7 @@ export default function CollectionPage() {
               >
                 <div className="aspect-square overflow-hidden bg-dark-700">
                   <img
-                    src={proxyImage(nft.nftImage)}
+                    src={nft.nftImage}
                     alt={nft.nftName}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
