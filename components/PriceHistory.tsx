@@ -59,10 +59,12 @@ function buildSearchQuery(name: string): string {
       .replace(/\b(Japanese|English|JPN|EN)\b/gi, '')
       .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
       .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, '')
+      .replace(/-HOLO\b/gi, '')
+      .replace(/-/g, ' ')
       .trim();
-    // Get meaningful words (likely character name)
+    // Get meaningful words (character name, set identifiers, etc.)
     const words = cleanName.split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w));
-    if (words.length > 0) parts.push(...words.slice(0, 3));
+    if (words.length > 0) parts.push(...words.slice(0, 6));
     parts.push(hashMatch[1]);
     // Add TCG context
     if (/one piece/i.test(name)) parts.push('one piece');
