@@ -148,6 +148,16 @@ export async function POST(req: NextRequest) {
       tx.add(createAssociatedTokenAccountInstruction(buyerPubkey, buyerAta, buyerPubkey, mintPubkey));
     }
 
+    // --- Artifacte 2% Platform Fee (pay first while wallet is fully funded) ---
+    const feeAmount = Math.round(Number(priceLamports) * PLATFORM_FEE_BPS / 10000);
+    tx.add(
+      SystemProgram.transfer({
+        fromPubkey: buyerPubkey,
+        toPubkey: TREASURY_WALLET,
+        lamports: feeAmount,
+      })
+    );
+
     // --- Deposit ---
     // Accounts: wallet, notary, escrow_payment_account, authority, auction_house, system_program
     // Args: _escrow_payment_bump (u8), amount (u64)
@@ -243,7 +253,7 @@ export async function POST(req: NextRequest) {
         { pubkey: ME_AUCTION_HOUSE_SOL, isSigner: false, isWritable: false }, // auction_house
         { pubkey: ahTreasury, isSigner: false, isWritable: true },      // auction_house_treasury
         { pubkey: buyerTradeState, isSigner: false, isWritable: true },  // buyer_trade_state
-        { pubkey: buyerPubkey, isSigner: false, isWritable: true },      // buyer_referral
+        { pubkey: buyerPubkey, isSigner: false, isWritable: true },        // buyer_referral (same as buy_v2)
         { pubkey: sellerTradeState, isSigner: false, isWritable: true }, // seller_trade_state
         { pubkey: sellerReferral, isSigner: false, isWritable: true },   // seller_referral
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -254,16 +264,6 @@ export async function POST(req: NextRequest) {
       ],
       data: execData,
     }));
-
-    // --- Artifacte 2% Fee ---
-    const feeAmount = Math.round(Number(priceLamports) * PLATFORM_FEE_BPS / 10000);
-    tx.add(
-      SystemProgram.transfer({
-        fromPubkey: buyerPubkey,
-        toPubkey: TREASURY_WALLET,
-        lamports: feeAmount,
-      })
-    );
 
     // 4. Serialize
     const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
