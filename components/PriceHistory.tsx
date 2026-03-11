@@ -191,7 +191,6 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
       <div
         className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer"
         onClick={() => setExpanded(true)}
-        title="Click to expand"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
