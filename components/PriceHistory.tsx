@@ -10,12 +10,18 @@ import { useState, useEffect } from "react";
  *   → "OP05-119"
  */
 function buildSearchQuery(name: string): string {
-  // 1. Extract card number like #OP05-119, OP11-118, ST01-012
-  const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i);
+  // 1. Extract card number like #OP05-119, OP11-118, OP05119 (with or without dash)
+  const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+[-]?\d+)/i);
   if (opMatch) {
+    // Normalize: insert dash if missing (OP05119 → OP05-119)
+    let cardNum = opMatch[1];
+    if (/^(OP|ST|EB|PRB?)\d{5,}/i.test(cardNum) && !cardNum.includes('-')) {
+      const m = cardNum.match(/^([A-Z]+\d{2})(\d+)$/i);
+      if (m) cardNum = `${m[1]}-${m[2]}`;
+    }
     // Include variant keywords for disambiguation (manga art vs alt art vs standard)
     const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|super\s*pre.?release|winner|sp|sec)\b/i);
-    return variant ? `${opMatch[1]} ${variant[0]}` : opMatch[1];
+    return variant ? `${cardNum} ${variant[0]}` : cardNum;
   }
 
   // 2. Extract Pokemon set codes: SV06-061, SWSH12-150, XY-150
