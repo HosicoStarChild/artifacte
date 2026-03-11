@@ -9,7 +9,15 @@ import { useState, useEffect } from "react";
  * E.g. "2023 One Piece OP05 Awakening SEC Monkey D. Luffy #OP05-119 PSA 10"
  *   → "OP05-119"
  */
+// Manual overrides for cards where ME listing names are too generic to match correctly
+const CHART_OVERRIDES: Record<string, string> = {
+  '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'P-001 super pre-release winner luffy',
+};
+
 function buildSearchQuery(name: string): string {
+  // Check manual overrides first
+  if (CHART_OVERRIDES[name]) return CHART_OVERRIDES[name];
+
   // 1. Extract full card number like #OP05-119, OP11-118, OP05119 (must have dash or 5+ digits)
   const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i) || name.match(/#?((?:OP|ST|EB|PRB?)\d{5,})/i);
   if (opMatch) {
