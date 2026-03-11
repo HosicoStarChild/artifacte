@@ -65,7 +65,6 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
   const [imageLoaded, setImageLoaded] = useState(false);
   const [salesCount, setSalesCount] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
@@ -176,7 +175,7 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
       </div>
 
       <div
-        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer group"
+        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer"
         onClick={() => setExpanded(true)}
         title="Click to expand"
       >
@@ -195,10 +194,8 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
           </div>
         )}
         {imageLoaded && (
-          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-            </svg>
+          <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-dark-900/80 px-2 py-1 rounded">
+            Tap to expand
           </div>
         )}
       </div>
