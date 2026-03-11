@@ -10,12 +10,12 @@ import { useState, useEffect } from "react";
  *   → "OP05-119"
  */
 function buildSearchQuery(name: string): string {
-  // 1. Extract card number like #OP05-119, OP11-118, OP05119 (with or without dash)
-  const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+[-]?\d+)/i);
+  // 1. Extract full card number like #OP05-119, OP11-118, OP05119 (must have dash or 5+ digits)
+  const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i) || name.match(/#?((?:OP|ST|EB|PRB?)\d{5,})/i);
   if (opMatch) {
     // Normalize: insert dash if missing (OP05119 → OP05-119)
     let cardNum = opMatch[1];
-    if (/^(OP|ST|EB|PRB?)\d{5,}/i.test(cardNum) && !cardNum.includes('-')) {
+    if (!cardNum.includes('-')) {
       const m = cardNum.match(/^([A-Z]+\d{2})(\d+)$/i);
       if (m) cardNum = `${m[1]}-${m[2]}`;
     }
