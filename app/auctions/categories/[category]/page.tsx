@@ -46,11 +46,39 @@ export default function CategoryAuctionsPage() {
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [page, setPage] = useState(1);
-  const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
-  const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
-  const [searchInput, setSearchInput] = useState("");
+  // Restore filters from sessionStorage on mount
+  const storageKey = `artifacte-filters-${categorySlug}`;
+  const [filters, setFilters] = useState<Record<string, string>>(() => {
+    if (typeof window === 'undefined') return {};
+    try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+  });
+  const [page, setPage] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    try { return parseInt(sessionStorage.getItem(`${storageKey}-page`) || '1'); } catch { return 1; }
+  });
+  const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">(() => {
+    if (typeof window === 'undefined') return "All";
+    try { return (sessionStorage.getItem(`${storageKey}-currency`) as any) || "All"; } catch { return "All"; }
+  });
+  const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">(() => {
+    if (typeof window === 'undefined') return "default";
+    try { return (sessionStorage.getItem(`${storageKey}-sort`) as any) || "default"; } catch { return "default"; }
+  });
+  const [searchInput, setSearchInput] = useState(() => {
+    if (typeof window === 'undefined') return "";
+    try { return sessionStorage.getItem(`${storageKey}-search`) || ""; } catch { return ""; }
+  });
+
+  // Persist filters to sessionStorage on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(filters));
+      sessionStorage.setItem(`${storageKey}-page`, String(page));
+      sessionStorage.setItem(`${storageKey}-currency`, currencyFilter);
+      sessionStorage.setItem(`${storageKey}-sort`, sortBy);
+      sessionStorage.setItem(`${storageKey}-search`, searchInput);
+    } catch {}
+  }, [filters, page, currencyFilter, sortBy, searchInput, storageKey]);
   const searchTimer = useRef<NodeJS.Timeout>();
   const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
