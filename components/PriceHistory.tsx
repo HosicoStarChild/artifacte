@@ -107,9 +107,10 @@ interface PriceHistoryProps {
   category?: string;
   grade?: string;
   year?: number | string;
+  nftAddress?: string;
 }
 
-export default function PriceHistory({ cardName, category, grade, year }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, category, grade, year, nftAddress }: PriceHistoryProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartUrl, setChartUrl] = useState<string | null>(null);
@@ -133,45 +134,64 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
       setSalesCount(null);
 
       try {
-        // Extract search-friendly query from full card name
-        const searchQuery = buildSearchQuery(cardName);
+        let assetId: string | null = null;
 
-        // Step 1: Search for card variants
-        const searchRes = await fetch(
-          `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
-          { signal: AbortSignal.timeout(15000) }
-        );
-        if (!searchRes.ok) throw new Error("Search failed");
-        const searchData = await searchRes.json();
+        // Strategy 1: Use pre-computed oracle mapping (same data as portfolio values)
+        try {
+          const mappingParams = new URLSearchParams();
+          mappingParams.set("endpoint", "chart-id");
+          if (cardName) mappingParams.set("name", cardName);
+          if (nftAddress) mappingParams.set("nft", nftAddress);
+          if (grade) mappingParams.set("grade", grade);
 
-        if (!searchData.variants || searchData.variants.length === 0) {
-          // Fallback: try with just card name keywords
+          const mappingRes = await fetch(`/api/oracle?${mappingParams.toString()}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (mappingRes.ok) {
+            const mapping = await mappingRes.json();
+            if (mapping.altAssetId) {
+              assetId = mapping.altAssetId;
+            }
+          }
+        } catch {}
+
+        // Strategy 2: Fall back to live search if no pre-computed mapping
+        if (!assetId) {
+          const searchQuery = buildSearchQuery(cardName);
+          const searchRes = await fetch(
+            `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
+            { signal: AbortSignal.timeout(15000) }
+          );
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.variants?.length > 0) {
+              assetId = searchData.variants[0].assetId;
+            }
+          }
+        }
+
+        if (!assetId) {
           setError("No price data found");
           setLoading(false);
           return;
         }
 
-        const chosen = searchData.variants[0];
+        // Get transaction count
+        try {
+          const txRes = await fetch(
+            `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(assetId)}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (txRes.ok) {
+            const txData = await txRes.json();
+            setSalesCount(txData.count || txData.transactions?.length || null);
+          }
+        } catch {}
 
-        // Step 2: Get transaction count
-        if (chosen.assetId) {
-          try {
-            const txRes = await fetch(
-              `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(chosen.assetId)}`,
-              { signal: AbortSignal.timeout(10000) }
-            );
-            if (txRes.ok) {
-              const txData = await txRes.json();
-              setSalesCount(txData.count || txData.transactions?.length || null);
-            }
-          } catch {}
-        }
-
-        // Step 3: Build chart URL (rendered server-side as PNG)
+        // Build chart URL using assetId directly (guaranteed correct mapping)
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
-        chartParams.set("q", searchQuery);
-        // Don't pass grade filter — too restrictive, often returns 0 results
+        chartParams.set("assetId", assetId);
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
@@ -184,7 +204,7 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
     };
 
     fetchChart();
-  }, [cardName, category, grade, shouldShow]);
+  }, [cardName, category, grade, nftAddress, shouldShow]);
 
   if (!shouldShow) return null;
 

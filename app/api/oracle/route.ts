@@ -38,6 +38,15 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Missing query parameter" }, { status: 400 });
       }
       url = `${ORACLE_API}/api/market/prices?card=${encodeURIComponent(q)}&limit=1`;
+    } else if (endpoint === "chart-id") {
+      const name = searchParams.get("name") || "";
+      const grade = searchParams.get("grade") || "";
+      const nft = searchParams.get("nft") || "";
+      const params = new URLSearchParams();
+      if (name) params.set("name", name);
+      if (grade) params.set("grade", grade);
+      if (nft) params.set("nft", nft);
+      url = `${ORACLE_API}/api/market/chart-id?${params.toString()}`;
     } else if (endpoint === "search") {
       const q = searchParams.get("q");
       if (!q) {
@@ -52,16 +61,19 @@ export async function GET(req: NextRequest) {
       const variant = searchParams.get("variant") || "";
       const grade = searchParams.get("grade") || "";
 
+      const assetId = searchParams.get("assetId") || "";
+
       const params = new URLSearchParams();
       if (set) params.set("set", set);
       if (number) params.set("number", number);
       if (q) params.set("q", q);
+      if (assetId) params.set("assetId", assetId);
       if (language) params.set("language", language);
       if (variant) params.set("variant", variant);
       if (grade) params.set("grade", grade);
 
-      if (!set && !number && !q) {
-        return NextResponse.json({ error: "Missing set+number or q parameter" }, { status: 400 });
+      if (!set && !number && !q && !assetId) {
+        return NextResponse.json({ error: "Missing set+number, q, or assetId parameter" }, { status: 400 });
       }
 
       url = `${ORACLE_API}/api/live/chart?${params.toString()}`;

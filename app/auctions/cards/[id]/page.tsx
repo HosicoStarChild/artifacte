@@ -291,6 +291,7 @@ export default function CardDetailPage() {
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year}
+              nftAddress={card.nftAddress}
             />
             )}
 
