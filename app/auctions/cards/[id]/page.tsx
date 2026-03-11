@@ -128,14 +128,12 @@ export default function CardDetailPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="mb-8">
-          <Link href={`/auctions/categories/${
-            card.category === 'MERCHANDISE' ? 'merchandise' :
-            card.category === 'SEALED' ? 'sealed' :
-            card.category === 'SPORTS_CARDS' ? 'sports-cards' :
-            'tcg-cards'
-          }${card.ccCategory && card.category === 'TCG_CARDS' ? `?tcg=${encodeURIComponent(card.ccCategory)}` : ''}`} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-            ← Back to {card.category === 'MERCHANDISE' ? 'Merchandise' : card.category === 'SEALED' ? 'Sealed Product' : card.category === 'SPORTS_CARDS' ? 'Sports Cards' : (card.ccCategory || 'TCG Cards')}
-          </Link>
+          <button
+            onClick={() => window.history.back()}
+            className="text-gold-500 hover:text-gold-400 text-sm font-medium transition cursor-pointer"
+          >
+            ← Back to {card.category === 'MERCHANDISE' ? 'Merchandise' : card.category === 'SEALED' ? 'Sealed Product' : card.category === 'SPORTS_CARDS' ? 'Sports Cards' : 'TCG Cards'}
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
