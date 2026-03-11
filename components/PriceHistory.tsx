@@ -61,6 +61,7 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
   const [imageLoaded, setImageLoaded] = useState(false);
   const [salesCount, setSalesCount] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
@@ -171,9 +172,9 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
       </div>
 
       <div
-        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer"
+        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer group"
         onClick={() => setExpanded(true)}
-        title="Tap to expand"
+        title="Click to expand"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -190,24 +191,26 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
           </div>
         )}
         {imageLoaded && (
-          <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-dark-900/80 px-2 py-1 rounded">
-            Tap to expand
+          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+            </svg>
           </div>
         )}
       </div>
 
-      {/* Fullscreen overlay */}
+      {/* Fullscreen lightbox */}
       {expanded && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setExpanded(false)}
         >
-          <div className="relative w-full max-w-5xl">
+          <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setExpanded(false)}
-              className="absolute -top-10 right-0 text-white/70 hover:text-white text-sm"
+              className="absolute -top-3 -right-3 z-10 bg-dark-800 border border-white/20 rounded-full w-8 h-8 flex items-center justify-center text-white hover:bg-dark-700 transition-colors"
             >
-              ✕ Close
+              ✕
             </button>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -215,6 +218,7 @@ export default function PriceHistory({ cardName, category, grade, year }: PriceH
               alt="Price History Chart"
               className="w-full h-auto rounded-lg"
             />
+            <div className="text-center mt-3 text-gray-500 text-sm">Click anywhere to close</div>
           </div>
         </div>
       )}
