@@ -102,6 +102,73 @@ function buildSearchQuery(name: string): string {
   return q || name.slice(0, 50);
 }
 
+/**
+ * Extract language and variant hints from CC card name to pick the correct Alt.xyz variant.
+ */
+function extractCardHints(name: string): { language: string | null; isAltArt: boolean; variant: string | null } {
+  const upper = name.toUpperCase();
+  
+  // Language detection
+  let language: string | null = null;
+  if (/\bJAPANESE\b|\bJPN\b|\b JP\b/i.test(name)) language = 'JPN';
+  else if (/\bKOREAN\b/i.test(name)) language = 'KR';
+  else if (/\bCHINESE\b/i.test(name)) language = 'CN';
+  // Default to EN if no language marker (most CC cards without language marker are EN)
+  else language = 'EN';
+
+  // Variant detection
+  const isAltArt = /\bALT(?:ERNATE)?\s*ART\b/i.test(name);
+  let variant: string | null = null;
+  if (/\bMANGA\b/i.test(name)) variant = 'manga';
+  else if (/\bSPECIAL\s*ALT/i.test(name)) variant = 'special alternate art';
+  else if (/\b3RD\s*ANNIVERSARY.*GOLD\b/i.test(name)) variant = '3rd anniversary gold';
+  else if (/\bSUPER\s*PRE.?RELEASE\b/i.test(name)) variant = 'super pre-release winner';
+  else if (/\bWINNER\b/i.test(name)) variant = 'winner';
+  else if (/\bSP\s*VERSION\b/i.test(name)) variant = 'sp';
+  else if (/\bSEC\b/i.test(name)) variant = 'sec';
+  else if (isAltArt) variant = 'alternate art';
+
+  return { language, isAltArt, variant };
+}
+
+/**
+ * Pick the best matching variant from search results based on card hints.
+ */
+function pickBestVariant(variants: any[], cardName: string): any {
+  if (variants.length <= 1) return variants[0];
+
+  const hints = extractCardHints(cardName);
+
+  // Score each variant
+  const scored = variants.map((v) => {
+    let score = 0;
+    const vName = (v.name || '').toUpperCase();
+    const vLang = (v.language || '').toUpperCase();
+    const vVariety = (v.variety || '').toUpperCase();
+
+    // Language match (most important)
+    if (hints.language === 'JPN' && (vLang === 'JPN' || vLang === 'JP' || vName.includes('JAPANESE'))) score += 100;
+    else if (hints.language === 'EN' && (vLang === 'EN' || (!vName.includes('JAPANESE') && !vName.includes('KOREAN')))) score += 100;
+    else if (hints.language === 'KR' && (vLang === 'KR' || vName.includes('KOREAN'))) score += 100;
+
+    // Variant match
+    if (hints.variant) {
+      const hv = hints.variant.toUpperCase();
+      if (vVariety.includes(hv) || vName.includes(hv)) score += 50;
+    } else if (!hints.isAltArt) {
+      // No variant keywords = standard card. Prefer variants with NO variety tag
+      if (!vVariety || vVariety === '' || vVariety === 'NONE') score += 50;
+      // Penalize alt art variants when card is standard
+      if (vVariety.includes('ALTERNATE') || vVariety.includes('ALT ART') || vVariety.includes('MANGA')) score -= 30;
+    }
+
+    return { variant: v, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].variant;
+}
+
 interface PriceHistoryProps {
   cardName?: string;
   category?: string;
@@ -150,7 +217,7 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
           return;
         }
 
-        const chosen = searchData.variants[0];
+        const chosen = pickBestVariant(searchData.variants, cardName);
 
         // Get transaction count
         if (chosen.assetId) {
