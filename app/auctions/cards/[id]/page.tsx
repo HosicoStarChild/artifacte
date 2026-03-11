@@ -17,7 +17,8 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 );
 
-const TREASURY = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+// Escrow wallet for payments (M2 proxy buy flow)
+const ESCROW_WALLET = new PublicKey("JDUtwNFcTQwbxDrmGHqwZThHQ1mb3nbC8ZX6WahaMVxQ");
 
 export default function CardDetailPage() {
   const params = useParams();
@@ -46,48 +47,70 @@ export default function CardDetailPage() {
     setBuying(true);
 
     try {
-      let tx: Transaction;
+      // Step 1: Send payment to escrow wallet
+      showToast.info("💳 Payment sent... Please confirm in your wallet");
+      
+      let paymentTx: Transaction;
 
       if (card.currency === 'SOL') {
         const lamports = Math.round(card.price * LAMPORTS_PER_SOL);
-        tx = new Transaction().add(
+        paymentTx = new Transaction().add(
           SystemProgram.transfer({
             fromPubkey: publicKey,
-            toPubkey: TREASURY,
+            toPubkey: ESCROW_WALLET,
             lamports,
           })
         );
       } else {
+        // USDC payment
         const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
         const tokenAmount = BigInt(Math.round(card.price * 1e6));
         const senderAta = await getAssociatedTokenAddress(usdcMint, publicKey);
-        const treasuryAta = await getAssociatedTokenAddress(usdcMint, TREASURY);
-        tx = new Transaction().add(
-          createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
+        const escrowAta = await getAssociatedTokenAddress(usdcMint, ESCROW_WALLET);
+        paymentTx = new Transaction().add(
+          createTransferInstruction(senderAta, escrowAta, publicKey, tokenAmount)
         );
       }
 
-      const sig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(sig, "confirmed");
+      const paymentSig = await sendTransaction(paymentTx, connection);
+      await connection.confirmTransaction(paymentSig, "confirmed");
 
-      try {
-        await fetch('/api/cc-buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ccId: card.ccId,
-            buyerWallet: publicKey.toBase58(),
-            paymentSignature: sig,
-          }),
-        });
-      } catch {}
+      showToast.success(`✓ Payment confirmed! TX: ${paymentSig.slice(0, 12)}...`);
+      
+      // Step 2: Call API to execute M2 buy and transfer
+      showToast.info("🔄 Purchasing NFT...");
+      
+      const buyResponse = await fetch('/api/cc-buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ccId: card.ccId,
+          nftAddress: card.nftAddress,
+          buyerWallet: publicKey.toBase58(),
+          paymentSignature: paymentSig,
+          price: card.price,
+          currency: card.currency,
+          sellerWallet: card.seller,
+        }),
+      });
 
-      showToast.success(`✓ Payment confirmed! NFT will be transferred shortly. TX: ${sig.slice(0, 12)}...`);
+      if (!buyResponse.ok) {
+        const errorData = await buyResponse.json();
+        throw new Error(errorData.error || 'NFT purchase failed');
+      }
+
+      const buyResult = await buyResponse.json();
+
+      showToast.success(
+        `✓ NFT purchased and transferred! TX: ${buyResult.buySignature?.slice(0, 12) || paymentSig.slice(0, 12)}...`
+      );
     } catch (err: any) {
       if (err.message?.includes("User rejected")) {
         showToast.error("Transaction rejected");
       } else if (err.message?.includes("insufficient")) {
         showToast.error(`Insufficient balance`);
+      } else if (err.message?.includes("Payment verification failed")) {
+        showToast.error("Payment not confirmed. Please try again.");
       } else {
         showToast.error(`Error: ${(err.message || "").slice(0, 80)}`);
       }

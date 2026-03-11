@@ -1,7 +1,7 @@
 // On-chain program constants
 export const AUCTION_PROGRAM_ID = "23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN";
 export const RWA_NFT_PROGRAM_ID = "F9mkXqMrgF1sSV3wDtTUpTs82B5XJ5qz9A33nBAdcNqb";
-export const TREASURY_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+export const TREASURY_WALLET = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
 export const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
