@@ -90,6 +90,15 @@ export async function GET(req: NextRequest) {
       if (grade) params.append("grade", grade);
 
       url = `${ORACLE_API}/api/live/transactions?${params.toString()}`;
+    } else if (endpoint === "sealed") {
+      const q = searchParams.get("q") || "";
+      const tcg = searchParams.get("tcg") || "";
+      const type = searchParams.get("type") || "";
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (tcg) params.set("tcg", tcg);
+      if (type) params.set("type", type);
+      url = `${ORACLE_API}/api/tcgplayer/sealed?${params.toString()}`;
     } else if (endpoint === "ungraded") {
       const number = searchParams.get("number") || "";
       const ccName = searchParams.get("ccName") || "";

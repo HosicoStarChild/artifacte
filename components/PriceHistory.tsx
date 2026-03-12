@@ -118,8 +118,9 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
   const [salesCount, setSalesCount] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [ungradedPrice, setUngradedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; rarity: string } | null>(null);
+  const [sealedPrice, setSealedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; tcg: string } | null>(null);
 
-  const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
+  const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES" || category === "SEALED";
 
   useEffect(() => {
     if (!shouldShow || !cardName) {
@@ -133,8 +134,38 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
       setImageLoaded(false);
       setChartUrl(null);
       setSalesCount(null);
+      setSealedPrice(null);
 
       try {
+        // Sealed products: fetch TCGplayer market price instead of graded chart
+        if (category === "SEALED") {
+          // Extract search terms from sealed product name
+          // e.g. "Awakening of the New Era - Booster Box" from CC listing name
+          const cleanName = cardName
+            .replace(/\b(PSA|CGC|BGS)\s*\d+/gi, '')
+            .replace(/\b\d{4}\b/g, '')
+            .replace(/\b(Collector Crypt|collector_crypt)\b/gi, '')
+            .trim();
+          
+          const sealedRes = await fetch(
+            `/api/oracle?endpoint=sealed&q=${encodeURIComponent(cleanName)}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (sealedRes.ok) {
+            const sealedData = await sealedRes.json();
+            if (sealedData.results?.length > 0) {
+              const best = sealedData.results[0];
+              setSealedPrice({ name: best.name, marketPrice: best.marketPrice, lowestPrice: best.lowestPrice, tcg: best.tcg });
+            } else {
+              setError("No sealed price data found");
+            }
+          } else {
+            setError("Sealed price lookup failed");
+          }
+          setLoading(false);
+          return;
+        }
+
         // Live search using smart query extraction from card name
         const searchQuery = buildSearchQuery(cardName);
 
@@ -214,7 +245,36 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
     );
   }
 
-  if (error && !chartUrl) {
+  // Sealed product pricing display
+  if (category === "SEALED" && sealedPrice) {
+    return (
+      <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <h2 className="text-white font-serif text-xl">Market Price</h2>
+          <span className="text-xs text-gray-500 font-medium">Powered by Artifacte Oracle</span>
+        </div>
+        <div className="bg-dark-900 rounded-lg border border-white/5 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-gray-400 text-sm">TCGplayer Market Price</span>
+            <span className="text-white text-2xl font-semibold">${sealedPrice.marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          {sealedPrice.lowestPrice && (
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-gray-500 text-sm">Lowest Listed</span>
+              <span className="text-gray-300">${sealedPrice.lowestPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
+          <div className="pt-3 border-t border-white/5">
+            <p className="text-gray-600 text-xs">{sealedPrice.name} • {sealedPrice.tcg}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (category === "SEALED" && !sealedPrice && !loading) return null;
+
+  if (error && !chartUrl && !sealedPrice) {
     return (
       <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
         <h2 className="text-white font-serif text-xl mb-4">Price History</h2>
