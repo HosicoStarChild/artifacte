@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -46,10 +46,22 @@ export default function CategoryAuctionsPage() {
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  // Restore filters from sessionStorage on mount
+  // Restore filters from sessionStorage on mount, with URL param override
+  const urlSearchParams = useSearchParams();
   const storageKey = `artifacte-filters-${categorySlug}`;
   const [filters, setFilters] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {};
+    // URL param takes priority (e.g. ?ccCategory=Pokemon from homepage)
+    const urlCcCategory = new URLSearchParams(window.location.search).get('ccCategory');
+    if (urlCcCategory) {
+      const reverseMap: Record<string, string> = {
+        'Pokemon': 'pokemon', 'One Piece': 'one piece', 'One+Piece': 'one piece',
+        'Yu-Gi-Oh': 'yu-gi-oh', 'Dragon Ball': 'dragon ball z', 'Lorcana': 'lorcana',
+        'Magic: The Gathering': 'magic',
+      };
+      const tcgVal = reverseMap[urlCcCategory] || urlCcCategory.toLowerCase();
+      return { tcg: tcgVal };
+    }
     try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
   });
   const [page, setPage] = useState(() => {

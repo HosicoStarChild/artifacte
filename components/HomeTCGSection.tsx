@@ -107,8 +107,8 @@ export function HomeTCGSection() {
 
   return (
     <>
-      <TCGCarousel title="One Piece TCG" emoji="🏴‍☠️" items={onePiece} />
-      <TCGCarousel title="Pokémon TCG" emoji="⚡" items={pokemon} bg="bg-dark-800/30 border-t border-white/5" />
+      <TCGCarousel title="One Piece TCG" emoji="🏴‍☠️" items={onePiece} viewAllHref="/auctions/categories/tcg-cards?ccCategory=One+Piece" viewAllLabel="View All One Piece" />
+      <TCGCarousel title="Pokémon TCG" emoji="⚡" items={pokemon} bg="bg-dark-800/30 border-t border-white/5" viewAllHref="/auctions/categories/tcg-cards?ccCategory=Pokemon" viewAllLabel="View All Pokémon" />
       <TCGCarousel title="Sealed Product" emoji="📦" items={sealed} viewAllHref="/auctions/categories/sealed" viewAllLabel="View All Sealed" />
     </>
   );
