@@ -90,6 +90,18 @@ export async function GET(req: NextRequest) {
       if (grade) params.append("grade", grade);
 
       url = `${ORACLE_API}/api/live/transactions?${params.toString()}`;
+    } else if (endpoint === "ungraded") {
+      const number = searchParams.get("number") || "";
+      const ccName = searchParams.get("ccName") || "";
+      const variant = searchParams.get("variant") || "";
+      if (!number && !ccName) {
+        return NextResponse.json({ error: "Missing number or ccName parameter" }, { status: 400 });
+      }
+      const params = new URLSearchParams();
+      if (number) params.set("number", number);
+      if (ccName) params.set("ccName", ccName);
+      if (variant) params.set("variant", variant);
+      url = `${ORACLE_API}/api/tcgplayer/ungraded?${params.toString()}`;
     } else {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
     }

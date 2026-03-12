@@ -117,6 +117,7 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
   const [imageLoaded, setImageLoaded] = useState(false);
   const [salesCount, setSalesCount] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [ungradedPrice, setUngradedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; rarity: string } | null>(null);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES";
 
@@ -173,6 +174,22 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
+
+        // Fetch ungraded NM price (non-blocking)
+        try {
+          const cardNum = cardName.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i)?.[1]
+            || cardName.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH)\d*[-/]\d+)/i)?.[1];
+          if (cardNum) {
+            const ugParams = new URLSearchParams({ endpoint: "ungraded", number: cardNum, ccName: cardName });
+            const ugRes = await fetch(`/api/oracle?${ugParams.toString()}`, { signal: AbortSignal.timeout(10000) });
+            if (ugRes.ok) {
+              const ugData = await ugRes.json();
+              if (ugData.found && ugData.marketPrice) {
+                setUngradedPrice({ name: ugData.name, marketPrice: ugData.marketPrice, lowestPrice: ugData.lowestPrice, rarity: ugData.rarity });
+              }
+            }
+          }
+        } catch {}
       } catch (err: any) {
         console.error("Price history error:", err);
         setError(err.message || "Unable to load price data");
@@ -247,6 +264,20 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
           </div>
         )}
       </div>
+
+      {/* Ungraded NM price */}
+      {ungradedPrice && (
+        <div className="mt-4 flex items-center justify-between bg-dark-900 rounded-lg border border-white/5 px-4 py-3">
+          <div>
+            <span className="text-gray-400 text-sm">NM Ungraded</span>
+            <span className="text-gray-600 text-xs ml-2">({ungradedPrice.name})</span>
+          </div>
+          <div className="text-right">
+            <span className="text-white font-medium">${ungradedPrice.marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="text-gray-500 text-xs ml-2">market</span>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen lightbox */}
       {expanded && (
