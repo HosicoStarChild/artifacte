@@ -110,7 +110,20 @@ interface PriceHistoryProps {
   nftAddress?: string;
 }
 
-export default function PriceHistory({ cardName, category, grade, year, nftAddress }: PriceHistoryProps) {
+function normalizeGrade(g?: string): string | undefined {
+  if (!g) return undefined;
+  // Normalize grading company names to Alt.xyz format
+  let normalized = g.trim()
+    .replace(/^Beckett\s*/i, 'BGS ')
+    .replace(/^Professional Sports Authenticator\s*/i, 'PSA ')
+    .replace(/^Certified Guaranty Company\s*/i, 'CGC ');
+  // Normalize space to dash: "PSA 10" → "PSA-10"
+  normalized = normalized.replace(/^(PSA|BGS|CGC|SGC)\s+/i, (_, co) => `${co.toUpperCase()}-`);
+  return normalized;
+}
+
+export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress }: PriceHistoryProps) {
+  const grade = normalizeGrade(rawGrade);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartUrl, setChartUrl] = useState<string | null>(null);
