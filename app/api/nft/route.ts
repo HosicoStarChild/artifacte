@@ -1,67 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Simplified NFT metadata endpoint
-// In production, this would fetch from Metaplex, Shyft, or Helius APIs
+const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04`;
+
 export async function GET(request: NextRequest) {
   try {
     const mint = request.nextUrl.searchParams.get("mint");
-
     if (!mint) {
-      return NextResponse.json(
-        { error: "Missing mint parameter" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing mint parameter" }, { status: 400 });
     }
 
-    // Try to fetch from Shyft API (free tier available)
-    try {
-      const shyftRes = await fetch(
-        `https://api.shyft.to/sol/v1/nft/compressed_search?network=mainnet&mint=${mint}`,
-        {
-          headers: {
-            "x-api-key": process.env.SHYFT_API_KEY || "test-key",
-          },
-        }
-      );
+    const res = await fetch(HELIUS_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "nft-meta",
+        method: "getAsset",
+        params: { id: mint },
+      }),
+    });
 
-      if (shyftRes.ok) {
-        const data = await shyftRes.json();
-        const nftData = data.result?.nft || data.result?.[0];
+    if (!res.ok) throw new Error(`Helius error: ${res.status}`);
+    const data = await res.json();
+    const asset = data.result;
 
-        if (nftData) {
-          return NextResponse.json({
-            nft: {
-              mint: nftData.mint || mint,
-              name: nftData.name || nftData.title || "Untitled",
-              image: nftData.image || nftData.image_uri || "/placeholder.png",
-              collection: nftData.collection?.name || nftData.collection || "Unknown",
-              description: nftData.description || "",
-              symbol: nftData.symbol || "",
-            },
-          });
-        }
-      }
-    } catch (shyftErr) {
-      console.error("Shyft API error:", shyftErr);
+    if (!asset) {
+      return NextResponse.json({
+        nft: { mint, name: "NFT", image: "/placeholder.png", collection: "Unknown", description: "", symbol: "" },
+      });
     }
 
-    // Fallback: Return basic NFT structure
-    // Frontend will still work with listing data from on-chain
+    const content = asset.content || {};
+    const metadata = content.metadata || {};
+    const files = content.files || [];
+    const links = content.links || {};
+    const grouping = asset.grouping || [];
+    const collection = grouping.find((g: any) => g.group_key === "collection");
+
     return NextResponse.json({
       nft: {
         mint,
-        name: "NFT",
-        image: "/placeholder.png",
-        collection: "Unknown Collection",
-        description: "",
-        symbol: "",
+        name: metadata.name || "Untitled",
+        image: links.image || files[0]?.uri || "/placeholder.png",
+        collection: collection?.group_value || metadata.symbol || "Unknown",
+        description: metadata.description || "",
+        symbol: metadata.symbol || "",
       },
     });
   } catch (error) {
     console.error("Error fetching NFT:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch NFT metadata" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch NFT metadata" }, { status: 500 });
   }
 }
