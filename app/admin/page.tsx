@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { BAXUS_SELLER_FEE_ENABLED, TREASURY_WALLET } from "@/lib/data";
+import { BAXUS_SELLER_FEE_ENABLED, TREASURY_WALLET, ADMIN_WALLET } from "@/lib/data";
 
 interface AdminListing {
   id: string;
@@ -87,7 +87,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (connected && publicKey) {
       const walletAddress = publicKey.toBase58();
-      if (walletAddress === TREASURY_WALLET) {
+      if (walletAddress === TREASURY_WALLET || walletAddress === ADMIN_WALLET) {
         setIsAdmin(true);
         loadAdminData();
       } else {
