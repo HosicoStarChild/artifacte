@@ -176,7 +176,7 @@ export default function DigitalArtPage() {
                 No NFTs are currently listed. Be the first to list from a collection!
               </p>
               <Link
-                href="/digital-art/list"
+                href="/list"
                 className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm"
               >
                 List Your NFT

@@ -184,7 +184,7 @@ export default function CollectionPage() {
                     <div className="p-3">
                       <p className="text-white text-sm font-semibold truncate">{nft.name}</p>
                       <Link
-                        href={`/digital-art/list?mint=${nft.mint}`}
+                        href={`/list?mint=${nft.mint}`}
                         className="mt-2 block w-full text-center py-2 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold text-xs rounded transition"
                       >
                         List Item
@@ -209,7 +209,7 @@ export default function CollectionPage() {
               </p>
               {userNFTs.length > 0 && (
                 <Link
-                  href={`/digital-art/list?collection=${collectionAddress}`}
+                  href={`/list?collection=${collectionAddress}`}
                   className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm"
                 >
                   List Your {collection.name} NFT
