@@ -211,9 +211,9 @@ export default function ListNFTPage() {
         <div className="max-w-2xl mx-auto px-4">
           <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
             <div className="text-5xl mb-4">✅</div>
-            <h2 className="font-serif text-2xl text-white mb-2">Listing Submitted</h2>
+            <h2 className="font-serif text-2xl text-white mb-2">Listed Successfully</h2>
             <p className="text-gray-400 mb-6">
-              Your NFT listing is pending review. Once approved, it will go live on Artifacte and your NFT will be escrowed on-chain.
+              Your NFT is now listed on Artifacte and escrowed on-chain.
             </p>
             <button
               onClick={() => { setSubmitted(false); setSelectedNft(null); setPrice(""); setDescription(""); }}
