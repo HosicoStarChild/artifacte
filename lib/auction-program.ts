@@ -58,11 +58,18 @@ function buildWNSApproveInstruction(
   payer: PublicKey,
   authority: PublicKey,
   mint: PublicKey,
+  collectionAddress: PublicKey,
   amount: number = 0
 ): TransactionInstruction {
   const [approveAccount] = PublicKey.findProgramAddressSync(
     [Buffer.from("approve-account"), mint.toBuffer()],
     WNS_PROGRAM_ID
+  );
+
+  // Distribution account PDA: seeds = ["distribution", collection_address]
+  const [distributionAccount] = PublicKey.findProgramAddressSync(
+    [Buffer.from("distribution"), collectionAddress.toBuffer()],
+    WNS_DISTRIBUTION_PROGRAM_ID
   );
 
   // Anchor discriminator for "approve_transfer": sha256("global:approve_transfer")[..8]
@@ -75,17 +82,15 @@ function buildWNSApproveInstruction(
   discriminator.copy(data, 0);
   data.writeBigUInt64LE(BigInt(amount), 8);
 
-  // Distribution account PDA (per-collection, but for amount=0 we can use a dummy)
-  // For amount=0, distribution is skipped, so we pass system program as placeholder
   const accounts = [
     { pubkey: payer, isSigner: true, isWritable: true },             // payer
     { pubkey: authority, isSigner: true, isWritable: false },         // authority
     { pubkey: mint, isSigner: false, isWritable: false },             // mint
     { pubkey: approveAccount, isSigner: false, isWritable: true },    // approve_account
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // payment_mint (dummy)
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // payment_mint (dummy for amount=0)
     { pubkey: WNS_PROGRAM_ID, isSigner: false, isWritable: false },   // distribution_token_account = None
     { pubkey: WNS_PROGRAM_ID, isSigner: false, isWritable: false },   // authority_token_account = None
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: true }, // distribution_account (dummy)
+    { pubkey: distributionAccount, isSigner: false, isWritable: true }, // distribution_account (real PDA)
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
     { pubkey: WNS_DISTRIBUTION_PROGRAM_ID, isSigner: false, isWritable: false }, // distribution_program
     { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
@@ -117,6 +122,26 @@ function getWNSRemainingAccounts(nftMint: PublicKey): { pubkey: PublicKey; isSig
     { pubkey: approveAccount, isSigner: false, isWritable: true },    // [1] approve_account
     { pubkey: WNS_PROGRAM_ID, isSigner: false, isWritable: false },   // [2] wns_program
   ];
+}
+
+/**
+ * Fetch the WNS collection/group address for a Token-2022 NFT.
+ * WNS NFTs use authorities[0].address as the group/collection address.
+ */
+async function getWNSCollectionAddress(nftMint: PublicKey): Promise<PublicKey> {
+  try {
+    const resp = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
+    const data = await resp.json();
+    const asset = data.nft || data;
+    // WNS authorities[0].address = collection/group address
+    if (asset.authorities?.[0]?.address) {
+      return new PublicKey(asset.authorities[0].address);
+    }
+  } catch (err) {
+    console.error("Failed to fetch WNS collection address:", err);
+  }
+  // Fallback: Quekz WNS authority
+  return new PublicKey("2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay");
 }
 
 export class AuctionProgram {
@@ -254,11 +279,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      // Build transaction manually to prepend approve IX
+      const wnsCollection = await getWNSCollectionAddress(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey, // seller is authority
         nftMint,
+        wnsCollection,
         0
       );
       const listIx = await builder.instruction();
@@ -335,11 +361,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      // Prepend approve IX (amount=0 — royalties handled separately later)
+      const wnsCollection = await getWNSCollectionAddress(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey, // buyer is authority for approve
         nftMint,
+        wnsCollection,
         0
       );
       const buyIx = await builder.instruction();
@@ -430,10 +457,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
+      const wnsCollection = await getWNSCollectionAddress(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey,
         nftMint,
+        wnsCollection,
         0
       );
       const cancelIx = await builder.instruction();
@@ -514,10 +543,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
+      const wnsCollection = await getWNSCollectionAddress(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey,
         nftMint,
+        wnsCollection,
         0
       );
       const settleIx = await builder.instruction();

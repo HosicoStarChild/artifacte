@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         royalty: asset.royalty || {},
         creators: asset.creators || [],
         mint_extensions: asset.mint_extensions || null,
+        authorities: asset.authorities || [],
       },
     });
   } catch (error) {
