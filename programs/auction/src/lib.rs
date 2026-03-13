@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::TokenInterface;
 
 declare_id!("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 
@@ -10,6 +11,14 @@ const TREASURY: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112"; // Wrapped SOL mint
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+// WNS Program IDs
+const WNS_PROGRAM: &str = "wns1gDLt8fgLcGhWi5MqAqgXpwEP1JftKE9eZnXS1HM";
+const DISTRIBUTION_PROGRAM: &str = "diste3nXmK7ddDTs1zb6uday6j4etCa9RChD8fJ1xay";
+
+// WNS Account seeds
+const APPROVE_ACCOUNT_SEED: &[u8] = b"approve-account";
+const EXTRA_METAS_ACCOUNT_SEED: &[u8] = b"extra-account-metas";
 
 #[program]
 pub mod auction {
@@ -41,6 +50,9 @@ pub mod auction {
             );
         }
 
+        // Detect if NFT mint is Token-2022
+        let is_token2022 = ctx.accounts.nft_token_program.key() != Token::id();
+
         listing.seller = ctx.accounts.seller.key();
         listing.nft_mint = ctx.accounts.nft_mint.key();
         listing.payment_mint = ctx.accounts.payment_mint.key();
@@ -58,17 +70,17 @@ pub mod auction {
         listing.current_bid = 0;
         listing.highest_bidder = Pubkey::default();
         listing.bump = ctx.bumps.listing;
+        listing.is_token2022 = is_token2022;
 
-        // Transfer NFT from seller to escrow
+        // Transfer NFT from seller to escrow (standard SPL Token path)
         let transfer_accounts = Transfer {
             from: ctx.accounts.seller_nft_account.to_account_info(),
             to: ctx.accounts.escrow_nft.to_account_info(),
             authority: ctx.accounts.seller.to_account_info(),
         };
-
         token::transfer(
             CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.nft_token_program.to_account_info(),
                 transfer_accounts,
             ),
             1,
@@ -172,7 +184,6 @@ pub mod auction {
     /// Buy a fixed-price listing immediately
     pub fn buy_now(ctx: Context<BuyNow>) -> Result<()> {
         let listing = &ctx.accounts.listing;
-        let clock = Clock::get()?;
 
         // Validate it's a fixed price listing
         require!(
@@ -255,17 +266,16 @@ pub mod auction {
             )?;
         }
 
-        // Transfer NFT from escrow to buyer
+        // Transfer NFT from escrow to buyer (uses escrow as authority)
         let escrow_nft_bump = listing.bump;
         let transfer_nft = Transfer {
             from: ctx.accounts.escrow_nft.to_account_info(),
             to: ctx.accounts.buyer_nft_account.to_account_info(),
             authority: ctx.accounts.escrow_nft.to_account_info(),
         };
-
         token::transfer(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.nft_token_program.to_account_info(),
                 transfer_nft,
                 &[&[
                     b"escrow_nft",
@@ -306,18 +316,16 @@ pub mod auction {
             );
         }
 
+        // Return NFT to seller (uses escrow as authority)
         let escrow_nft_bump = listing.bump;
-
-        // Return NFT to seller
         let transfer_nft = Transfer {
             from: ctx.accounts.escrow_nft.to_account_info(),
             to: ctx.accounts.seller_nft_account.to_account_info(),
             authority: ctx.accounts.escrow_nft.to_account_info(),
         };
-
         token::transfer(
             CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.nft_token_program.to_account_info(),
                 transfer_nft,
                 &[&[
                     b"escrow_nft",
@@ -359,14 +367,8 @@ pub mod auction {
             AuctionError::AuctionNotEnded
         );
 
-        let escrow_nft_bump = listing.bump;
         let bid_escrow_bump = ctx.bumps.bid_escrow;
         let nft_mint_key = listing.nft_mint;
-        let bid_escrow_seeds: &[&[&[u8]]] = &[&[
-            b"bid_escrow",
-            nft_mint_key.as_ref(),
-            &[bid_escrow_bump],
-        ]];
 
         if listing.current_bid > 0 {
             // Auction has bids: transfer to highest bidder and distribute payments
@@ -390,6 +392,12 @@ pub mod auction {
                 .ok_or(AuctionError::CalculationError)?
                 .checked_sub(creator_royalty)
                 .ok_or(AuctionError::CalculationError)?;
+
+            let bid_escrow_seeds: &[&[&[u8]]] = &[&[
+                b"bid_escrow",
+                nft_mint_key.as_ref(),
+                &[bid_escrow_bump],
+            ]];
 
             // Transfer payment to seller (bid_escrow is PDA, needs signer seeds)
             let transfer_seller = Transfer {
@@ -441,16 +449,16 @@ pub mod auction {
                 )?;
             }
 
-            // Transfer NFT to highest bidder
+            // Transfer NFT to highest bidder (uses escrow as authority)
+            let escrow_nft_bump = listing.bump;
             let transfer_nft = Transfer {
                 from: ctx.accounts.escrow_nft.to_account_info(),
                 to: ctx.accounts.buyer_nft_account.to_account_info(),
                 authority: ctx.accounts.escrow_nft.to_account_info(),
             };
-
             token::transfer(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
+                    ctx.accounts.nft_token_program.to_account_info(),
                     transfer_nft,
                     &[&[
                         b"escrow_nft",
@@ -471,15 +479,15 @@ pub mod auction {
             });
         } else {
             // No bids: return NFT to seller
+            let escrow_nft_bump = listing.bump;
             let transfer_nft = Transfer {
                 from: ctx.accounts.escrow_nft.to_account_info(),
                 to: ctx.accounts.seller_nft_account.to_account_info(),
                 authority: ctx.accounts.escrow_nft.to_account_info(),
             };
-
             token::transfer(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
+                    ctx.accounts.nft_token_program.to_account_info(),
                     transfer_nft,
                     &[&[
                         b"escrow_nft",
@@ -532,6 +540,14 @@ fn validate_category_and_payment(category: &ItemCategory, payment_mint: Pubkey) 
     Ok(())
 }
 
+// Token-2022/WNS support for future implementation
+// Currently using standard SPL Token transfer for all NFT transfers
+// To add Token-2022 support, the remaining_accounts pattern would be:
+// [0] approve_account PDA (["approve-account", mint], writable)
+// [1] extra_metas_account PDA (["extra-account-metas", mint], readonly)
+// [2] wns_program (readonly)
+// For detailed WNS integration, see the WNS program documentation
+
 // ============================================================================
 // Instructions
 // ============================================================================
@@ -562,6 +578,7 @@ pub struct ListItem<'info> {
     pub seller_nft_account: Account<'info, TokenAccount>,
     #[account(mut)]
     pub seller: Signer<'info>,
+    pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -590,10 +607,7 @@ pub struct PlaceBid<'info> {
 pub struct BuyNow<'info> {
     #[account(mut)]
     pub listing: Account<'info, Listing>,
-    #[account(
-        mut,
-        token::mint = listing.nft_mint,
-    )]
+    #[account(mut)]
     pub escrow_nft: Account<'info, TokenAccount>,
     #[account(mut)]
     pub buyer_payment_account: Account<'info, TokenAccount>,
@@ -608,6 +622,7 @@ pub struct BuyNow<'info> {
     pub buyer_nft_account: Account<'info, TokenAccount>,
     #[account(mut)]
     pub buyer: Signer<'info>,
+    pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -616,15 +631,12 @@ pub struct BuyNow<'info> {
 pub struct CancelListing<'info> {
     #[account(mut)]
     pub listing: Account<'info, Listing>,
-    #[account(
-        mut,
-        token::mint = listing.nft_mint,
-    )]
+    #[account(mut)]
     pub escrow_nft: Account<'info, TokenAccount>,
     #[account(mut)]
     pub seller_nft_account: Account<'info, TokenAccount>,
     pub seller: Signer<'info>,
-    pub token_program: Program<'info, Token>,
+    pub nft_token_program: Interface<'info, TokenInterface>,
 }
 
 #[derive(Accounts)]
@@ -638,10 +650,7 @@ pub struct SettleAuction<'info> {
         token::mint = listing.payment_mint,
     )]
     pub bid_escrow: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        token::mint = listing.nft_mint,
-    )]
+    #[account(mut)]
     pub escrow_nft: Account<'info, TokenAccount>,
     #[account(mut)]
     pub seller_payment_account: Account<'info, TokenAccount>,
@@ -654,6 +663,7 @@ pub struct SettleAuction<'info> {
     pub buyer_nft_account: Account<'info, TokenAccount>,
     #[account(mut)]
     pub seller_nft_account: Account<'info, TokenAccount>,
+    pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -700,6 +710,7 @@ pub struct Listing {
     pub current_bid: u64,
     pub highest_bidder: Pubkey,
     pub baxus_fee: bool, // true = 10% additional seller fee for BAXUS items
+    pub is_token2022: bool, // true = Token-2022/WNS NFT, false = standard SPL Token
     pub bump: u8,
 }
 
@@ -786,4 +797,10 @@ pub enum AuctionError {
     InvalidPaymentMint,
     #[msg("Price must be greater than zero")]
     InvalidPrice,
+    #[msg("Insufficient WNS remaining accounts")]
+    InsufficientWNSAccounts,
+    #[msg("WNS approve_transfer instruction failed")]
+    WNSApproveTransferFailed,
+    #[msg("WNS transfer_checked instruction failed")]
+    WNSTransferFailed,
 }
