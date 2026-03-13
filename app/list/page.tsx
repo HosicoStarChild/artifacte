@@ -174,8 +174,10 @@ export default function ListNFTPage() {
       setSubmitted(true);
     } catch (err: any) {
       console.error("Listing failed:", err);
-      setError(err.message || "Failed to list NFT");
-      showToast.error(err.message || "Failed to list NFT");
+      const msg = err?.message || err?.toString() || "Unknown error";
+      const shortMsg = msg.length > 200 ? msg.slice(0, 200) + "..." : msg;
+      setError(shortMsg);
+      showToast.error(shortMsg);
     } finally {
       setSubmitting(false);
     }
