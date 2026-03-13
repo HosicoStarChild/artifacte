@@ -1,4 +1,5 @@
-export const IDL = {
+export const IDL =
+{
   "address": "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3",
   "metadata": {
     "name": "auction",
@@ -295,6 +296,14 @@ export const IDL = {
               "name": "ItemCategory"
             }
           }
+        },
+        {
+          "name": "royalty_basis_points",
+          "type": "u16"
+        },
+        {
+          "name": "creator_address",
+          "type": "pubkey"
         }
       ]
     },
@@ -846,6 +855,14 @@ export const IDL = {
           {
             "name": "is_token2022",
             "type": "bool"
+          },
+          {
+            "name": "royalty_basis_points",
+            "type": "u16"
+          },
+          {
+            "name": "creator_address",
+            "type": "pubkey"
           },
           {
             "name": "bump",

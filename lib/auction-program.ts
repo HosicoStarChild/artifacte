@@ -133,6 +133,67 @@ export class AuctionProgram {
   }
 
   /**
+   * Fetch royalty info from NFT metadata via Helius DAS API.
+   * For WNS/Token-2022: reads from mint_extensions.metadata.additional_metadata
+   * For Metaplex: reads from creators[] array + royalty.basis_points
+   * Returns the primary creator (highest share) and basis points.
+   */
+  private async fetchRoyaltyInfo(
+    nftMint: PublicKey,
+    isToken2022: boolean
+  ): Promise<{ royaltyBps: number; creatorAddress: PublicKey }> {
+    try {
+      const resp = await fetch('/api/nft?mint=' + nftMint.toBase58());
+      const data = await resp.json();
+      const asset = data.nft || data;
+
+      if (isToken2022) {
+        // WNS: royalty info in mint_extensions.metadata.additional_metadata
+        const addlMeta = asset.mint_extensions?.metadata?.additional_metadata || [];
+        let bps = 0;
+        let bestAddr = '';
+        let bestShare = 0;
+
+        for (const [key, value] of addlMeta) {
+          if (key === 'royalty_basis_points') {
+            bps = parseInt(value) || 0;
+          } else {
+            // Creator address entries: address → share percentage
+            const share = parseInt(value);
+            if (!isNaN(share) && share > bestShare) {
+              bestShare = share;
+              bestAddr = key;
+            }
+          }
+        }
+
+        if (bps > 0 && bestAddr) {
+          return { royaltyBps: bps, creatorAddress: new PublicKey(bestAddr) };
+        }
+      }
+
+      // Metaplex standard: creators[] + royalty.basis_points
+      const bps = asset.royalty?.basis_points || 0;
+      const creators = asset.creators || [];
+      // Find primary creator (highest share)
+      let primaryCreator = SystemProgram.programId; // fallback
+      let maxShare = 0;
+      for (const c of creators) {
+        if (c.share > maxShare) {
+          maxShare = c.share;
+          primaryCreator = new PublicKey(c.address);
+        }
+      }
+
+      return { royaltyBps: bps, creatorAddress: primaryCreator };
+    } catch (err) {
+      console.error('Failed to fetch royalty info:', err);
+      // Default: 2% to treasury (our own minted NFTs)
+      return { royaltyBps: 200, creatorAddress: TREASURY_WALLET };
+    }
+  }
+
+  /**
    * List an NFT for sale (fixed price or auction)
    * Supports both standard SPL Token and Token-2022/WNS NFTs
    */
@@ -148,6 +209,9 @@ export class AuctionProgram {
     const nftTokenProgram = await detectTokenProgram(this.connection, nftMint);
     const isT22 = nftTokenProgram.equals(TOKEN_2022_PROGRAM_ID);
     const isWNS = isT22 ? await isWNSNft(this.connection, nftMint) : false;
+
+    // Fetch royalty info from NFT metadata via Helius DAS
+    const { royaltyBps, creatorAddress } = await this.fetchRoyaltyInfo(nftMint, isT22);
 
     const listing = PublicKey.findProgramAddressSync(
       [Buffer.from("listing"), nftMint.toBuffer()],
@@ -168,7 +232,9 @@ export class AuctionProgram {
         category === ItemCategory.Spirits ? { spirits: {} } :
         category === ItemCategory.TCGCards ? { tcgCards: {} } :
         category === ItemCategory.SportsCards ? { sportsCards: {} } :
-        { watches: {} }
+        { watches: {} },
+        royaltyBps,
+        creatorAddress
       )
       .accounts({
         listing,
@@ -240,6 +306,13 @@ export class AuctionProgram {
       TREASURY_WALLET
     );
 
+    // Fetch listing to get creator_address for royalty payment
+    const listingData = await this.program.account.listing.fetch(listing);
+    const creatorAddr = listingData.creatorAddress as PublicKey;
+    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddr)
+      : SystemProgram.programId;
+
     let builder = this.program.methods
       .buyNow()
       .accounts({
@@ -249,7 +322,7 @@ export class AuctionProgram {
         buyerPaymentAccount,
         sellerPaymentAccount,
         treasuryPaymentAccount,
-        creatorPaymentAccount: SystemProgram.programId,
+        creatorPaymentAccount,
         buyerNftAccount,
         buyer: this.wallet.publicKey,
         nftTokenProgram,
@@ -412,6 +485,13 @@ export class AuctionProgram {
       TREASURY_WALLET
     );
 
+    // Fetch listing to get creator_address for royalty payment
+    const listingData = await this.program.account.listing.fetch(listing);
+    const creatorAddr = listingData.creatorAddress as PublicKey;
+    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddr)
+      : SystemProgram.programId;
+
     let builder = this.program.methods
       .settleAuction()
       .accounts({
@@ -421,7 +501,7 @@ export class AuctionProgram {
         escrowNft,
         sellerPaymentAccount,
         treasuryPaymentAccount,
-        creatorPaymentAccount: SystemProgram.programId,
+        creatorPaymentAccount,
         buyerNftAccount,
         sellerNftAccount,
         nftTokenProgram,

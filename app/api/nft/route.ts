@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
         collection: collection?.group_value || metadata.symbol || "Unknown",
         description: metadata.description || "",
         symbol: metadata.symbol || "",
+        royalty: asset.royalty || {},
+        creators: asset.creators || [],
+        mint_extensions: asset.mint_extensions || null,
       },
     });
   } catch (error) {

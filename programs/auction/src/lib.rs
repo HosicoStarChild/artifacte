@@ -35,6 +35,8 @@ pub mod auction {
         price: u64,
         duration_seconds: Option<i64>,
         category: ItemCategory,
+        royalty_basis_points: u16,
+        creator_address: Pubkey,
     ) -> Result<()> {
         let clock = Clock::get()?;
         let listing = &mut ctx.accounts.listing;
@@ -75,6 +77,8 @@ pub mod auction {
         listing.highest_bidder = Pubkey::default();
         listing.baxus_fee = false;
         listing.is_token2022 = is_token2022;
+        listing.royalty_basis_points = royalty_basis_points;
+        listing.creator_address = creator_address;
         listing.bump = ctx.bumps.listing;
 
         // Transfer NFT from seller to escrow
@@ -224,7 +228,7 @@ pub mod auction {
         } else {
             0u64
         };
-        let creator_royalty = 0u64; // TODO: Read from metadata
+        let creator_royalty = (listing.price * listing.royalty_basis_points as u64) / 10000;
 
         let seller_amount = listing
             .price
@@ -261,7 +265,7 @@ pub mod auction {
             platform_fee + baxus_fee,
         )?;
 
-        // Creator royalty (when implemented)
+        // Creator royalty — always enforced
         if creator_royalty > 0 {
             token::transfer(
                 CpiContext::new(
@@ -438,7 +442,7 @@ pub mod auction {
             } else {
                 0u64
             };
-            let creator_royalty = 0u64; // TODO
+            let creator_royalty = (listing.current_bid * listing.royalty_basis_points as u64) / 10000;
 
             let seller_amount = listing
                 .current_bid
@@ -483,7 +487,7 @@ pub mod auction {
                 platform_fee + baxus_fee,
             )?;
 
-            // Creator royalty (when implemented)
+            // Creator royalty — always enforced
             if creator_royalty > 0 {
                 token::transfer(
                     CpiContext::new_with_signer(
@@ -637,7 +641,7 @@ fn validate_category_and_payment(category: &ItemCategory, payment_mint: Pubkey) 
 // ============================================================================
 
 #[derive(Accounts)]
-#[instruction(listing_type: ListingType, price: u64, duration_seconds: Option<i64>, category: ItemCategory)]
+#[instruction(listing_type: ListingType, price: u64, duration_seconds: Option<i64>, category: ItemCategory, royalty_basis_points: u16, creator_address: Pubkey)]
 pub struct ListItem<'info> {
     #[account(
         init,
@@ -741,15 +745,15 @@ pub struct CancelListing<'info> {
 #[derive(Accounts)]
 pub struct SettleAuction<'info> {
     #[account(mut)]
-    pub listing: Account<'info, Listing>,
-    pub nft_mint: InterfaceAccount<'info, IfaceMint>,
+    pub listing: Box<Account<'info, Listing>>,
+    pub nft_mint: Box<InterfaceAccount<'info, IfaceMint>>,
     #[account(
         mut,
         seeds = [b"bid_escrow", listing.nft_mint.as_ref()],
         bump,
         token::mint = listing.payment_mint,
     )]
-    pub bid_escrow: Account<'info, TokenAccount>,
+    pub bid_escrow: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         seeds = [b"escrow_nft", listing.nft_mint.as_ref()],
@@ -757,18 +761,18 @@ pub struct SettleAuction<'info> {
         token::mint = listing.nft_mint,
         token::token_program = nft_token_program,
     )]
-    pub escrow_nft: InterfaceAccount<'info, IfaceTokenAccount>,
+    pub escrow_nft: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     #[account(mut)]
-    pub seller_payment_account: Account<'info, TokenAccount>,
+    pub seller_payment_account: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    pub treasury_payment_account: Account<'info, TokenAccount>,
+    pub treasury_payment_account: Box<Account<'info, TokenAccount>>,
     /// CHECK: Creator payment account (may not exist yet)
     #[account(mut)]
     pub creator_payment_account: UncheckedAccount<'info>,
     #[account(mut)]
-    pub buyer_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
+    pub buyer_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     #[account(mut)]
-    pub seller_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
+    pub seller_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -817,6 +821,8 @@ pub struct Listing {
     pub highest_bidder: Pubkey,
     pub baxus_fee: bool,
     pub is_token2022: bool,
+    pub royalty_basis_points: u16,
+    pub creator_address: Pubkey,
     pub bump: u8,
 }
 
