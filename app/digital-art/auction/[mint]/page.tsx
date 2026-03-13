@@ -16,14 +16,16 @@ const TREASURY = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
 
 interface ListingData {
   seller: string;
-  nft_mint: string;
+  nftMint: string;
   price: number;
-  listing_type: { fixedPrice?: {}; auction?: {} };
+  listingType: { fixedPrice?: {}; auction?: {} };
   status: { active?: {}; settled?: {}; cancelled?: {} };
-  end_time: number;
-  current_bid: number;
-  highest_bidder: string;
-  escrow_nft_account: string;
+  endTime: number;
+  currentBid: number;
+  highestBidder: string;
+  escrowNftAccount: string;
+  royaltyBasisPoints: number;
+  creatorAddress: string;
 }
 
 interface NFTData {
@@ -54,7 +56,8 @@ export default function AuctionDetailPage() {
     setLoading(true);
     try {
       const nftMint = new PublicKey(mint);
-      const auctionProgram = new AuctionProgram(connection, { publicKey: PublicKey.default });
+      const dummyWallet = { publicKey: PublicKey.default, signTransaction: async (tx: any) => tx, signAllTransactions: async (txs: any) => txs };
+      const auctionProgram = new AuctionProgram(connection, dummyWallet as any);
 
       // Fetch listing from on-chain
       const listingData = await auctionProgram.fetchListing(nftMint);
@@ -64,7 +67,19 @@ export default function AuctionDetailPage() {
         return;
       }
 
-      setListing(listingData);
+      // Convert BN values to numbers and Pubkeys to strings
+      setListing({
+        ...listingData,
+        seller: listingData.seller?.toBase58?.() || listingData.seller,
+        nftMint: listingData.nftMint?.toBase58?.() || listingData.nftMint,
+        price: listingData.price?.toNumber?.() || Number(listingData.price),
+        endTime: listingData.endTime?.toNumber?.() || Number(listingData.endTime),
+        currentBid: listingData.currentBid?.toNumber?.() || Number(listingData.currentBid),
+        highestBidder: listingData.highestBidder?.toBase58?.() || listingData.highestBidder,
+        escrowNftAccount: listingData.escrowNftAccount?.toBase58?.() || listingData.escrowNftAccount,
+        creatorAddress: listingData.creatorAddress?.toBase58?.() || listingData.creatorAddress,
+        royaltyBasisPoints: listingData.royaltyBasisPoints || 0,
+      });
 
       // Fetch NFT metadata
       try {
@@ -82,11 +97,11 @@ export default function AuctionDetailPage() {
     }
   };
 
-  const isFixedPrice = listing?.listing_type.fixedPrice !== undefined;
-  const isAuction = listing?.listing_type.auction !== undefined;
+  const isFixedPrice = listing?.listingType?.fixedPrice !== undefined;
+  const isAuction = listing?.listingType?.auction !== undefined;
   const isSeller = listing?.seller === publicKey?.toBase58();
-  const isSettled = listing?.status.settled !== undefined;
-  const isCancelled = listing?.status.cancelled !== undefined;
+  const isSettled = listing?.status?.settled !== undefined;
+  const isCancelled = listing?.status?.cancelled !== undefined;
 
   const handleBuyNow = async () => {
     if (!publicKey || !connected || !wallet || !listing || !nft) {
@@ -134,8 +149,8 @@ export default function AuctionDetailPage() {
 
     const newBidLamports = Math.floor(parseFloat(bidAmount) * 1e9);
     const MIN_INCREMENT = 0.1 * 1e9; // 0.1 SOL
-    const minBid = listing.current_bid > 0
-      ? listing.current_bid + MIN_INCREMENT
+    const minBid = listing.currentBid > 0
+      ? listing.currentBid + MIN_INCREMENT
       : listing.price;
 
     if (newBidLamports < minBid) {
@@ -147,8 +162,8 @@ export default function AuctionDetailPage() {
     try {
       const nftMint = new PublicKey(mint);
       const bidderTokenAccount = await getAssociatedTokenAddress(SOL_MINT, publicKey);
-      const previousBidderAccount = listing.current_bid > 0
-        ? await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.highest_bidder))
+      const previousBidderAccount = listing.currentBid > 0
+        ? await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.highestBidder))
         : PublicKey.default;
 
       const auctionProgram = new AuctionProgram(connection, wallet);
@@ -181,7 +196,7 @@ export default function AuctionDetailPage() {
     try {
       const nftMint = new PublicKey(mint);
       const sellerPaymentAccount = await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.seller));
-      const buyerNftAccount = await getAssociatedTokenAddress(nftMint, new PublicKey(listing.highest_bidder));
+      const buyerNftAccount = await getAssociatedTokenAddress(nftMint, new PublicKey(listing.highestBidder));
       const sellerNftAccount = await getAssociatedTokenAddress(nftMint, new PublicKey(listing.seller));
 
       const auctionProgram = new AuctionProgram(connection, wallet);
@@ -306,7 +321,7 @@ export default function AuctionDetailPage() {
               <div className="bg-dark-800 border border-white/10 rounded-xl p-6">
                 <p className="text-gray-400 text-sm mb-4">Time Remaining</p>
                 <AuctionCountdownTimer
-                  endTime={listing.end_time}
+                  endTime={listing.endTime}
                   onEnded={() => setAuctionEnded(true)}
                 />
               </div>
@@ -322,12 +337,12 @@ export default function AuctionDetailPage() {
               ) : (
                 <div>
                   <p className="text-gray-400 text-sm mb-2">
-                    {listing.current_bid > 0 ? "Current Highest Bid" : "Starting Bid"}
+                    {listing.currentBid > 0 ? "Current Highest Bid" : "Starting Bid"}
                   </p>
-                  <p className="text-4xl font-serif text-gold-400">◎ {(Math.max(listing.price, listing.current_bid) / 1e9).toFixed(4)}</p>
-                  {listing.current_bid > 0 && (
+                  <p className="text-4xl font-serif text-gold-400">◎ {(Math.max(listing.price, listing.currentBid) / 1e9).toFixed(4)}</p>
+                  {listing.currentBid > 0 && (
                     <p className="text-gray-500 text-xs mt-2">
-                      Leading bidder: {listing.highest_bidder.slice(0, 4)}...{listing.highest_bidder.slice(-4)}
+                      Leading bidder: {listing.highestBidder.slice(0, 4)}...{listing.highestBidder.slice(-4)}
                     </p>
                   )}
                 </div>
@@ -346,7 +361,7 @@ export default function AuctionDetailPage() {
                       <input
                         type="number"
                         step="0.1"
-                        min={listing.current_bid > 0 ? (listing.current_bid + 0.1 * 1e9) / 1e9 : listing.price / 1e9}
+                        min={listing.currentBid > 0 ? (listing.currentBid + 0.1 * 1e9) / 1e9 : listing.price / 1e9}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
                         className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
@@ -354,7 +369,7 @@ export default function AuctionDetailPage() {
                       />
                     </div>
                     <p className="text-gray-500 text-xs mt-1">
-                      Minimum: ◎ {listing.current_bid > 0 ? ((listing.current_bid + 0.1 * 1e9) / 1e9).toFixed(2) : (listing.price / 1e9).toFixed(2)}
+                      Minimum: ◎ {listing.currentBid > 0 ? ((listing.currentBid + 0.1 * 1e9) / 1e9).toFixed(2) : (listing.price / 1e9).toFixed(2)}
                     </p>
                   </div>
 
@@ -406,7 +421,7 @@ export default function AuctionDetailPage() {
             )}
 
             {/* Settle Auction Button (for ended auctions) */}
-            {isAuction && auctionEnded && !isSettled && !isCancelled && listing.current_bid > 0 && (
+            {isAuction && auctionEnded && !isSettled && !isCancelled && listing.currentBid > 0 && (
               <button
                 onClick={handleSettleAuction}
                 disabled={loadingAction}
@@ -424,15 +439,15 @@ export default function AuctionDetailPage() {
             {isSeller && !isSettled && !isCancelled && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-gray-500 text-xs mb-3">
-                  {isAuction && listing.current_bid > 0
+                  {isAuction && listing.currentBid > 0
                     ? "Cannot cancel after bids have been placed"
                     : "You can cancel this listing anytime"}
                 </p>
                 <button
                   onClick={handleCancelListing}
-                  disabled={isAuction && listing.current_bid > 0 || loadingAction}
+                  disabled={isAuction && listing.currentBid > 0 || loadingAction}
                   className={`w-full py-2 rounded-lg font-semibold text-sm transition ${
-                    isAuction && listing.current_bid > 0 || loadingAction
+                    isAuction && listing.currentBid > 0 || loadingAction
                       ? "bg-gray-700 text-gray-400 cursor-not-allowed"
                       : "bg-red-900 hover:bg-red-800 text-red-100"
                   }`}
