@@ -46,8 +46,10 @@ export default function CategoryAuctionsPage() {
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
-  // Restore filters from sessionStorage on mount, with URL param override
+  // URL search params (triggers re-render on change)
   const urlSearchParams = useSearchParams();
+  const urlCcCategoryParam = urlSearchParams.get('ccCategory');
+  // Restore filters from sessionStorage on mount, with URL param override
   const storageKey = `artifacte-filters-${categorySlug}`;
   const [filters, setFilters] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {};
@@ -81,6 +83,21 @@ export default function CategoryAuctionsPage() {
     if (typeof window === 'undefined') return "";
     try { return sessionStorage.getItem(`${storageKey}-search`) || ""; } catch { return ""; }
   });
+
+  // Sync URL ccCategory param → filter state (handles navigation between carousels)
+  useEffect(() => {
+    if (!urlCcCategoryParam) return;
+    const reverseMap: Record<string, string> = {
+      'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
+      'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
+      'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
+    };
+    const tcgVal = reverseMap[urlCcCategoryParam] || urlCcCategoryParam;
+    if (filters.tcg !== tcgVal) {
+      setFilters({ tcg: tcgVal });
+      setPage(1);
+    }
+  }, [urlCcCategoryParam]);
 
   // Persist filters to sessionStorage on change
   useEffect(() => {
