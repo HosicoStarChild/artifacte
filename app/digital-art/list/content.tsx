@@ -37,6 +37,8 @@ export default function ListPageContent() {
   const [durationDays, setDurationDays] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [royaltyBps, setRoyaltyBps] = useState<number>(0);
+  const [loadingRoyalty, setLoadingRoyalty] = useState(false);
 
   // Load whitelisted collections
   const [collections, setCollections] = useState<Set<string>>(new Set());
@@ -70,9 +72,29 @@ export default function ListPageContent() {
       .finally(() => setLoadingNFTs(false));
   }, [connected, publicKey, collections]);
 
-  const handleSelectNFT = (nft: OwnedNFT) => {
+  const handleSelectNFT = async (nft: OwnedNFT) => {
     setSelectedNFT(nft);
     setStep("details");
+    setLoadingRoyalty(true);
+    try {
+      const resp = await fetch(`/api/nft?mint=${nft.mint}`);
+      const data = await resp.json();
+      const asset = data.nft || data;
+      // Check WNS mint_extensions first
+      const addlMeta = asset.mint_extensions?.metadata?.additional_metadata || [];
+      for (const [key, value] of addlMeta) {
+        if (key === 'royalty_basis_points') {
+          setRoyaltyBps(parseInt(value) || 0);
+          setLoadingRoyalty(false);
+          return;
+        }
+      }
+      // Fallback to Metaplex royalty
+      setRoyaltyBps(asset.royalty?.basis_points || 0);
+    } catch {
+      setRoyaltyBps(0);
+    }
+    setLoadingRoyalty(false);
   };
 
   const handleSubmitListing = async (e: React.FormEvent) => {
@@ -341,13 +363,25 @@ export default function ListPageContent() {
                   <span className="text-white font-medium">◎ {price}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Platform Fee (2% at settlement):</span>
-                  <span className="text-gray-300">◎ {(parseFloat(price) * 0.02).toFixed(4)}</span>
+                  <span className="text-gray-400">Platform Fee:</span>
+                  <span className="text-gray-300">2%</span>
                 </div>
-                <div className="border-t border-white/10 pt-2 mt-2 flex justify-between">
-                  <span className="text-gray-300">You'll receive after settlement:</span>
-                  <span className="text-gold-400 font-semibold">◎ {(parseFloat(price) * 0.98).toFixed(4)}</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Creator Royalty:</span>
+                  <span className="text-gray-300">{loadingRoyalty ? "..." : `${(royaltyBps / 100).toFixed(1)}%`}</span>
                 </div>
+                {(() => {
+                  const p = parseFloat(price);
+                  const totalFeeRate = 0.02 + royaltyBps / 10000;
+                  const youReceive = p * (1 - totalFeeRate);
+                  return (
+                    <div className="border-t border-white/10 pt-2 mt-2 flex justify-between">
+                      <span className="text-gray-300">You receive:</span>
+                      <span className="text-gold-400 font-semibold">◎ {youReceive.toFixed(4)}</span>
+                    </div>
+                  );
+                })()}
+                <p className="text-gray-600 text-xs pt-1">Fees are only charged when your item sells. No sale, no fee.</p>
               </div>
             )}
 
