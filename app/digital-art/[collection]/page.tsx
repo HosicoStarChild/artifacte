@@ -56,16 +56,36 @@ export default function CollectionPage() {
       );
       setCollection(col || null);
 
-      // Get approved listings for this collection
-      const lRes = await fetch(`/api/listings?status=approved&collection=${collectionAddress}`);
-      const lData = await lRes.json();
-      setListings(lData.listings || []);
+      // Find all addresses for this collection (e.g. Quekz has legacy + WNS)
+      const colName = col?.name;
+      const siblingAddresses: string[] = colName
+        ? (alData.collections || [])
+            .filter((c: any) => c.name === colName)
+            .map((c: any) => c.collectionAddress)
+        : [collectionAddress];
 
-      // Get user's NFTs from this collection
+      // Get approved listings for all sibling addresses
+      const listingResults = await Promise.all(
+        siblingAddresses.map((addr: string) =>
+          fetch(`/api/listings?status=approved&collection=${addr}`)
+            .then(r => r.json())
+            .then(d => d.listings || [])
+            .catch(() => [])
+        )
+      );
+      setListings(listingResults.flat());
+
+      // Get user's NFTs from all sibling addresses
       if (publicKey) {
-        const nRes = await fetch(`/api/nfts?owner=${publicKey.toBase58()}&collection=${collectionAddress}`);
-        const nData = await nRes.json();
-        setUserNFTs(nData.nfts || []);
+        const nftResults = await Promise.all(
+          siblingAddresses.map((addr: string) =>
+            fetch(`/api/nfts?owner=${publicKey.toBase58()}&collection=${addr}`)
+              .then(r => r.json())
+              .then(d => d.nfts || [])
+              .catch(() => [])
+          )
+        );
+        setUserNFTs(nftResults.flat());
       }
     } catch (err) {
       console.error("Failed to load collection:", err);
