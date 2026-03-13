@@ -117,12 +117,12 @@ function getWNSRemainingAccounts(nftMint: PublicKey): { pubkey: PublicKey; isSig
     WNS_PROGRAM_ID
   );
 
-  // Order must match what addExtraAccountMetasForExecute resolves:
-  // approve_account, wns_program, extra_account_metas
+  // Order must match Token-2022 CPI hook resolution:
+  // hook_program, extra_account_metas_pda, then resolved metas (approve_account)
   return [
-    { pubkey: approveAccount, isSigner: false, isWritable: true },    // [0] approve_account
-    { pubkey: WNS_PROGRAM_ID, isSigner: false, isWritable: false },   // [1] wns_program (hook program)
-    { pubkey: extraMetasPda, isSigner: false, isWritable: false },    // [2] extra_account_metas
+    { pubkey: WNS_PROGRAM_ID, isSigner: false, isWritable: false },   // [0] hook program
+    { pubkey: extraMetasPda, isSigner: false, isWritable: false },    // [1] extra_account_metas PDA
+    { pubkey: approveAccount, isSigner: false, isWritable: true },    // [2] approve_account (resolved from meta list)
   ];
 }
 

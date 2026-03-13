@@ -15,4 +15,5 @@ anchor-spl = { version = "0.31.1", features = ["token_2022"] }
 spl-token = { version = "6", features = ["no-entrypoint"] }
 spl-token-2022 = "6"
 spl-token-interface = "2.0"
+spl-transfer-hook-interface = "0.8"
 sha2 = "0.10"

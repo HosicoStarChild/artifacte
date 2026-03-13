@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
-use anchor_spl::token_2022;
 use anchor_spl::token_interface::{
     Mint as IfaceMint,
     TokenAccount as IfaceTokenAccount,
     TokenInterface,
 };
+use spl_token_2022::extension::BaseStateWithExtensions;
+use spl_transfer_hook_interface::onchain::add_extra_accounts_for_execute_cpi;
 
 declare_id!("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 
@@ -16,6 +17,74 @@ const TREASURY: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+/// Perform a Token-2022 transfer_checked CPI that properly supports transfer hooks.
+/// remaining_accounts must include the hook-related accounts (extra_metas, approve_account, hook_program).
+fn transfer_checked_with_hook<'info>(
+    token_program: &AccountInfo<'info>,
+    source: &AccountInfo<'info>,
+    mint: &AccountInfo<'info>,
+    destination: &AccountInfo<'info>,
+    authority: &AccountInfo<'info>,
+    remaining_accounts: &[AccountInfo<'info>],
+    amount: u64,
+    decimals: u8,
+    signer_seeds: &[&[&[u8]]],
+) -> Result<()> {
+    // Build the base transfer_checked instruction
+    let mut ix = spl_token_2022::instruction::transfer_checked(
+        token_program.key,
+        source.key,
+        mint.key,
+        destination.key,
+        authority.key,
+        &[],
+        amount,
+        decimals,
+    ).map_err(|_| AuctionError::TransferFailed)?;
+
+    // Collect all account infos for the CPI
+    let mut account_infos = vec![
+        source.clone(),
+        mint.clone(),
+        destination.clone(),
+        authority.clone(),
+    ];
+
+    // Find the transfer hook program ID from mint extensions
+    let mint_data = mint.try_borrow_data()?;
+    let mint_state = spl_token_2022::extension::StateWithExtensions::<spl_token_2022::state::Mint>::unpack(&mint_data)?;
+    let hook_program_id = if let Ok(hook) = mint_state.get_extension::<spl_token_2022::extension::transfer_hook::TransferHook>() {
+        let id: Option<Pubkey> = hook.program_id.into();
+        id
+    } else {
+        None
+    };
+    drop(mint_data);
+
+    if let Some(hook_id) = hook_program_id {
+        // Add extra accounts for transfer hook execution
+        add_extra_accounts_for_execute_cpi(
+            &mut ix,
+            &mut account_infos,
+            &hook_id,
+            source.clone(),
+            mint.clone(),
+            destination.clone(),
+            authority.clone(),
+            amount,
+            remaining_accounts,
+        ).map_err(|_| AuctionError::TransferFailed)?;
+    }
+
+    // Invoke with or without signer seeds
+    if signer_seeds.is_empty() {
+        anchor_lang::solana_program::program::invoke(&ix, &account_infos)?;
+    } else {
+        anchor_lang::solana_program::program::invoke_signed(&ix, &account_infos, signer_seeds)?;
+    }
+    Ok(())
+}
 
 #[program]
 pub mod auction {
@@ -83,24 +152,17 @@ pub mod auction {
 
         // Transfer NFT from seller to escrow
         if is_token2022 {
-            // Token-2022: use transfer_checked (hook fires, approve must be in same tx)
-            require!(ctx.remaining_accounts.len() >= 3, AuctionError::InsufficientWNSAccounts);
-            token_2022::transfer_checked(
-                CpiContext::new(
-                    ctx.accounts.nft_token_program.to_account_info(),
-                    token_2022::TransferChecked {
-                        from: ctx.accounts.seller_nft_account.to_account_info(),
-                        mint: ctx.accounts.nft_mint.to_account_info(),
-                        to: ctx.accounts.escrow_nft.to_account_info(),
-                        authority: ctx.accounts.seller.to_account_info(),
-                    },
-                ).with_remaining_accounts(vec![
-                    ctx.remaining_accounts[0].clone(), // extra_metas
-                    ctx.remaining_accounts[1].clone(), // approve_account
-                    ctx.remaining_accounts[2].clone(), // wns_program
-                ]),
+            // Token-2022 with transfer hook: use proper hook-aware CPI
+            transfer_checked_with_hook(
+                &ctx.accounts.nft_token_program.to_account_info(),
+                &ctx.accounts.seller_nft_account.to_account_info(),
+                &ctx.accounts.nft_mint.to_account_info(),
+                &ctx.accounts.escrow_nft.to_account_info(),
+                &ctx.accounts.seller.to_account_info(),
+                ctx.remaining_accounts,
                 1,
                 0,
+                &[],
             )?;
         } else {
             // Standard SPL Token
@@ -290,24 +352,17 @@ pub mod auction {
         ];
 
         if listing.is_token2022 {
-            require!(ctx.remaining_accounts.len() >= 3, AuctionError::InsufficientWNSAccounts);
-            token_2022::transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.nft_token_program.to_account_info(),
-                    token_2022::TransferChecked {
-                        from: ctx.accounts.escrow_nft.to_account_info(),
-                        mint: ctx.accounts.nft_mint.to_account_info(),
-                        to: ctx.accounts.buyer_nft_account.to_account_info(),
-                        authority: ctx.accounts.escrow_nft.to_account_info(),
-                    },
-                    &[escrow_seeds],
-                ).with_remaining_accounts(vec![
-                    ctx.remaining_accounts[0].clone(),
-                    ctx.remaining_accounts[1].clone(),
-                    ctx.remaining_accounts[2].clone(),
-                ]),
+            // Token-2022 with transfer hook: escrow → buyer
+            transfer_checked_with_hook(
+                &ctx.accounts.nft_token_program.to_account_info(),
+                &ctx.accounts.escrow_nft.to_account_info(),
+                &ctx.accounts.nft_mint.to_account_info(),
+                &ctx.accounts.buyer_nft_account.to_account_info(),
+                &ctx.accounts.escrow_nft.to_account_info(),
+                ctx.remaining_accounts,
                 1,
                 0,
+                &[escrow_seeds],
             )?;
         } else {
             token::transfer(
@@ -365,24 +420,17 @@ pub mod auction {
         ];
 
         if listing.is_token2022 {
-            require!(ctx.remaining_accounts.len() >= 3, AuctionError::InsufficientWNSAccounts);
-            token_2022::transfer_checked(
-                CpiContext::new_with_signer(
-                    ctx.accounts.nft_token_program.to_account_info(),
-                    token_2022::TransferChecked {
-                        from: ctx.accounts.escrow_nft.to_account_info(),
-                        mint: ctx.accounts.nft_mint.to_account_info(),
-                        to: ctx.accounts.seller_nft_account.to_account_info(),
-                        authority: ctx.accounts.escrow_nft.to_account_info(),
-                    },
-                    &[escrow_seeds],
-                ).with_remaining_accounts(vec![
-                    ctx.remaining_accounts[0].clone(),
-                    ctx.remaining_accounts[1].clone(),
-                    ctx.remaining_accounts[2].clone(),
-                ]),
+            // Token-2022 with transfer hook: escrow → seller (cancel)
+            transfer_checked_with_hook(
+                &ctx.accounts.nft_token_program.to_account_info(),
+                &ctx.accounts.escrow_nft.to_account_info(),
+                &ctx.accounts.nft_mint.to_account_info(),
+                &ctx.accounts.seller_nft_account.to_account_info(),
+                &ctx.accounts.escrow_nft.to_account_info(),
+                ctx.remaining_accounts,
                 1,
                 0,
+                &[escrow_seeds],
             )?;
         } else {
             token::transfer(
@@ -511,24 +559,17 @@ pub mod auction {
             ];
 
             if listing.is_token2022 {
-                require!(ctx.remaining_accounts.len() >= 3, AuctionError::InsufficientWNSAccounts);
-                token_2022::transfer_checked(
-                    CpiContext::new_with_signer(
-                        ctx.accounts.nft_token_program.to_account_info(),
-                        token_2022::TransferChecked {
-                            from: ctx.accounts.escrow_nft.to_account_info(),
-                            mint: ctx.accounts.nft_mint.to_account_info(),
-                            to: ctx.accounts.buyer_nft_account.to_account_info(),
-                            authority: ctx.accounts.escrow_nft.to_account_info(),
-                        },
-                        &[nft_escrow_seeds],
-                    ).with_remaining_accounts(vec![
-                        ctx.remaining_accounts[0].clone(),
-                        ctx.remaining_accounts[1].clone(),
-                        ctx.remaining_accounts[2].clone(),
-                    ]),
+                // Token-2022 with transfer hook: escrow → winner
+                transfer_checked_with_hook(
+                    &ctx.accounts.nft_token_program.to_account_info(),
+                    &ctx.accounts.escrow_nft.to_account_info(),
+                    &ctx.accounts.nft_mint.to_account_info(),
+                    &ctx.accounts.buyer_nft_account.to_account_info(),
+                    &ctx.accounts.escrow_nft.to_account_info(),
+                    ctx.remaining_accounts,
                     1,
                     0,
+                    &[nft_escrow_seeds],
                 )?;
             } else {
                 token::transfer(
@@ -562,24 +603,17 @@ pub mod auction {
             ];
 
             if listing.is_token2022 {
-                require!(ctx.remaining_accounts.len() >= 3, AuctionError::InsufficientWNSAccounts);
-                token_2022::transfer_checked(
-                    CpiContext::new_with_signer(
-                        ctx.accounts.nft_token_program.to_account_info(),
-                        token_2022::TransferChecked {
-                            from: ctx.accounts.escrow_nft.to_account_info(),
-                            mint: ctx.accounts.nft_mint.to_account_info(),
-                            to: ctx.accounts.seller_nft_account.to_account_info(),
-                            authority: ctx.accounts.escrow_nft.to_account_info(),
-                        },
-                        &[nft_escrow_seeds],
-                    ).with_remaining_accounts(vec![
-                        ctx.remaining_accounts[0].clone(),
-                        ctx.remaining_accounts[1].clone(),
-                        ctx.remaining_accounts[2].clone(),
-                    ]),
+                // Token-2022 with transfer hook: escrow → seller (no bids)
+                transfer_checked_with_hook(
+                    &ctx.accounts.nft_token_program.to_account_info(),
+                    &ctx.accounts.escrow_nft.to_account_info(),
+                    &ctx.accounts.nft_mint.to_account_info(),
+                    &ctx.accounts.seller_nft_account.to_account_info(),
+                    &ctx.accounts.escrow_nft.to_account_info(),
+                    ctx.remaining_accounts,
                     1,
                     0,
+                    &[nft_escrow_seeds],
                 )?;
             } else {
                 token::transfer(
@@ -911,4 +945,6 @@ pub enum AuctionError {
     InvalidPrice,
     #[msg("Insufficient WNS remaining accounts for Token-2022 transfer")]
     InsufficientWNSAccounts,
+    #[msg("Token-2022 transfer with hook failed")]
+    TransferFailed,
 }
