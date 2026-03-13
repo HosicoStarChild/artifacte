@@ -74,9 +74,8 @@ function buildWNSApproveInstruction(
   );
 
   // Anchor discriminator for "approve_transfer": sha256("global:approve_transfer")[..8]
-  const crypto = require("crypto");
-  const hash = crypto.createHash("sha256").update("global:approve_transfer").digest();
-  const discriminator = hash.slice(0, 8);
+  // Hardcoded to avoid require("crypto") which doesn't work in browser
+  const discriminator = Buffer.from([198, 217, 247, 150, 208, 60, 169, 244]);
 
   // Instruction data: discriminator + amount (u64 LE)
   const data = Buffer.alloc(16);
