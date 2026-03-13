@@ -35,6 +35,8 @@ export default function ListNFTPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [allowedCollections, setAllowedCollections] = useState<Record<string, string>>({});
+  const [royaltyBps, setRoyaltyBps] = useState<number>(0);
+  const [loadingRoyalty, setLoadingRoyalty] = useState(false);
 
   // Digital Art = collection gate only, no wallet whitelist needed
   useEffect(() => {
@@ -267,7 +269,26 @@ export default function ListNFTPage() {
                   return (
                     <button
                       key={nft.id}
-                      onClick={() => setSelectedNft(nft)}
+                      onClick={() => {
+                        setSelectedNft(nft);
+                        setLoadingRoyalty(true);
+                        fetch(`/api/nft?mint=${nft.id}`)
+                          .then(r => r.json())
+                          .then(data => {
+                            const asset = data.nft || data;
+                            const addlMeta = asset.mint_extensions?.metadata?.additional_metadata || [];
+                            for (const [key, value] of addlMeta) {
+                              if (key === 'royalty_basis_points') {
+                                setRoyaltyBps(parseInt(value) || 0);
+                                setLoadingRoyalty(false);
+                                return;
+                              }
+                            }
+                            setRoyaltyBps(asset.royalty?.basis_points || 0);
+                            setLoadingRoyalty(false);
+                          })
+                          .catch(() => { setRoyaltyBps(0); setLoadingRoyalty(false); });
+                      }}
                       className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden text-left hover:border-gold-500/50 transition group"
                     >
                       <div className="aspect-square bg-dark-700 relative overflow-hidden">
@@ -396,12 +417,12 @@ export default function ListNFTPage() {
                 </div>
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-gray-500">Creator royalty</span>
-                  <span className="text-white">2%</span>
+                  <span className="text-white">{loadingRoyalty ? "..." : `${(royaltyBps / 100).toFixed(1)}%`}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
                   <span className="text-gray-500">You receive</span>
                   <span className="text-gold-400 font-semibold">
-                    {price ? `◎ ${(parseFloat(price) * 0.96).toFixed(2)}` : "—"}
+                    {price ? `◎ ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
                   </span>
                 </div>
                 <p className="text-gray-600 text-[10px] mt-3">Fees are only charged when your item sells. No sale, no fee.</p>
