@@ -54,12 +54,13 @@ export default function CategoryAuctionsPage() {
     // URL param takes priority (e.g. ?ccCategory=Pokemon from homepage)
     const urlCcCategory = new URLSearchParams(window.location.search).get('ccCategory');
     if (urlCcCategory) {
+      // Map URL param to dropdown option values (must match exactly)
       const reverseMap: Record<string, string> = {
-        'Pokemon': 'pokemon', 'One Piece': 'one piece', 'One+Piece': 'one piece',
-        'Yu-Gi-Oh': 'yu-gi-oh', 'Dragon Ball': 'dragon ball z', 'Lorcana': 'lorcana',
-        'Magic: The Gathering': 'magic',
+        'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
+        'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
+        'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
       };
-      const tcgVal = reverseMap[urlCcCategory] || urlCcCategory.toLowerCase();
+      const tcgVal = reverseMap[urlCcCategory] || urlCcCategory;
       return { tcg: tcgVal };
     }
     try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
