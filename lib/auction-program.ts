@@ -58,7 +58,7 @@ function buildWNSApproveInstruction(
   payer: PublicKey,
   authority: PublicKey,
   mint: PublicKey,
-  collectionAddress: PublicKey,
+  groupMint: PublicKey,
   amount: number = 0
 ): TransactionInstruction {
   const [approveAccount] = PublicKey.findProgramAddressSync(
@@ -66,9 +66,10 @@ function buildWNSApproveInstruction(
     WNS_PROGRAM_ID
   );
 
-  // Distribution account PDA: seeds = ["distribution", collection_address]
+  // Distribution account PDA: seeds = [group_mint, payment_mint]
+  // payment_mint = SystemProgram (SOL) for amount=0 transfers
   const [distributionAccount] = PublicKey.findProgramAddressSync(
-    [Buffer.from("distribution"), collectionAddress.toBuffer()],
+    [groupMint.toBuffer(), SystemProgram.programId.toBuffer()],
     WNS_DISTRIBUTION_PROGRAM_ID
   );
 
@@ -124,24 +125,36 @@ function getWNSRemainingAccounts(nftMint: PublicKey): { pubkey: PublicKey; isSig
   ];
 }
 
+// WNS authority → group mint mapping for distribution PDA derivation
+// Distribution PDA seeds: [group_mint, payment_mint] under distribution program
+// The group_mint is the Token-2022 collection NFT mint, NOT the authority address
+const WNS_GROUP_MINT_MAP: Record<string, string> = {
+  // Quekz WNS: authority → group mint
+  "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay": "98AmC3VCiJvrntZqR4Uv8fzoESdsSGrrshZ3e2WqiYgf",
+};
+
 /**
- * Fetch the WNS collection/group address for a Token-2022 NFT.
- * WNS NFTs use authorities[0].address as the group/collection address.
+ * Get the WNS group mint for a Token-2022 NFT.
+ * Uses the authority from Helius DAS to look up the group mint.
  */
-async function getWNSCollectionAddress(nftMint: PublicKey): Promise<PublicKey> {
+async function getWNSGroupMint(nftMint: PublicKey): Promise<PublicKey> {
   try {
     const resp = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
     const data = await resp.json();
     const asset = data.nft || data;
-    // WNS authorities[0].address = collection/group address
-    if (asset.authorities?.[0]?.address) {
-      return new PublicKey(asset.authorities[0].address);
+    const authority = asset.authorities?.[0]?.address;
+    if (authority && WNS_GROUP_MINT_MAP[authority]) {
+      return new PublicKey(WNS_GROUP_MINT_MAP[authority]);
+    }
+    // If not in map, try authority as group mint (may work for some collections)
+    if (authority) {
+      return new PublicKey(authority);
     }
   } catch (err) {
-    console.error("Failed to fetch WNS collection address:", err);
+    console.error("Failed to fetch WNS group mint:", err);
   }
-  // Fallback: Quekz WNS authority
-  return new PublicKey("2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay");
+  // Fallback: Quekz group mint
+  return new PublicKey("98AmC3VCiJvrntZqR4Uv8fzoESdsSGrrshZ3e2WqiYgf");
 }
 
 export class AuctionProgram {
@@ -279,12 +292,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      const wnsCollection = await getWNSCollectionAddress(nftMint);
+      const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey, // seller is authority
         nftMint,
-        wnsCollection,
+        wnsGroupMint,
         0
       );
       const listIx = await builder.instruction();
@@ -361,12 +374,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      const wnsCollection = await getWNSCollectionAddress(nftMint);
+      const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey, // buyer is authority for approve
         nftMint,
-        wnsCollection,
+        wnsGroupMint,
         0
       );
       const buyIx = await builder.instruction();
@@ -457,12 +470,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      const wnsCollection = await getWNSCollectionAddress(nftMint);
+      const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey,
         nftMint,
-        wnsCollection,
+        wnsGroupMint,
         0
       );
       const cancelIx = await builder.instruction();
@@ -543,12 +556,12 @@ export class AuctionProgram {
     }
 
     if (isWNS) {
-      const wnsCollection = await getWNSCollectionAddress(nftMint);
+      const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
         this.wallet.publicKey,
         nftMint,
-        wnsCollection,
+        wnsGroupMint,
         0
       );
       const settleIx = await builder.instruction();
