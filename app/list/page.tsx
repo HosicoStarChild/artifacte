@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import Link from "next/link";
 import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
@@ -150,8 +150,13 @@ export default function ListNFTPage() {
       const priceInLamports = Math.floor(parseFloat(price) * 1e9);
       const durationSeconds = listingType === "auction" ? parseInt(auctionDuration) * 3600 : undefined;
 
-      // Get user's NFT token account
-      const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey);
+      // Get user's NFT token account (detect Token-2022 vs standard SPL)
+      const mintAccountInfo = await connection.getAccountInfo(nftMint);
+      const isToken2022 = mintAccountInfo?.owner.equals(TOKEN_2022_PROGRAM_ID);
+      const sellerNftAccount = await getAssociatedTokenAddress(
+        nftMint, publicKey, false,
+        isToken2022 ? TOKEN_2022_PROGRAM_ID : undefined
+      );
 
       const auctionProgram = new AuctionProgram(connection, wallet.adapter);
 
