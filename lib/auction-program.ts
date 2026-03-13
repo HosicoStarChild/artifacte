@@ -111,7 +111,7 @@ export class AuctionProgram {
 
     const creatorPaymentAccount = await getAssociatedTokenAddress(
       paymentMint,
-      new PublicKey("1111111111111111111111111111111111111111111")
+      SystemProgram.programId
     );
 
     const tx = await this.program.methods
@@ -232,7 +232,7 @@ export class AuctionProgram {
 
     const creatorPaymentAccount = await getAssociatedTokenAddress(
       paymentMint,
-      new PublicKey("1111111111111111111111111111111111111111111")
+      SystemProgram.programId
     );
 
     const tx = await this.program.methods
