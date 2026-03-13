@@ -64,10 +64,10 @@ export default function CollectionPage() {
             .map((c: any) => c.collectionAddress)
         : [collectionAddress];
 
-      // Get approved listings for all sibling addresses
+      // Get active on-chain listings for all sibling addresses
       const listingResults = await Promise.all(
         siblingAddresses.map((addr: string) =>
-          fetch(`/api/listings?status=approved&collection=${addr}`)
+          fetch(`/api/on-chain-listings?collection=${addr}`)
             .then(r => r.json())
             .then(d => d.listings || [])
             .catch(() => [])
@@ -218,9 +218,9 @@ export default function CollectionPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {listings.map((nft) => (
+              {listings.map((nft: any) => (
                 <Link
-                  key={nft.id}
+                  key={nft.nftMint}
                   href={`/digital-art/auction/${nft.nftMint}`}
                   className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden group hover:border-gold-500/30 transition"
                 >
@@ -239,7 +239,7 @@ export default function CollectionPage() {
                         <p className="text-gray-500 text-[10px] uppercase">
                           {nft.listingType === "auction" ? "Current Bid" : "Price"}
                         </p>
-                        <p className="text-white font-semibold text-sm">◎ {nft.price}</p>
+                        <p className="text-white font-semibold text-sm">◎ {nft.currentBid > 0 ? nft.currentBid : nft.price}</p>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                         nft.listingType === "auction"
