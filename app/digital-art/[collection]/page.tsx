@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-
+import { useWallet } from "@solana/wallet-adapter-react";
 
 interface CollectionInfo {
   collectionAddress: string;
@@ -23,16 +23,27 @@ interface ListedNFT {
   status: string;
 }
 
+interface UserNFT {
+  mint: string;
+  name: string;
+  image: string;
+  collection: string;
+}
+
 export default function CollectionPage() {
   const params = useParams();
   const collectionAddress = params.collection as string;
+  const { publicKey } = useWallet();
+
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [listings, setListings] = useState<ListedNFT[]>([]);
+  const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showUserNFTs, setShowUserNFTs] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [collectionAddress]);
+  }, [collectionAddress, publicKey]);
 
   async function loadData() {
     setLoading(true);
@@ -49,6 +60,13 @@ export default function CollectionPage() {
       const lRes = await fetch(`/api/listings?status=approved&collection=${collectionAddress}`);
       const lData = await lRes.json();
       setListings(lData.listings || []);
+
+      // Get user's NFTs from this collection
+      if (publicKey) {
+        const nRes = await fetch(`/api/nfts?owner=${publicKey.toBase58()}&collection=${collectionAddress}`);
+        const nData = await nRes.json();
+        setUserNFTs(nData.nfts || []);
+      }
     } catch (err) {
       console.error("Failed to load collection:", err);
     } finally {
@@ -115,59 +133,108 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        {/* Listings */}
-        {listings.length === 0 ? (
-          <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
-            <div className="text-5xl mb-4">📭</div>
-            <h2 className="font-serif text-xl text-white mb-2">No Listings Yet</h2>
-            <p className="text-gray-400 mb-6 text-sm">
-              No NFTs from this collection are currently listed on Artifacte.
-            </p>
-            <Link
-              href="/list"
-              className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm"
-            >
-              List Your {collection.name} NFT
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {listings.map((nft) => (
-              <Link
-                key={nft.id}
-                href={`/auctions/${nft.nftMint}`}
-                className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden group hover:border-gold-500/30 transition"
+        {/* User NFTs Section */}
+        {userNFTs.length > 0 && (
+          <div className="mb-16">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-2xl text-white">Your NFTs</h2>
+              <button
+                onClick={() => setShowUserNFTs(!showUserNFTs)}
+                className="text-gold-400 hover:text-gold-300 text-sm transition"
               >
-                <div className="aspect-square overflow-hidden bg-dark-700">
-                  <img
-                    src={nft.nftImage}
-                    alt={nft.nftName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
-                  />
-                </div>
-                <div className="p-3">
-                  <p className="text-white text-sm font-semibold truncate">{nft.nftName}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <div>
-                      <p className="text-gray-500 text-[10px] uppercase">
-                        {nft.listingType === "auction" ? "Current Bid" : "Price"}
-                      </p>
-                      <p className="text-white font-semibold text-sm">◎ {nft.price}</p>
+                {showUserNFTs ? "Hide" : "Show"}
+              </button>
+            </div>
+
+            {showUserNFTs && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {userNFTs.map((nft) => (
+                  <div
+                    key={nft.mint}
+                    className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden group hover:border-gold-500/30 transition"
+                  >
+                    <div className="aspect-square overflow-hidden bg-dark-700">
+                      <img
+                        src={nft.image}
+                        alt={nft.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+                      />
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      nft.listingType === "auction"
-                        ? "bg-purple-900/40 text-purple-300 border border-purple-700"
-                        : "bg-green-900/40 text-green-300 border border-green-700"
-                    }`}>
-                      {nft.listingType === "auction" ? "Auction" : "Buy Now"}
-                    </span>
+                    <div className="p-3">
+                      <p className="text-white text-sm font-semibold truncate">{nft.name}</p>
+                      <Link
+                        href={`/digital-art/list?mint=${nft.mint}`}
+                        className="mt-2 block w-full text-center py-2 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold text-xs rounded transition"
+                      >
+                        List Item
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                ))}
+              </div>
+            )}
           </div>
         )}
+
+        {/* Active Listings */}
+        <div>
+          <h2 className="font-serif text-2xl text-white mb-6">Active Listings</h2>
+          {listings.length === 0 ? (
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
+              <div className="text-5xl mb-4">📭</div>
+              <h3 className="font-serif text-xl text-white mb-2">No Listings Yet</h3>
+              <p className="text-gray-400 mb-6 text-sm">
+                No NFTs from this collection are currently listed on Artifacte.
+              </p>
+              {userNFTs.length > 0 && (
+                <Link
+                  href={`/digital-art/list?collection=${collectionAddress}`}
+                  className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm"
+                >
+                  List Your {collection.name} NFT
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {listings.map((nft) => (
+                <Link
+                  key={nft.id}
+                  href={`/digital-art/auction/${nft.nftMint}`}
+                  className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden group hover:border-gold-500/30 transition"
+                >
+                  <div className="aspect-square overflow-hidden bg-dark-700">
+                    <img
+                      src={nft.nftImage}
+                      alt={nft.nftName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
+                    />
+                  </div>
+                  <div className="p-3">
+                    <p className="text-white text-sm font-semibold truncate">{nft.nftName}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <div>
+                        <p className="text-gray-500 text-[10px] uppercase">
+                          {nft.listingType === "auction" ? "Current Bid" : "Price"}
+                        </p>
+                        <p className="text-white font-semibold text-sm">◎ {nft.price}</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        nft.listingType === "auction"
+                          ? "bg-purple-900/40 text-purple-300 border border-purple-700"
+                          : "bg-green-900/40 text-green-300 border border-green-700"
+                      }`}>
+                        {nft.listingType === "auction" ? "Auction" : "Buy Now"}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
