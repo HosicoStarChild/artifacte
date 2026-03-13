@@ -202,6 +202,7 @@ export default function PriceHistory({ cardName, category, grade, year, nftAddre
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
         chartParams.set("q", searchQuery);
+        if (grade) chartParams.set("grade", grade);
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
