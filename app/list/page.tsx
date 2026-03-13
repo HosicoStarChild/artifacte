@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import Link from "next/link";
+import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
+import { showToast } from "@/components/ToastContainer";
 
 interface NFTAsset {
   id: string;
@@ -22,7 +26,8 @@ interface WhitelistStatus {
 }
 
 export default function ListNFTPage() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, wallet } = useWallet();
+  const { connection } = useConnection();
   const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
   const [nfts, setNfts] = useState<NFTAsset[]>([]);
   const [loadingNfts, setLoadingNfts] = useState(false);
@@ -136,32 +141,36 @@ export default function ListNFTPage() {
   }
 
   async function handleSubmit() {
-    if (!selectedNft || !price || !publicKey) return;
+    if (!selectedNft || !price || !publicKey || !wallet) return;
     setSubmitting(true);
     setError("");
     try {
-      const collection = getNftCollection(selectedNft);
-      const res = await fetch("/api/listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nftMint: selectedNft.id,
-          nftName: selectedNft.content?.metadata?.name || "Unknown",
-          nftImage: getNftImage(selectedNft),
-          collectionName: collection?.name || "Unknown",
-          collectionAddress: collection?.address || "",
-          seller: publicKey.toBase58(),
-          price: parseFloat(price),
-          listingType,
-          auctionDuration: listingType === "auction" ? parseInt(auctionDuration) : undefined,
-          description,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit");
+      const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+      const nftMint = new PublicKey(selectedNft.id);
+      const priceInLamports = Math.floor(parseFloat(price) * 1e9);
+      const durationSeconds = listingType === "auction" ? parseInt(auctionDuration) * 3600 : undefined;
+
+      // Get user's NFT token account
+      const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey);
+
+      const auctionProgram = new AuctionProgram(connection, wallet.adapter);
+
+      const tx = await auctionProgram.listItem(
+        nftMint,
+        sellerNftAccount,
+        SOL_MINT,
+        listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
+        priceInLamports,
+        durationSeconds,
+        ItemCategory.DigitalArt
+      );
+
+      showToast.success("NFT listed successfully!");
       setSubmitted(true);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Listing failed:", err);
+      setError(err.message || "Failed to list NFT");
+      showToast.error(err.message || "Failed to list NFT");
     } finally {
       setSubmitting(false);
     }
