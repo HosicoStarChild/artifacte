@@ -108,9 +108,10 @@ pub mod auction {
             AuctionError::AuctionEnded
         );
 
-        // Validate bid amount
+        // Validate bid amount (minimum 0.1 SOL / 100_000_000 lamports increment)
+        let min_increment: u64 = 100_000_000; // 0.1 SOL
         let min_bid = if listing.current_bid > 0 {
-            listing.current_bid + 1
+            listing.current_bid + min_increment
         } else {
             listing.price
         };
@@ -359,6 +360,13 @@ pub mod auction {
         );
 
         let escrow_nft_bump = listing.bump;
+        let bid_escrow_bump = ctx.bumps.bid_escrow;
+        let nft_mint_key = listing.nft_mint;
+        let bid_escrow_seeds: &[&[&[u8]]] = &[&[
+            b"bid_escrow",
+            nft_mint_key.as_ref(),
+            &[bid_escrow_bump],
+        ]];
 
         if listing.current_bid > 0 {
             // Auction has bids: transfer to highest bidder and distribute payments
@@ -383,7 +391,7 @@ pub mod auction {
                 .checked_sub(creator_royalty)
                 .ok_or(AuctionError::CalculationError)?;
 
-            // Transfer payment to seller
+            // Transfer payment to seller (bid_escrow is PDA, needs signer seeds)
             let transfer_seller = Transfer {
                 from: ctx.accounts.bid_escrow.to_account_info(),
                 to: ctx.accounts.seller_payment_account.to_account_info(),
@@ -391,9 +399,10 @@ pub mod auction {
             };
 
             token::transfer(
-                CpiContext::new(
+                CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
                     transfer_seller,
+                    bid_escrow_seeds,
                 ),
                 seller_amount,
             )?;
@@ -406,9 +415,10 @@ pub mod auction {
             };
 
             token::transfer(
-                CpiContext::new(
+                CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
                     transfer_fee,
+                    bid_escrow_seeds,
                 ),
                 platform_fee + baxus_fee,
             )?;
@@ -422,9 +432,10 @@ pub mod auction {
                 };
 
                 token::transfer(
-                    CpiContext::new(
+                    CpiContext::new_with_signer(
                         ctx.accounts.token_program.to_account_info(),
                         transfer_royalty,
+                        bid_escrow_seeds,
                     ),
                     creator_royalty,
                 )?;
@@ -622,6 +633,8 @@ pub struct SettleAuction<'info> {
     pub listing: Account<'info, Listing>,
     #[account(
         mut,
+        seeds = [b"bid_escrow", listing.nft_mint.as_ref()],
+        bump,
         token::mint = listing.payment_mint,
     )]
     pub bid_escrow: Account<'info, TokenAccount>,
