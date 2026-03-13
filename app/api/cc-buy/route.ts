@@ -21,9 +21,8 @@ import {
  * Status: LIVE — Uses on-chain M2 program directly
  */
 
-// Load CC listings data
-import ccListingsData from '@/data/cc-listings.json';
-const ccListings = ccListingsData as any[];
+// CC listings now served from Railway — no local file
+const ccListings: any[] = [];
 
 // Helius RPC endpoint
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04';
