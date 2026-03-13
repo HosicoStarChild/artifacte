@@ -324,7 +324,31 @@ export const IDL = {
         },
         {
           "name": "bid_escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  105,
+                  100,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing.nft_mint",
+                "account": "Listing"
+              }
+            ]
+          }
         },
         {
           "name": "escrow_nft",
@@ -512,6 +536,11 @@ export const IDL = {
       "code": 6010,
       "name": "InvalidPaymentMint",
       "msg": "Invalid payment mint for this category"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidPrice",
+      "msg": "Price must be greater than zero"
     }
   ],
   "types": [
@@ -700,6 +729,10 @@ export const IDL = {
             "type": "pubkey"
           },
           {
+            "name": "baxus_fee",
+            "type": "bool"
+          },
+          {
             "name": "bump",
             "type": "u8"
           }
@@ -798,4 +831,4 @@ export const IDL = {
       }
     }
   ]
-};
+} as const;
