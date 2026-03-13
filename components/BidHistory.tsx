@@ -2,12 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Connection, PublicKey } from "@solana/web3.js";
-import BN from "bn.js";
 
-const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-
-// BidPlaced event discriminator: sha256("event:BidPlaced")[..8]
-const BID_PLACED_DISC = "8735b053c1456c3d";
+const RAILWAY_URL = "https://artifacte-oracle-production.up.railway.app";
 
 interface Bid {
   bidder: string;
@@ -45,82 +41,76 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
   const fetchBids = async () => {
     setLoading(true);
     try {
+      // Try Railway first (fast, pre-indexed)
+      const res = await fetch(`${RAILWAY_URL}/api/auction/bids?mint=${nftMint}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bids && data.bids.length > 0) {
+          setBids(data.bids);
+          return;
+        }
+      }
+
+      // Fallback: parse on-chain tx history directly
+      await fetchBidsOnChain();
+    } catch (err) {
+      console.error("Failed to fetch bids from Railway, trying on-chain:", err);
+      await fetchBidsOnChain();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBidsOnChain = async () => {
+    try {
+      const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
+      const BID_PLACED_DISC = "8735b053c1456c3d";
       const nftMintPk = new PublicKey(nftMint);
 
-      // Derive listing PDA
       const [listingPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("listing"), nftMintPk.toBuffer()],
         AUCTION_PROGRAM_ID
       );
 
-      // Fetch transaction signatures for the listing PDA
-      const signatures = await connection.getSignaturesForAddress(listingPda, {
-        limit: 50,
-      });
+      const signatures = await connection.getSignaturesForAddress(listingPda, { limit: 50 });
+      if (signatures.length === 0) { setBids([]); return; }
 
-      if (signatures.length === 0) {
-        setBids([]);
-        return;
-      }
-
-      // Fetch parsed transactions
       const txs = await connection.getParsedTransactions(
         signatures.map((s) => s.signature),
         { maxSupportedTransactionVersion: 0 }
       );
 
-      const parsedBids: Bid[] = [];
-
+      const parsed: Bid[] = [];
       for (let i = 0; i < txs.length; i++) {
         const tx = txs[i];
         if (!tx || tx.meta?.err) continue;
 
-        // Look for BidPlaced events in program logs
         const logs = tx.meta?.logMessages || [];
-        const hasBid = logs.some(
-          (log) => log.includes("Instruction: PlaceBid") || log.includes("Program log: BidPlaced")
-        );
-
+        const hasBid = logs.some((log) => log.includes("Instruction: PlaceBid"));
         if (!hasBid) continue;
 
-        // Parse event data from inner instructions or log data
-        // Anchor emits events as base64 in "Program data:" log lines
         for (const log of logs) {
           if (!log.startsWith("Program data: ")) continue;
-
           try {
-            const b64 = log.replace("Program data: ", "");
-            const buf = Buffer.from(b64, "base64");
+            const buf = Buffer.from(log.replace("Program data: ", ""), "base64");
+            if (buf.length < 88) continue;
+            if (buf.slice(0, 8).toString("hex") !== BID_PLACED_DISC) continue;
 
-            // Check discriminator (first 8 bytes)
-            const disc = buf.slice(0, 8).toString("hex");
-            if (disc !== BID_PLACED_DISC) continue;
+            const bidderBytes = buf.slice(40, 72);
+            const bidder = new PublicKey(bidderBytes).toBase58();
+            const amount = buf.readUInt32LE(72) + buf.readUInt32LE(76) * 0x100000000;
+            const timestamp = buf.readUInt32LE(80) + buf.readUInt32LE(84) * 0x100000000;
 
-            // Parse BidPlaced: nft_mint (32) + bidder (32) + amount (u64) + timestamp (i64)
-            const bidder = new PublicKey(buf.slice(40, 72)).toBase58();
-            const amount = new BN(buf.slice(72, 80), "le").toNumber();
-            const timestamp = new BN(buf.slice(80, 88), "le").toNumber();
-
-            parsedBids.push({
-              bidder,
-              amount,
-              timestamp,
-              signature: signatures[i].signature,
-            });
-          } catch {
-            // Skip unparseable data
-          }
+            parsed.push({ bidder, amount, timestamp, signature: signatures[i].signature });
+          } catch { /* skip */ }
         }
       }
 
-      // Sort newest first
-      parsedBids.sort((a, b) => b.timestamp - a.timestamp);
-      setBids(parsedBids);
+      parsed.sort((a, b) => b.timestamp - a.timestamp);
+      setBids(parsed);
     } catch (err) {
-      console.error("Failed to fetch bid history:", err);
+      console.error("On-chain bid fetch failed:", err);
       setBids([]);
-    } finally {
-      setLoading(false);
     }
   };
 
