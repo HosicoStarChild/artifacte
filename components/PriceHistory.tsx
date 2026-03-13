@@ -323,7 +323,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           src={chartUrl}
           alt="Price History Chart"
           onLoad={() => setImageLoaded(true)}
-          onError={() => setError("Chart unavailable")}
+          onError={() => { setError("Chart unavailable"); setChartUrl(null); }}
           className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
           style={{ minHeight: "200px" }}
         />
