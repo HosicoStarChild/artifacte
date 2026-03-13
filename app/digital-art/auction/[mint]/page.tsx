@@ -133,8 +133,9 @@ export default function AuctionDetailPage() {
     }
 
     const newBidLamports = Math.floor(parseFloat(bidAmount) * 1e9);
+    const MIN_INCREMENT = 0.1 * 1e9; // 0.1 SOL
     const minBid = listing.current_bid > 0
-      ? listing.current_bid + 1
+      ? listing.current_bid + MIN_INCREMENT
       : listing.price;
 
     if (newBidLamports < minBid) {
@@ -345,7 +346,7 @@ export default function AuctionDetailPage() {
                       <input
                         type="number"
                         step="0.1"
-                        min={listing.current_bid > 0 ? (listing.current_bid + 1) / 1e9 : listing.price / 1e9}
+                        min={listing.current_bid > 0 ? (listing.current_bid + 0.1 * 1e9) / 1e9 : listing.price / 1e9}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
                         className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
@@ -353,7 +354,7 @@ export default function AuctionDetailPage() {
                       />
                     </div>
                     <p className="text-gray-500 text-xs mt-1">
-                      Minimum: ◎ {listing.current_bid > 0 ? ((listing.current_bid + 1) / 1e9).toFixed(4) : (listing.price / 1e9).toFixed(4)}
+                      Minimum: ◎ {listing.current_bid > 0 ? ((listing.current_bid + 0.1 * 1e9) / 1e9).toFixed(2) : (listing.price / 1e9).toFixed(2)}
                     </p>
                   </div>
 
