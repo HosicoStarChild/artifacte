@@ -124,6 +124,7 @@ export default function PortfolioPage() {
     "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj", // Sensei
     "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP", // Dead King Society
     "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3", // Okay Bears
+    "C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i", // Frogana
   ]);
 
   useEffect(() => {
