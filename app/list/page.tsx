@@ -241,6 +241,7 @@ export default function ListNFTPage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-10">
+          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Home</Link>
           <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">List NFT</p>
           <h1 className="font-serif text-4xl text-white mb-3">List Your Digital Collectible</h1>
           <p className="text-gray-400 text-base">
