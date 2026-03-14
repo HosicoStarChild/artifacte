@@ -9,7 +9,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Mad Lads are a collection of 10,000 dynamic NFTs on the Solana blockchain, built by the Backpack team. Holders gain access to the Backpack ecosystem and exclusive drops."
+      "description": "Mad Lads are a collection of 10,000 dynamic NFTs on the Solana blockchain, built by the Backpack team. Holders gain access to the Backpack ecosystem and exclusive drops.",
+      "links": {
+        "website": "https://www.madlads.com",
+        "twitter": "https://twitter.com/MadLads",
+        "discord": "https://discord.gg/madlads"
+      }
     },
     {
       "collectionAddress": "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W",
@@ -20,7 +25,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "SMB is a collection of 5,000 unique randomly generated SolanaMonkeys stored on the blockchain. Reject humanity, return to monke."
+      "description": "SMB is a collection of 5,000 unique randomly generated SolanaMonkeys stored on the blockchain. Reject humanity, return to monke.",
+      "links": {
+        "website": "https://solanamonkey.business",
+        "twitter": "https://twitter.com/SolanaMBS",
+        "discord": "https://discord.gg/solanamonkeybusiness"
+      }
     },
     {
       "collectionAddress": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
@@ -31,7 +41,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "The next generation of Solana Monkey Business. 5,000 unique monkeys with enhanced art and utility, building on the legacy of the original SMB collection."
+      "description": "The next generation of Solana Monkey Business. 5,000 unique monkeys with enhanced art and utility, building on the legacy of the original SMB collection.",
+      "links": {
+        "website": "https://solanamonkey.business",
+        "twitter": "https://twitter.com/SolanaMBS",
+        "discord": "https://discord.gg/solanamonkeybusiness"
+      }
     },
     {
       "collectionAddress": "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac",
@@ -42,7 +57,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "A collection of 7,777 foxes building the Famous Fox Federation — a community-driven ecosystem on Solana with staking, raffles, and governance."
+      "description": "A collection of 7,777 foxes building the Famous Fox Federation — a community-driven ecosystem on Solana with staking, raffles, and governance.",
+      "links": {
+        "website": "https://famousfoxes.com",
+        "twitter": "https://twitter.com/FamousFoxFed",
+        "discord": "https://discord.gg/famousfoxes"
+      }
     },
     {
       "collectionAddress": "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK",
@@ -53,7 +73,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Claynosaurz is a collection of 10,000 hand-crafted clay dinosaurs on Solana. A vibrant community with gaming, merchandise, and ecosystem partnerships."
+      "description": "Claynosaurz is a collection of 10,000 hand-crafted clay dinosaurs on Solana. A vibrant community with gaming, merchandise, and ecosystem partnerships.",
+      "links": {
+        "website": "https://claynosaurz.com",
+        "twitter": "https://twitter.com/Claynosaurz",
+        "discord": "https://discord.gg/claynosaurz"
+      }
     },
     {
       "collectionAddress": "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
@@ -64,7 +89,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards."
+      "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards.",
+      "links": {
+        "website": "https://taiyorobotics.com",
+        "twitter": "https://twitter.com/TaiyoRobotics",
+        "discord": "https://discord.gg/taiyorobotics"
+      }
     },
     {
       "collectionAddress": "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ",
@@ -75,7 +105,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Call of Saga is the Claynosaurz companion collection — 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem."
+      "description": "Call of Saga is the Claynosaurz companion collection — 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem.",
+      "links": {
+        "website": "https://claynosaurz.com",
+        "twitter": "https://twitter.com/Claynosaurz",
+        "discord": "https://discord.gg/claynosaurz"
+      }
     },
     {
       "collectionAddress": "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q",
@@ -86,7 +121,12 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Galactic Gecko Space Garage is a collection of 10,000 unique geckos on Solana, known for their staking rewards and community-driven initiatives."
+      "description": "Galactic Gecko Space Garage is a collection of 10,000 unique geckos on Solana, known for their staking rewards and community-driven initiatives.",
+      "links": {
+        "website": "https://galacticgecko.com",
+        "twitter": "https://twitter.com/GalacticGeckoSG",
+        "discord": "https://discord.gg/galacticgecko"
+      }
     },
     {
       "collectionAddress": "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H",
@@ -97,7 +137,10 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "little swag world is a collection of 3,333 characters on Solana, featuring unique pixel art and a focus on community, creativity, and vibes."
+      "description": "little swag world is a collection of 3,333 characters on Solana, featuring unique pixel art and a focus on community, creativity, and vibes.",
+      "links": {
+        "twitter": "https://twitter.com/littleswagworld"
+      }
     },
     {
       "collectionAddress": "BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko",
@@ -108,7 +151,11 @@
       "addedAt": 1710100000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters."
+      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters.",
+      "links": {
+        "twitter": "https://twitter.com/QuekzNFT",
+        "discord": "https://discord.gg/quekz"
+      }
     },
     {
       "collectionAddress": "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay",
@@ -120,7 +167,11 @@
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
       "matchBy": "authority",
-      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters."
+      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters.",
+      "links": {
+        "twitter": "https://twitter.com/QuekzNFT",
+        "discord": "https://discord.gg/quekz"
+      }
     },
     {
       "collectionAddress": "CywHUY59AFi7nmGf9kVfNgd39TD9rnkyx6GfWsn5iNnE",
@@ -132,7 +183,10 @@
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
       "matchBy": "authority",
-      "description": "Hot Heads is an exclusive collection of unique 1/1 hand-drawn characters on Solana, each with its own personality and story."
+      "description": "Hot Heads is an exclusive collection of unique 1/1 hand-drawn characters on Solana, each with its own personality and story.",
+      "links": {
+        "twitter": "https://twitter.com/HotHeadsNFT"
+      }
     },
     {
       "collectionAddress": "6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr",
@@ -143,7 +197,12 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "DeGods is a digital art collection on Solana. A deflationary collection of degenerates, punks, and misfits. DUST. Season III."
+      "description": "DeGods is a digital art collection on Solana. A deflationary collection of degenerates, punks, and misfits. DUST. Season III.",
+      "links": {
+        "website": "https://degods.com",
+        "twitter": "https://twitter.com/DeGodsNFT",
+        "discord": "https://discord.gg/degods"
+      }
     },
     {
       "collectionAddress": "DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD",
@@ -154,7 +213,12 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Degen Ape Academy is a collection of 10,000 randomly generated, unique apes on the Solana blockchain. One of the OG Solana NFT collections."
+      "description": "Degen Ape Academy is a collection of 10,000 randomly generated, unique apes on the Solana blockchain. One of the OG Solana NFT collections.",
+      "links": {
+        "website": "https://degenape.academy",
+        "twitter": "https://twitter.com/DegenApeAcademy",
+        "discord": "https://discord.gg/degenapeacademy"
+      }
     },
     {
       "collectionAddress": "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj",
@@ -165,7 +229,10 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Sensei is a Metaplex Core collection on Solana featuring unique characters with martial arts themes and community-driven utility."
+      "description": "Sensei is a Metaplex Core collection on Solana featuring unique characters with martial arts themes and community-driven utility.",
+      "links": {
+        "twitter": "https://twitter.com/SenseiNFT"
+      }
     },
     {
       "collectionAddress": "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP",
@@ -176,7 +243,10 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Dead King Society is a curated collection of 1/1 art pieces on Solana, featuring royal characters with dark, gothic aesthetics."
+      "description": "Dead King Society is a curated collection of 1/1 art pieces on Solana, featuring royal characters with dark, gothic aesthetics.",
+      "links": {
+        "twitter": "https://twitter.com/DeadKingSociety"
+      }
     },
     {
       "collectionAddress": "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3",
@@ -187,7 +257,12 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Okay Bears is a culture shift. A collection of 10,000 bears on the Solana blockchain, bringing Web3 to the mainstream with premium art and partnerships."
+      "description": "Okay Bears is a culture shift. A collection of 10,000 bears on the Solana blockchain, bringing Web3 to the mainstream with premium art and partnerships.",
+      "links": {
+        "website": "https://okaybears.com",
+        "twitter": "https://twitter.com/olokaybears",
+        "discord": "https://discord.gg/okaybears"
+      }
     },
     {
       "collectionAddress": "C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i",
@@ -198,7 +273,11 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Frogana is a collection of 5,555 pNFTs on Solana. Frogs taking over the blockchain, one hop at a time."
+      "description": "Frogana is a collection of 5,555 pNFTs on Solana. Frogs taking over the blockchain, one hop at a time.",
+      "links": {
+        "twitter": "https://twitter.com/FroganaNFT",
+        "discord": "https://discord.gg/frogana"
+      }
     }
   ]
 }
