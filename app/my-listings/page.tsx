@@ -75,8 +75,14 @@ export default function MyListingsPage() {
             const resp = await fetch(`/api/nft?mint=${mintAddr}`);
             const data = await resp.json();
             const nft = data.nft || data;
-            name = nft.content?.metadata?.name || name;
-            image = nft.content?.links?.image || nft.content?.files?.[0]?.uri || image;
+            name = nft.name || nft.content?.metadata?.name || name;
+            const rawImage = nft.image || nft.content?.links?.image || nft.content?.files?.[0]?.uri || "";
+            // Proxy arweave/IPFS images
+            if (rawImage.includes("arweave.net") || rawImage.includes("irys.xyz")) {
+              image = `/api/img-proxy?url=${encodeURIComponent(rawImage)}`;
+            } else if (rawImage) {
+              image = rawImage;
+            }
           } catch {}
 
           // Determine status
@@ -280,10 +286,7 @@ export default function MyListingsPage() {
                             </span>
                           </div>
                         )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Royalty</span>
-                          <span className="text-gray-400">{(listing.royaltyBps / 100).toFixed(1)}%</span>
-                        </div>
+                        {/* royalty removed */}
                       </div>
                     </div>
                   </div>
