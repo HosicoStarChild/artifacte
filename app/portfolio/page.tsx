@@ -256,11 +256,11 @@ export default function PortfolioPage() {
     <div className="pt-24 min-h-screen bg-dark-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         {/* Header */}
+        <a href="/" className="text-gold-400 hover:text-gold-300 text-sm mb-4 inline-block">← Home</a>
         <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">
           Investor Profile
         </p>
         <h1 className="font-serif text-3xl text-white mb-2">My Portfolio</h1>
-        <a href="/" className="text-gold-400 hover:text-gold-300 text-sm mb-4 inline-block">← Home</a>
         <p className="text-gray-400 text-sm mb-8">
           {connected
             ? `${publicKey!.toBase58().slice(0, 4)}...${publicKey!.toBase58().slice(-4)} — RWAs & Digital Collectibles`
