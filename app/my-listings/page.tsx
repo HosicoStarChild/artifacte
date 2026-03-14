@@ -260,7 +260,7 @@ export default function MyListingsPage() {
                       )}
 
                       <div className="absolute top-3 left-3">
-                        <span className="bg-dark-900/80 backdrop-blur-sm text-gray-300 px-2 py-1 rounded text-xs">
+                        <span className="bg-dark-900/80 backdrop-blur-sm text-gold-400 px-2 py-1 rounded text-xs font-semibold">
                           {listing.listingType}
                         </span>
                       </div>
