@@ -166,6 +166,7 @@ export default function ApplyPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
         <div className="max-w-2xl mb-16">
+          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
           <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-4">
             Apply to Artifacte
           </p>
