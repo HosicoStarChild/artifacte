@@ -241,20 +241,6 @@
       }
     },
     {
-      "collectionAddress": "C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i",
-      "name": "Frogana",
-      "category": "Digital Art",
-      "image": "/collections/frogana.png",
-      "supply": 5555,
-      "addedAt": 1710200000000,
-      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true,
-      "description": "Frogana is a collection of 5,555 pNFTs on Solana. Frogs taking over the blockchain, one hop at a time.",
-      "links": {
-        "twitter": "https://x.com/FroganaHQ"
-      }
-    },
-    {
       "collectionAddress": "7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj",
       "name": "Drifella 2",
       "category": "Digital Art",

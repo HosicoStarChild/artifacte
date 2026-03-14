@@ -124,7 +124,6 @@ export default function PortfolioPage() {
     "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj", // Sensei
     "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP", // Dead King Society
     "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3", // Okay Bears
-    "C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i", // Frogana
     "7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj", // Drifella 2
     "ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ", // Drifella III
   ]);

@@ -19,7 +19,6 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   'GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj': { symbol: 'sensei', name: 'Sensei' },
   '7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP': { symbol: 'dead_king_society', name: 'Dead King Society' },
   '3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3': { symbol: 'okay_bears', name: 'Okay Bears' },
-  'C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i': { symbol: 'frogana', name: 'Frogana' },
   '7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj': { symbol: 'drifella_2', name: 'Drifella 2' },
   'ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ': { symbol: 'drifella_iii', name: 'Drifella III' },
 };
