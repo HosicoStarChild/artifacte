@@ -118,6 +118,10 @@ export default function PortfolioPage() {
     "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H", // little swag world
     "BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko", // Quekz (old collection)
     "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay", // Quekz (WNS authority)
+    "CywHUY59AFi7nmGf9kVfNgd39TD9rnkyx6GfWsn5iNnE", // Hot Heads (authority)
+    "6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr", // DeGods
+    "DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD", // Degen Ape Academy
+    "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj", // Sensei
   ]);
 
   useEffect(() => {

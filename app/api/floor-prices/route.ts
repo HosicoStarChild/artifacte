@@ -13,6 +13,10 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   'CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H': { symbol: 'littleswagworld', name: 'little swag world' },
   'BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko': { symbol: 'quekz', name: 'Quekz' },
   '2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay': { symbol: 'quekz', name: 'Quekz' },
+  'CywHUY59AFi7nmGf9kVfNgd39TD9rnkyx6GfWsn5iNnE': { symbol: 'hot_heads', name: 'Hot Heads' },
+  '6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr': { symbol: 'degods', name: 'DeGods' },
+  'DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD': { symbol: 'degen_ape_academy', name: 'Degen Ape Academy' },
+  'GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj': { symbol: 'sensei', name: 'Sensei' },
 };
 
 // Tensor-only collections (not on ME) — manually updated floors
