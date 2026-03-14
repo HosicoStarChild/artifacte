@@ -491,8 +491,6 @@ export default function PortfolioPage() {
               {(
                 [
                   { value: "all" as FilterType, label: "All" },
-                  { value: "listed" as FilterType, label: "Listed" },
-                  { value: "unlisted" as FilterType, label: "Unlisted" },
                 ] as const
               ).map((tab) => (
                 <button
