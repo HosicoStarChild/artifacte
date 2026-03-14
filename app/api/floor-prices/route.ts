@@ -17,6 +17,7 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   '6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr': { symbol: 'degods', name: 'DeGods' },
   'DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD': { symbol: 'degen_ape_academy', name: 'Degen Ape Academy' },
   'GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj': { symbol: 'sensei', name: 'Sensei' },
+  '7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP': { symbol: 'dead_king_society', name: 'Dead King Society' },
 };
 
 // Tensor-only collections (not on ME) — manually updated floors

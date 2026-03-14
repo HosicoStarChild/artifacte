@@ -152,5 +152,16 @@
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
     }
+    ,
+    {
+      "collectionAddress": "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP",
+      "name": "Dead King Society",
+      "category": "Digital Art",
+      "image": "/collections/dead-king-society.png",
+      "supply": 100,
+      "addedAt": 1710200000000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    }
   ]
 }
