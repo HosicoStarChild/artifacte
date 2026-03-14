@@ -50,18 +50,18 @@ export default function Navbar() {
             <Link href="/portfolio" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Portfolio
             </Link>
+            {connected && (
+              <Link href="/my-listings" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                My Listings
+              </Link>
+            )}
             <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Agents
             </Link>
             {connected && (
-              <>
-                <Link href="/list" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-                  List Item
-                </Link>
-                <Link href="/my-listings" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-                  My Listings
-                </Link>
-              </>
+              <Link href="/list" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                List Item
+              </Link>
             )}
             <Link href="/apply" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Apply to List
@@ -102,18 +102,18 @@ export default function Navbar() {
             <Link href="/portfolio" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Portfolio
             </Link>
+            {connected && (
+              <Link href="/my-listings" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
+                My Listings
+              </Link>
+            )}
             <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Agents
             </Link>
             {connected && (
-              <>
-                <Link href="/list" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-                  List Item
-                </Link>
-                <Link href="/my-listings" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-                  My Listings
-                </Link>
-              </>
+              <Link href="/list" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
+                List Item
+              </Link>
             )}
             <Link href="/apply" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Apply to List
