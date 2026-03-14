@@ -154,7 +154,7 @@ export default function MyListingsPage() {
     <main className="min-h-screen bg-dark-900 pt-32 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
-          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Home</Link>
+          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-white mb-4">My Listings</h1>
           <p className="text-gray-400 text-lg">Manage your NFT listings on Artifacte</p>
         </div>

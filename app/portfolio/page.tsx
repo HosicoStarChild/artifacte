@@ -256,7 +256,7 @@ export default function PortfolioPage() {
     <div className="pt-24 min-h-screen bg-dark-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         {/* Header */}
-        <a href="/" className="text-gold-400 hover:text-gold-300 text-sm mb-4 inline-block">← Home</a>
+        <a href="/" className="text-gold-400 hover:text-gold-300 text-sm mb-4 inline-block">← Back to Home</a>
         <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-2">
           Investor Profile
         </p>

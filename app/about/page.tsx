@@ -7,7 +7,7 @@ export default function AboutPage() {
 
         {/* Hero */}
         <div className="max-w-4xl mb-20">
-          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Home</Link>
+          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
           <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-6">About Us</p>
           <h1 className="font-serif text-5xl md:text-6xl text-white mb-8 leading-tight">
             Curating the Future of Asset Ownership

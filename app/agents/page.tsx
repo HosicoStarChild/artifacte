@@ -120,7 +120,7 @@ export default function AgentsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
-          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Home</Link>
+          <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
           <div className="flex items-center gap-4 mb-4">
             <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">
               AI Agents
