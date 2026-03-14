@@ -81,22 +81,6 @@
       }
     },
     {
-      "collectionAddress": "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
-      "name": "Taiyo Robotics",
-      "category": "Digital Art",
-      "image": "/collections/taiyo-robotics.png",
-      "supply": 2348,
-      "addedAt": 1704067200000,
-      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true,
-      "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards.",
-      "links": {
-        "website": "https://taiyorobotics.com",
-        "twitter": "https://twitter.com/TaiyoRobotics",
-        "discord": "https://discord.gg/taiyorobotics"
-      }
-    },
-    {
       "collectionAddress": "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ",
       "name": "Claynosaurz: Call of Saga",
       "category": "Digital Art",
@@ -110,6 +94,22 @@
         "website": "https://claynosaurz.com",
         "twitter": "https://twitter.com/Claynosaurz",
         "discord": "https://discord.gg/claynosaurz"
+      }
+    },
+    {
+      "collectionAddress": "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
+      "name": "Taiyo Robotics",
+      "category": "Digital Art",
+      "image": "/collections/taiyo-robotics.png",
+      "supply": 2348,
+      "addedAt": 1704067200000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards.",
+      "links": {
+        "website": "https://taiyorobotics.com",
+        "twitter": "https://twitter.com/TaiyoRobotics",
+        "discord": "https://discord.gg/taiyorobotics"
       }
     },
     {
