@@ -72,7 +72,7 @@ export default function ListNFTPage() {
     if (!publicKey) return;
     setLoadingNfts(true);
     try {
-      const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04`, {
+      const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

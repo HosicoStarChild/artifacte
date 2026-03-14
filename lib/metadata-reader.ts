@@ -3,7 +3,7 @@
  * Reads NFT metadata and auto-detects verifiedBy field
  */
 
-const HELIUS_API_KEY = "345726df-3822-42c1-86e0-1a13dc6c7a04";
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY || "";
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
 // Known authorities for verification

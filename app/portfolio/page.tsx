@@ -146,7 +146,7 @@ export default function PortfolioPage() {
         const [response, floorRes, nftRes] = await Promise.all([
           fetch(`/api/portfolio?wallet=${wallet}`),
           fetch('/api/floor-prices').catch(() => null),
-          fetch("https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04", {
+          fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

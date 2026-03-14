@@ -40,7 +40,7 @@ import {
  * https://github.com/magicoss/m2/tree/main/programs/m2/src
  */
 
-const RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04';
+const RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const TREASURY_WALLET = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
 const PLATFORM_FEE_BPS = 200; // 2%
 

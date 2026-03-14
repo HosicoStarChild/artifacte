@@ -12,8 +12,17 @@ export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
   if (!url) return new NextResponse("Missing url", { status: 400 });
 
-  const allowed = ["arweave.net", "irys.xyz", "ipfs", "helius-rpc.com", "nftstorage.link", "ar-io.dev"];
-  if (!allowed.some((d) => url.includes(d))) {
+  // Validate URL hostname against allowlist (prevent SSRF)
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return new NextResponse("Invalid URL", { status: 400 });
+  }
+  const hostname = parsedUrl.hostname;
+  const allowedHosts = ["arweave.net", "gateway.irys.xyz", "ar-io.dev", "cdn.helius-rpc.com", "nftstorage.link", "dweb.link", "w3s.link", "cloudflare-ipfs.com"];
+  const isIpfs = hostname.endsWith(".ipfs.nftstorage.link") || hostname.endsWith(".ipfs.dweb.link") || hostname.endsWith(".ipfs.w3s.link");
+  if (!allowedHosts.includes(hostname) && !isIpfs && !hostname.endsWith(".mypinata.cloud")) {
     return new NextResponse("Domain not allowed", { status: 403 });
   }
 

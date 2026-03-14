@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04`;
+const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 
 export async function GET(request: NextRequest) {
   try {

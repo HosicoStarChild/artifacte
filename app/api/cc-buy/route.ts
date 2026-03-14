@@ -25,7 +25,7 @@ import {
 const ccListings: any[] = [];
 
 // Helius RPC endpoint
-const RPC_URL = process.env.HELIUS_RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=345726df-3822-42c1-86e0-1a13dc6c7a04';
+const RPC_URL = process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 
 // Get escrow wallet address from keypair
 let ESCROW_ADDRESS: PublicKey;
