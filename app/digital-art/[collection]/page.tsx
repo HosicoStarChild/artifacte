@@ -10,6 +10,7 @@ interface CollectionInfo {
   name: string;
   image: string;
   supply?: number;
+  description?: string;
 }
 
 interface ListedNFT {
@@ -152,6 +153,13 @@ export default function CollectionPage() {
             <p className="text-gray-600 text-xs font-mono mt-1">{collectionAddress}</p>
           </div>
         </div>
+
+        {/* Collection Description */}
+        {collection.description && (
+          <div className="mb-10 max-w-3xl">
+            <p className="text-gray-400 text-sm leading-relaxed">{collection.description}</p>
+          </div>
+        )}
 
         {/* User NFTs Section */}
         {userNFTs.length > 0 && (

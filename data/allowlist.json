@@ -8,7 +8,8 @@
       "supply": 9968,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Mad Lads are a collection of 10,000 dynamic NFTs on the Solana blockchain, built by the Backpack team. Holders gain access to the Backpack ecosystem and exclusive drops."
     },
     {
       "collectionAddress": "SMBtHCCC6RYRutFEPb4gZqeBLUZbMNhRKaMKZZLHi7W",
@@ -18,7 +19,8 @@
       "supply": 4992,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "SMB is a collection of 5,000 unique randomly generated SolanaMonkeys stored on the blockchain. Reject humanity, return to monke."
     },
     {
       "collectionAddress": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
@@ -28,7 +30,8 @@
       "supply": 5000,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "The next generation of Solana Monkey Business. 5,000 unique monkeys with enhanced art and utility, building on the legacy of the original SMB collection."
     },
     {
       "collectionAddress": "BUjZjAS2vbbb65g7Z1Ca9ZRVYoJscURG5L3AkVvHP9ac",
@@ -38,7 +41,8 @@
       "supply": 9992,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "A collection of 7,777 foxes building the Famous Fox Federation — a community-driven ecosystem on Solana with staking, raffles, and governance."
     },
     {
       "collectionAddress": "6mszaj17KSfVqADrQj3o4W3zoLMTykgmV37W4QadCczK",
@@ -48,7 +52,8 @@
       "supply": 10232,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Claynosaurz is a collection of 10,000 hand-crafted clay dinosaurs on Solana. A vibrant community with gaming, merchandise, and ecosystem partnerships."
     },
     {
       "collectionAddress": "HJx4HRAT3RiFq7cy9fSrvP92usAmJ7bJgPccQTyroT2r",
@@ -58,7 +63,8 @@
       "supply": 2348,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards."
     },
     {
       "collectionAddress": "1yPMtWU5aqcF72RdyRD5yipmcMRC8NGNK59NvYubLkZ",
@@ -68,7 +74,8 @@
       "supply": 1999,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Call of Saga is the Claynosaurz companion collection — 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem."
     },
     {
       "collectionAddress": "J6RJFQfLgBTcoAt3KoZFiTFW9AbufsztBNDgZ7Znrp1Q",
@@ -78,7 +85,8 @@
       "supply": 10000,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Galactic Gecko Space Garage is a collection of 10,000 unique geckos on Solana, known for their staking rewards and community-driven initiatives."
     },
     {
       "collectionAddress": "CjL5WpAmf4cMEEGwZGTfTDKWok9a92ykq9aLZrEK2D5H",
@@ -88,7 +96,8 @@
       "supply": 3328,
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "little swag world is a collection of 3,333 characters on Solana, featuring unique pixel art and a focus on community, creativity, and vibes."
     },
     {
       "collectionAddress": "BuAYoZPVwQw4AfeEpHTx6iGPbQtB27W7tJUjgyLzgiko",
@@ -98,7 +107,8 @@
       "supply": 5000,
       "addedAt": 1710100000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters."
     },
     {
       "collectionAddress": "2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay",
@@ -109,7 +119,8 @@
       "addedAt": 1710100000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "matchBy": "authority"
+      "matchBy": "authority",
+      "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters."
     },
     {
       "collectionAddress": "CywHUY59AFi7nmGf9kVfNgd39TD9rnkyx6GfWsn5iNnE",
@@ -120,7 +131,8 @@
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "matchBy": "authority"
+      "matchBy": "authority",
+      "description": "Hot Heads is an exclusive collection of unique 1/1 hand-drawn characters on Solana, each with its own personality and story."
     },
     {
       "collectionAddress": "6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr",
@@ -130,7 +142,8 @@
       "supply": 6666,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "DeGods is a digital art collection on Solana. A deflationary collection of degenerates, punks, and misfits. DUST. Season III."
     },
     {
       "collectionAddress": "DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD",
@@ -140,7 +153,8 @@
       "supply": 10000,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Degen Ape Academy is a collection of 10,000 randomly generated, unique apes on the Solana blockchain. One of the OG Solana NFT collections."
     },
     {
       "collectionAddress": "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj",
@@ -150,9 +164,9 @@
       "supply": 5555,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
-    }
-    ,
+      "verified": true,
+      "description": "Sensei is a Metaplex Core collection on Solana featuring unique characters with martial arts themes and community-driven utility."
+    },
     {
       "collectionAddress": "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP",
       "name": "Dead King Society",
@@ -161,9 +175,9 @@
       "supply": 100,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
-    }
-    ,
+      "verified": true,
+      "description": "Dead King Society is a curated collection of 1/1 art pieces on Solana, featuring royal characters with dark, gothic aesthetics."
+    },
     {
       "collectionAddress": "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3",
       "name": "Okay Bears",
@@ -172,9 +186,9 @@
       "supply": 10000,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
-    }
-    ,
+      "verified": true,
+      "description": "Okay Bears is a culture shift. A collection of 10,000 bears on the Solana blockchain, bringing Web3 to the mainstream with premium art and partnerships."
+    },
     {
       "collectionAddress": "C7on9fL8YFp5W6M7a6SvehMKBppauZXu2eYDTZG4BN2i",
       "name": "Frogana",
@@ -183,7 +197,8 @@
       "supply": 5555,
       "addedAt": 1710200000000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true
+      "verified": true,
+      "description": "Frogana is a collection of 5,555 pNFTs on Solana. Frogs taking over the blockchain, one hop at a time."
     }
   ]
 }
