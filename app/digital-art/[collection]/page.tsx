@@ -134,8 +134,8 @@ export default function CollectionPage() {
             onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
           />
           <div>
-            <Link href="/digital-art" className="text-gray-500 text-xs hover:text-gray-300 transition mb-1 block">
-              ← Digital Collectibles
+            <Link href="/digital-art" className="text-gold-500 hover:text-gold-400 text-sm mb-2 block">
+              ← Back to Digital Collectibles
             </Link>
             <h1 className="font-serif text-3xl text-white">{collection.name}</h1>
             <div className="flex items-center gap-4 mt-1">
