@@ -163,5 +163,16 @@
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true
     }
+    ,
+    {
+      "collectionAddress": "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3",
+      "name": "Okay Bears",
+      "category": "Digital Art",
+      "image": "/collections/okay-bears.png",
+      "supply": 10000,
+      "addedAt": 1710200000000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true
+    }
   ]
 }

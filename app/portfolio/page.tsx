@@ -123,6 +123,7 @@ export default function PortfolioPage() {
     "DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD", // Degen Ape Academy
     "GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj", // Sensei
     "7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP", // Dead King Society
+    "3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3", // Okay Bears
   ]);
 
   useEffect(() => {
