@@ -239,10 +239,13 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } catch {}
         }
 
-        // Build chart URL using the search query
+        // Build chart URL — use assetId for exact variant match, keep q for fallback
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
         chartParams.set("q", searchQuery);
+        if (chosen.assetId) {
+          chartParams.set("assetId", chosen.assetId);
+        }
         if (grade) chartParams.set("grade", grade);
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
