@@ -195,7 +195,35 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        const chosen = searchData.variants[0];
+        // Pick the variant that matches the card number from the name
+        let chosen = searchData.variants[0];
+        const cardNumMatch = cardName.match(/#(\w+)/);
+        if (cardNumMatch && searchData.variants.length > 1) {
+          const targetNum = cardNumMatch[1];
+          const exactMatch = searchData.variants.find(
+            (v: any) => String(v.cardNumber) === targetNum
+          );
+          // If multiple variants share the same card number, further filter by variant type
+          if (exactMatch) {
+            const sameNumVariants = searchData.variants.filter(
+              (v: any) => String(v.cardNumber) === targetNum
+            );
+            if (sameNumVariants.length > 1) {
+              const nameUpper = cardName.toUpperCase();
+              const isReverse = /REVERSE/i.test(nameUpper);
+              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              const picked = sameNumVariants.find((v: any) => {
+                const vName = (v.name || '').toUpperCase();
+                if (isReverse) return /REVERSE/i.test(vName);
+                if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
+                return !/REVERSE|HOLO/i.test(vName);
+              });
+              chosen = picked || sameNumVariants[0];
+            } else {
+              chosen = exactMatch;
+            }
+          }
+        }
 
         // Get transaction count
         if (chosen.assetId) {
