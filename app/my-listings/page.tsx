@@ -216,9 +216,10 @@ export default function MyListingsPage() {
             {!loading && filteredListings.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredListings.map((listing) => (
-                  <div
+                  <Link
                     key={listing.id}
-                    className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all"
+                    href={`/digital-art/auction/${listing.nftMint}`}
+                    className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all block"
                   >
                     {/* Image */}
                     <div className="aspect-square bg-dark-700 overflow-hidden relative">
@@ -289,7 +290,7 @@ export default function MyListingsPage() {
                         {/* royalty removed */}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
