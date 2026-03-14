@@ -55,14 +55,14 @@ export default function Navbar() {
                 My Listings
               </Link>
             )}
-            <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Agents
-            </Link>
             {connected && (
               <Link href="/list" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
                 List Item
               </Link>
             )}
+            <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+              Agent Dashboard
+            </Link>
             <Link href="/apply" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
               Apply to List
             </Link>
@@ -107,14 +107,14 @@ export default function Navbar() {
                 My Listings
               </Link>
             )}
-            <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Agents
-            </Link>
             {connected && (
               <Link href="/list" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
                 List Item
               </Link>
             )}
+            <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
+              Agent Dashboard
+            </Link>
             <Link href="/apply" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
               Apply to List
             </Link>
