@@ -69,9 +69,6 @@ export default function Home() {
                 <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Browse</p>
                 <h2 className="font-serif text-3xl md:text-4xl text-white">Collections</h2>
               </div>
-              <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-                View All →
-              </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
