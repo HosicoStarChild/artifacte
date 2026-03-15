@@ -212,13 +212,25 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const nameUpper = cardName.toUpperCase();
               const isReverse = /REVERSE/i.test(nameUpper);
               const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
-              const picked = sameNumVariants.find((v: any) => {
+              
+              // Filter by language first — CC names contain "Japanese"/"JPN" for JP cards
+              const isCardJapanese = /JAPANESE|JPN|\bJP\b/i.test(cardName);
+              let langFiltered = sameNumVariants;
+              if (isCardJapanese) {
+                const jpOnly = sameNumVariants.filter((v: any) => /JAPANESE/i.test(v.name || '') || /JAPANESE/i.test(v.brand || ''));
+                if (jpOnly.length > 0) langFiltered = jpOnly;
+              } else {
+                const enOnly = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || '') && !/JAPANESE|CHINESE/i.test(v.brand || ''));
+                if (enOnly.length > 0) langFiltered = enOnly;
+              }
+              
+              const picked = langFiltered.find((v: any) => {
                 const vName = (v.name || '').toUpperCase();
                 if (isReverse) return /REVERSE/i.test(vName);
                 if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
                 return !/REVERSE|HOLO/i.test(vName);
               });
-              chosen = picked || sameNumVariants[0];
+              chosen = picked || langFiltered[0];
             } else {
               chosen = exactMatch;
             }
