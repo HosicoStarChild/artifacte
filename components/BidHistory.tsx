@@ -59,6 +59,19 @@ export function BidHistory({ nftMint, connection, currentBid, highestBidder }: B
       console.error("Failed to fetch bids from Railway, trying on-chain:", err);
       await fetchBidsOnChain();
     } finally {
+      // Final fallback: if still no bids but listing has one, show it
+      setBids(prev => {
+        if (prev.length === 0 && currentBid && currentBid > 0 && highestBidder && 
+            highestBidder !== "11111111111111111111111111111111") {
+          return [{
+            bidder: highestBidder,
+            amount: currentBid,
+            timestamp: Math.floor(Date.now() / 1000),
+            signature: "on-chain",
+          }];
+        }
+        return prev;
+      });
       setLoading(false);
     }
   };
