@@ -710,8 +710,12 @@ pub struct ListItem<'info> {
 pub struct PlaceBid<'info> {
     #[account(mut)]
     pub listing: Account<'info, Listing>,
+    pub payment_mint: Account<'info, anchor_spl::token::Mint>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = bidder,
+        token::mint = payment_mint,
+        token::authority = bid_escrow,
         seeds = [b"bid_escrow", listing.nft_mint.as_ref()],
         bump,
     )]
@@ -724,6 +728,7 @@ pub struct PlaceBid<'info> {
     pub bidder: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]

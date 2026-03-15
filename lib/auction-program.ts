@@ -421,12 +421,14 @@ export class AuctionProgram {
       .placeBid(new anchor.BN(bidAmount))
       .accounts({
         listing,
+        paymentMint,
         bidEscrow,
         bidderTokenAccount,
         previousBidderAccount,
         bidder: this.wallet.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .rpc();
 
