@@ -251,40 +251,50 @@ export default function CollectionPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {listings.map((nft: any) => (
+              {listings.map((nft: any) => {
+                const isAuctionEnded = nft.listingType === "auction" && nft.endTime > 0 && Date.now() / 1000 > nft.endTime;
+                return (
                 <Link
                   key={nft.nftMint}
                   href={`/digital-art/auction/${nft.nftMint}`}
-                  className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden group hover:border-gold-500/30 transition"
+                  className={`bg-dark-800 border rounded-xl overflow-hidden group transition ${isAuctionEnded ? "border-yellow-700/40 opacity-75" : "border-white/5 hover:border-gold-500/30"}`}
                 >
-                  <div className="aspect-square overflow-hidden bg-dark-700">
+                  <div className="aspect-square overflow-hidden bg-dark-700 relative">
                     <img
                       src={nft.nftImage}
                       alt={nft.nftName}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
                     />
+                    {isAuctionEnded && (
+                      <div className="absolute top-2 left-2 bg-yellow-900/90 text-yellow-200 text-[10px] font-semibold px-2 py-0.5 rounded">
+                        Ended
+                      </div>
+                    )}
                   </div>
                   <div className="p-3">
                     <p className="text-white text-sm font-semibold truncate">{nft.nftName}</p>
                     <div className="flex items-center justify-between mt-2">
                       <div>
                         <p className="text-gray-500 text-[10px] uppercase">
-                          {nft.listingType === "auction" ? "Current Bid" : "Price"}
+                          {isAuctionEnded ? "Ended" : nft.listingType === "auction" ? "Current Bid" : "Price"}
                         </p>
-                        <p className="text-white font-semibold text-sm">◎ {nft.currentBid > 0 ? nft.currentBid : nft.price}</p>
+                        <p className={`font-semibold text-sm ${isAuctionEnded ? "text-yellow-200/70" : "text-white"}`}>◎ {nft.currentBid > 0 ? nft.currentBid : nft.price}</p>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                        nft.listingType === "auction"
+                        isAuctionEnded
+                          ? "bg-yellow-900/40 text-yellow-300 border border-yellow-700"
+                          : nft.listingType === "auction"
                           ? "bg-purple-900/40 text-purple-300 border border-purple-700"
                           : "bg-green-900/40 text-green-300 border border-green-700"
                       }`}>
-                        {nft.listingType === "auction" ? "Auction" : "Buy Now"}
+                        {isAuctionEnded ? "Ended" : nft.listingType === "auction" ? "Auction" : "Buy Now"}
                       </span>
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
