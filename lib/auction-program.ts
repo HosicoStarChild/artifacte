@@ -417,6 +417,36 @@ export class AuctionProgram {
       AUCTION_PROGRAM_ID
     )[0];
 
+    // For wSOL bids: create ATA + wrap SOL if needed
+    const preInstructions: TransactionInstruction[] = [];
+    const SOL_MINT_ADDR = new PublicKey("So11111111111111111111111111111111111111112");
+    if (paymentMint.equals(SOL_MINT_ADDR)) {
+      const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
+      // Check if bidder wSOL ATA exists
+      const ataInfo = await this.program.provider.connection.getAccountInfo(bidderTokenAccount);
+      if (!ataInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            bidderTokenAccount,
+            this.wallet.publicKey,
+            SOL_MINT_ADDR
+          )
+        );
+      }
+      // Transfer native SOL into wSOL ATA
+      preInstructions.push(
+        SystemProgram.transfer({
+          fromPubkey: this.wallet.publicKey,
+          toPubkey: bidderTokenAccount,
+          lamports: bidAmount,
+        })
+      );
+      // Sync native balance
+      const { createSyncNativeInstruction } = await import("@solana/spl-token");
+      preInstructions.push(createSyncNativeInstruction(bidderTokenAccount));
+    }
+
     const tx = await this.program.methods
       .placeBid(new anchor.BN(bidAmount))
       .accounts({
@@ -430,6 +460,7 @@ export class AuctionProgram {
         systemProgram: SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
+      .preInstructions(preInstructions)
       .rpc();
 
     return tx;
