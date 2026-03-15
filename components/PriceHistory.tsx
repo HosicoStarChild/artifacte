@@ -14,51 +14,6 @@ const CHART_OVERRIDES: Record<string, string> = {
   '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'P-001 super pre-release winner luffy',
 };
 
-/** Extract language + variant hints from CC/ME card name */
-function extractCardHints(name: string) {
-  const language = /\bJAPANESE\b|\bJPN\b|\bJP\b/i.test(name) ? 'JPN'
-    : /\bKOREAN\b/i.test(name) ? 'KR' : 'EN';
-  const isAltArt = /\bALT(?:ERNATE)?\s*ART\b/i.test(name);
-  let variant: string | null = null;
-  if (/\bMANGA\b/i.test(name)) variant = 'manga';
-  else if (/\bSPECIAL\s*ALT/i.test(name)) variant = 'special alternate art';
-  else if (/\b3RD\s*ANNIVERSARY.*GOLD\b/i.test(name)) variant = '3rd anniversary gold';
-  else if (/\bSUPER\s*PRE.?RELEASE\b/i.test(name)) variant = 'super pre-release winner';
-  else if (/\bWINNER\b/i.test(name)) variant = 'winner';
-  else if (/\bCONVENTION\b/i.test(name)) variant = 'convention exclusive';
-  else if (/\bWANTED\b/i.test(name)) variant = 'wanted';
-  else if (/\bSP\s*VERSION\b|\bSP\s*VER\b/i.test(name)) variant = 'sp';
-  else if (/\bSEC\b/i.test(name)) variant = 'sec';
-  else if (isAltArt) variant = 'alternate art';
-  return { language, variant, isAltArt };
-}
-
-/** Score-based variant picker — matches language (100pts) + variant type (50pts) */
-function pickBestVariant(variants: any[], cardName: string) {
-  if (variants.length <= 1) return variants[0];
-  const hints = extractCardHints(cardName);
-  let best = variants[0], bestScore = -999;
-  for (const v of variants) {
-    let score = 0;
-    const vVariety = (v.variety || '').toUpperCase();
-    const vName = (v.name || '').toUpperCase();
-    // Language match (most important — 100 pts)
-    if (hints.language === 'JPN' && (vName.includes('JAPANESE') || v.brand?.toUpperCase().includes('JAPANESE'))) score += 100;
-    else if (hints.language === 'EN' && !vName.includes('JAPANESE') && !vName.includes('CHINESE') && !v.brand?.toUpperCase().includes('JAPANESE')) score += 100;
-    else if (hints.language === 'KR' && vName.includes('KOREAN')) score += 100;
-    // Variant match (50 pts)
-    if (hints.variant) {
-      if (vVariety.includes(hints.variant.toUpperCase()) || vName.includes(hints.variant.toUpperCase())) score += 50;
-    } else if (!hints.isAltArt) {
-      // No variant keywords in CC name — prefer standard/base variants
-      if (!vVariety || vVariety === 'STANDARD') score += 50;
-      if (vVariety.includes('ALTERNATE') || vVariety.includes('MANGA')) score -= 30;
-    }
-    if (score > bestScore) { bestScore = score; best = v; }
-  }
-  return best;
-}
-
 function buildSearchQuery(name: string): string {
   // Check manual overrides first
   if (CHART_OVERRIDES[name]) return CHART_OVERRIDES[name];
@@ -240,8 +195,47 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        // Pick the best variant using scoring (language + variant type matching)
-        let chosen = pickBestVariant(searchData.variants, cardName);
+        // Pick the variant that matches the card number from the name
+        let chosen = searchData.variants[0];
+        const cardNumMatch = cardName.match(/#(\w+)/);
+        if (cardNumMatch && searchData.variants.length > 1) {
+          const targetNum = cardNumMatch[1];
+          const exactMatch = searchData.variants.find(
+            (v: any) => String(v.cardNumber) === targetNum
+          );
+          // If multiple variants share the same card number, further filter by variant type
+          if (exactMatch) {
+            const sameNumVariants = searchData.variants.filter(
+              (v: any) => String(v.cardNumber) === targetNum
+            );
+            if (sameNumVariants.length > 1) {
+              const nameUpper = cardName.toUpperCase();
+              const isReverse = /REVERSE/i.test(nameUpper);
+              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              
+              // Filter by language first — CC names contain "Japanese"/"JPN" for JP cards
+              const isCardJapanese = /JAPANESE|JPN|\bJP\b/i.test(cardName);
+              let langFiltered = sameNumVariants;
+              if (isCardJapanese) {
+                const jpOnly = sameNumVariants.filter((v: any) => /JAPANESE/i.test(v.name || '') || /JAPANESE/i.test(v.brand || ''));
+                if (jpOnly.length > 0) langFiltered = jpOnly;
+              } else {
+                const enOnly = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || '') && !/JAPANESE|CHINESE/i.test(v.brand || ''));
+                if (enOnly.length > 0) langFiltered = enOnly;
+              }
+              
+              const picked = langFiltered.find((v: any) => {
+                const vName = (v.name || '').toUpperCase();
+                if (isReverse) return /REVERSE/i.test(vName);
+                if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
+                return !/REVERSE|HOLO/i.test(vName);
+              });
+              chosen = picked || langFiltered[0];
+            } else {
+              chosen = exactMatch;
+            }
+          }
+        }
 
         // Get transaction count
         if (chosen.assetId) {
