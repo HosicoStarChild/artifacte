@@ -529,6 +529,7 @@ export default function PortfolioPage() {
                       <img
                         src={card.frontImage}
                         alt={card.itemName}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display =
@@ -630,7 +631,7 @@ export default function PortfolioPage() {
                     <div key={nft.id} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group">
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
-                          <img src={nft.image} alt={nft.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          <img src={nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>
                         )}
