@@ -222,14 +222,18 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const setWords = setMatch ? setMatch[1].toLowerCase().split(/\s+/).filter((w: string) => w.length > 2) : [];
               
               let matched = sameNumVariants;
+              // Detect if the CC card itself is Japanese (name contains "Japanese" or "JPN")
+              const isCardJapanese = /japanese|JPN/i.test(cardName);
               if (setWords.length >= 2) {
-                // Match brand containing key set words AND not Japanese/Chinese (CC cards are English)
+                // Match brand containing key set words, filter by language
                 const brandMatched = sameNumVariants.filter((v: any) => {
                   const brand = (v.brand || v.name || '').toLowerCase();
                   const nameL = (v.name || '').toLowerCase();
                   const hasSetWords = setWords.filter((w: string) => brand.includes(w) || nameL.includes(w)).length >= 2;
-                  const isJapanese = /japanese|chinese/i.test(v.name || '') || /japanese|chinese/i.test(v.brand || '');
-                  return hasSetWords && !isJapanese;
+                  const isJapaneseVariant = /japanese|chinese/i.test(v.name || '') || /japanese|chinese/i.test(v.brand || '');
+                  // If card is Japanese, ALLOW Japanese variants; otherwise exclude them
+                  if (isCardJapanese) return hasSetWords && isJapaneseVariant;
+                  return hasSetWords && !isJapaneseVariant;
                 });
                 if (brandMatched.length > 0) matched = brandMatched;
               }
