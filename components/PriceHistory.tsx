@@ -215,11 +215,14 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const gradePrefix = grade ? grade.split('-')[0]?.toUpperCase() : ''; // e.g. "PSA" from "PSA-10"
               const gradeNum = grade ? grade.split('-')[1] : '';
               
+              // CC names lack variant info — pick by: English first, then most sales for grade
+              const englishVariants = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || ''));
+              const pool = englishVariants.length > 0 ? englishVariants : sameNumVariants;
+              
               if (gradePrefix && gradeNum) {
-                // Count matching grade sales per variant and pick the one with most data
-                let bestVariant = sameNumVariants[0];
+                let bestVariant = pool[0];
                 let bestCount = 0;
-                for (const v of sameNumVariants) {
+                for (const v of pool) {
                   const matchingSales = (v.grades || []).filter((g: any) => 
                     g.grader?.toUpperCase() === gradePrefix && String(g.grade) === gradeNum
                   ).length;
@@ -230,7 +233,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
                 }
                 chosen = bestVariant;
               } else {
-                chosen = sameNumVariants[0];
+                chosen = pool[0];
               }
             } else {
               chosen = exactMatch;
