@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer, CloseAccount};
 use anchor_spl::token_interface::{
     Mint as IfaceMint,
     TokenAccount as IfaceTokenAccount,
@@ -390,19 +390,20 @@ pub mod auction {
             creator_royalty,
         });
 
-        // Close escrow_nft account, return rent to buyer
-        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
-        let buyer_info = ctx.accounts.buyer.to_account_info();
-        let dest_starting_lamports = buyer_info.lamports();
-        **buyer_info.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(escrow_info.lamports())
-            .unwrap();
-        **escrow_info.lamports.borrow_mut() = 0;
-        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
-        escrow_info.realloc(0, false)?;
+        // Close escrow_nft token account via CPI, return rent to buyer
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.nft_token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft.to_account_info(),
+                destination: ctx.accounts.buyer.to_account_info(),
+                authority: ctx.accounts.escrow_nft.to_account_info(),
+            },
+            &[escrow_seeds],
+        ))?;
 
-        // Close listing account, return rent to buyer
+        // Close listing account (owned by our program), return rent to buyer
         let listing_info = ctx.accounts.listing.to_account_info();
+        let buyer_info = ctx.accounts.buyer.to_account_info();
         let dest_starting_lamports = buyer_info.lamports();
         **buyer_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
@@ -475,19 +476,20 @@ pub mod auction {
             seller: listing.seller,
         });
 
-        // Close escrow_nft account, return rent to seller
-        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
-        let seller_info = ctx.accounts.seller.to_account_info();
-        let dest_starting_lamports = seller_info.lamports();
-        **seller_info.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(escrow_info.lamports())
-            .unwrap();
-        **escrow_info.lamports.borrow_mut() = 0;
-        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
-        escrow_info.realloc(0, false)?;
+        // Close escrow_nft token account via CPI, return rent to seller
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.nft_token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.escrow_nft.to_account_info(),
+            },
+            &[escrow_seeds],
+        ))?;
 
-        // Close listing account, return rent to seller
+        // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
         let dest_starting_lamports = seller_info.lamports();
         **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
@@ -680,19 +682,25 @@ pub mod auction {
             });
         }
 
-        // Close escrow_nft account, return rent to seller
-        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
-        let seller_info = ctx.accounts.seller.to_account_info();
-        let dest_starting_lamports = seller_info.lamports();
-        **seller_info.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(escrow_info.lamports())
-            .unwrap();
-        **escrow_info.lamports.borrow_mut() = 0;
-        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
-        escrow_info.realloc(0, false)?;
+        // Close escrow_nft token account via CPI, return rent to seller
+        let close_escrow_seeds: &[&[u8]] = &[
+            b"escrow_nft",
+            nft_mint_key.as_ref(),
+            &[escrow_bump],
+        ];
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.nft_token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.escrow_nft.to_account_info(),
+            },
+            &[close_escrow_seeds],
+        ))?;
 
-        // Close listing account, return rent to seller
+        // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
         let dest_starting_lamports = seller_info.lamports();
         **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
@@ -726,21 +734,27 @@ pub mod auction {
             seller: listing.seller,
         });
 
-        // Close escrow_nft account if it exists
-        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
-        let seller_info = ctx.accounts.seller.to_account_info();
-        if escrow_info.lamports() > 0 {
-            let dest_starting_lamports = seller_info.lamports();
-            **seller_info.lamports.borrow_mut() = dest_starting_lamports
-                .checked_add(escrow_info.lamports())
-                .unwrap();
-            **escrow_info.lamports.borrow_mut() = 0;
-            escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
-            escrow_info.realloc(0, false)?;
-        }
+        // Close escrow_nft token account via CPI, return rent to seller
+        let nft_mint_key = listing.nft_mint;
+        let escrow_bump = ctx.bumps.escrow_nft;
+        let close_escrow_seeds: &[&[u8]] = &[
+            b"escrow_nft",
+            nft_mint_key.as_ref(),
+            &[escrow_bump],
+        ];
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.nft_token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_nft.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.escrow_nft.to_account_info(),
+            },
+            &[close_escrow_seeds],
+        ))?;
 
-        // Close listing account
+        // Close listing account (owned by our program)
         let listing_info = ctx.accounts.listing.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
         let dest_starting_lamports = seller_info.lamports();
         **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
