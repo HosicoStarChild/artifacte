@@ -212,13 +212,24 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const nameUpper = cardName.toUpperCase();
               const isReverse = /REVERSE/i.test(nameUpper);
               const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              const isManga = /MANGA/i.test(nameUpper);
+              const isAltArt = /ALT(ERNATE)?\s*ART/i.test(nameUpper) && !isManga;
               const picked = sameNumVariants.find((v: any) => {
                 const vName = (v.name || '').toUpperCase();
+                // Manga: only pick manga variant if name says manga
+                if (isManga) return /MANGA/i.test(vName);
+                // Alt art (not manga): pick alt art that's NOT manga
+                if (isAltArt) return /ALT/i.test(vName) && !/MANGA/i.test(vName);
                 if (isReverse) return /REVERSE/i.test(vName);
                 if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
-                return !/REVERSE|HOLO/i.test(vName);
+                // Default: avoid manga and alt art variants
+                return !/MANGA/i.test(vName) && !/ALT/i.test(vName) && !/REVERSE|HOLO/i.test(vName);
               });
-              chosen = picked || sameNumVariants[0];
+              // If no exact match, at least avoid manga when name doesn't say manga
+              const fallback = !isManga 
+                ? sameNumVariants.find((v: any) => !/MANGA/i.test((v.name || '').toUpperCase()))
+                : sameNumVariants[0];
+              chosen = picked || fallback || sameNumVariants[0];
             } else {
               chosen = exactMatch;
             }
