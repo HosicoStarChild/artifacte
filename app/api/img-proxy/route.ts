@@ -8,6 +8,14 @@ const ARWEAVE_GATEWAYS = [
   "https://arweave.net",
 ];
 
+const FETCH_TIMEOUT = 8000; // 8s per gateway attempt
+
+function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = FETCH_TIMEOUT): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
   if (!url) return new NextResponse("Missing url", { status: 400 });
@@ -32,10 +40,10 @@ export async function GET(req: NextRequest) {
 
   if (arweaveMatch) {
     const txId = arweaveMatch[1];
-    // Try multiple gateways
+    // Try multiple gateways with timeout
     for (const gw of ARWEAVE_GATEWAYS) {
       try {
-        const res = await fetch(`${gw}/${txId}`, {
+        const res = await fetchWithTimeout(`${gw}/${txId}`, {
           headers: { Accept: "image/*" },
           redirect: "follow",
         });
@@ -56,9 +64,9 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Image not found on any gateway", { status: 404 });
   }
 
-  // Non-arweave URLs: direct fetch
+  // Non-arweave URLs: direct fetch with timeout
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { Accept: "image/*" },
       redirect: "follow",
     });

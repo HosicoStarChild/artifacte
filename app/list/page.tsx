@@ -104,6 +104,9 @@ export default function ListNFTPage() {
   }
 
   function getNftImage(nft: NFTAsset): string {
+    // Prefer Helius CDN URI (reliable Cloudflare proxy)
+    const cdnUri = nft.content?.files?.[0]?.cdn_uri;
+    if (cdnUri) return cdnUri;
     let url = nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
     if (url.startsWith("ipfs://")) {
       url = url.replace("ipfs://", "https://cf-ipfs.com/ipfs/");

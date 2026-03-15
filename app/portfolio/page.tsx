@@ -197,6 +197,9 @@ export default function PortfolioPage() {
                   id: asset.id,
                   name: asset.content?.metadata?.name || "Unknown",
                   image: (() => {
+                    // Prefer Helius CDN URI (reliable Cloudflare proxy)
+                    const cdnUri = asset.content?.files?.[0]?.cdn_uri;
+                    if (cdnUri) return cdnUri;
                     let u = asset.content?.links?.image || "";
                     if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
                     if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
