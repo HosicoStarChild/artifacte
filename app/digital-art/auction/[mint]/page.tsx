@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import Link from "next/link";
@@ -37,7 +37,8 @@ interface NFTData {
 export default function AuctionDetailPage() {
   const params = useParams();
   const mint = params.mint as string;
-  const { publicKey, connected, wallet } = useWallet();
+  const { publicKey, connected } = useWallet();
+  const wallet = useAnchorWallet();
   const { connection } = useConnection();
 
   const [listing, setListing] = useState<ListingData | null>(null);
