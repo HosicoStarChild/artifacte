@@ -226,11 +226,8 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
                 // Default: avoid manga and alt art variants
                 return !/MANGA/i.test(vName) && !/ALT/i.test(vName) && !/REVERSE|HOLO/i.test(vName);
               });
-              // If no exact match, at least avoid manga when name doesn't say manga
-              const fallback = !isManga 
-                ? sameNumVariants.find((v: any) => !/MANGA/i.test((v.name || '').toUpperCase()))
-                : sameNumVariants[0];
-              chosen = picked || fallback || sameNumVariants[0];
+              // Fallback: prefer non-Japanese English variant, then just use first (most traded)
+              chosen = picked || sameNumVariants[0];
             } else {
               chosen = exactMatch;
             }
