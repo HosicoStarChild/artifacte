@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import Link from "next/link";
 import { AuctionProgram } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
@@ -228,7 +228,34 @@ export default function AuctionDetailPage() {
     setLoadingAction(true);
     try {
       const nftMint = new PublicKey(mint);
-      const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey);
+
+      // Detect if Token-2022 mint
+      const mintInfo = await connection.getAccountInfo(nftMint);
+      const isT22 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
+      const tokenProgramId = isT22 ? TOKEN_2022_PROGRAM_ID : new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+
+      const sellerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey, false, tokenProgramId);
+
+      // Create ATA if it doesn't exist (closed when NFT was escrowed)
+      const ataInfo = await connection.getAccountInfo(sellerNftAccount);
+      if (!ataInfo) {
+        const createAtaIx = createAssociatedTokenAccountInstruction(
+          publicKey,
+          sellerNftAccount,
+          publicKey,
+          nftMint,
+          tokenProgramId,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const { blockhash } = await connection.getLatestBlockhash();
+        const ataTx = new (await import("@solana/web3.js")).Transaction().add(createAtaIx);
+        ataTx.recentBlockhash = blockhash;
+        ataTx.feePayer = publicKey;
+        const signed = await wallet.signTransaction(ataTx);
+        await connection.sendRawTransaction(signed.serialize());
+        // Wait for ATA to be created
+        await new Promise(r => setTimeout(r, 2000));
+      }
 
       const auctionProgram = new AuctionProgram(connection, wallet);
       const tx = await auctionProgram.cancelListing(nftMint, sellerNftAccount);
