@@ -435,12 +435,22 @@ export default function AuctionDetailPage() {
               </button>
             )}
 
+            {/* Ended auction with no bids — prompt seller to reclaim */}
+            {isAuction && auctionEnded && !isSettled && !isCancelled && listing.currentBid === 0 && isSeller && (
+              <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-5 text-center">
+                <p className="text-yellow-200 font-semibold mb-1">Auction ended with no bids</p>
+                <p className="text-yellow-200/70 text-sm">Cancel the listing to reclaim your NFT from escrow.</p>
+              </div>
+            )}
+
             {/* Cancel Listing Button (seller only) */}
             {isSeller && !isSettled && !isCancelled && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-gray-500 text-xs mb-3">
                   {isAuction && listing.currentBid > 0
                     ? "Cannot cancel after bids have been placed"
+                    : isAuction && auctionEnded
+                    ? "Cancel to return NFT to your wallet"
                     : "You can cancel this listing anytime"}
                 </p>
                 <button
