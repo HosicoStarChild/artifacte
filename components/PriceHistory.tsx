@@ -200,13 +200,14 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         const cardNumMatch = cardName.match(/#(\w+)/);
         if (cardNumMatch && searchData.variants.length > 1) {
           const targetNum = cardNumMatch[1];
+          // Match card number — try exact, then endsWith (e.g. "118" matches "OP09-118")
           const exactMatch = searchData.variants.find(
-            (v: any) => String(v.cardNumber) === targetNum
+            (v: any) => String(v.cardNumber) === targetNum || String(v.cardNumber).endsWith(`-${targetNum}`)
           );
           // If multiple variants share the same card number, further filter by variant type
           if (exactMatch) {
             const sameNumVariants = searchData.variants.filter(
-              (v: any) => String(v.cardNumber) === targetNum
+              (v: any) => String(v.cardNumber) === targetNum || String(v.cardNumber).endsWith(`-${targetNum}`)
             );
             if (sameNumVariants.length > 1) {
               const nameUpper = cardName.toUpperCase();
