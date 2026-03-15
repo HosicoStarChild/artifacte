@@ -72,17 +72,15 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
         AUCTION_PROGRAM_ID
       );
 
-      // Use Helius RPC directly for reliable tx fetching
-      const heliusRpc = `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
-      const conn = new Connection(heliusRpc);
-
-      const signatures = await conn.getSignaturesForAddress(listingPda, { limit: 50 });
+      const signatures = await connection.getSignaturesForAddress(listingPda, { limit: 50 });
+      console.log("[BidHistory] signatures found:", signatures.length);
       if (signatures.length === 0) { setBids([]); return; }
 
-      const txs = await conn.getParsedTransactions(
+      const txs = await connection.getParsedTransactions(
         signatures.map((s) => s.signature),
         { maxSupportedTransactionVersion: 0 }
       );
+      console.log("[BidHistory] txs fetched:", txs.filter(Boolean).length);
 
       const parsed: Bid[] = [];
       for (let i = 0; i < txs.length; i++) {
@@ -118,10 +116,11 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
         }
       }
 
+      console.log("[BidHistory] parsed bids:", parsed.length);
       parsed.sort((a, b) => b.timestamp - a.timestamp);
       setBids(parsed);
     } catch (err) {
-      console.error("On-chain bid fetch failed:", err);
+      console.error("[BidHistory] On-chain bid fetch failed:", err);
       setBids([]);
     }
   };
