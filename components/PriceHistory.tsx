@@ -210,24 +210,28 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               (v: any) => String(v.cardNumber) === targetNum || String(v.cardNumber).endsWith(`-${targetNum}`)
             );
             if (sameNumVariants.length > 1) {
-              const nameUpper = cardName.toUpperCase();
-              const isReverse = /REVERSE/i.test(nameUpper);
-              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
-              const isManga = /MANGA/i.test(nameUpper);
-              const isAltArt = /ALT(ERNATE)?\s*ART/i.test(nameUpper) && !isManga;
-              const picked = sameNumVariants.find((v: any) => {
-                const vName = (v.name || '').toUpperCase();
-                // Manga: only pick manga variant if name says manga
-                if (isManga) return /MANGA/i.test(vName);
-                // Alt art (not manga): pick alt art that's NOT manga
-                if (isAltArt) return /ALT/i.test(vName) && !/MANGA/i.test(vName);
-                if (isReverse) return /REVERSE/i.test(vName);
-                if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
-                // Default: avoid manga and alt art variants
-                return !/MANGA/i.test(vName) && !/ALT/i.test(vName) && !/REVERSE|HOLO/i.test(vName);
-              });
-              // Fallback: prefer non-Japanese English variant, then just use first (most traded)
-              chosen = picked || sameNumVariants[0];
+              // Pick variant with most sales for the requested grade
+              // CC names often lack variant info (no "Manga", "Alt Art"), so keyword matching is unreliable
+              const gradePrefix = grade ? grade.split('-')[0]?.toUpperCase() : ''; // e.g. "PSA" from "PSA-10"
+              const gradeNum = grade ? grade.split('-')[1] : '';
+              
+              if (gradePrefix && gradeNum) {
+                // Count matching grade sales per variant and pick the one with most data
+                let bestVariant = sameNumVariants[0];
+                let bestCount = 0;
+                for (const v of sameNumVariants) {
+                  const matchingSales = (v.grades || []).filter((g: any) => 
+                    g.grader?.toUpperCase() === gradePrefix && String(g.grade) === gradeNum
+                  ).length;
+                  if (matchingSales > bestCount) {
+                    bestCount = matchingSales;
+                    bestVariant = v;
+                  }
+                }
+                chosen = bestVariant;
+              } else {
+                chosen = sameNumVariants[0];
+              }
             } else {
               chosen = exactMatch;
             }
