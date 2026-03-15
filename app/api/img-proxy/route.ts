@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
   const hostname = parsedUrl.hostname;
   const allowedHosts = ["arweave.net", "gateway.irys.xyz", "ar-io.dev", "cdn.helius-rpc.com", "nftstorage.link", "dweb.link", "w3s.link", "cloudflare-ipfs.com"];
   const isIpfs = hostname.endsWith(".ipfs.nftstorage.link") || hostname.endsWith(".ipfs.dweb.link") || hostname.endsWith(".ipfs.w3s.link");
-  if (!allowedHosts.includes(hostname) && !isIpfs && !hostname.endsWith(".mypinata.cloud")) {
+  const isArIoSubdomain = hostname.endsWith(".ar-io.dev");
+  if (!allowedHosts.includes(hostname) && !isIpfs && !isArIoSubdomain && !hostname.endsWith(".mypinata.cloud")) {
     return new NextResponse("Domain not allowed", { status: 403 });
   }
 
