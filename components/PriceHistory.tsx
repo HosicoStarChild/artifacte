@@ -200,61 +200,25 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         const cardNumMatch = cardName.match(/#(\w+)/);
         if (cardNumMatch && searchData.variants.length > 1) {
           const targetNum = cardNumMatch[1];
-          // Match card number — try exact, then endsWith (e.g. "118" matches "OP09-118")
           const exactMatch = searchData.variants.find(
-            (v: any) => String(v.cardNumber) === targetNum || String(v.cardNumber).endsWith(`-${targetNum}`)
+            (v: any) => String(v.cardNumber) === targetNum
           );
           // If multiple variants share the same card number, further filter by variant type
           if (exactMatch) {
             const sameNumVariants = searchData.variants.filter(
-              (v: any) => String(v.cardNumber) === targetNum || String(v.cardNumber).endsWith(`-${targetNum}`)
+              (v: any) => String(v.cardNumber) === targetNum
             );
             if (sameNumVariants.length > 1) {
-              // Pick variant with most sales for the requested grade
-              // CC names often lack variant info (no "Manga", "Alt Art"), so keyword matching is unreliable
-              const gradePrefix = grade ? grade.split('-')[0]?.toUpperCase() : ''; // e.g. "PSA" from "PSA-10"
-              const gradeNum = grade ? grade.split('-')[1] : '';
-              
-              // Match variant by set/brand name from CC listing name
-              // CC names contain set names like "OP09-Emperors in the New World"
-              // Alt.xyz brand field contains the same: "Emperors In the New World"
-              const setMatch = cardName.match(/(?:OP|ST|EB)\d+-(.+?)(?:\s+Pokemon|\s+One Piece|\s+Dragon Ball)?$/i);
-              const setWords = setMatch ? setMatch[1].toLowerCase().split(/\s+/).filter((w: string) => w.length > 2) : [];
-              
-              let matched = sameNumVariants;
-              // Detect if the CC card itself is Japanese (name contains "Japanese" or "JPN")
-              const isCardJapanese = /japanese|JPN/i.test(cardName);
-              if (setWords.length >= 2) {
-                // Match brand containing key set words, filter by language
-                const brandMatched = sameNumVariants.filter((v: any) => {
-                  const brand = (v.brand || v.name || '').toLowerCase();
-                  const nameL = (v.name || '').toLowerCase();
-                  const hasSetWords = setWords.filter((w: string) => brand.includes(w) || nameL.includes(w)).length >= 2;
-                  const isJapaneseVariant = /japanese|chinese/i.test(v.name || '') || /japanese|chinese/i.test(v.brand || '');
-                  // If card is Japanese, ALLOW Japanese variants; otherwise exclude them
-                  if (isCardJapanese) return hasSetWords && isJapaneseVariant;
-                  return hasSetWords && !isJapaneseVariant;
-                });
-                if (brandMatched.length > 0) matched = brandMatched;
-              }
-              
-              // Among matched, pick variant with most sales for requested grade
-              if (gradePrefix && gradeNum && matched.length > 1) {
-                let bestVariant = matched[0];
-                let bestCount = 0;
-                for (const v of matched) {
-                  const matchingSales = (v.grades || []).filter((g: any) => 
-                    g.grader?.toUpperCase() === gradePrefix && String(g.grade) === gradeNum
-                  ).length;
-                  if (matchingSales > bestCount) {
-                    bestCount = matchingSales;
-                    bestVariant = v;
-                  }
-                }
-                chosen = bestVariant;
-              } else {
-                chosen = matched[0];
-              }
+              const nameUpper = cardName.toUpperCase();
+              const isReverse = /REVERSE/i.test(nameUpper);
+              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              const picked = sameNumVariants.find((v: any) => {
+                const vName = (v.name || '').toUpperCase();
+                if (isReverse) return /REVERSE/i.test(vName);
+                if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
+                return !/REVERSE|HOLO/i.test(vName);
+              });
+              chosen = picked || sameNumVariants[0];
             } else {
               chosen = exactMatch;
             }
