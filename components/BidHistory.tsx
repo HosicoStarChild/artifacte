@@ -15,6 +15,8 @@ interface Bid {
 interface BidHistoryProps {
   nftMint: string;
   connection: Connection;
+  currentBid?: number;        // lamports
+  highestBidder?: string;
 }
 
 function maskWallet(wallet: string): string {
@@ -30,7 +32,7 @@ function timeAgo(ts: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export function BidHistory({ nftMint, connection }: BidHistoryProps) {
+export function BidHistory({ nftMint, connection, currentBid, highestBidder }: BidHistoryProps) {
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -118,6 +120,17 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
 
       console.log("[BidHistory] parsed bids:", parsed.length);
       parsed.sort((a, b) => b.timestamp - a.timestamp);
+      
+      // If parsing found nothing but we have on-chain bid data, show it
+      if (parsed.length === 0 && currentBid && currentBid > 0 && highestBidder) {
+        parsed.push({
+          bidder: highestBidder,
+          amount: currentBid,
+          timestamp: Math.floor(Date.now() / 1000),
+          signature: "on-chain",
+        });
+      }
+      
       setBids(parsed);
     } catch (err) {
       console.error("[BidHistory] On-chain bid fetch failed:", err);

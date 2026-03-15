@@ -492,7 +492,12 @@ export default function AuctionDetailPage() {
             {isAuction && (
               <div>
                 <h2 className="font-serif text-2xl text-white mb-4">Bid History</h2>
-                <BidHistory nftMint={mint} connection={connection} />
+                <BidHistory 
+                  nftMint={mint} 
+                  connection={connection}
+                  currentBid={listing?.currentBid}
+                  highestBidder={listing?.highestBidder}
+                />
               </div>
             )}
 
