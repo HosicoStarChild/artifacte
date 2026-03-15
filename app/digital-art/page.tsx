@@ -194,6 +194,7 @@ export default function DigitalArtPage() {
                     <img
                       src={listing.image}
                       alt={listing.name}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
                     />
