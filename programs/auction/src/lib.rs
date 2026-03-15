@@ -272,7 +272,7 @@ pub mod auction {
     /// (amount=0) BEFORE this instruction in the same transaction.
     /// remaining_accounts: same layout as list_item
     pub fn buy_now<'info>(ctx: Context<'_, '_, '_, 'info, BuyNow<'info>>) -> Result<()> {
-        let listing = &ctx.accounts.listing;
+        let listing = &mut ctx.accounts.listing;
 
         require!(
             matches!(listing.listing_type, ListingType::FixedPrice),
@@ -379,6 +379,8 @@ pub mod auction {
             )?;
         }
 
+        listing.status = ListingStatus::Settled;
+
         emit!(ItemPurchased {
             nft_mint: listing.nft_mint,
             seller: listing.seller,
@@ -387,6 +389,27 @@ pub mod auction {
             platform_fee,
             creator_royalty,
         });
+
+        // Close escrow_nft account, return rent to buyer
+        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
+        let buyer_info = ctx.accounts.buyer.to_account_info();
+        let dest_starting_lamports = buyer_info.lamports();
+        **buyer_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(escrow_info.lamports())
+            .unwrap();
+        **escrow_info.lamports.borrow_mut() = 0;
+        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
+        escrow_info.realloc(0, false)?;
+
+        // Close listing account, return rent to buyer
+        let listing_info = ctx.accounts.listing.to_account_info();
+        let dest_starting_lamports = buyer_info.lamports();
+        **buyer_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(listing_info.lamports())
+            .unwrap();
+        **listing_info.lamports.borrow_mut() = 0;
+        listing_info.assign(&anchor_lang::solana_program::system_program::ID);
+        listing_info.realloc(0, false)?;
 
         Ok(())
     }
@@ -447,12 +470,31 @@ pub mod auction {
             )?;
         }
 
-        listing.status = ListingStatus::Cancelled;
-
         emit!(ListingCancelled {
             nft_mint: listing.nft_mint,
             seller: listing.seller,
         });
+
+        // Close escrow_nft account, return rent to seller
+        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(escrow_info.lamports())
+            .unwrap();
+        **escrow_info.lamports.borrow_mut() = 0;
+        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
+        escrow_info.realloc(0, false)?;
+
+        // Close listing account, return rent to seller
+        let listing_info = ctx.accounts.listing.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(listing_info.lamports())
+            .unwrap();
+        **listing_info.lamports.borrow_mut() = 0;
+        listing_info.assign(&anchor_lang::solana_program::system_program::ID);
+        listing_info.realloc(0, false)?;
 
         Ok(())
     }
@@ -638,6 +680,75 @@ pub mod auction {
             });
         }
 
+        // Close escrow_nft account, return rent to seller
+        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(escrow_info.lamports())
+            .unwrap();
+        **escrow_info.lamports.borrow_mut() = 0;
+        escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
+        escrow_info.realloc(0, false)?;
+
+        // Close listing account, return rent to seller
+        let listing_info = ctx.accounts.listing.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(listing_info.lamports())
+            .unwrap();
+        **listing_info.lamports.borrow_mut() = 0;
+        listing_info.assign(&anchor_lang::solana_program::system_program::ID);
+        listing_info.realloc(0, false)?;
+
+        Ok(())
+    }
+
+    /// Close a stale listing where escrow is empty (NFT already returned)
+    /// This allows re-listing the same NFT after a cancelled listing
+    pub fn close_stale_listing(ctx: Context<CloseStaleListing>) -> Result<()> {
+        let listing = &ctx.accounts.listing;
+
+        // Only the original seller can close their stale listing
+        require!(
+            ctx.accounts.seller.key() == listing.seller,
+            AuctionError::Unauthorized
+        );
+
+        // Verify escrow is empty (NFT already returned)
+        require!(
+            ctx.accounts.escrow_nft.amount == 0,
+            AuctionError::ListingNotActive // reuse: listing still has NFT
+        );
+
+        emit!(ListingCancelled {
+            nft_mint: listing.nft_mint,
+            seller: listing.seller,
+        });
+
+        // Close escrow_nft account if it exists
+        let escrow_info = ctx.accounts.escrow_nft.to_account_info();
+        let seller_info = ctx.accounts.seller.to_account_info();
+        if escrow_info.lamports() > 0 {
+            let dest_starting_lamports = seller_info.lamports();
+            **seller_info.lamports.borrow_mut() = dest_starting_lamports
+                .checked_add(escrow_info.lamports())
+                .unwrap();
+            **escrow_info.lamports.borrow_mut() = 0;
+            escrow_info.assign(&anchor_lang::solana_program::system_program::ID);
+            escrow_info.realloc(0, false)?;
+        }
+
+        // Close listing account
+        let listing_info = ctx.accounts.listing.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(listing_info.lamports())
+            .unwrap();
+        **listing_info.lamports.borrow_mut() = 0;
+        listing_info.assign(&anchor_lang::solana_program::system_program::ID);
+        listing_info.realloc(0, false)?;
+
         Ok(())
     }
 }
@@ -784,6 +895,24 @@ pub struct CancelListing<'info> {
 }
 
 #[derive(Accounts)]
+pub struct CloseStaleListing<'info> {
+    #[account(mut)]
+    pub listing: Account<'info, Listing>,
+    pub nft_mint: InterfaceAccount<'info, IfaceMint>,
+    #[account(
+        mut,
+        seeds = [b"escrow_nft", listing.nft_mint.as_ref()],
+        bump,
+        token::mint = listing.nft_mint,
+        token::token_program = nft_token_program,
+    )]
+    pub escrow_nft: InterfaceAccount<'info, IfaceTokenAccount>,
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    pub nft_token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
 pub struct SettleAuction<'info> {
     #[account(mut)]
     pub listing: Box<Account<'info, Listing>>,
@@ -814,6 +943,9 @@ pub struct SettleAuction<'info> {
     pub buyer_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     #[account(mut)]
     pub seller_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
+    /// CHECK: The original seller, validated against listing.seller. Receives rent refunds.
+    #[account(mut, constraint = seller.key() == listing.seller)]
+    pub seller: UncheckedAccount<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

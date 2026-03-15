@@ -233,6 +233,35 @@ export class AuctionProgram {
   }
 
   /**
+   * Close a stale listing where the NFT has already been returned (escrow empty).
+   * This allows re-listing the same NFT after a cancelled listing.
+   */
+  async closeStaleListing(nftMint: PublicKey): Promise<string> {
+    const nftTokenProgram = await detectTokenProgram(this.connection, nftMint);
+
+    const listing = PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+
+    const escrowNft = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow_nft"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+
+    return await this.program.methods
+      .closeStaleListing()
+      .accounts({
+        listing,
+        nftMint,
+        escrowNft,
+        seller: this.wallet.publicKey,
+        nftTokenProgram,
+      })
+      .rpc();
+  }
+
+  /**
    * List an NFT for sale (fixed price or auction)
    * Supports both standard SPL Token and Token-2022/WNS NFTs
    */
@@ -569,6 +598,8 @@ export class AuctionProgram {
       ? await getAssociatedTokenAddress(paymentMint, creatorAddr)
       : SystemProgram.programId;
 
+    const sellerAddress = listingData.seller as PublicKey;
+
     let builder = this.program.methods
       .settleAuction()
       .accounts({
@@ -581,6 +612,7 @@ export class AuctionProgram {
         creatorPaymentAccount,
         buyerNftAccount,
         sellerNftAccount,
+        seller: sellerAddress,
         nftTokenProgram,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,

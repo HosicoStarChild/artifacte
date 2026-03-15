@@ -163,6 +163,20 @@ export default function ListNFTPage() {
 
       const auctionProgram = new AuctionProgram(connection, wallet.adapter);
 
+      // Check for stale listing PDA and close it first
+      const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
+      const [listingPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("listing"), nftMint.toBuffer()],
+        AUCTION_PROGRAM_ID
+      );
+      const existingListing = await connection.getAccountInfo(listingPda);
+      if (existingListing) {
+        console.log("Stale listing found, closing...");
+        await auctionProgram.closeStaleListing(nftMint);
+        // Wait for confirmation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
       const tx = await auctionProgram.listItem(
         nftMint,
         sellerNftAccount,

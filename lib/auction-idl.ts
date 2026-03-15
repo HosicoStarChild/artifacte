@@ -1,5 +1,4 @@
-export const IDL =
-{
+export const IDL = {
   "address": "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3",
   "metadata": {
     "name": "auction",
@@ -161,6 +160,69 @@ export const IDL =
         },
         {
           "name": "seller",
+          "signer": true
+        },
+        {
+          "name": "nft_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_stale_listing",
+      "docs": [
+        "Close a stale listing where escrow is empty (NFT already returned)",
+        "This allows re-listing the same NFT after a cancelled listing"
+      ],
+      "discriminator": [
+        120,
+        38,
+        229,
+        87,
+        16,
+        1,
+        54,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "listing",
+          "writable": true
+        },
+        {
+          "name": "nft_mint"
+        },
+        {
+          "name": "escrow_nft",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  110,
+                  102,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing.nft_mint",
+                "account": "Listing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seller",
+          "writable": true,
           "signer": true
         },
         {
@@ -495,6 +557,10 @@ export const IDL =
         },
         {
           "name": "seller_nft_account",
+          "writable": true
+        },
+        {
+          "name": "seller",
           "writable": true
         },
         {
@@ -979,4 +1045,4 @@ export const IDL =
       }
     }
   ]
-};
+} as const;
