@@ -312,6 +312,7 @@ export default function ListNFTPage() {
                         <img
                           src={getNftImage(nft)}
                           alt={nft.content?.metadata?.name}
+                          loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
                         />
