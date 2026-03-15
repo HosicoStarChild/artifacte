@@ -51,7 +51,7 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "A collection of 7,777 foxes building the Famous Fox Federation — a community-driven ecosystem on Solana with staking, raffles, and governance.",
+      "description": "A collection of 7,777 foxes building the Famous Fox Federation \u2014 a community-driven ecosystem on Solana with staking, raffles, and governance.",
       "links": {
         "twitter": "https://twitter.com/FamousFoxFed"
       }
@@ -79,7 +79,7 @@
       "addedAt": 1704067200000,
       "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
       "verified": true,
-      "description": "Call of Saga is the Claynosaurz companion collection — 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem.",
+      "description": "Call of Saga is the Claynosaurz companion collection \u2014 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem.",
       "links": {
         "twitter": "https://twitter.com/Claynosaurz"
       }
@@ -266,6 +266,20 @@
       "description": "Drifella III is the third generation of the Drifella collection on Solana. A Metaplex Core collection.",
       "links": {
         "twitter": "https://x.com/bis__cut"
+      }
+    },
+    {
+      "collectionAddress": "8vE4uASPp9WbS9Ls2qzJ9fpUBpR3UrTG3hBZXdAJQ9mz",
+      "name": "Monkey Baby Business",
+      "category": "Digital Art",
+      "image": "/collections/monkey-baby-business.png",
+      "supply": 5000,
+      "addedAt": 1741999600000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "Monkey Baby Business (MBB) is a collection of ProgrammableNFTs on Solana. 5% royalties enforced.",
+      "links": {
+        "twitter": ""
       }
     }
   ]
