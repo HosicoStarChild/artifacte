@@ -405,14 +405,6 @@ export default function AuctionDetailPage() {
                     <div className="bg-dark-900 border border-white/10 rounded-lg p-3 space-y-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Your Bid:</span>
-                        <span className="text-white">◎ {bidAmount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Platform Fee (2% deducted from seller):</span>
-                        <span className="text-gray-300">—</span>
-                      </div>
-                      <div className="border-t border-white/10 pt-2 flex justify-between">
-                        <span className="text-gray-300">Total Amount:</span>
                         <span className="text-gold-400 font-semibold">◎ {bidAmount}</span>
                       </div>
                     </div>
