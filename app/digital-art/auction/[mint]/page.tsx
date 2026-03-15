@@ -163,14 +163,10 @@ export default function AuctionDetailPage() {
     try {
       const nftMint = new PublicKey(mint);
       const bidderTokenAccount = await getAssociatedTokenAddress(SOL_MINT, publicKey);
-      // When no previous bidder, pass the bid_escrow PDA (valid token account) to satisfy Anchor
-      const bidEscrow = PublicKey.findProgramAddressSync(
-        [Buffer.from("bid_escrow"), nftMint.toBuffer()],
-        new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3")
-      )[0];
+      // UncheckedAccount on-chain — safe to pass any pubkey when no previous bidder
       const previousBidderAccount = listing.currentBid > 0
         ? await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.highestBidder))
-        : bidEscrow;
+        : publicKey;
 
       const auctionProgram = new AuctionProgram(connection, wallet);
       const tx = await auctionProgram.placeBid(

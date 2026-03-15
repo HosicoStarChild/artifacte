@@ -722,8 +722,9 @@ pub struct PlaceBid<'info> {
     pub bid_escrow: Account<'info, TokenAccount>,
     #[account(mut)]
     pub bidder_token_account: Account<'info, TokenAccount>,
+    /// CHECK: Only used when refunding previous bidder (current_bid > 0). Validated in instruction body.
     #[account(mut)]
-    pub previous_bidder_account: Account<'info, TokenAccount>,
+    pub previous_bidder_account: UncheckedAccount<'info>,
     #[account(mut)]
     pub bidder: Signer<'info>,
     pub token_program: Program<'info, Token>,
