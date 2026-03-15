@@ -285,6 +285,7 @@ export class AuctionProgram {
         nftTokenProgram,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       });
 
     // Add WNS remaining accounts if Token-2022 with hook

@@ -688,7 +688,7 @@ pub struct ListItem<'info> {
     pub nft_mint: InterfaceAccount<'info, IfaceMint>,
     pub payment_mint: Account<'info, anchor_spl::token::Mint>,
     #[account(
-        init,
+        init_if_needed,
         payer = seller,
         token::mint = nft_mint,
         token::authority = escrow_nft,
@@ -704,6 +704,7 @@ pub struct ListItem<'info> {
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
