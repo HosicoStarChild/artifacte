@@ -68,14 +68,18 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
       const nftMintPk = new PublicKey(nftMint);
 
       const [listingPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("listing"), nftMintPk.toBuffer()],
+        [new TextEncoder().encode("listing"), nftMintPk.toBuffer()],
         AUCTION_PROGRAM_ID
       );
 
-      const signatures = await connection.getSignaturesForAddress(listingPda, { limit: 50 });
+      // Use Helius RPC directly for reliable tx fetching
+      const heliusRpc = `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+      const conn = new Connection(heliusRpc);
+
+      const signatures = await conn.getSignaturesForAddress(listingPda, { limit: 50 });
       if (signatures.length === 0) { setBids([]); return; }
 
-      const txs = await connection.getParsedTransactions(
+      const txs = await conn.getParsedTransactions(
         signatures.map((s) => s.signature),
         { maxSupportedTransactionVersion: 0 }
       );
@@ -92,14 +96,22 @@ export function BidHistory({ nftMint, connection }: BidHistoryProps) {
         for (const log of logs) {
           if (!log.startsWith("Program data: ")) continue;
           try {
-            const buf = Buffer.from(log.replace("Program data: ", ""), "base64");
+            // Use Uint8Array instead of Buffer for browser compatibility
+            const raw = atob(log.replace("Program data: ", ""));
+            const buf = new Uint8Array(raw.length);
+            for (let j = 0; j < raw.length; j++) buf[j] = raw.charCodeAt(j);
+            
             if (buf.length < 88) continue;
-            if (buf.slice(0, 8).toString("hex") !== BID_PLACED_DISC) continue;
+            
+            // Check discriminator
+            const disc = Array.from(buf.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if (disc !== BID_PLACED_DISC) continue;
 
-            const bidderBytes = buf.slice(40, 72);
-            const bidder = new PublicKey(bidderBytes).toBase58();
-            const amount = buf.readUInt32LE(72) + buf.readUInt32LE(76) * 0x100000000;
-            const timestamp = buf.readUInt32LE(80) + buf.readUInt32LE(84) * 0x100000000;
+            const bidder = new PublicKey(buf.slice(40, 72)).toBase58();
+            // Read u64 as little-endian
+            const view = new DataView(buf.buffer, buf.byteOffset);
+            const amount = view.getUint32(72, true) + view.getUint32(76, true) * 0x100000000;
+            const timestamp = view.getUint32(80, true) + view.getUint32(84, true) * 0x100000000;
 
             parsed.push({ bidder, amount, timestamp, signature: signatures[i].signature });
           } catch { /* skip */ }
