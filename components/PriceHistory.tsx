@@ -215,14 +215,30 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const gradePrefix = grade ? grade.split('-')[0]?.toUpperCase() : ''; // e.g. "PSA" from "PSA-10"
               const gradeNum = grade ? grade.split('-')[1] : '';
               
-              // CC names lack variant info — pick by: English first, then most sales for grade
-              const englishVariants = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || ''));
-              const pool = englishVariants.length > 0 ? englishVariants : sameNumVariants;
+              // Match variant by set/brand name from CC listing name
+              // CC names contain set names like "OP09-Emperors in the New World"
+              // Alt.xyz brand field contains the same: "Emperors In the New World"
+              const setMatch = cardName.match(/(?:OP|ST|EB)\d+-(.+?)(?:\s+Pokemon|\s+One Piece|\s+Dragon Ball)?$/i);
+              const setWords = setMatch ? setMatch[1].toLowerCase().split(/\s+/).filter((w: string) => w.length > 2) : [];
               
-              if (gradePrefix && gradeNum) {
-                let bestVariant = pool[0];
+              let matched = sameNumVariants;
+              if (setWords.length >= 2) {
+                // Match brand containing key set words AND not Japanese/Chinese (CC cards are English)
+                const brandMatched = sameNumVariants.filter((v: any) => {
+                  const brand = (v.brand || v.name || '').toLowerCase();
+                  const nameL = (v.name || '').toLowerCase();
+                  const hasSetWords = setWords.filter((w: string) => brand.includes(w) || nameL.includes(w)).length >= 2;
+                  const isJapanese = /japanese|chinese/i.test(v.name || '') || /japanese|chinese/i.test(v.brand || '');
+                  return hasSetWords && !isJapanese;
+                });
+                if (brandMatched.length > 0) matched = brandMatched;
+              }
+              
+              // Among matched, pick variant with most sales for requested grade
+              if (gradePrefix && gradeNum && matched.length > 1) {
+                let bestVariant = matched[0];
                 let bestCount = 0;
-                for (const v of pool) {
+                for (const v of matched) {
                   const matchingSales = (v.grades || []).filter((g: any) => 
                     g.grader?.toUpperCase() === gradePrefix && String(g.grade) === gradeNum
                   ).length;
@@ -233,7 +249,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
                 }
                 chosen = bestVariant;
               } else {
-                chosen = pool[0];
+                chosen = matched[0];
               }
             } else {
               chosen = exactMatch;
