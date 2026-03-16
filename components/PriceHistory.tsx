@@ -3,42 +3,104 @@
 import { useState, useEffect } from "react";
 
 /**
- * Extract a simple search query from verbose CC/ME card names.
- * Used as fallback for chart endpoint when valuate doesn't return an assetId.
+ * Extract search-friendly query from verbose CC/ME card names.
+ * E.g. "2015 Pokemon Japanese XY Promo Poncho-wearing Pikachu #150/XY-P PSA 10"
+ *   → "Pikachu Poncho 150 XY-P"
+ * E.g. "2023 One Piece OP05 Awakening SEC Monkey D. Luffy #OP05-119 PSA 10"
+ *   → "OP05-119"
  */
+// Manual overrides for cards where ME listing names are too generic to match correctly
+const CHART_OVERRIDES: Record<string, string> = {
+  '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'one piece luffy P-001 super prerelease winner',
+  '2024 #019 Divine Departure PSA 10 One Piece Japanese OP10-Royal Blood': 'OP10019 divine depature Japanese',
+  '2023 #092 Rob Lucci PSA 10 One Piece Japanese OP05-Awakening of the New Era Pokemon': 'OP05092 rob lucci japanese special alternate art',
+};
+
 function buildSearchQuery(name: string): string {
-  // 1. Extract full card number like #OP05-119, OP11-118, OP05119
+  // Check manual overrides first
+  if (CHART_OVERRIDES[name]) return CHART_OVERRIDES[name];
+
+  // 1. Extract full card number like #OP05-119, OP11-118, OP05119 (must have dash or 5+ digits)
   const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i) || name.match(/#?((?:OP|ST|EB|PRB?)\d{5,})/i);
   if (opMatch) {
+    // Normalize: insert dash if missing (OP05119 → OP05-119)
     let cardNum = opMatch[1];
     if (!cardNum.includes('-')) {
       const m = cardNum.match(/^([A-Z]+\d{2})(\d+)$/i);
       if (m) cardNum = `${m[1]}-${m[2]}`;
     }
-    return cardNum;
+    // Include variant keywords for disambiguation (manga art vs alt art vs standard)
+    const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|super\s*pre.?release|winner|sp|sec)\b/i);
+    return variant ? `${cardNum} ${variant[0]}` : cardNum;
   }
 
-  // 2. Extract Pokemon set codes
+  // 2. Extract Pokemon set codes: SV06-061, SWSH12-150, XY-150
   const pkMatch = name.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d*[-/]\d+[-/]?[A-Z]*)/i);
   if (pkMatch) return pkMatch[1];
 
-  // 3. Extract card number with set prefix
+  // 3. Extract card number with # prefix: #051, #118, #150/XY-P
   const hashMatch = name.match(/#(\d+(?:\/[\w-]+)?)/);
   if (hashMatch) {
+    // Check if set code like OP09, ST01, EB01 exists in the name (e.g. "OP09-Emperors in the New World")
     const setPrefix = name.match(/\b(OP|ST|EB|PRB?)\d{2}/i);
-    if (setPrefix) return `${setPrefix[0]}-${hashMatch[1]}`;
+    if (setPrefix) {
+      // Combine: OP09 + #051 → OP09-051, plus character name + variant for disambiguation
+      const cardNum = `${setPrefix[0]}-${hashMatch[1]}`;
+      const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec|3rd\s*anniversary|gold|serialized|tournament)\b/i);
+      // Also extract character name
+      const charWords = name
+        .replace(/\b\d{4}\b/g, '').replace(/#\d+/g, '')
+        .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
+        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|English|EN)\b/gi, '')
+        .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
+        .replace(/\b(OP|ST|EB)\d+[-\w]*/gi, '')
+        .replace(/[\/|,-]/g, ' ')
+        .trim().split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w)).slice(0, 3);
+      const parts = [cardNum, ...charWords];
+      if (variant) parts.push(variant[0]);
+      return parts.join(' ');
+    }
+    // Build query from card number + name context
+    const parts: string[] = [];
+    // Extract character/card name (first 1-3 capitalized words before common keywords)
+    const cleanName = name
+      .replace(/[\/|]/g, ' ')
+      .replace(/\b\d{4}\b/g, '')
+      .replace(/#\d+/g, '')
+      .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
+      .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, '')
+      .replace(/\b(English|EN)\b/gi, '')
+      .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
+      .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, '')
+      .replace(/-HOLO\b/gi, '')
+      .replace(/-/g, ' ')
+      .trim();
+    // Get meaningful words (character name, set identifiers, etc.)
+    const words = cleanName.split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w));
+    if (words.length > 0) parts.push(...words.slice(0, 6));
+    parts.push(hashMatch[1]);
+    // Add TCG context
+    if (/one piece/i.test(name)) parts.push('one piece');
+    else if (/pokemon/i.test(name)) parts.push('pokemon');
+    else if (/dragon ball/i.test(name)) parts.push('dragon ball');
+    else if (/yu-?gi-?oh/i.test(name)) parts.push('yugioh');
+    return parts.join(' ');
   }
 
-  // 4. Generic cleanup
+  // 4. Clean up name for freetext search
   let q = name
     .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
     .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '')
-    .replace(/\b\d{4}\b/g, '')
+    .replace(/\b\d{4}\b/g, '') // years
     .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes|TCG)\b/gi, '')
+    .replace(/\b(English|EN)\b/gi, '')
+    .replace(/\b(1st Edition|Unlimited|Shadowless|Holo|Reverse)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+
   const words = q.split(' ').filter(w => w.length > 2);
   if (words.length > 5) q = words.slice(0, 5).join(' ');
+
   return q || name.slice(0, 50);
 }
 
@@ -52,10 +114,12 @@ interface PriceHistoryProps {
 
 function normalizeGrade(g?: string): string | undefined {
   if (!g) return undefined;
+  // Normalize grading company names to Alt.xyz format
   let normalized = g.trim()
     .replace(/^Beckett\s*/i, 'BGS ')
     .replace(/^Professional Sports Authenticator\s*/i, 'PSA ')
     .replace(/^Certified Guaranty Company\s*/i, 'CGC ');
+  // Normalize space to dash: "PSA 10" → "PSA-10"
   normalized = normalized.replace(/^(PSA|BGS|CGC|SGC)\s+/i, (_, co) => `${co.toUpperCase()}-`);
   return normalized;
 }
@@ -70,7 +134,6 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
   const [expanded, setExpanded] = useState(false);
   const [ungradedPrice, setUngradedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; rarity: string } | null>(null);
   const [sealedPrice, setSealedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; tcg: string } | null>(null);
-  const [valuateResult, setValuateResult] = useState<{ value: number; method: string; variety: string; confidence: string } | null>(null);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES" || category === "SEALED";
 
@@ -87,11 +150,12 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
       setChartUrl(null);
       setSalesCount(null);
       setSealedPrice(null);
-      setValuateResult(null);
 
       try {
         // Sealed products: fetch TCGplayer market price instead of graded chart
         if (category === "SEALED") {
+          // Extract search terms from sealed product name
+          // e.g. "Awakening of the New Era - Booster Box" from CC listing name
           const cleanName = cardName
             .replace(/\b(PSA|CGC|BGS)\s*\d+/gi, '')
             .replace(/\b\d{4}\b/g, '')
@@ -117,44 +181,104 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        // Step 1: Call V3.5 valuate endpoint for smart variant selection
-        let assetId: string | null = null;
-        try {
-          const valRes = await fetch(
-            `/api/oracle?endpoint=valuate&name=${encodeURIComponent(cardName)}`,
-            { signal: AbortSignal.timeout(15000) }
+        // Live search using smart query extraction from card name
+        const searchQuery = buildSearchQuery(cardName);
+
+        const searchRes = await fetch(
+          `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        if (!searchRes.ok) throw new Error("Search failed");
+        const searchData = await searchRes.json();
+
+        if (!searchData.variants || searchData.variants.length === 0) {
+          setError("No price data found");
+          setLoading(false);
+          return;
+        }
+
+        // Pick the variant that matches the card number from the name
+        let chosen = searchData.variants[0];
+        const cardNumMatch = cardName.match(/#(\w+)/);
+        if (cardNumMatch && searchData.variants.length > 1) {
+          const targetNum = cardNumMatch[1];
+          const matchesNum = (cn: string) => cn === targetNum || cn.endsWith(`-${targetNum}`) || cn.endsWith(targetNum);
+          const exactMatch = searchData.variants.find(
+            (v: any) => matchesNum(String(v.cardNumber))
           );
-          if (valRes.ok) {
-            const valData = await valRes.json();
-            if (valData.assetId) {
-              assetId = valData.assetId;
-              setValuateResult({
-                value: valData.value,
-                method: valData.method,
-                variety: valData.variety,
-                confidence: valData.confidence,
-              });
-              if (valData.count) setSalesCount(valData.count);
+          // If multiple variants share the same card number, further filter by variant type
+          if (exactMatch) {
+            const sameNumVariants = searchData.variants.filter(
+              (v: any) => matchesNum(String(v.cardNumber))
+            );
+            if (sameNumVariants.length > 1) {
+              const nameUpper = cardName.toUpperCase();
+              const isReverse = /REVERSE/i.test(nameUpper);
+              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              
+              // Filter by language first — CC names contain "Japanese"/"JPN" for JP cards
+              const isCardJapanese = /JAPANESE|JPN|\bJP\b/i.test(cardName);
+              let langFiltered = sameNumVariants;
+              if (isCardJapanese) {
+                const jpOnly = sameNumVariants.filter((v: any) => /JAPANESE/i.test(v.name || '') || /JAPANESE/i.test(v.brand || ''));
+                if (jpOnly.length > 0) langFiltered = jpOnly;
+              } else {
+                const enOnly = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || '') && !/JAPANESE|CHINESE/i.test(v.brand || ''));
+                if (enOnly.length > 0) langFiltered = enOnly;
+              }
+              
+              // Apply holo/reverse filter
+              let pool = langFiltered;
+              if (isReverse) {
+                const rev = langFiltered.filter((v: any) => /REVERSE/i.test(v.name || ''));
+                if (rev.length > 0) pool = rev;
+              } else if (isHolo) {
+                const hol = langFiltered.filter((v: any) => /HOLO/i.test(v.name || '') && !/REVERSE/i.test(v.name || ''));
+                if (hol.length > 0) pool = hol;
+              }
+              
+              // Pick variant with most sales for requested grade
+              const gp = grade ? grade.split('-')[0]?.toUpperCase() : '';
+              const gn = grade ? grade.split('-')[1] : '';
+              if (gp && gn && pool.length > 1) {
+                let bestV = pool[0], bestC = 0;
+                for (const v of pool) {
+                  const cnt = (v.grades || []).filter((g: any) => g.grader?.toUpperCase() === gp && String(g.grade) === gn).length;
+                  if (cnt > bestC) { bestC = cnt; bestV = v; }
+                }
+                chosen = bestV;
+              } else {
+                chosen = pool[0];
+              }
+            } else {
+              chosen = exactMatch;
             }
           }
-        } catch {
-          // Valuate failed — fall through to old search path
         }
 
-        // Step 2: Build chart URL
+        // Get transaction count
+        if (chosen.assetId) {
+          try {
+            const txRes = await fetch(
+              `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(chosen.assetId)}`,
+              { signal: AbortSignal.timeout(10000) }
+            );
+            if (txRes.ok) {
+              const txData = await txRes.json();
+              setSalesCount(txData.count || txData.transactions?.length || null);
+            }
+          } catch {}
+        }
+
+        // Build chart URL — use assetId for exact variant match, keep q for fallback
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
-        if (assetId) {
-          // V3.5 selected the right variant — pass assetId directly to chart
-          chartParams.set("assetId", assetId);
-        } else {
-          // Fallback: use old search query extraction
-          chartParams.set("q", buildSearchQuery(cardName));
+        chartParams.set("q", searchQuery);
+        if (chosen.assetId) {
+          chartParams.set("assetId", chosen.assetId);
         }
         if (grade) chartParams.set("grade", grade);
-        // Pass card name for chart title
-        chartParams.set("card", cardName);
-
+        
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
 

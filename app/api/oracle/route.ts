@@ -62,14 +62,12 @@ export async function GET(req: NextRequest) {
       const grade = searchParams.get("grade") || "";
 
       const assetId = searchParams.get("assetId") || "";
-      const card = searchParams.get("card") || "";
 
       const params = new URLSearchParams();
       if (set) params.set("set", set);
       if (number) params.set("number", number);
       if (q) params.set("q", q);
       if (assetId) params.set("assetId", assetId);
-      if (card) params.set("card", card);
       if (language) params.set("language", language);
       if (variant) params.set("variant", variant);
       if (grade) params.set("grade", grade);
