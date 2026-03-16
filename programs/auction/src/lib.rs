@@ -423,20 +423,20 @@ pub mod auction {
             creator_royalty,
         });
 
-        // Close escrow_nft token account via CPI — rent to treasury
+        // Close escrow_nft token account via CPI (works for both Token and Token-2022)
         close_token_account_cpi(
             &ctx.accounts.nft_token_program.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
-            &ctx.accounts.rent_treasury.to_account_info(),
+            &ctx.accounts.buyer.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
             &[escrow_seeds],
         )?;
 
-        // Close listing account (owned by our program), rent to treasury
+        // Close listing account (owned by our program), return rent to buyer
         let listing_info = ctx.accounts.listing.to_account_info();
-        let treasury_info = ctx.accounts.rent_treasury.to_account_info();
-        let dest_starting_lamports = treasury_info.lamports();
-        **treasury_info.lamports.borrow_mut() = dest_starting_lamports
+        let buyer_info = ctx.accounts.buyer.to_account_info();
+        let dest_starting_lamports = buyer_info.lamports();
+        **buyer_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
             .unwrap();
         **listing_info.lamports.borrow_mut() = 0;
@@ -507,20 +507,20 @@ pub mod auction {
             seller: listing.seller,
         });
 
-        // Close escrow_nft token account via CPI — rent to treasury
+        // Close escrow_nft token account via CPI, return rent to seller
         close_token_account_cpi(
             &ctx.accounts.nft_token_program.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
-            &ctx.accounts.rent_treasury.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
             &[escrow_seeds],
         )?;
 
-        // Close listing account (owned by our program), rent to treasury
+        // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
-        let treasury_info = ctx.accounts.rent_treasury.to_account_info();
-        let dest_starting_lamports = treasury_info.lamports();
-        **treasury_info.lamports.borrow_mut() = dest_starting_lamports
+        let seller_info = ctx.accounts.seller.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
             .unwrap();
         **listing_info.lamports.borrow_mut() = 0;
@@ -720,16 +720,16 @@ pub mod auction {
         close_token_account_cpi(
             &ctx.accounts.nft_token_program.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
-            &ctx.accounts.rent_treasury.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
             &[close_escrow_seeds],
         )?;
 
-        // Close listing account (owned by our program), rent to treasury
+        // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
-        let treasury_info = ctx.accounts.rent_treasury.to_account_info();
-        let dest_starting_lamports = treasury_info.lamports();
-        **treasury_info.lamports.borrow_mut() = dest_starting_lamports
+        let seller_info = ctx.accounts.seller.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
             .unwrap();
         **listing_info.lamports.borrow_mut() = 0;
@@ -772,16 +772,16 @@ pub mod auction {
         close_token_account_cpi(
             &ctx.accounts.nft_token_program.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
-            &ctx.accounts.rent_treasury.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
             &ctx.accounts.escrow_nft.to_account_info(),
             &[close_escrow_seeds],
         )?;
 
-        // Close listing account (owned by our program), rent to treasury
+        // Close listing account (owned by our program)
         let listing_info = ctx.accounts.listing.to_account_info();
-        let treasury_info = ctx.accounts.rent_treasury.to_account_info();
-        let dest_starting_lamports = treasury_info.lamports();
-        **treasury_info.lamports.borrow_mut() = dest_starting_lamports
+        let seller_info = ctx.accounts.seller.to_account_info();
+        let dest_starting_lamports = seller_info.lamports();
+        **seller_info.lamports.borrow_mut() = dest_starting_lamports
             .checked_add(listing_info.lamports())
             .unwrap();
         **listing_info.lamports.borrow_mut() = 0;
@@ -909,9 +909,6 @@ pub struct BuyNow<'info> {
     pub buyer_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
     #[account(mut)]
     pub buyer: Signer<'info>,
-    /// CHECK: Treasury for rent refunds
-    #[account(mut, address = TREASURY.parse::<Pubkey>().unwrap())]
-    pub rent_treasury: UncheckedAccount<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -933,9 +930,6 @@ pub struct CancelListing<'info> {
     #[account(mut)]
     pub seller_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
     pub seller: Signer<'info>,
-    /// CHECK: Treasury for rent refunds
-    #[account(mut, address = TREASURY.parse::<Pubkey>().unwrap())]
-    pub rent_treasury: UncheckedAccount<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
 }
 
@@ -954,9 +948,6 @@ pub struct CloseStaleListing<'info> {
     pub escrow_nft: InterfaceAccount<'info, IfaceTokenAccount>,
     #[account(mut)]
     pub seller: Signer<'info>,
-    /// CHECK: Treasury for rent refunds
-    #[account(mut, address = TREASURY.parse::<Pubkey>().unwrap())]
-    pub rent_treasury: UncheckedAccount<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
 }
 
@@ -991,12 +982,9 @@ pub struct SettleAuction<'info> {
     pub buyer_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     #[account(mut)]
     pub seller_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
-    /// CHECK: The original seller, validated against listing.seller.
+    /// CHECK: The original seller, validated against listing.seller. Receives rent refunds.
     #[account(mut, constraint = seller.key() == listing.seller)]
     pub seller: UncheckedAccount<'info>,
-    /// CHECK: Treasury for rent refunds
-    #[account(mut, address = TREASURY.parse::<Pubkey>().unwrap())]
-    pub rent_treasury: UncheckedAccount<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
