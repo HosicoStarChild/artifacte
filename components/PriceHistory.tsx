@@ -49,7 +49,7 @@ function buildSearchQuery(name: string): string {
       const charWords = name
         .replace(/\b\d{4}\b/g, '').replace(/#\d+/g, '')
         .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
-        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|Japanese|English|JPN|EN)\b/gi, '')
+        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|English|EN)\b/gi, '')
         .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
         .replace(/\b(OP|ST|EB)\d+[-\w]*/gi, '')
         .replace(/[\/|,-]/g, ' ')
@@ -67,7 +67,7 @@ function buildSearchQuery(name: string): string {
       .replace(/#\d+/g, '')
       .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
       .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, '')
-      .replace(/\b(Japanese|English|JPN|EN)\b/gi, '')
+      .replace(/\b(English|EN)\b/gi, '')
       .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
       .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, '')
       .replace(/-HOLO\b/gi, '')
@@ -91,7 +91,7 @@ function buildSearchQuery(name: string): string {
     .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '')
     .replace(/\b\d{4}\b/g, '') // years
     .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes|TCG)\b/gi, '')
-    .replace(/\b(Japanese|English|Chinese|Korean|JPN|EN)\b/gi, '')
+    .replace(/\b(English|EN)\b/gi, '')
     .replace(/\b(1st Edition|Unlimited|Shadowless|Holo|Reverse)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
