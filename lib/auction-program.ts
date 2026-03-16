@@ -380,7 +380,7 @@ export class AuctionProgram {
     const listingData = await this.program.account.listing.fetch(listing);
     const creatorAddr = listingData.creatorAddress as PublicKey;
     const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
-      ? await getAssociatedTokenAddress(paymentMint, creatorAddr)
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddr, true)
       : SystemProgram.programId;
 
     let builder = this.program.methods
@@ -595,7 +595,7 @@ export class AuctionProgram {
     const listingData = await this.program.account.listing.fetch(listing);
     const creatorAddr = listingData.creatorAddress as PublicKey;
     const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
-      ? await getAssociatedTokenAddress(paymentMint, creatorAddr)
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddr, true)
       : SystemProgram.programId;
 
     const sellerAddress = listingData.seller as PublicKey;
