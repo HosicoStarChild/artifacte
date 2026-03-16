@@ -63,6 +63,8 @@ export async function GET(req: NextRequest) {
 
       const assetId = searchParams.get("assetId") || "";
 
+      const card = searchParams.get("card") || "";
+
       const params = new URLSearchParams();
       if (set) params.set("set", set);
       if (number) params.set("number", number);
@@ -71,6 +73,7 @@ export async function GET(req: NextRequest) {
       if (language) params.set("language", language);
       if (variant) params.set("variant", variant);
       if (grade) params.set("grade", grade);
+      if (card) params.set("card", card);
 
       if (!set && !number && !q && !assetId) {
         return NextResponse.json({ error: "Missing set+number, q, or assetId parameter" }, { status: 400 });
