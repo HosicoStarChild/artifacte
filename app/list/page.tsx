@@ -33,7 +33,7 @@ export default function ListNFTPage() {
   const [loadingNfts, setLoadingNfts] = useState(false);
   const [selectedNft, setSelectedNft] = useState<NFTAsset | null>(null);
   const [price, setPrice] = useState("");
-  const [listingType, setListingType] = useState<"fixed" | "auction">("fixed");
+  const [listingType, setListingType] = useState<"fixed" | "auction">("auction");
   const [auctionDuration, setAuctionDuration] = useState("72");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -382,34 +382,18 @@ export default function ListNFTPage() {
               {/* Listing type */}
               <div className="mb-5">
                 <label className="block text-sm text-gray-400 mb-2 font-medium">Listing Type</label>
+                {/* Auctions only — fixed price disabled */}
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setListingType("fixed")}
-                    className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
-                      listingType === "fixed"
-                        ? "border-gold-500 bg-gold-500/10 text-gold-400"
-                        : "border-white/10 text-gray-400 hover:border-white/20"
-                    }`}
-                  >
-                    Fixed Price
-                  </button>
-                  <button
-                    onClick={() => setListingType("auction")}
-                    className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
-                      listingType === "auction"
-                        ? "border-gold-500 bg-gold-500/10 text-gold-400"
-                        : "border-white/10 text-gray-400 hover:border-white/20"
-                    }`}
-                  >
+                  <div className="flex-1 py-3 rounded-lg border border-gold-500 bg-gold-500/10 text-gold-400 text-sm font-semibold text-center">
                     Auction
-                  </button>
+                  </div>
                 </div>
               </div>
 
               {/* Price */}
               <div className="mb-5">
                 <label className="block text-sm text-gray-400 mb-1.5 font-medium">
-                  {listingType === "fixed" ? "Price" : "Starting Price"} (SOL)
+                  Starting Price (SOL)
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-2.5 text-gray-500">◎</span>
