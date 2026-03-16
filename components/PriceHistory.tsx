@@ -181,51 +181,103 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        // V3.5 smart valuation — server-side variant selection
-        const valuateRes = await fetch(
-          `/api/oracle?endpoint=valuate&name=${encodeURIComponent(cardName)}`,
+        // Live search using smart query extraction from card name
+        const searchQuery = buildSearchQuery(cardName);
+
+        const searchRes = await fetch(
+          `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
           { signal: AbortSignal.timeout(15000) }
         );
-        
-        if (!valuateRes.ok) throw new Error("Valuation failed");
-        const valuation = await valuateRes.json();
+        if (!searchRes.ok) throw new Error("Search failed");
+        const searchData = await searchRes.json();
 
-        if (!valuation.value && !valuation.assetId) {
-          // Fallback to old search method if valuate returns nothing
-          const searchQuery = buildSearchQuery(cardName);
-          const searchRes = await fetch(
-            `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
-            { signal: AbortSignal.timeout(15000) }
-          );
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            if (searchData.variants?.length > 0) {
-              const chartParams = new URLSearchParams();
-              chartParams.set("endpoint", "chart");
-              chartParams.set("q", searchQuery);
-              if (searchData.variants[0].assetId) chartParams.set("assetId", searchData.variants[0].assetId);
-              if (grade) chartParams.set("grade", grade);
-              setChartUrl(`/api/oracle?${chartParams.toString()}`);
-              setLoading(false);
-              return;
-            }
-          }
+        if (!searchData.variants || searchData.variants.length === 0) {
           setError("No price data found");
           setLoading(false);
           return;
         }
 
-        // Build chart URL using V3.5's chosen assetId
-        const searchQuery = buildSearchQuery(cardName);
+        // Pick the variant that matches the card number from the name
+        let chosen = searchData.variants[0];
+        const cardNumMatch = cardName.match(/#(\w+)/);
+        if (cardNumMatch && searchData.variants.length > 1) {
+          const targetNum = cardNumMatch[1];
+          const matchesNum = (cn: string) => cn === targetNum || cn.endsWith(`-${targetNum}`) || cn.endsWith(targetNum);
+          const exactMatch = searchData.variants.find(
+            (v: any) => matchesNum(String(v.cardNumber))
+          );
+          // If multiple variants share the same card number, further filter by variant type
+          if (exactMatch) {
+            const sameNumVariants = searchData.variants.filter(
+              (v: any) => matchesNum(String(v.cardNumber))
+            );
+            if (sameNumVariants.length > 1) {
+              const nameUpper = cardName.toUpperCase();
+              const isReverse = /REVERSE/i.test(nameUpper);
+              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
+              
+              // Filter by language first — CC names contain "Japanese"/"JPN" for JP cards
+              const isCardJapanese = /JAPANESE|JPN|\bJP\b/i.test(cardName);
+              let langFiltered = sameNumVariants;
+              if (isCardJapanese) {
+                const jpOnly = sameNumVariants.filter((v: any) => /JAPANESE/i.test(v.name || '') || /JAPANESE/i.test(v.brand || ''));
+                if (jpOnly.length > 0) langFiltered = jpOnly;
+              } else {
+                const enOnly = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || '') && !/JAPANESE|CHINESE/i.test(v.brand || ''));
+                if (enOnly.length > 0) langFiltered = enOnly;
+              }
+              
+              // Apply holo/reverse filter
+              let pool = langFiltered;
+              if (isReverse) {
+                const rev = langFiltered.filter((v: any) => /REVERSE/i.test(v.name || ''));
+                if (rev.length > 0) pool = rev;
+              } else if (isHolo) {
+                const hol = langFiltered.filter((v: any) => /HOLO/i.test(v.name || '') && !/REVERSE/i.test(v.name || ''));
+                if (hol.length > 0) pool = hol;
+              }
+              
+              // Pick variant with most sales for requested grade
+              const gp = grade ? grade.split('-')[0]?.toUpperCase() : '';
+              const gn = grade ? grade.split('-')[1] : '';
+              if (gp && gn && pool.length > 1) {
+                let bestV = pool[0], bestC = 0;
+                for (const v of pool) {
+                  const cnt = (v.grades || []).filter((g: any) => g.grader?.toUpperCase() === gp && String(g.grade) === gn).length;
+                  if (cnt > bestC) { bestC = cnt; bestV = v; }
+                }
+                chosen = bestV;
+              } else {
+                chosen = pool[0];
+              }
+            } else {
+              chosen = exactMatch;
+            }
+          }
+        }
+
+        // Get transaction count
+        if (chosen.assetId) {
+          try {
+            const txRes = await fetch(
+              `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(chosen.assetId)}`,
+              { signal: AbortSignal.timeout(10000) }
+            );
+            if (txRes.ok) {
+              const txData = await txRes.json();
+              setSalesCount(txData.count || txData.transactions?.length || null);
+            }
+          } catch {}
+        }
+
+        // Build chart URL — use assetId for exact variant match, keep q for fallback
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
         chartParams.set("q", searchQuery);
-        if (valuation.assetId) {
-          chartParams.set("assetId", valuation.assetId);
+        if (chosen.assetId) {
+          chartParams.set("assetId", chosen.assetId);
         }
         if (grade) chartParams.set("grade", grade);
-        // Pass card name for chart title
-        chartParams.set("card", cardName.replace(/\b\d{4}\b/, '').replace(/#\w+/, '').replace(/\b(PSA|CGC|BGS)\s*\d+\.?\d*/gi, '').replace(/\b(GEM.?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '').trim());
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
