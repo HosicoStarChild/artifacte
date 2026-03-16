@@ -82,12 +82,13 @@ async function setup() {
   const [escrowNft] = PublicKey.findProgramAddressSync([Buffer.from("escrow_nft"), nftMint.toBuffer()], AUCTION_PROGRAM_ID);
   
   await auctionProgram.methods
-    .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL), null, { digitalArt: {} })
+    .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL), null, { digitalArt: {} }, 500, authority.publicKey)
     .accounts({
       listing, nftMint,
       paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
       escrowNft, sellerNftAccount: sellerAta.address,
-      seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+      seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     }).rpc();
 
@@ -158,12 +159,13 @@ async function test() {
   console.log("\n🗡️ ATTACK 4: Double-list the same NFT");
   await expect("Cannot double-list same NFT", async () => {
     await auctionProgram.methods
-      .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL * 2), null, { digitalArt: {} })
+      .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL * 2), null, { digitalArt: {} }, 500, authority.publicKey)
       .accounts({
         listing, nftMint,
         paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
         escrowNft, sellerNftAccount: sellerAta.address,
-        seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+        seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
   });
@@ -178,12 +180,13 @@ async function test() {
   
   await expect("Cannot list Digital Art with USD1", async () => {
     await auctionProgram.methods
-      .listItem({ fixedPrice: {} }, new BN(100_000000), null, { digitalArt: {} })
+      .listItem({ fixedPrice: {} }, new BN(100_000000), null, { digitalArt: {} }, 500, authority.publicKey)
       .accounts({
         listing: listing2, nftMint: nftMint2,
         paymentMint: new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"),
         escrowNft: escrow2, sellerNftAccount: ata2.address,
-        seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+        seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
   });
@@ -192,12 +195,13 @@ async function test() {
   console.log("\n🗡️ ATTACK 6: List TCG Cards with SOL (wrong mint)");
   await expect("Cannot list TCG Cards with SOL", async () => {
     await auctionProgram.methods
-      .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL), null, { tcgCards: {} })
+      .listItem({ fixedPrice: {} }, new BN(LAMPORTS_PER_SOL), null, { tcgCards: {} }, 500, authority.publicKey)
       .accounts({
         listing: listing2, nftMint: nftMint2,
         paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
         escrowNft: escrow2, sellerNftAccount: ata2.address,
-        seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+        seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
   });
@@ -206,12 +210,13 @@ async function test() {
   console.log("\n🗡️ ATTACK 7: List with zero price");
   await expect("Cannot list with zero price", async () => {
     await auctionProgram.methods
-      .listItem({ fixedPrice: {} }, new BN(0), null, { digitalArt: {} })
+      .listItem({ fixedPrice: {} }, new BN(0), null, { digitalArt: {} }, 500, authority.publicKey)
       .accounts({
         listing: listing2, nftMint: nftMint2,
         paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
         escrowNft: escrow2, sellerNftAccount: ata2.address,
-        seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+        seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
   });
@@ -227,12 +232,13 @@ async function test() {
   
   // List as 1-hour auction
   await auctionProgram.methods
-    .listItem({ auction: {} }, new BN(LAMPORTS_PER_SOL), new BN(3600), { digitalArt: {} })
+    .listItem({ auction: {} }, new BN(LAMPORTS_PER_SOL), new BN(3600), { digitalArt: {} }, 500, authority.publicKey)
     .accounts({
       listing: listing3, nftMint: nftMint3,
       paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
       escrowNft: escrow3, sellerNftAccount: ata3.address,
-      seller: authority.publicKey, tokenProgram: TOKEN_PROGRAM_ID,
+      seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     }).rpc();
 
@@ -329,6 +335,144 @@ async function test() {
         creatorPaymentAccount: authority.publicKey,
         buyerNftAccount: attackerAta3b.address,
         buyer: attacker.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      }).rpc();
+  });
+
+  // ===== ATTACK 14: Cancel auction that has bids =====
+  console.log("\n🗡️ ATTACK 14: Cancel auction with active bids");
+  // Place a valid bid on the auction first
+  const bidderAta3 = await getOrCreateAssociatedTokenAccount(connection, attacker, 
+    new PublicKey("So11111111111111111111111111111111111111112"), attacker.publicKey);
+  // Fund attacker with wSOL for bidding
+  const wrapTx = new (await import("@solana/web3.js")).Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: authority.publicKey,
+      toPubkey: bidderAta3.address,
+      lamports: 2 * LAMPORTS_PER_SOL,
+    }),
+    (await import("@solana/spl-token")).createSyncNativeInstruction(bidderAta3.address),
+  );
+  await provider.sendAndConfirm(wrapTx);
+
+  const [bidEscrow3b] = PublicKey.findProgramAddressSync([Buffer.from("bid_escrow"), nftMint3.toBuffer()], AUCTION_PROGRAM_ID);
+  // Place bid
+  await attackerAuction.methods
+    .placeBid(new BN(LAMPORTS_PER_SOL))
+    .accounts({
+      listing: listing3, bidEscrow: bidEscrow3b,
+      paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
+      bidderTokenAccount: bidderAta3.address,
+      previousBidderAccount: attacker.publicKey,
+      bidder: attacker.publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).rpc();
+
+  await expect("Cannot cancel auction with active bids", async () => {
+    await auctionProgram.methods
+      .cancelListing()
+      .accounts({
+        listing: listing3, nftMint: nftMint3, escrowNft: escrow3,
+        sellerNftAccount: ata3.address,
+        seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+      }).rpc();
+  });
+
+  // ===== ATTACK 15: Bid below minimum increment =====
+  console.log("\n🗡️ ATTACK 15: Bid below minimum increment (< 0.1 SOL above current)");
+  await expect("Cannot bid below minimum increment", async () => {
+    // Current bid is 1 SOL, minimum next = 1.1 SOL, try 1.05 SOL
+    await attackerAuction.methods
+      .placeBid(new BN(1.05 * LAMPORTS_PER_SOL))
+      .accounts({
+        listing: listing3, bidEscrow: bidEscrow3b,
+        paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
+        bidderTokenAccount: bidderAta3.address,
+        previousBidderAccount: attacker.publicKey,
+        bidder: attacker.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      }).rpc();
+  });
+
+  // ===== ATTACK 16: Bid after auction ended =====
+  console.log("\n🗡️ ATTACK 16: Bid on expired auction");
+  // Create a very short auction (1 second) and wait
+  const nftMint4 = await createMint(connection, authority, authority.publicKey, null, 0);
+  const ata4 = await getOrCreateAssociatedTokenAccount(connection, authority, nftMint4, authority.publicKey);
+  await mintTo(connection, authority, nftMint4, ata4.address, authority, 1);
+  const [listing4] = PublicKey.findProgramAddressSync([Buffer.from("listing"), nftMint4.toBuffer()], AUCTION_PROGRAM_ID);
+  const [escrow4] = PublicKey.findProgramAddressSync([Buffer.from("escrow_nft"), nftMint4.toBuffer()], AUCTION_PROGRAM_ID);
+  
+  await auctionProgram.methods
+    .listItem({ auction: {} }, new BN(LAMPORTS_PER_SOL), new BN(1), { digitalArt: {} }, 500, authority.publicKey)
+    .accounts({
+      listing: listing4, nftMint: nftMint4,
+      paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
+      escrowNft: escrow4, sellerNftAccount: ata4.address,
+      seller: authority.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).rpc();
+
+  // Wait for auction to expire
+  console.log("   ⏳ Waiting 3s for auction to expire...");
+  await new Promise(r => setTimeout(r, 3000));
+
+  const [bidEscrow4] = PublicKey.findProgramAddressSync([Buffer.from("bid_escrow"), nftMint4.toBuffer()], AUCTION_PROGRAM_ID);
+  const attackerAta4 = await getOrCreateAssociatedTokenAccount(connection, attacker, nftMint4, attacker.publicKey);
+  await expect("Cannot bid on expired auction", async () => {
+    await attackerAuction.methods
+      .placeBid(new BN(LAMPORTS_PER_SOL))
+      .accounts({
+        listing: listing4, bidEscrow: bidEscrow4,
+        paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
+        bidderTokenAccount: bidderAta3.address,
+        previousBidderAccount: attacker.publicKey,
+        bidder: attacker.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      }).rpc();
+  });
+
+  // ===== ATTACK 17: Close stale listing by non-seller =====
+  console.log("\n🗡️ ATTACK 17: Non-seller closes stale listing");
+  await expect("Non-seller cannot close stale listing", async () => {
+    await attackerAuction.methods
+      .closeStaleListing()
+      .accounts({
+        listing: listing4, nftMint: nftMint4, escrowNft: escrow4,
+        seller: attacker.publicKey, nftTokenProgram: TOKEN_PROGRAM_ID,
+      }).rpc();
+  });
+
+  // ===== ATTACK 18: Seller bids on own auction =====
+  console.log("\n🗡️ ATTACK 18: Seller bids on own auction (shill bidding)");
+  // Create wSOL ATA for authority (seller)
+  const sellerWsolAta = await getOrCreateAssociatedTokenAccount(connection, authority,
+    new PublicKey("So11111111111111111111111111111111111111112"), authority.publicKey);
+  const wrapTx2 = new (await import("@solana/web3.js")).Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: authority.publicKey,
+      toPubkey: sellerWsolAta.address,
+      lamports: 2 * LAMPORTS_PER_SOL,
+    }),
+    (await import("@solana/spl-token")).createSyncNativeInstruction(sellerWsolAta.address),
+  );
+  await provider.sendAndConfirm(wrapTx2);
+
+  // Seller (authority) is also the listing seller for listing3
+  await expect("Seller cannot bid on own auction", async () => {
+    await auctionProgram.methods
+      .placeBid(new BN(1.2 * LAMPORTS_PER_SOL))
+      .accounts({
+        listing: listing3, bidEscrow: bidEscrow3b,
+        paymentMint: new PublicKey("So11111111111111111111111111111111111111112"),
+        bidderTokenAccount: sellerWsolAta.address,
+        previousBidderAccount: attacker.publicKey,
+        bidder: authority.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
