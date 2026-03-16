@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::invoke_signed;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, CloseAccount};
 use anchor_spl::token_interface::{
     Mint as IfaceMint,
@@ -9,6 +10,32 @@ use spl_token_2022::extension::BaseStateWithExtensions;
 use spl_transfer_hook_interface::onchain::add_extra_accounts_for_execute_cpi;
 
 declare_id!("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
+
+/// Close a token account using the correct token program (works for both Token and Token-2022)
+fn close_token_account_cpi<'info>(
+    token_program: &AccountInfo<'info>,
+    account: &AccountInfo<'info>,
+    destination: &AccountInfo<'info>,
+    authority: &AccountInfo<'info>,
+    signer_seeds: &[&[&[u8]]],
+) -> Result<()> {
+    // CloseAccount instruction index is 9 for both Token and Token-2022
+    let ix = anchor_lang::solana_program::instruction::Instruction {
+        program_id: token_program.key(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new(account.key(), false),
+            anchor_lang::solana_program::instruction::AccountMeta::new(destination.key(), false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(authority.key(), true),
+        ],
+        data: vec![9], // CloseAccount instruction discriminator
+    };
+    invoke_signed(
+        &ix,
+        &[account.clone(), destination.clone(), authority.clone(), token_program.clone()],
+        signer_seeds,
+    )?;
+    Ok(())
+}
 
 // Treasury wallet
 const TREASURY: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
@@ -210,6 +237,12 @@ pub mod auction {
             AuctionError::AuctionEnded
         );
 
+        // Prevent shill bidding — seller cannot bid on own auction
+        require!(
+            ctx.accounts.bidder.key() != listing.seller,
+            AuctionError::SellerCannotBid
+        );
+
         // Minimum 0.1 SOL increment
         let min_increment: u64 = 100_000_000;
         let min_bid = if listing.current_bid > 0 {
@@ -390,16 +423,14 @@ pub mod auction {
             creator_royalty,
         });
 
-        // Close escrow_nft token account via CPI, return rent to buyer
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.nft_token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_nft.to_account_info(),
-                destination: ctx.accounts.buyer.to_account_info(),
-                authority: ctx.accounts.escrow_nft.to_account_info(),
-            },
+        // Close escrow_nft token account via CPI (works for both Token and Token-2022)
+        close_token_account_cpi(
+            &ctx.accounts.nft_token_program.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
+            &ctx.accounts.buyer.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
             &[escrow_seeds],
-        ))?;
+        )?;
 
         // Close listing account (owned by our program), return rent to buyer
         let listing_info = ctx.accounts.listing.to_account_info();
@@ -477,15 +508,13 @@ pub mod auction {
         });
 
         // Close escrow_nft token account via CPI, return rent to seller
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.nft_token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_nft.to_account_info(),
-                destination: ctx.accounts.seller.to_account_info(),
-                authority: ctx.accounts.escrow_nft.to_account_info(),
-            },
+        close_token_account_cpi(
+            &ctx.accounts.nft_token_program.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
             &[escrow_seeds],
-        ))?;
+        )?;
 
         // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
@@ -688,15 +717,13 @@ pub mod auction {
             nft_mint_key.as_ref(),
             &[escrow_bump],
         ];
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.nft_token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_nft.to_account_info(),
-                destination: ctx.accounts.seller.to_account_info(),
-                authority: ctx.accounts.escrow_nft.to_account_info(),
-            },
+        close_token_account_cpi(
+            &ctx.accounts.nft_token_program.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
             &[close_escrow_seeds],
-        ))?;
+        )?;
 
         // Close listing account (owned by our program), return rent to seller
         let listing_info = ctx.accounts.listing.to_account_info();
@@ -742,15 +769,13 @@ pub mod auction {
             nft_mint_key.as_ref(),
             &[escrow_bump],
         ];
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.nft_token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_nft.to_account_info(),
-                destination: ctx.accounts.seller.to_account_info(),
-                authority: ctx.accounts.escrow_nft.to_account_info(),
-            },
+        close_token_account_cpi(
+            &ctx.accounts.nft_token_program.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
+            &ctx.accounts.seller.to_account_info(),
+            &ctx.accounts.escrow_nft.to_account_info(),
             &[close_escrow_seeds],
-        ))?;
+        )?;
 
         // Close listing account (owned by our program)
         let listing_info = ctx.accounts.listing.to_account_info();
@@ -1100,4 +1125,6 @@ pub enum AuctionError {
     InsufficientWNSAccounts,
     #[msg("Token-2022 transfer with hook failed")]
     TransferFailed,
+    #[msg("Seller cannot bid on their own auction")]
+    SellerCannotBid,
 }
