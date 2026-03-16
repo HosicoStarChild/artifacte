@@ -134,7 +134,7 @@ export default function AuctionDetailPage() {
       );
 
       showToast.success("Purchase successful!");
-      setTimeout(() => loadListingData(), 2000);
+      setListing((prev: any) => prev ? { ...prev, status: { settled: {} } } : prev);
     } catch (err: any) {
       console.error("Purchase failed:", err);
       showToast.error(err.message || "Purchase failed");
@@ -223,7 +223,8 @@ export default function AuctionDetailPage() {
       );
 
       showToast.success("Auction settled successfully!");
-      setTimeout(() => loadListingData(), 2000);
+      // Update local state instead of reloading (listing PDA is closed after settle)
+      setListing((prev: any) => prev ? { ...prev, status: { settled: {} } } : prev);
     } catch (err: any) {
       console.error("Settlement failed:", err);
       showToast.error(err.message || "Settlement failed");
@@ -274,7 +275,7 @@ export default function AuctionDetailPage() {
       const tx = await auctionProgram.cancelListing(nftMint, sellerNftAccount);
 
       showToast.success("Listing cancelled successfully!");
-      setTimeout(() => loadListingData(), 2000);
+      setListing((prev: any) => prev ? { ...prev, status: { cancelled: {} } } : prev);
     } catch (err: any) {
       console.error("Cancellation failed:", err);
       showToast.error(err.message || "Cancellation failed");
