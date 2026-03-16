@@ -118,17 +118,10 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         }
 
         // Step 1: Call V3.5 valuate endpoint for smart variant selection
-        // Prefer NFT address (Railway looks up CC index + on-chain Description for variant info)
         let assetId: string | null = null;
         try {
-          const valParams = new URLSearchParams({ endpoint: "valuate" });
-          if (nftAddress) {
-            valParams.set("nft", nftAddress);
-          } else {
-            valParams.set("name", cardName);
-          }
           const valRes = await fetch(
-            `/api/oracle?${valParams.toString()}`,
+            `/api/oracle?endpoint=valuate&name=${encodeURIComponent(cardName)}`,
             { signal: AbortSignal.timeout(15000) }
           );
           if (valRes.ok) {
