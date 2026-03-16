@@ -111,6 +111,12 @@ export async function GET(req: NextRequest) {
       if (ccName) params.set("ccName", ccName);
       if (variant) params.set("variant", variant);
       url = `${ORACLE_API}/api/tcgplayer/ungraded?${params.toString()}`;
+    } else if (endpoint === "valuate") {
+      const name = searchParams.get("name") || "";
+      if (!name) {
+        return NextResponse.json({ error: "Missing name parameter" }, { status: 400 });
+      }
+      url = `${ORACLE_API}/api/live/valuate?name=${encodeURIComponent(name)}`;
     } else {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
     }
