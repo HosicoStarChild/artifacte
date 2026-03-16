@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
         mint_extensions: asset.mint_extensions || null,
         authorities: asset.authorities || [],
       },
+      attributes: metadata.attributes || [],
     });
   } catch (error) {
     console.error("Error fetching NFT:", error);
