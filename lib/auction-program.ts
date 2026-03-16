@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Transaction, SystemProgram, TransactionInstruction } from "@solana/web3.js";
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import { IDL } from "./auction-idl";
 
@@ -599,6 +599,7 @@ export class AuctionProgram {
       : SystemProgram.programId;
 
     const sellerAddress = listingData.seller as PublicKey;
+    const highestBidder = listingData.highestBidder as PublicKey;
 
     let builder = this.program.methods
       .settleAuction()
@@ -622,6 +623,53 @@ export class AuctionProgram {
       builder = builder.remainingAccounts(getWNSRemainingAccounts(nftMint));
     }
 
+    // Build pre-instructions to create missing ATAs
+    const preIxs: TransactionInstruction[] = [];
+
+    // Seller wSOL ATA (to receive payment)
+    const sellerPaymentInfo = await this.connection.getAccountInfo(sellerPaymentAccount);
+    if (!sellerPaymentInfo) {
+      preIxs.push(createAssociatedTokenAccountInstruction(
+        this.wallet.publicKey, sellerPaymentAccount, sellerAddress, paymentMint
+      ));
+    }
+
+    // Treasury wSOL ATA (for platform fee)
+    const treasuryInfo = await this.connection.getAccountInfo(treasuryPaymentAccount);
+    if (!treasuryInfo) {
+      preIxs.push(createAssociatedTokenAccountInstruction(
+        this.wallet.publicKey, treasuryPaymentAccount, TREASURY_WALLET, paymentMint
+      ));
+    }
+
+    // Creator payment ATA (for royalties) — skip if no royalties
+    if (creatorPaymentAccount.toBase58() !== SystemProgram.programId.toBase58()) {
+      const creatorInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+      if (!creatorInfo) {
+        preIxs.push(createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey, creatorPaymentAccount, creatorAddr, paymentMint
+        ));
+      }
+    }
+
+    // Buyer NFT ATA (to receive the NFT)
+    const buyerNftInfo = await this.connection.getAccountInfo(buyerNftAccount);
+    if (!buyerNftInfo) {
+      preIxs.push(createAssociatedTokenAccountInstruction(
+        this.wallet.publicKey, buyerNftAccount, highestBidder, nftMint, nftTokenProgram, ASSOCIATED_TOKEN_PROGRAM_ID
+      ));
+    }
+
+    // Always use Transaction path to include pre-instructions
+    const settleIx = await builder.instruction();
+    const tx = new Transaction();
+
+    // Add pre-instructions for missing ATAs
+    for (const ix of preIxs) {
+      tx.add(ix);
+    }
+
+    // Add WNS approve if needed
     if (isWNS) {
       const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
@@ -631,18 +679,17 @@ export class AuctionProgram {
         wnsGroupMint,
         0
       );
-      const settleIx = await builder.instruction();
-      const tx = new Transaction().add(approveIx).add(settleIx);
-      const { blockhash } = await this.connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await this.connection.confirmTransaction(sig);
-      return sig;
-    } else {
-      return await builder.rpc();
+      tx.add(approveIx);
     }
+
+    tx.add(settleIx);
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = this.wallet.publicKey;
+    const signed = await this.wallet.signTransaction(tx);
+    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    await this.connection.confirmTransaction(sig);
+    return sig;
   }
 
   /**
