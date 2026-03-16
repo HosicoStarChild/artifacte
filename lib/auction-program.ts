@@ -256,6 +256,7 @@ export class AuctionProgram {
         nftMint,
         escrowNft,
         seller: this.wallet.publicKey,
+        rentTreasury: TREASURY_WALLET,
         nftTokenProgram,
       })
       .rpc();
@@ -395,6 +396,7 @@ export class AuctionProgram {
         creatorPaymentAccount,
         buyerNftAccount,
         buyer: this.wallet.publicKey,
+        rentTreasury: TREASURY_WALLET,
         nftTokenProgram,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
@@ -526,6 +528,7 @@ export class AuctionProgram {
         escrowNft,
         sellerNftAccount,
         seller: this.wallet.publicKey,
+        rentTreasury: TREASURY_WALLET,
         nftTokenProgram,
       });
 
@@ -614,6 +617,7 @@ export class AuctionProgram {
         buyerNftAccount,
         sellerNftAccount,
         seller: sellerAddress,
+        rentTreasury: TREASURY_WALLET,
         nftTokenProgram,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,

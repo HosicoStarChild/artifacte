@@ -87,6 +87,10 @@
           "signer": true
         },
         {
+          "name": "rent_treasury",
+          "writable": true
+        },
+        {
           "name": "nft_token_program"
         },
         {
@@ -163,6 +167,10 @@
           "signer": true
         },
         {
+          "name": "rent_treasury",
+          "writable": true
+        },
+        {
           "name": "nft_token_program"
         }
       ],
@@ -224,6 +232,10 @@
           "name": "seller",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "rent_treasury",
+          "writable": true
         },
         {
           "name": "nft_token_program"
@@ -561,6 +573,10 @@
         },
         {
           "name": "seller",
+          "writable": true
+        },
+        {
+          "name": "rent_treasury",
           "writable": true
         },
         {
