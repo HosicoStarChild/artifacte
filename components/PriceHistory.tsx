@@ -11,7 +11,9 @@ import { useState, useEffect } from "react";
  */
 // Manual overrides for cards where ME listing names are too generic to match correctly
 const CHART_OVERRIDES: Record<string, string> = {
-  '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'P-001 super pre-release winner luffy',
+  '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'one piece luffy P-001 super prerelease winner',
+  '2024 #019 Divine Departure PSA 10 One Piece Japanese OP10-Royal Blood': 'OP10019 divine depature Japanese',
+  '2023 #092 Rob Lucci PSA 10 One Piece Japanese OP05-Awakening of the New Era Pokemon': 'OP05092 rob lucci japanese special alternate art',
 };
 
 function buildSearchQuery(name: string): string {
@@ -225,13 +227,29 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
                 if (enOnly.length > 0) langFiltered = enOnly;
               }
               
-              const picked = langFiltered.find((v: any) => {
-                const vName = (v.name || '').toUpperCase();
-                if (isReverse) return /REVERSE/i.test(vName);
-                if (isHolo) return /HOLO/i.test(vName) && !/REVERSE/i.test(vName);
-                return !/REVERSE|HOLO/i.test(vName);
-              });
-              chosen = picked || langFiltered[0];
+              // Apply holo/reverse filter
+              let pool = langFiltered;
+              if (isReverse) {
+                const rev = langFiltered.filter((v: any) => /REVERSE/i.test(v.name || ''));
+                if (rev.length > 0) pool = rev;
+              } else if (isHolo) {
+                const hol = langFiltered.filter((v: any) => /HOLO/i.test(v.name || '') && !/REVERSE/i.test(v.name || ''));
+                if (hol.length > 0) pool = hol;
+              }
+              
+              // Pick variant with most sales for requested grade
+              const gp = grade ? grade.split('-')[0]?.toUpperCase() : '';
+              const gn = grade ? grade.split('-')[1] : '';
+              if (gp && gn && pool.length > 1) {
+                let bestV = pool[0], bestC = 0;
+                for (const v of pool) {
+                  const cnt = (v.grades || []).filter((g: any) => g.grader?.toUpperCase() === gp && String(g.grade) === gn).length;
+                  if (cnt > bestC) { bestC = cnt; bestV = v; }
+                }
+                chosen = bestV;
+              } else {
+                chosen = pool[0];
+              }
             } else {
               chosen = exactMatch;
             }
@@ -367,7 +385,17 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           src={chartUrl}
           alt="Price History Chart"
           onLoad={() => setImageLoaded(true)}
-          onError={() => { setError("Chart unavailable"); setChartUrl(null); }}
+          onError={() => {
+            // If grade-filtered chart fails, retry without grade filter (shows all grades)
+            if (grade && chartUrl?.includes('grade=')) {
+              const fallbackUrl = chartUrl.replace(/&?grade=[^&]*/g, '');
+              setChartUrl(fallbackUrl);
+              setImageLoaded(false);
+            } else {
+              setError("Chart unavailable");
+              setChartUrl(null);
+            }
+          }}
           className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
           style={{ minHeight: "200px" }}
         />
