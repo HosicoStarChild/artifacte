@@ -224,6 +224,8 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           chartParams.set("assetId", valuation.assetId);
         }
         if (grade) chartParams.set("grade", grade);
+        // Pass card name for chart title
+        chartParams.set("card", cardName.replace(/\b\d{4}\b/, '').replace(/#\w+/, '').replace(/\b(PSA|CGC|BGS)\s*\d+\.?\d*/gi, '').replace(/\b(GEM.?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '').trim());
         
         setChartUrl(`/api/oracle?${chartParams.toString()}`);
         setLoading(false);
