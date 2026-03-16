@@ -115,10 +115,14 @@ export async function GET(req: NextRequest) {
       url = `${ORACLE_API}/api/tcgplayer/ungraded?${params.toString()}`;
     } else if (endpoint === "valuate") {
       const name = searchParams.get("name") || "";
-      if (!name) {
-        return NextResponse.json({ error: "Missing name parameter" }, { status: 400 });
+      const nft = searchParams.get("nft") || "";
+      if (!name && !nft) {
+        return NextResponse.json({ error: "Missing name or nft parameter" }, { status: 400 });
       }
-      url = `${ORACLE_API}/api/live/valuate?name=${encodeURIComponent(name)}`;
+      const vParams = new URLSearchParams();
+      if (name) vParams.set("name", name);
+      if (nft) vParams.set("nft", nft);
+      url = `${ORACLE_API}/api/live/valuate?${vParams.toString()}`;
     } else {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
     }

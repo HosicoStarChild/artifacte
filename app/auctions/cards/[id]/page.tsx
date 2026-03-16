@@ -25,7 +25,6 @@ export default function CardDetailPage() {
   const [card, setCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
-  const [onChainDesc, setOnChainDesc] = useState<string | null>(null);
   const { publicKey, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
 
@@ -41,19 +40,6 @@ export default function CardDetailPage() {
       })
       .catch(() => setLoading(false));
   }, [cardId]);
-
-  // Fetch on-chain Description for better variant matching in price oracle
-  useEffect(() => {
-    if (!card?.nftAddress) return;
-    fetch(`/api/nft?mint=${card.nftAddress}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data?.attributes) return;
-        const desc = data.attributes.find((a: any) => a.trait_type === 'Description');
-        if (desc?.value) setOnChainDesc(desc.value);
-      })
-      .catch(() => {});
-  }, [card?.nftAddress]);
 
   const handleBuy = async () => {
     if (!connected || !publicKey || !card) return;
@@ -301,7 +287,7 @@ export default function CardDetailPage() {
             {/* Oracle Price History — skip for merchandise */}
             {card.category !== 'MERCHANDISE' && (
             <PriceHistory 
-              cardName={onChainDesc || card.name} 
+              cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year}
