@@ -405,27 +405,118 @@ export class AuctionProgram {
       builder = builder.remainingAccounts(getWNSRemainingAccounts(nftMint));
     }
 
+    // Build pre-instructions for wSOL wrapping + missing ATAs
+    const preInstructions: TransactionInstruction[] = [];
+    const postInstructions: TransactionInstruction[] = [];
+    const SOL_MINT_ADDR = new PublicKey("So11111111111111111111111111111111111111112");
+
+    if (paymentMint.equals(SOL_MINT_ADDR)) {
+      // Check if buyer wSOL ATA exists
+      const buyerAtaInfo = await this.connection.getAccountInfo(buyerPaymentAccount);
+      if (!buyerAtaInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            buyerPaymentAccount,
+            this.wallet.publicKey,
+            SOL_MINT_ADDR
+          )
+        );
+      }
+      // Transfer SOL → wSOL ATA
+      preInstructions.push(
+        SystemProgram.transfer({
+          fromPubkey: this.wallet.publicKey,
+          toPubkey: buyerPaymentAccount,
+          lamports: price,
+        })
+      );
+      // Sync native
+      const { createSyncNativeInstruction } = await import("@solana/spl-token");
+      preInstructions.push(createSyncNativeInstruction(buyerPaymentAccount));
+    }
+
+    // Check seller payment ATA
+    const sellerAtaInfo = await this.connection.getAccountInfo(sellerPaymentAccount);
+    if (!sellerAtaInfo) {
+      const sellerAddr = listingData.seller as PublicKey;
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          sellerPaymentAccount,
+          sellerAddr,
+          paymentMint
+        )
+      );
+    }
+
+    // Check treasury payment ATA
+    const treasuryAtaInfo = await this.connection.getAccountInfo(treasuryPaymentAccount);
+    if (!treasuryAtaInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          treasuryPaymentAccount,
+          TREASURY_WALLET,
+          paymentMint
+        )
+      );
+    }
+
+    // Check creator payment ATA
+    if (listingData.royaltyBasisPoints > 0) {
+      const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+      if (!creatorAtaInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            creatorPaymentAccount,
+            creatorAddr,
+            paymentMint
+          )
+        );
+      }
+    }
+
+    // Check buyer NFT ATA
+    const buyerNftAtaInfo = await this.connection.getAccountInfo(buyerNftAccount);
+    if (!buyerNftAtaInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          buyerNftAccount,
+          this.wallet.publicKey,
+          nftMint,
+          nftTokenProgram
+        )
+      );
+    }
+
+    // Build final transaction
+    const buyIx = await builder.instruction();
+    const tx = new Transaction();
+
     if (isWNS) {
       const wnsGroupMint = await getWNSGroupMint(nftMint);
       const approveIx = buildWNSApproveInstruction(
         this.wallet.publicKey,
-        this.wallet.publicKey, // buyer is authority for approve
+        this.wallet.publicKey,
         nftMint,
         wnsGroupMint,
         0
       );
-      const buyIx = await builder.instruction();
-      const tx = new Transaction().add(approveIx).add(buyIx);
-      const { blockhash } = await this.connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await this.connection.confirmTransaction(sig);
-      return sig;
+      tx.add(...preInstructions, approveIx, buyIx);
     } else {
-      return await builder.rpc();
+      tx.add(...preInstructions, buyIx);
     }
+
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = this.wallet.publicKey;
+    const signed = await this.wallet.signTransaction(tx);
+    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    await this.connection.confirmTransaction(sig);
+    return sig;
   }
 
   /**
