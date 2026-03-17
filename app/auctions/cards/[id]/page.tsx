@@ -6,7 +6,7 @@ import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
@@ -68,20 +68,20 @@ export default function CardDetailPage() {
 
       const { v0Tx, legacyTx, price } = await buildRes.json();
       
-      const txBase64 = v0Tx || legacyTx;
-      if (!txBase64) throw new Error("No transaction returned from API");
+      if (!legacyTx) throw new Error("No transaction returned from API");
       
       // Calculate our 2% platform fee
-      // Displayed price = ME price × 1.02, so ME price = displayed / 1.02
-      // Our fee = displayed - ME price
-      const mePrice = price; // ME API returns actual ME price
+      const mePrice = price; // actual ME listing price
       const displayedPrice = card.price; // includes our 2% markup
       const feeAmount = Math.round((displayedPrice - mePrice) * LAMPORTS_PER_SOL);
 
-      // Build fee transaction
-      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      // Deserialize ME buy transaction (legacy, notary already signed)
+      const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
+      const meTx = Transaction.from(txBytes);
+
+      // Build fee transaction with same blockhash
       const feeTx = new Transaction({
-        recentBlockhash: blockhash,
+        recentBlockhash: meTx.recentBlockhash!,
         feePayer: publicKey,
       }).add(
         SystemProgram.transfer({
@@ -91,9 +91,6 @@ export default function CardDetailPage() {
         })
       );
 
-      // Deserialize ME buy transaction
-      const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
-      
       const wallet = (window as any).solana || (window as any).phantom?.solana;
       if (!wallet?.signAllTransactions) {
         throw new Error("Wallet does not support batch signing");
@@ -101,46 +98,23 @@ export default function CardDetailPage() {
 
       showToast.info(`💳 Confirm in wallet — ${displayedPrice} SOL (incl. 2% fee)`);
 
-      if (v0Tx) {
-        // Versioned tx path
-        const meTx = VersionedTransaction.deserialize(txBytes);
-        
-        // Sign both: fee tx (legacy) needs separate handling
-        const signedFee = await wallet.signTransaction(feeTx);
-        const signedMe = await wallet.signTransaction(meTx);
-        
-        // Send fee first
-        if (feeAmount > 0) {
-          const feeSig = await connection.sendRawTransaction(signedFee.serialize());
-          await connection.confirmTransaction(feeSig, "confirmed");
-        }
-        
-        // Then send ME buy
-        const sig = await connection.sendRawTransaction(signedMe.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-        });
-        
-        showToast.info("⏳ Confirming purchase...");
-        await connection.confirmTransaction(sig, "confirmed");
-        showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
-      } else {
-        // Legacy fallback
-        const meTx = Transaction.from(txBytes);
-        
-        // Sign both at once — single wallet popup
-        const [signedFee, signedMe] = await wallet.signAllTransactions([feeTx, meTx]);
-        
-        if (feeAmount > 0) {
-          const feeSig = await connection.sendRawTransaction(signedFee.serialize());
-          await connection.confirmTransaction(feeSig, "confirmed");
-        }
-        
-        const sig = await connection.sendRawTransaction(signedMe.serialize());
-        showToast.info("⏳ Confirming purchase...");
-        await connection.confirmTransaction(sig, "confirmed");
-        showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
+      // Sign both transactions at once — single wallet popup
+      const signed = feeAmount > 0 
+        ? await wallet.signAllTransactions([feeTx, meTx])
+        : [null, await wallet.signTransaction(meTx)];
+      
+      // Send fee first (if applicable)
+      if (feeAmount > 0 && signed[0]) {
+        const feeSig = await connection.sendRawTransaction(signed[0].serialize());
+        await connection.confirmTransaction(feeSig, "confirmed");
       }
+      
+      // Send ME buy transaction
+      const buyTx = feeAmount > 0 ? signed[1] : signed[1];
+      const sig = await connection.sendRawTransaction(buyTx.serialize());
+      showToast.info("⏳ Confirming purchase...");
+      await connection.confirmTransaction(sig, "confirmed");
+      showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
     } catch (err: any) {
       if (err.message?.includes("User rejected")) {
         showToast.error("Transaction cancelled");

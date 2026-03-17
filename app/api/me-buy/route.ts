@@ -69,12 +69,9 @@ export async function POST(req: NextRequest) {
 
     const buyData = await buyRes.json();
 
-    // 3. Return the v0 (versioned) tx with notary signature
-    // Frontend will deserialize, add fee instruction, buyer signs, submit
+    // 3. Return the legacy tx with notary signature (most compatible)
     return NextResponse.json({
-      // Versioned tx (preferred)
-      v0Tx: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null,
-      // Legacy tx fallback
+      v0Tx: null, // disabled — legacy is more reliable
       legacyTx: buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
       // Blockhash info
       blockhash: buyData.blockhashData?.blockhash,
