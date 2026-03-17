@@ -215,50 +215,61 @@ export default function CategoryAuctionsPage() {
     try {
       let sig: string = "";
 
-      // Collector Crypt proxy buy flow
-      if (listing?.source === 'collector-crypt') {
-        let tx: Transaction;
-        const ccCurrency = listing.currency;
-
-        if (ccCurrency === 'SOL') {
-          const lamports = Math.round(price * LAMPORTS_PER_SOL);
-          tx = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: publicKey,
-              toPubkey: TREASURY,
-              lamports,
-            })
-          );
-        } else {
-          // USDC
-          const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-          const tokenAmount = BigInt(Math.round(price * 1e6));
-          const senderAta = await getAssociatedTokenAddress(usdcMint, publicKey);
-          const treasuryAta = await getAssociatedTokenAddress(usdcMint, TREASURY);
-          tx = new Transaction().add(
-            createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
-          );
+      // CC / ME-listed cards: buy via ME notary-cosigned transaction
+      if (listing?.source === 'collector-crypt' || listing?.nftAddress) {
+        const mintAddr = listing?.nftAddress || nftMint;
+        if (!mintAddr) {
+          showToast.error("NFT mint address not available");
+          setBuyingId(null);
+          return;
         }
 
-        sig = await sendTransaction(tx, connection);
-        await connection.confirmTransaction(sig, "confirmed");
+        // USDC listings: redirect to ME (SPL flow not built yet)
+        if (listing?.currency === 'USDC') {
+          window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
+          setBuyingId(null);
+          return;
+        }
 
-        // Notify backend to fulfill the order
-        try {
-          await fetch('/api/cc-buy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ccId: listingId.replace('cc-', ''),
-              buyerWallet: publicKey.toBase58(),
-              paymentSignature: sig,
-            }),
+        // SOL listings: buy directly via ME API
+        showToast.info("Building transaction...");
+        const buildRes = await fetch('/api/me-buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+        });
+
+        if (!buildRes.ok) {
+          const errData = await buildRes.json();
+          throw new Error(errData.error || 'Failed to build transaction');
+        }
+
+        const { v0Tx, legacyTx, price: mePrice } = await buildRes.json();
+        const txBase64 = v0Tx || legacyTx;
+        if (!txBase64) throw new Error("No transaction returned from API");
+
+        const wallet = (window as any).solana || (window as any).phantom?.solana;
+        if (!wallet?.signTransaction) throw new Error("Wallet not found");
+
+        showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+        const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
+
+        if (v0Tx) {
+          const { VersionedTransaction } = await import('@solana/web3.js');
+          const vTx = VersionedTransaction.deserialize(txBytes);
+          const signed = await wallet.signTransaction(vTx);
+          sig = await connection.sendRawTransaction(signed.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
           });
-        } catch (apiErr) {
-          console.warn('CC buy API notification failed:', apiErr);
+        } else {
+          const tx = Transaction.from(txBytes);
+          const signed = await wallet.signTransaction(tx);
+          sig = await connection.sendRawTransaction(signed.serialize());
         }
 
-        showToast.success(`✓ Payment confirmed! NFT will be transferred to your wallet shortly. TX: ${sig.slice(0, 12)}...`);
+        await connection.confirmTransaction(sig, "confirmed");
+        showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
         setBuyingId(null);
         return;
       }
