@@ -34,8 +34,7 @@ export const ME_AUTHORITY = new PublicKey('autMW8SgBkVYeBgqYiTuJZnkvDZMVU2MHJh9J
 export const ME_NOTARY = new PublicKey('NTYeYJ1wr4bpM5xo6zx5En44SvJFAd35zTxxNoERYqd');
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
-// Artifacte treasury — receives our platform fee
-export const ARTIFACTE_TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
+// No platform fee — pass-through like Tensor
 
 const PREFIX = 'm2';
 const TREASURY = 'treasury';
@@ -395,10 +394,8 @@ export interface BuyTransactionOptions {
   buyer: PublicKey;
   /** Connection for metadata lookups */
   connection: Connection;
-  /** Buyer referral wallet (default: ARTIFACTE_TREASURY) */
+  /** Buyer referral wallet (default: ME_AUTHORITY — no referral fee) */
   buyerReferral?: PublicKey;
-  /** Platform fee in lamports (added as SOL transfer, default: 0) */
-  platformFeeLamports?: bigint;
   /** Creator royalty basis points to honor (default: 10000 = full) */
   buyerCreatorRoyaltyBp?: number;
   /** Compute unit price in micro-lamports (default: 100000) */
@@ -416,8 +413,7 @@ export async function buildM2BuyTransaction(opts: BuyTransactionOptions): Promis
     listing,
     buyer,
     connection,
-    buyerReferral = ARTIFACTE_TREASURY,
-    platformFeeLamports = BigInt(0),
+    buyerReferral = ME_AUTHORITY, // No referral fee — pass-through like Tensor
     buyerCreatorRoyaltyBp = 10000, // 100% = honor full royalties
     computeUnitPrice = 100_000,
     buyerExpiry,
@@ -443,36 +439,22 @@ export async function buildM2BuyTransaction(opts: BuyTransactionOptions): Promis
   const creators = await getMetadataCreators(connection, mint);
   const creatorPubkeys = creators.map(c => c.address);
 
-  // Deposit amount = price (ME takes escrow then distributes)
-  const depositAmount = priceLamports;
-
-  // Build transaction
+  // Build transaction — exact same flow as Tensor
   const tx = new Transaction();
 
   // 1. Set compute budget
   tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: computeUnitPrice }));
 
-  // 2. Platform fee (SOL transfer to our treasury)
-  if (platformFeeLamports > BigInt(0)) {
-    tx.add(
-      SystemProgram.transfer({
-        fromPubkey: buyer,
-        toPubkey: ARTIFACTE_TREASURY,
-        lamports: platformFeeLamports,
-      })
-    );
-  }
+  // 2. Deposit into escrow
+  tx.add(buildDepositIx(buyer, escrowPaymentAccount, escrowBump, priceLamports));
 
-  // 3. Deposit into escrow
-  tx.add(buildDepositIx(buyer, escrowPaymentAccount, escrowBump, depositAmount));
-
-  // 4. BuyV2 — create buyer trade state
+  // 3. BuyV2 — create buyer trade state
   tx.add(buildBuyV2Ix(
     buyer, mint, metadata, escrowPaymentAccount, buyerTradeState,
     buyerReferral, priceLamports, BigInt(1), buyerStateExpiry, buyerCreatorRoyaltyBp,
   ));
 
-  // 5. ExecuteSaleV2 — execute the swap
+  // 4. ExecuteSaleV2 — execute the swap
   tx.add(buildExecuteSaleV2Ix(
     buyer, seller, sellerTokenAccount, mint, metadata,
     escrowPaymentAccount, buyerReceiptTokenAccount,
@@ -488,11 +470,4 @@ export async function buildM2BuyTransaction(opts: BuyTransactionOptions): Promis
   return tx;
 }
 
-/**
- * Calculate Artifacte platform fee for a given price
- * @param priceLamports NFT price in lamports
- * @param feeBp Fee in basis points (default: 200 = 2%)
- */
-export function calculatePlatformFee(priceLamports: bigint, feeBp: number = 200): bigint {
-  return (priceLamports * BigInt(feeBp)) / BigInt(10000);
-}
+// No platform fee — pure pass-through like Tensor
