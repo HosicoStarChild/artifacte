@@ -151,7 +151,7 @@ export default function ListNFTPage() {
       const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
       const nftMint = new PublicKey(selectedNft.id);
       const priceInLamports = Math.floor(parseFloat(price) * 1e9);
-      const durationSeconds = listingType === "auction" ? parseInt(auctionDuration) * 3600 : undefined;
+      const durationSeconds = listingType === "auction" ? Math.round(parseFloat(auctionDuration) * 3600) : undefined;
 
       // Get user's NFT token account (detect Token-2022 vs standard SPL)
       const mintAccountInfo = await connection.getAccountInfo(nftMint);
