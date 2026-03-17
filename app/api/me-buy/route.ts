@@ -3,20 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Artifacte ME Proxy Buy API
  * 
+ * Pure pass-through — no platform fee, exactly like Tensor.
+ * 
  * Flow:
  * 1. Fetch listing details from ME
- * 2. Call ME /v2/instructions/buy_now with API key → get notary-cosigned tx
+ * 2. Call ME /v2/instructions/buy_now → get notary-cosigned tx
  * 3. Return serialized tx to frontend
  * 4. Frontend: buyer signs → submit to chain
- * 
- * Our 2% Artifacte fee is added as a separate SOL transfer in the frontend
- * BEFORE the ME buy tx (atomic: both in same wallet prompt).
  */
 
 const ME_API_KEY = process.env.ME_API_KEY || '8fc012d5-a112-4bd4-9173-c78a616cea02';
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
-
-// CC auction house
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
 
 export async function POST(req: NextRequest) {
@@ -69,14 +66,12 @@ export async function POST(req: NextRequest) {
 
     const buyData = await buyRes.json();
 
-    // 3. Return v0 (versioned) tx — legacy is too large for ME transactions
+    // 3. Return notary-cosigned tx as-is (no modifications)
     return NextResponse.json({
       v0Tx: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null,
       legacyTx: buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
-      // Blockhash info
       blockhash: buyData.blockhashData?.blockhash,
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
-      // Listing info for frontend display
       price,
       seller,
       mint,
