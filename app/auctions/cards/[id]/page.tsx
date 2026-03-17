@@ -6,7 +6,7 @@ import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, VersionedTransaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
@@ -16,7 +16,8 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 );
 
-const TREASURY_WALLET = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
+// Fee collection happens on our auction program listings only (2% on-chain)
+// CC card buys pass through to ME with no separate fee
 
 export default function CardDetailPage() {
   const params = useParams();
@@ -76,33 +77,7 @@ export default function CardDetailPage() {
         throw new Error("Wallet not found");
       }
 
-      // Calculate our 2% platform fee
-      const mePrice = price; // actual ME listing price  
-      const displayedPrice = card.price; // includes our 2% markup
-      const feeAmount = Math.round((displayedPrice - mePrice) * LAMPORTS_PER_SOL);
-
-      // Step 1: Send fee transaction first (if applicable)
-      if (feeAmount > 0) {
-        showToast.info(`💳 Confirm platform fee — ${(feeAmount / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
-        const { blockhash: feeBh } = await connection.getLatestBlockhash('confirmed');
-        const feeTx = new Transaction({
-          recentBlockhash: feeBh,
-          feePayer: publicKey,
-        }).add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: TREASURY_WALLET,
-            lamports: feeAmount,
-          })
-        );
-        const signedFee = await wallet.signTransaction(feeTx);
-        const feeSig = await connection.sendRawTransaction(signedFee.serialize());
-        await connection.confirmTransaction(feeSig, "confirmed");
-        showToast.success("Fee confirmed ✓");
-      }
-
-      // Step 2: Sign and send ME buy transaction (versioned, notary pre-signed)
-      showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+      showToast.info(`💳 Confirm purchase — ${price} SOL`);
       const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
       
       let sig: string;
