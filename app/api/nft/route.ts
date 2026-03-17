@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         creators: asset.creators || [],
         mint_extensions: asset.mint_extensions || null,
         authorities: asset.authorities || [],
+        attributes: metadata.attributes || [],
       },
     });
   } catch (error) {

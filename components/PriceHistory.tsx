@@ -181,6 +181,34 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
+        // Fetch on-chain Description for variant keywords (if NFT address available)
+        let onChainVariantHints = '';
+        if (nftAddress) {
+          try {
+            const nftRes = await fetch(`/api/nft?mint=${nftAddress}`, { signal: AbortSignal.timeout(8000) });
+            if (nftRes.ok) {
+              const nftData = await nftRes.json();
+              const attrs = nftData.attributes || [];
+              const desc = attrs.find((a: any) => a.trait_type === 'Description')?.value || '';
+              const cardNameAttr = attrs.find((a: any) => a.trait_type === 'Card Name')?.value || '';
+              // Extract variant keywords from on-chain metadata
+              const combined = `${desc} ${cardNameAttr}`.toUpperCase();
+              const variantPatterns = [
+                'MANGA ART', 'MANGA ALTERNATE ART', 'ALT ART', 'ALTERNATE ART',
+                'CONVENTION EXCLUSIVE', 'SPECIAL ART', 'FULL ART', 'GOLD',
+                'WANTED POSTER', 'SECRET RARE', 'SEC', 'SP', '3RD ANNIVERSARY',
+                'TEXTURED FOIL', 'PREMIUM BOOSTER', 'BEST PREMIUM'
+              ];
+              const found = variantPatterns.filter(p => combined.includes(p));
+              if (found.length > 0) onChainVariantHints = found.join(' ');
+              // Also check if it's a premium booster reprint
+              if (combined.includes('PREMIUM BOOSTER') || combined.includes('THE BEST')) {
+                onChainVariantHints += ' PREMIUM BOOSTER';
+              }
+            }
+          } catch {} // Non-fatal — fall back to name-based matching
+        }
+
         // Live search using smart query extraction from card name
         const searchQuery = buildSearchQuery(cardName);
 
@@ -237,6 +265,32 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
                 if (hol.length > 0) pool = hol;
               }
               
+              // Use on-chain variant hints to narrow down further
+              if (onChainVariantHints && pool.length > 1) {
+                const hints = onChainVariantHints.toUpperCase();
+                const isPremiumBooster = hints.includes('PREMIUM BOOSTER');
+                const scored = pool.map((v: any) => {
+                  const vName = ((v.name || '') + ' ' + (v.variety || '') + ' ' + (v.brand || '')).toUpperCase();
+                  let score = 0;
+                  // Match specific variant keywords
+                  if (hints.includes('MANGA') && vName.includes('MANGA')) score += 2;
+                  if (hints.includes('ALT') && vName.includes('ALT')) score += 2;
+                  if (hints.includes('CONVENTION') && vName.includes('CONVENTION')) score += 3;
+                  if (hints.includes('GOLD') && vName.includes('GOLD')) score += 3;
+                  if (hints.includes('3RD ANNIVERSARY') && vName.includes('3RD ANNIVERSARY')) score += 3;
+                  if (hints.includes('WANTED') && vName.includes('WANTED')) score += 3;
+                  if (hints.includes('SEC') && (vName.includes(' SEC ') || vName.includes(' SEC') || vName.includes('MANGA ART SEC'))) score += 2;
+                  // Premium Booster reprint detection
+                  if (isPremiumBooster && (vName.includes('PREMIUM BOOSTER') || vName.includes('THE BEST'))) score += 3;
+                  if (!isPremiumBooster && (vName.includes('PREMIUM BOOSTER') || vName.includes('THE BEST'))) score -= 2;
+                  return { v, score };
+                });
+                scored.sort((a: any, b: any) => b.score - a.score);
+                if (scored[0].score > 0) {
+                  pool = scored.filter((s: any) => s.score === scored[0].score).map((s: any) => s.v);
+                }
+              }
+
               // Pick variant with most sales for requested grade
               const gp = grade ? grade.split('-')[0]?.toUpperCase() : '';
               const gn = grade ? grade.split('-')[1] : '';
