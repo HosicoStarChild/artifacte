@@ -3,7 +3,7 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback } from "react";
-import { getAssetsByOwner, readNFTMetadata } from "@/lib/metadata-reader";
+// metadata-reader removed — using /api/helius-das proxy instead
 import { showToast } from "@/components/ToastContainer";
 import { Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
 

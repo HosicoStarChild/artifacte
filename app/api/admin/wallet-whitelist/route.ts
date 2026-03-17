@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 
 interface WalletEntry {
@@ -42,9 +43,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { address, name, role, adminWallet } = body;
+    const { address, name, role, adminWallet, adminSecret } = body;
 
-    if (adminWallet !== ADMIN_WALLET) {
+    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     if (!address || !name) {
@@ -75,9 +76,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
-    const { address, adminWallet } = body;
+    const { address, adminWallet, adminSecret } = body;
 
-    if (adminWallet !== ADMIN_WALLET) {
+    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

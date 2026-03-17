@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BOT_API = process.env.LISTING_BOT_API || "http://localhost:4444";
+const BOT_API = process.env.LISTING_BOT_API;
 
 const CATEGORY_LABELS: Record<string, string> = {
   DIGITAL_ART: "Digital Art",
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    // Notify the Telegram bot
-    try {
+    // Notify the Telegram bot (only if configured)
+    if (BOT_API) try {
       const price = value.replace(/[^0-9.]/g, "");
       await fetch(`${BOT_API}/event`, {
         method: "POST",
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
             currency: "USD1",
             image: listing.image || undefined,
             auctionEnd: listing.auctionEnd || undefined,
-            link: `https://artifacte-five.vercel.app/auctions/${listing.id}`,
+            link: `https://artifacte.io/auctions/${listing.id}`,
           },
         }),
       });
