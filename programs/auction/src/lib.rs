@@ -344,6 +344,18 @@ pub mod auction {
         };
         let creator_royalty = (listing.price * listing.royalty_basis_points as u64) / 10000;
 
+        // Validate creator_payment_account if royalty > 0
+        if creator_royalty > 0 {
+            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                &listing.creator_address,
+                &listing.payment_mint,
+            );
+            require!(
+                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                AuctionError::InvalidCreatorAccount
+            );
+        }
+
         let seller_amount = listing
             .price
             .checked_sub(platform_fee)
@@ -591,6 +603,18 @@ pub mod auction {
                 0u64
             };
             let creator_royalty = (listing.current_bid * listing.royalty_basis_points as u64) / 10000;
+
+            // Validate creator_payment_account if royalty > 0
+            if creator_royalty > 0 {
+                let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                    &listing.creator_address,
+                    &listing.payment_mint,
+                );
+                require!(
+                    ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                    AuctionError::InvalidCreatorAccount
+                );
+            }
 
             let seller_amount = listing
                 .current_bid
@@ -921,6 +945,8 @@ pub struct ListItem<'info> {
 pub struct PlaceBid<'info> {
     #[account(mut)]
     pub listing: Account<'info, Listing>,
+    /// Payment mint — must match the listing's payment mint
+    #[account(constraint = payment_mint.key() == listing.payment_mint @ AuctionError::InvalidPaymentMint)]
     pub payment_mint: Account<'info, anchor_spl::token::Mint>,
     #[account(
         init_if_needed,
@@ -958,11 +984,13 @@ pub struct BuyNow<'info> {
     pub escrow_nft: InterfaceAccount<'info, IfaceTokenAccount>,
     #[account(mut)]
     pub buyer_payment_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    /// Seller payment account — must be owned by listing.seller
+    #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
     pub seller_payment_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    /// Treasury payment account — must be owned by treasury wallet
+    #[account(mut, constraint = treasury_payment_account.owner.to_string() == TREASURY @ AuctionError::Unauthorized)]
     pub treasury_payment_account: Account<'info, TokenAccount>,
-    /// CHECK: Creator payment account (may not exist yet)
+    /// CHECK: Creator payment account — validated in instruction body
     #[account(mut)]
     pub creator_payment_account: UncheckedAccount<'info>,
     #[account(mut)]
@@ -1037,7 +1065,8 @@ pub struct SettleAuction<'info> {
     /// Seller's payment token account — must be owned by listing.seller
     #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
     pub seller_payment_account: Box<Account<'info, TokenAccount>>,
-    #[account(mut)]
+    /// Treasury payment account — must be owned by treasury wallet
+    #[account(mut, constraint = treasury_payment_account.owner.to_string() == TREASURY @ AuctionError::Unauthorized)]
     pub treasury_payment_account: Box<Account<'info, TokenAccount>>,
     /// CHECK: Creator payment account — validated in instruction body if royalty > 0
     #[account(mut)]
@@ -1202,4 +1231,6 @@ pub enum AuctionError {
     RoyaltyTooHigh,
     #[msg("Invalid buyer account — must be owned by highest bidder")]
     InvalidBuyerAccount,
+    #[msg("Invalid creator account — must be creator's ATA for payment mint")]
+    InvalidCreatorAccount,
 }

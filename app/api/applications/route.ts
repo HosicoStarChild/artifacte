@@ -4,6 +4,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const APPLICATIONS_FILE = path.join(process.cwd(), "data", "applications.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
@@ -68,8 +69,9 @@ async function writeAllowlist(data: AllowlistData): Promise<void> {
   await fs.writeFile(ALLOWLIST_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function validateAdmin(adminWallet: string): boolean {
-  return adminWallet === ADMIN_WALLET;
+function validateAdmin(adminWallet: string, secret?: string): boolean {
+  if (!ADMIN_SECRET) return false;
+  return adminWallet === ADMIN_WALLET && secret === ADMIN_SECRET;
 }
 
 /**
@@ -222,9 +224,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, action, rejectionReason, adminWallet } = body;
+    const { id, action, rejectionReason, adminWallet, adminSecret } = body;
 
-    if (!validateAdmin(adminWallet)) {
+    if (!validateAdmin(adminWallet, adminSecret)) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid admin wallet" },
         { status: 403 }

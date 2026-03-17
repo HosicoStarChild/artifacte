@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
 const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
@@ -149,9 +150,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, action, adminWallet } = body;
+    const { id, action, adminWallet, adminSecret } = body;
 
-    if (adminWallet !== ADMIN_WALLET) {
+    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     if (!id || !action || !["approve", "reject"].includes(action)) {

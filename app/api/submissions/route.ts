@@ -42,8 +42,11 @@ async function writeSubmissions(data: SubmissionsData): Promise<void> {
   await fs.writeFile(SUBMISSIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function isAdminWallet(wallet?: string): boolean {
-  return wallet === TREASURY_WALLET;
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+
+function isAdminWallet(wallet?: string, secret?: string): boolean {
+  if (!ADMIN_SECRET) return false;
+  return wallet === TREASURY_WALLET && secret === ADMIN_SECRET;
 }
 
 // GET — list all submissions (admin only) or user's own submissions
@@ -51,16 +54,17 @@ export async function GET(req: NextRequest) {
   try {
     const wallet = req.nextUrl.searchParams.get("wallet");
     const adminWallet = req.headers.get("x-admin-wallet") || undefined;
+    const adminSecretHeader = req.headers.get("x-admin-secret") || undefined;
     const data = await readSubmissions();
 
     // If requesting user's own submissions, no admin check needed
-    if (wallet && !isAdminWallet(adminWallet)) {
+    if (wallet && !isAdminWallet(adminWallet, adminSecretHeader)) {
       const filtered = data.submissions.filter(s => s.sellerWallet === wallet);
       return NextResponse.json({ ok: true, submissions: filtered });
     }
 
     // If admin requesting all submissions
-    if (isAdminWallet(adminWallet)) {
+    if (isAdminWallet(adminWallet, adminSecretHeader)) {
       return NextResponse.json({ ok: true, submissions: data.submissions });
     }
 
@@ -121,8 +125,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const adminWallet = req.headers.get("x-admin-wallet") || undefined;
+    const adminSecretHeader = req.headers.get("x-admin-secret") || undefined;
 
-    if (!isAdminWallet(adminWallet)) {
+    if (!isAdminWallet(adminWallet, adminSecretHeader)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
