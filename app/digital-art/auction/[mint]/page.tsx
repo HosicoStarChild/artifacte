@@ -477,8 +477,8 @@ export default function AuctionDetailPage() {
               </div>
             )}
 
-            {/* Cancel Listing Button (seller only) — hidden during live auction */}
-            {isSeller && !isSettled && !isCancelled && !(isAuction && !auctionEnded) && (
+            {/* Cancel Listing Button (seller only) — hidden during live auction with bids */}
+            {isSeller && !isSettled && !isCancelled && !(isAuction && !auctionEnded && listing.currentBid > 0) && (
               <div className="pt-4 border-t border-white/10">
                 <p className="text-gray-500 text-xs mb-3">
                   {isAuction && listing.currentBid > 0
