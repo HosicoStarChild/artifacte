@@ -87,6 +87,10 @@ export const IDL = {
           "signer": true
         },
         {
+          "name": "treasury",
+          "writable": true
+        },
+        {
           "name": "nft_token_program"
         },
         {
@@ -561,6 +565,10 @@ export const IDL = {
         },
         {
           "name": "seller",
+          "writable": true
+        },
+        {
+          "name": "treasury",
           "writable": true
         },
         {
