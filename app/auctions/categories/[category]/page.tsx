@@ -413,7 +413,8 @@ export default function CategoryAuctionsPage() {
 
         {/* Tabs & Filters */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10 pb-8 border-b border-white/5">
-          {/* Tabs */}
+          {/* Tabs — only show for on-chain categories (not ME-backed) */}
+          {!useMeApi && (
           <div className="flex gap-3 bg-dark-800 rounded-lg p-1 border border-white/5">
             <button
               onClick={() => setTab("fixed")}
@@ -432,6 +433,7 @@ export default function CategoryAuctionsPage() {
               Live Auctions
             </button>
           </div>
+          )}
 
           {/* Currency Filter */}
           {category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" ? (
