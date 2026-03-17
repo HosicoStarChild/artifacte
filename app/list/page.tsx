@@ -72,12 +72,10 @@ export default function ListNFTPage() {
     if (!publicKey) return;
     setLoadingNfts(true);
     try {
-      const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`, {
+      const res = await fetch("/api/helius-das", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: "list-nfts",
           method: "getAssetsByOwner",
           params: {
             ownerAddress: publicKey.toBase58(),
