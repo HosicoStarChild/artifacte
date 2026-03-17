@@ -8,13 +8,17 @@ export const maxDuration = 10;
 
 // In-memory listing cache (updated by webhook, read by /api/me-listings)
 // In production this would be Redis/DB, but for now we use revalidation
-const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET || "";
+const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET;
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify webhook auth token
+    // Verify webhook auth token — fail closed if secret not configured
+    if (!WEBHOOK_SECRET) {
+      console.error("[helius-webhook] HELIUS_WEBHOOK_SECRET not configured — rejecting all requests");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    }
     const authHeader = req.headers.get("authorization");
-    if (WEBHOOK_SECRET && authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    if (authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -300,32 +300,8 @@ export default function CategoryAuctionsPage() {
           throw new Error(`On-chain purchase failed: ${programErr.message?.slice(0, 50)}`);
         }
       } else {
-        // Mock listing: use direct transfer
-        let tx: Transaction;
-
-        if (isDigitalArt) {
-          // Digital Art pays in SOL
-          const lamports = Math.round(price * LAMPORTS_PER_SOL);
-          tx = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: publicKey,
-              toPubkey: TREASURY,
-              lamports,
-            })
-          );
-        } else {
-          // RWA categories pay in USD1/USDC
-          const token = TOKENS[currency];
-          const tokenAmount = BigInt(Math.round(price * 10 ** token.decimals));
-          const senderAta = await getAssociatedTokenAddress(token.mint, publicKey);
-          const treasuryAta = await getAssociatedTokenAddress(token.mint, TREASURY);
-          tx = new Transaction().add(
-            createTransferInstruction(senderAta, treasuryAta, publicKey, tokenAmount)
-          );
-        }
-
-        sig = await sendTransaction(tx, connection);
-        await connection.confirmTransaction(sig, "confirmed");
+        // No on-chain listing found — cannot proceed
+        throw new Error("This item is not available for purchase");
       }
 
       showToast.success(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`);

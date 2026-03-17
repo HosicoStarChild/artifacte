@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
 // Bundled fallback for Vercel (fs.readFile fails in serverless)
@@ -47,8 +48,9 @@ async function writeAllowlist(data: AllowlistData): Promise<void> {
   await fs.writeFile(ALLOWLIST_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function validateAdmin(adminWallet: string): boolean {
-  return adminWallet === ADMIN_WALLET;
+function validateAdmin(adminWallet: string, secret?: string): boolean {
+  if (!ADMIN_SECRET) return false; // Fail closed if secret not configured
+  return adminWallet === ADMIN_WALLET && secret === ADMIN_SECRET;
 }
 
 export async function GET() {
@@ -69,9 +71,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { mintAuthority, name, category, adminWallet } = body;
+    const { mintAuthority, name, category, adminWallet, adminSecret } = body;
 
-    if (!validateAdmin(adminWallet)) {
+    if (!validateAdmin(adminWallet, adminSecret)) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid admin wallet" },
         { status: 403 }
@@ -126,9 +128,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
-    const { mintAuthority, adminWallet } = body;
+    const { mintAuthority, adminWallet, adminSecret } = body;
 
-    if (!validateAdmin(adminWallet)) {
+    if (!validateAdmin(adminWallet, adminSecret)) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid admin wallet" },
         { status: 403 }

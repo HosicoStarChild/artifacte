@@ -141,6 +141,9 @@ pub mod auction {
         require!(price > 0, AuctionError::InvalidPrice);
         require!(price <= 1_000_000_000_000_000_000, AuctionError::InvalidPrice);
 
+        // Cap royalty basis points at 10% (1000 bps) to prevent fee manipulation
+        require!(royalty_basis_points <= 1000, AuctionError::RoyaltyTooHigh);
+
         // Validate category matches allowed payments
         validate_category_and_payment(&category, ctx.accounts.payment_mint.key())?;
 
@@ -254,6 +257,22 @@ pub mod auction {
 
         // Refund previous bidder
         if listing.current_bid > 0 && listing.highest_bidder != Pubkey::default() {
+            // Validate previous_bidder_account belongs to actual previous highest bidder
+            require!(
+                ctx.accounts.previous_bidder_account.key() != Pubkey::default(),
+                AuctionError::InvalidRefundAccount
+            );
+            // The token account owner must be the previous highest bidder
+            // We verify by checking the ATA derivation matches
+            let expected_ata = anchor_spl::associated_token::get_associated_token_address(
+                &listing.highest_bidder,
+                &listing.payment_mint,
+            );
+            require!(
+                ctx.accounts.previous_bidder_account.key() == expected_ata,
+                AuctionError::InvalidRefundAccount
+            );
+
             let bid_escrow_bump = ctx.bumps.bid_escrow;
             token::transfer(
                 CpiContext::new_with_signer(
@@ -556,6 +575,14 @@ pub mod auction {
         let escrow_bump = ctx.bumps.escrow_nft;
 
         if listing.current_bid > 0 {
+            // Validate buyer_nft_account is owned by the highest bidder
+            // (prevents redirecting the NFT to an attacker's account)
+            let buyer_nft_owner = ctx.accounts.buyer_nft_account.owner;
+            require!(
+                buyer_nft_owner == listing.highest_bidder,
+                AuctionError::InvalidBuyerAccount
+            );
+
             // Auction has bids: distribute payments + transfer NFT to winner
             let platform_fee = (listing.current_bid * 200) / 10000;
             let baxus_fee = if listing.baxus_fee {
@@ -669,6 +696,13 @@ pub mod auction {
             });
         } else {
             // No bids: return NFT to seller
+            // Validate seller_nft_account is owned by the seller
+            let seller_nft_owner = ctx.accounts.seller_nft_account.owner;
+            require!(
+                seller_nft_owner == listing.seller,
+                AuctionError::Unauthorized
+            );
+
             let nft_escrow_seeds: &[&[u8]] = &[
                 b"escrow_nft",
                 nft_mint_key.as_ref(),
@@ -1000,15 +1034,18 @@ pub struct SettleAuction<'info> {
         token::token_program = nft_token_program,
     )]
     pub escrow_nft: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
-    #[account(mut)]
+    /// Seller's payment token account — must be owned by listing.seller
+    #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
     pub seller_payment_account: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     pub treasury_payment_account: Box<Account<'info, TokenAccount>>,
-    /// CHECK: Creator payment account (may not exist yet)
+    /// CHECK: Creator payment account — validated in instruction body if royalty > 0
     #[account(mut)]
     pub creator_payment_account: UncheckedAccount<'info>,
+    /// Buyer NFT account — must be owned by highest bidder (or seller if no bids for return)
     #[account(mut)]
     pub buyer_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
+    /// Seller NFT account — must be owned by listing.seller (for no-bid return)
     #[account(mut)]
     pub seller_nft_account: Box<InterfaceAccount<'info, IfaceTokenAccount>>,
     /// CHECK: The original seller, validated against listing.seller.
@@ -1159,4 +1196,10 @@ pub enum AuctionError {
     TransferFailed,
     #[msg("Seller cannot bid on their own auction")]
     SellerCannotBid,
+    #[msg("Invalid refund account — must be previous bidder's ATA")]
+    InvalidRefundAccount,
+    #[msg("Royalty basis points too high (max 1000 = 10%)")]
+    RoyaltyTooHigh,
+    #[msg("Invalid buyer account — must be owned by highest bidder")]
+    InvalidBuyerAccount,
 }

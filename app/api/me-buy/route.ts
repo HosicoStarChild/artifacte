@@ -12,7 +12,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * 4. Frontend: buyer signs → submit to chain
  */
 
-const ME_API_KEY = process.env.ME_API_KEY || '8fc012d5-a112-4bd4-9173-c78a616cea02';
+const ME_API_KEY = process.env.ME_API_KEY;
+if (!ME_API_KEY) {
+  console.error('[me-buy] ME_API_KEY not set in environment');
+}
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
 
@@ -21,6 +24,9 @@ export async function POST(req: NextRequest) {
     const { mint, buyer } = await req.json();
     if (!mint || !buyer) {
       return NextResponse.json({ error: 'Missing mint or buyer' }, { status: 400 });
+    }
+    if (!ME_API_KEY) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
     // 1. Fetch active listing from ME
