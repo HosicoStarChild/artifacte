@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
@@ -25,7 +24,7 @@ export default function CardDetailPage() {
   const [card, setCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
 
   useEffect(() => {
@@ -72,9 +71,8 @@ export default function CardDetailPage() {
       const txBase64 = v0Tx || legacyTx;
       if (!txBase64) throw new Error("No transaction returned from API");
       
-      const wallet = (window as any).solana || (window as any).phantom?.solana;
-      if (!wallet?.signTransaction) {
-        throw new Error("Wallet not found");
+      if (!signTransaction) {
+        throw new Error("Wallet does not support signing");
       }
 
       showToast.info(`💳 Confirm purchase — ${price} SOL`);
@@ -83,14 +81,14 @@ export default function CardDetailPage() {
       let sig: string;
       if (v0Tx) {
         const vTx = VersionedTransaction.deserialize(txBytes);
-        const signed = await wallet.signTransaction(vTx);
-        sig = await connection.sendRawTransaction(signed.serialize(), {
+        const signed = await signTransaction(vTx as any);
+        sig = await connection.sendRawTransaction((signed as any).serialize(), {
           skipPreflight: false,
           preflightCommitment: 'confirmed',
         });
       } else {
         const tx = Transaction.from(txBytes);
-        const signed = await wallet.signTransaction(tx);
+        const signed = await signTransaction(tx);
         sig = await connection.sendRawTransaction(signed.serialize());
       }
       

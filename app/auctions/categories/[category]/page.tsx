@@ -41,7 +41,7 @@ export default function CategoryAuctionsPage() {
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -248,8 +248,7 @@ export default function CategoryAuctionsPage() {
         const txBase64 = v0Tx || legacyTx;
         if (!txBase64) throw new Error("No transaction returned from API");
 
-        const wallet = (window as any).solana || (window as any).phantom?.solana;
-        if (!wallet?.signTransaction) throw new Error("Wallet not found");
+        if (!signTransaction) throw new Error("Wallet does not support signing");
 
         showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
         const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
@@ -257,14 +256,14 @@ export default function CategoryAuctionsPage() {
         if (v0Tx) {
           const { VersionedTransaction } = await import('@solana/web3.js');
           const vTx = VersionedTransaction.deserialize(txBytes);
-          const signed = await wallet.signTransaction(vTx);
-          sig = await connection.sendRawTransaction(signed.serialize(), {
+          const signed = await signTransaction(vTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
             skipPreflight: false,
             preflightCommitment: 'confirmed',
           });
         } else {
           const tx = Transaction.from(txBytes);
-          const signed = await wallet.signTransaction(tx);
+          const signed = await signTransaction(tx);
           sig = await connection.sendRawTransaction(signed.serialize());
         }
 
