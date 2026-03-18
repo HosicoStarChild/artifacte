@@ -627,6 +627,15 @@ export default function CategoryAuctionsPage() {
                             >
                               Buy on BAXUS
                             </a>
+                          ) : (l as any).nftAddress || (l as any).nftMint ? (
+                            <a
+                              href={`https://magiceden.io/item-details/${(l as any).nftAddress || (l as any).nftMint}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
+                            >
+                              Buy on Magic Eden
+                            </a>
                           ) : connected ? (
                             <button
                               onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint, l)}

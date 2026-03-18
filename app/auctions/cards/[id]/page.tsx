@@ -188,25 +188,15 @@ export default function CardDetailPage() {
               </div>
 {/* price markup info removed */}
 
-              {connected ? (
-                card.currency === 'SOL' && card.nftAddress ? (
-                  <button
-                    onClick={handleBuy}
-                    disabled={buying}
-                    className="w-full px-6 py-3.5 bg-gold-500 hover:bg-gold-600 disabled:bg-gold-500/50 disabled:cursor-not-allowed text-dark-900 rounded-lg text-base font-semibold transition-colors"
-                  >
-                    {buying ? "Processing..." : `Buy Now — ◎${card.price}`}
-                  </button>
-                ) : (
-                  <a
-                    href={`https://magiceden.io/item-details/${card.nftAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full px-6 py-3.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-base font-semibold transition-colors text-center block"
-                  >
-                    Buy on Magic Eden — ${card.price}
-                  </a>
-                )
+              {card.nftAddress ? (
+                <a
+                  href={`https://magiceden.io/item-details/${card.nftAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full px-6 py-3.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-base font-semibold transition-colors text-center block"
+                >
+                  Buy on Magic Eden
+                </a>
               ) : (
                 <WalletMultiButton className="!w-full !bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-base !font-semibold" />
               )}
