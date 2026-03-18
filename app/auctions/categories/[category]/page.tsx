@@ -619,14 +619,12 @@ export default function CategoryAuctionsPage() {
                             )}
                           </div>
                           {l.source === 'baxus' && l.externalUrl ? (
-                            <a
-                              href={l.externalUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
+                            <button
+                              disabled
+                              className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
                             >
-                              Buy on BAXUS
-                            </a>
+                              Coming Soon
+                            </button>
                           ) : useMeApi ? (
                             <button
                               disabled
