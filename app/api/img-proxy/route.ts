@@ -35,6 +35,40 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Domain not allowed", { status: 403 });
   }
 
+  // Extract IPFS CID + path if present
+  const ipfsMatch = url.match(/\/ipfs\/([a-zA-Z0-9]+)(\/.*)?/) || url.match(/([a-zA-Z0-9]+)\.ipfs\.[^/]+(\/.*)?/);
+  if (ipfsMatch) {
+    const cid = ipfsMatch[1];
+    const path = ipfsMatch[2] || "";
+    const IPFS_GATEWAYS = [
+      `https://w3s.link/ipfs/${cid}${path}`,
+      `https://ipfs.io/ipfs/${cid}${path}`,
+      `https://cloudflare-ipfs.com/ipfs/${cid}${path}`,
+      `https://dweb.link/ipfs/${cid}${path}`,
+    ];
+    for (const gwUrl of IPFS_GATEWAYS) {
+      try {
+        const res = await fetchWithTimeout(gwUrl, {
+          headers: { Accept: "image/*" },
+          redirect: "follow",
+        });
+        if (res.ok) {
+          const contentType = res.headers.get("content-type") || "image/png";
+          return new NextResponse(res.body, {
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "public, max-age=86400, s-maxage=604800",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+    return new NextResponse("Image not found on any IPFS gateway", { status: 404 });
+  }
+
   // Extract Arweave TX ID if present
   const arweaveMatch = url.match(/https?:\/\/(?:www\.)?arweave\.net\/([a-zA-Z0-9_-]+)/);
 
