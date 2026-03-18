@@ -241,34 +241,6 @@
       }
     },
     {
-      "collectionAddress": "7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj",
-      "name": "Drifella 2",
-      "category": "Digital Art",
-      "image": "/collections/drifella-2.png",
-      "supply": 5000,
-      "addedAt": 1773498533473,
-      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true,
-      "description": "Drifella 2 is the second generation of the Drifella collection on Solana.",
-      "links": {
-        "twitter": "https://x.com/bis__cut"
-      }
-    },
-    {
-      "collectionAddress": "ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ",
-      "name": "Drifella III",
-      "category": "Digital Art",
-      "image": "/collections/drifella-3.png",
-      "supply": 5000,
-      "addedAt": 1773498586169,
-      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
-      "verified": true,
-      "description": "Drifella III is the third generation of the Drifella collection on Solana. A Metaplex Core collection.",
-      "links": {
-        "twitter": "https://x.com/bis__cut"
-      }
-    },
-    {
       "collectionAddress": "8vE4uASPp9WbS9Ls2qzJ9fpUBpR3UrTG3hBZXdAJQ9mz",
       "name": "Monkey Baby Business",
       "category": "Digital Art",
