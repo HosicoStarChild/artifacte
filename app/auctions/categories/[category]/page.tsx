@@ -627,6 +627,13 @@ export default function CategoryAuctionsPage() {
                             >
                               Buy on BAXUS
                             </a>
+                          ) : useMeApi ? (
+                            <button
+                              disabled
+                              className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
+                            >
+                              Coming Soon
+                            </button>
                           ) : connected ? (
                             <button
                               onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint, l)}

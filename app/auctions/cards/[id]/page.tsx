@@ -189,15 +189,14 @@ export default function CardDetailPage() {
 {/* price markup info removed */}
 
               {connected ? (
-                card.currency === 'SOL' && card.nftAddress ? (
-                  <button
-                    onClick={handleBuy}
-                    disabled={buying}
-                    className="w-full px-6 py-3.5 bg-gold-500 hover:bg-gold-600 disabled:bg-gold-500/50 disabled:cursor-not-allowed text-dark-900 rounded-lg text-base font-semibold transition-colors"
-                  >
-                    {buying ? "Processing..." : `Buy Now — ◎${card.price}`}
-                  </button>
-                ) : (
+                <button
+                  disabled
+                  className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
+                >
+                  Buy Now — Coming Soon
+                </button>
+              ) : (
+                false ? (
                   <a
                     href={`https://magiceden.io/item-details/${card.nftAddress}`}
                     target="_blank"
