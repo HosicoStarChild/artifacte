@@ -71,6 +71,32 @@ export async function POST(req: NextRequest) {
     const sellerExpiry = listing.expiry ?? -1;
     const auctionHouse = listing.auctionHouse || CC_AUCTION_HOUSE;
 
+    // 1b. Verify NFT is still owned by the seller (catch stale listings)
+    const HELIUS_KEY = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+    if (HELIUS_KEY) {
+      try {
+        const assetRes = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', id: 1,
+            method: 'getAsset',
+            params: { id: mint },
+          }),
+        });
+        const assetData = await assetRes.json();
+        const currentOwner = assetData?.result?.ownership?.owner;
+        if (currentOwner && currentOwner !== seller) {
+          return NextResponse.json({ 
+            error: 'This listing is no longer available — the NFT has already been sold.' 
+          }, { status: 410 });
+        }
+      } catch (e) {
+        // Non-fatal — proceed with buy attempt
+        console.warn('[me-buy] Ownership check failed, proceeding:', e);
+      }
+    }
+
     // 2. Call ME buy_now instructions API (returns notary-cosigned tx)
     const params = new URLSearchParams({
       buyer,

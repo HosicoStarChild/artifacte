@@ -83,7 +83,7 @@ export default function CardDetailPage() {
         const vTx = VersionedTransaction.deserialize(txBytes);
         const signed = await signTransaction(vTx as any);
         sig = await connection.sendRawTransaction((signed as any).serialize(), {
-          skipPreflight: false,
+          skipPreflight: true,
           preflightCommitment: 'confirmed',
         });
       } else {
@@ -96,14 +96,18 @@ export default function CardDetailPage() {
       await connection.confirmTransaction(sig, "confirmed");
       showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
     } catch (err: any) {
-      if (err.message?.includes("User rejected")) {
+      if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
         showToast.error("Transaction cancelled");
       } else if (err.message?.includes("insufficient")) {
-        showToast.error("Insufficient balance");
+        showToast.error("Insufficient SOL balance");
+      } else if (err.message?.includes("no longer available") || err.message?.includes("already been sold")) {
+        showToast.error("This item has already been sold");
       } else if (err.message?.includes("No active listing")) {
-        showToast.error("This item is no longer available");
+        showToast.error("This item is no longer listed");
+      } else if (err.message?.includes("Simulation failed") || err.message?.includes("simulation failed")) {
+        showToast.error("Transaction simulation failed. This listing may be stale — try refreshing the page.");
       } else {
-        showToast.error(`Error: ${(err.message || "").slice(0, 100)}`);
+        showToast.error(`Error: ${(err.message || "").slice(0, 120)}`);
       }
     } finally {
       setBuying(false);
