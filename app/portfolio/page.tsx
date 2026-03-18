@@ -201,7 +201,7 @@ export default function PortfolioPage() {
                     if (cdnUri) return cdnUri;
                     let u = asset.content?.links?.image || "";
                     if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
-                    if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                    if (u.includes("arweave.net/") || u.includes("nftstorage.link/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
                     return u;
                   })(),
                   collection: fp?.name || matchedAddress?.slice(0, 8) || "Unknown",
