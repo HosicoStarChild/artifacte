@@ -281,6 +281,20 @@
       "links": {
         "twitter": "https://x.com/MonkeyBabyBiz"
       }
+    },
+    {
+      "collectionAddress": "89Xwuah6o9Y2q91EREgsc1wKeFHYyfXEZKqPFRBNrfhv",
+      "name": "ZMB",
+      "category": "Digital Art",
+      "image": "/collections/zmb.png",
+      "supply": 5000,
+      "addedAt": 1742335800000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "ZMB is a collection of unique zombie-themed NFTs on Solana.",
+      "links": {
+        "twitter": "https://x.com/zmb_nft"
+      }
     }
   ]
 }

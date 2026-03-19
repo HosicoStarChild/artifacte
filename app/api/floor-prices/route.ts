@@ -22,6 +22,7 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   '7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj': { symbol: 'drifella2', name: 'Drifella 2' },
   'ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ': { symbol: 'drifella_iii', name: 'Drifella III' },
   '8vE4uASPp9WbS9Ls2qzJ9fpUBpR3UrTG3hBZXdAJQ9mz': { symbol: 'monkey_baby_business', name: 'Monkey Baby Business' },
+  '89Xwuah6o9Y2q91EREgsc1wKeFHYyfXEZKqPFRBNrfhv': { symbol: 'zmb_0735', name: 'ZMB' },
 };
 
 // Tensor-only collections (not on ME) — manually updated floors
