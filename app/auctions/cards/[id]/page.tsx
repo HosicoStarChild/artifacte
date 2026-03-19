@@ -188,16 +188,12 @@ export default function CardDetailPage() {
               </div>
 {/* price markup info removed */}
 
-              {connected ? (
-                <button
-                  disabled
-                  className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
-                >
-                  Buy Now — Coming Soon
-                </button>
-              ) : (
-                <WalletMultiButton className="!w-full !bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-12 !text-base !font-semibold" />
-              )}
+              <button
+                disabled
+                className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
+              >
+                Buy Now — Coming Soon
+              </button>
               <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>
             </div>
 
