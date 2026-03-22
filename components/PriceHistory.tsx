@@ -274,6 +274,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
         chartParams.set("q", searchQuery);
+        if (nftAddress) chartParams.set("mint", nftAddress);
         if (chosen.assetId) {
           chartParams.set("assetId", chosen.assetId);
         }
