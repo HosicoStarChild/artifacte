@@ -10,6 +10,11 @@ const SOLD_QUERY = `query SearchServiceConfig {
         collectionName
         expiresAt
       }
+      universalSearch {
+        clientConfig { nodes { host } apiKey }
+        collectionName
+        expiresAt
+      }
     }
   }
 }`;
