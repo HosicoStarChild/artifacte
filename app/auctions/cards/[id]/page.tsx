@@ -359,8 +359,8 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Oracle Price History — skip for merchandise */}
-            {card.category !== 'MERCHANDISE' && (
+            {/* Oracle Price History — skip for merchandise and TCGplayer-sourced cards */}
+            {card.category !== 'MERCHANDISE' && card.priceSource !== 'TCGplayer' && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
@@ -368,6 +368,20 @@ export default function CardDetailPage() {
               year={card.year}
               nftAddress={card.nftAddress}
             />
+            )}
+            {card.priceSource === 'TCGplayer' && (
+              <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">Market Price</h3>
+                <p className="text-gray-400 text-xs mb-2">Current market price sourced from TCGplayer</p>
+                <a 
+                  href={`https://www.tcgplayer.com/product/${card.priceSourceId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gold-500 hover:text-gold-400 text-xs transition"
+                >
+                  View on TCGplayer →
+                </a>
+              </div>
             )}
 
             {/* NFT Details */}
