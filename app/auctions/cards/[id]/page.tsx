@@ -29,15 +29,66 @@ export default function CardDetailPage() {
 
   useEffect(() => {
     if (!cardId) return;
-    // Fetch all listings and find this card
-    fetch(`/api/me-listings?perPage=10000`)
-      .then(r => r.json())
-      .then(data => {
+    
+    async function loadCard() {
+      // First try: listing index (CC cards)
+      try {
+        const listRes = await fetch(`/api/me-listings?perPage=10000`);
+        const data = await listRes.json();
         const found = (data.listings || []).find((l: any) => l.id === cardId || l.ccId === cardId.replace('cc-', ''));
-        setCard(found || null);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+        if (found) {
+          setCard(found);
+          setLoading(false);
+          return;
+        }
+      } catch {}
+
+      // Second try: direct Helius lookup (Artifacte-minted cards)
+      try {
+        const nftRes = await fetch(`/api/nft?mint=${cardId}`);
+        if (nftRes.ok) {
+          const nftData = await nftRes.json();
+          const asset = nftData.result;
+          if (asset) {
+            const attrs = asset.content?.metadata?.attributes || [];
+            const getAttr = (key: string) => attrs.find((a: any) => a.trait_type === key)?.value || "";
+            const isArtifacte = asset.authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+            
+            if (isArtifacte) {
+              setCard({
+                id: asset.id,
+                name: asset.content?.metadata?.name || "Unknown",
+                image: asset.content?.links?.image || "",
+                nftAddress: asset.id,
+                category: "TCG_CARDS",
+                source: "artifacte",
+                grade: getAttr("Condition") === "Graded" ? `${getAttr("Grading Company")} ${getAttr("Grade")}` : getAttr("Condition"),
+                gradeNum: getAttr("Grade") || null,
+                gradingCompany: getAttr("Grading Company") || null,
+                year: getAttr("Year"),
+                ccCategory: getAttr("TCG"),
+                variant: getAttr("Variant"),
+                language: getAttr("Language"),
+                cardName: getAttr("Card Name"),
+                set: getAttr("Set"),
+                cardNumber: getAttr("Card Number"),
+                priceSource: getAttr("Price Source"),
+                priceSourceId: getAttr("Price Source ID"),
+                seller: asset.ownership?.owner,
+                insuredValue: null,
+                vault: null,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      } catch {}
+
+      setLoading(false);
+    }
+    
+    loadCard();
   }, [cardId]);
 
   const handleBuy = async () => {
@@ -178,24 +229,27 @@ export default function CardDetailPage() {
             </div>
 
             {/* Price */}
-            <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-              <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Price</p>
-              <div className="flex items-baseline gap-3 mb-4">
-                <p className="text-white font-serif text-4xl">
-                  {card.currency === 'SOL' ? `◎ ${card.price.toLocaleString()}` : `$${card.price.toLocaleString()}`}
-                </p>
-                <span className="text-gold-500 text-sm font-medium">{card.currency}</span>
-              </div>
-{/* price markup info removed */}
+            {card.source === "artifacte" ? (
+              <ArtifactePriceSection card={card} />
+            ) : (
+              <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+                <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Price</p>
+                <div className="flex items-baseline gap-3 mb-4">
+                  <p className="text-white font-serif text-4xl">
+                    {card.currency === 'SOL' ? `◎ ${card.price?.toLocaleString()}` : `$${card.price?.toLocaleString()}`}
+                  </p>
+                  <span className="text-gold-500 text-sm font-medium">{card.currency}</span>
+                </div>
 
-              <button
-                disabled
-                className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
-              >
-                Buy Now — Coming Soon
-              </button>
-              <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>
-            </div>
+                <button
+                  disabled
+                  className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
+                >
+                  Buy Now — Coming Soon
+                </button>
+                <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>
+              </div>
+            )}
 
             {/* Grading Info */}
             <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
@@ -344,6 +398,39 @@ export default function CardDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactePriceSection({ card }: { card: any }) {
+  const [marketPrice, setMarketPrice] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (card.priceSource === "TCGplayer" && card.priceSourceId) {
+      fetch(`/api/tcgplayer-price?id=${card.priceSourceId}`)
+        .then(r => r.json())
+        .then(d => setMarketPrice(d.marketPrice || d.listedMedianPrice || null))
+        .catch(() => {});
+    }
+  }, [card.priceSource, card.priceSourceId]);
+
+  return (
+    <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+      <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Market Price</p>
+      <div className="flex items-baseline gap-3 mb-2">
+        <p className="text-white font-serif text-4xl">
+          {marketPrice ? `$${marketPrice.toFixed(2)}` : "—"}
+        </p>
+        {card.priceSource && (
+          <span className="text-gold-500 text-xs font-medium">via {card.priceSource}</span>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
+        {card.variant && <span className="bg-dark-700 px-2 py-1 rounded">{card.variant}</span>}
+        {card.language && <span className="bg-dark-700 px-2 py-1 rounded">{card.language}</span>}
+        {card.grade && <span className="bg-dark-700 px-2 py-1 rounded">{card.grade}</span>}
+        <span className="bg-dark-700 px-2 py-1 rounded">Artifacte Collection</span>
       </div>
     </div>
   );
