@@ -104,6 +104,7 @@ export default function PortfolioPage() {
   const [floorPrices, setFloorPrices] = useState<Record<string, { name: string; floor: number }>>({});
   const [digitalCollectiblesValue, setDigitalCollectiblesValue] = useState(0);
   const [digitalNfts, setDigitalNfts] = useState<Array<{ id: string; name: string; image: string; collection: string; floorPrice: number }>>([]);
+  const [artifacteRwaValue, setArtifacteRwaValue] = useState(0);
   
   // Whitelisted collection addresses for digital collectibles
   const WHITELISTED_COLLECTIONS = new Set([
@@ -230,6 +231,7 @@ export default function PortfolioPage() {
             });
 
             // Fetch prices for Artifacte-minted NFTs
+            let totalArtifacteValue = 0;
             for (const item of artifacteItems) {
               let price = 0;
               if (item.priceSource === "TCGplayer" && item.priceSourceId) {
@@ -241,6 +243,7 @@ export default function PortfolioPage() {
                   }
                 } catch {}
               }
+              totalArtifacteValue += price;
               digitalItems.push({
                 id: item.asset.id,
                 name: item.asset.content?.metadata?.name || "Unknown",
@@ -253,6 +256,7 @@ export default function PortfolioPage() {
             if (!cancelled) {
               setDigitalCollectiblesValue(totalDigitalValue);
               setDigitalNfts(digitalItems);
+              setArtifacteRwaValue(totalArtifacteValue);
             }
           }
         }
@@ -364,7 +368,7 @@ export default function PortfolioPage() {
                     RWA Market Value
                   </p>
                   <h2 className="font-serif text-5xl text-gold-400 font-bold mb-2">
-                    {formatFullPrice(pd.totalListedValue || 0)}
+                    {formatFullPrice((pd.totalListedValue || 0) + artifacteRwaValue)}
                   </h2>
                   <p className="text-gray-600 text-xs">
                     Powered by Artifacte Oracle
