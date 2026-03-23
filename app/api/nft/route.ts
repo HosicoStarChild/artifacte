@@ -49,7 +49,9 @@ export async function GET(request: NextRequest) {
         creators: asset.creators || [],
         mint_extensions: asset.mint_extensions || null,
         authorities: asset.authorities || [],
+        attributes: metadata.attributes || [],
       },
+      result: asset, // Raw Helius response for detailed lookups
     });
   } catch (error) {
     console.error("Error fetching NFT:", error);

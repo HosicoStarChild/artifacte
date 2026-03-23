@@ -48,18 +48,18 @@ export default function CardDetailPage() {
         const nftRes = await fetch(`/api/nft?mint=${cardId}`);
         if (nftRes.ok) {
           const nftData = await nftRes.json();
-          const asset = nftData.result;
+          const asset = nftData.result || nftData.nft;
           if (asset) {
-            const attrs = asset.content?.metadata?.attributes || [];
+            const attrs = asset.content?.metadata?.attributes || asset.attributes || [];
             const getAttr = (key: string) => attrs.find((a: any) => a.trait_type === key)?.value || "";
             const isArtifacte = asset.authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
             
             if (isArtifacte) {
               setCard({
-                id: asset.id,
-                name: asset.content?.metadata?.name || "Unknown",
-                image: asset.content?.links?.image || "",
-                nftAddress: asset.id,
+                id: asset.id || asset.mint || cardId,
+                name: asset.content?.metadata?.name || asset.name || "Unknown",
+                image: asset.content?.links?.image || asset.image || "",
+                nftAddress: asset.id || asset.mint || cardId,
                 category: "TCG_CARDS",
                 source: "artifacte",
                 grade: getAttr("Condition") === "Graded" ? `${getAttr("Grading Company")} ${getAttr("Grade")}` : getAttr("Condition"),
