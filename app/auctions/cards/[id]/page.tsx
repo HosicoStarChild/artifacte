@@ -344,12 +344,18 @@ export default function CardDetailPage() {
                 )}
               </div>
               <div className="mt-4 pt-4 border-t border-white/5">
-                <p className="text-gray-400 text-xs leading-relaxed">
-                  📦 Physical card securely stored at {card.vault || 'vault facility'}. After purchase, you own the NFT representing this card. To claim the physical card, redeem via{' '}
-                  <a href="https://collectorcrypt.com" target="_blank" rel="noopener noreferrer" className="text-gold-500 hover:text-gold-400 underline">
-                    Collector Crypt
-                  </a>.
-                </p>
+                {card.source === "artifacte" ? (
+                  <p className="text-gray-400 text-xs leading-relaxed">
+                    📦 Physical card securely stored and custodied by <span className="text-gold-500 font-medium">Artifacte</span>. After purchase, you own the NFT representing this card. To claim the physical card, contact Artifacte for redemption.
+                  </p>
+                ) : (
+                  <p className="text-gray-400 text-xs leading-relaxed">
+                    📦 Physical card securely stored at {card.vault || 'vault facility'}. After purchase, you own the NFT representing this card. To claim the physical card, redeem via{' '}
+                    <a href="https://collectorcrypt.com" target="_blank" rel="noopener noreferrer" className="text-gold-500 hover:text-gold-400 underline">
+                      Collector Crypt
+                    </a>.
+                  </p>
+                )}
               </div>
             </div>
 
