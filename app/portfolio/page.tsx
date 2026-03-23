@@ -105,6 +105,7 @@ export default function PortfolioPage() {
   const [digitalCollectiblesValue, setDigitalCollectiblesValue] = useState(0);
   const [digitalNfts, setDigitalNfts] = useState<Array<{ id: string; name: string; image: string; collection: string; floorPrice: number }>>([]);
   const [artifacteRwaValue, setArtifacteRwaValue] = useState(0);
+  const [artifacteRwaCount, setArtifacteRwaCount] = useState(0);
   
   // Whitelisted collection addresses for digital collectibles
   const WHITELISTED_COLLECTIONS = new Set([
@@ -254,9 +255,13 @@ export default function PortfolioPage() {
             }
 
             if (!cancelled) {
+              // Separate Artifacte RWAs from digital collectibles
+              const realDigital = digitalItems.filter(d => d.collection !== "Artifacte");
+              const artifacteCards = digitalItems.filter(d => d.collection === "Artifacte");
               setDigitalCollectiblesValue(totalDigitalValue);
-              setDigitalNfts(digitalItems);
+              setDigitalNfts(digitalItems); // Keep all for display
               setArtifacteRwaValue(totalArtifacteValue);
+              setArtifacteRwaCount(artifacteCards.length);
             }
           }
         }
@@ -410,14 +415,14 @@ export default function PortfolioPage() {
                 {/* RWAs */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">RWAs</p>
-                  <p className="font-serif text-2xl text-gold-400 font-bold">{pd.totalCards}</p>
-                  <p className="text-gray-600 text-xs mt-1">{pd.listedCards} listed · {pd.unlistedCards} unlisted</p>
+                  <p className="font-serif text-2xl text-gold-400 font-bold">{pd.totalCards + artifacteRwaCount}</p>
+                  <p className="text-gray-600 text-xs mt-1">{pd.totalCards > 0 ? `${pd.listedCards} listed · ${pd.unlistedCards} unlisted` : ""}{artifacteRwaCount > 0 ? `${pd.totalCards > 0 ? " · " : ""}${artifacteRwaCount} Artifacte` : ""}</p>
                 </div>
 
                 {/* Digital Collectibles */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Digital Collectibles</p>
-                  <p className="font-serif text-2xl text-blue-400 font-bold">{digitalNfts.length}</p>
+                  <p className="font-serif text-2xl text-blue-400 font-bold">{digitalNfts.filter(d => d.collection !== "Artifacte").length}</p>
                   <p className="text-gray-600 text-xs mt-1">In wallet</p>
                 </div>
 
@@ -431,7 +436,7 @@ export default function PortfolioPage() {
                 {/* Total Portfolio */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
-                  <p className="font-serif text-2xl text-white font-bold">{pd.totalCards + digitalNfts.length}</p>
+                  <p className="font-serif text-2xl text-white font-bold">{pd.totalCards + artifacteRwaCount + digitalNfts.filter(d => d.collection !== "Artifacte").length}</p>
                   <p className="text-gray-600 text-xs mt-1">RWAs + Digital Collectibles</p>
                 </div>
               </div>
