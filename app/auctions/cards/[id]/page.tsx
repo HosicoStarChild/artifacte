@@ -35,7 +35,7 @@ export default function CardDetailPage() {
       try {
         const listRes = await fetch(`/api/me-listings?perPage=10000`);
         const data = await listRes.json();
-        const found = (data.listings || []).find((l: any) => l.id === cardId || l.ccId === cardId.replace('cc-', ''));
+        const found = (data.listings || []).find((l: any) => l.id === cardId || l.nftAddress === cardId || l.ccId === cardId.replace('cc-', ''));
         if (found) {
           setCard(found);
           setLoading(false);

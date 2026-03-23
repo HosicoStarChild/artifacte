@@ -582,7 +582,7 @@ export default function PortfolioPage() {
               {filteredCards.map((card) => (
                 <div
                   key={card.nftAddress}
-                  onClick={() => window.location.href = `/auctions/cards/${(card as any).ccId ? `cc-${(card as any).ccId}` : card.nftAddress}`}
+                  onClick={() => window.location.href = `/auctions/cards/${card.nftAddress}`}
                   className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer"
                 >
                   {/* Card Image */}
