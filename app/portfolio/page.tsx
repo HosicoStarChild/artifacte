@@ -188,6 +188,25 @@ export default function PortfolioPage() {
                 const auth = (asset as any).authorities?.find((a: any) => WHITELISTED_COLLECTIONS.has(a.address));
                 matchedAddress = auth?.address;
               }
+              // Check for Artifacte-minted NFTs (admin wallet as creator/authority)
+              const isArtifacte = !matchedAddress && (
+                (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
+                (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
+              );
+              if (isArtifacte) {
+                // Artifacte-minted NFT — get value from Price Source attribute
+                const attrs = (asset.content?.metadata as any)?.attributes || [];
+                const priceSource = attrs.find((a: any) => a.trait_type === "Price Source")?.value;
+                const priceSourceId = attrs.find((a: any) => a.trait_type === "Price Source ID")?.value;
+                digitalItems.push({
+                  id: asset.id,
+                  name: asset.content?.metadata?.name || "Unknown",
+                  image: asset.content?.links?.image || "",
+                  collection: "Artifacte",
+                  floorPrice: 0, // TODO: fetch from Price Source
+                });
+                return;
+              }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
                 const fp = localFloorPrices[matchedAddress];
                 const floor = fp?.floor || 0;
