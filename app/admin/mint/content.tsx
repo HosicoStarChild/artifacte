@@ -3,7 +3,7 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { ADMIN_WALLET } from "@/lib/data";
+import { ADMIN_WALLET, ARTIFACTE_COLLECTION } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
 import { createV1, createCollectionV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
@@ -207,7 +207,7 @@ function MintFormInner() {
   const { connection } = useConnection();
   const [minting, setMinting] = useState(false);
   const [mintResult, setMintResult] = useState<string | null>(null);
-  const [collectionAddress, setCollectionAddress] = useState("");
+  const [collectionAddress, setCollectionAddress] = useState(ARTIFACTE_COLLECTION || "");
   const [creatingCollection, setCreatingCollection] = useState(false);
 
   const handleCreateCollection = async () => {
