@@ -509,8 +509,13 @@ export function MintContent() {
       );
     }
 
-    // Add pricing info
-    metadata.attributes.push(
+    // Price source mapping
+    if (formData.priceSource !== "None" && formData.priceSourceId) {
+      metadata.attributes.push(
+        { trait_type: "Price Source", value: formData.priceSource },
+        { trait_type: "Price Source ID", value: formData.priceSourceId }
+      );
+    }
     return metadata;
   };
 
