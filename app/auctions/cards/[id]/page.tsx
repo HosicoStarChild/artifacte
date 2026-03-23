@@ -53,6 +53,9 @@ export default function CardDetailPage() {
             const attrs = asset.content?.metadata?.attributes || asset.attributes || [];
             const getAttr = (key: string) => attrs.find((a: any) => a.trait_type === key)?.value || "";
             const isArtifacte = asset.authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+            const ccCollection = asset.grouping?.find((g: any) => g.group_value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") || 
+                                 asset.collection === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
+            const isCC = !!ccCollection;
             
             if (isArtifacte) {
               setCard({
@@ -77,6 +80,29 @@ export default function CardDetailPage() {
                 seller: asset.ownership?.owner,
                 insuredValue: null,
                 vault: null,
+              });
+              setLoading(false);
+              return;
+            }
+
+            if (isCC) {
+              const ccName = asset.content?.metadata?.name || asset.name || "Unknown";
+              setCard({
+                id: asset.id || asset.mint || cardId,
+                name: ccName,
+                image: asset.content?.links?.image || asset.image || "",
+                nftAddress: asset.id || asset.mint || cardId,
+                category: "TCG_CARDS",
+                source: "collector-crypt",
+                grade: `${getAttr("Grading Company")} ${getAttr("The Grade") || getAttr("GradeNum")}`.trim(),
+                gradeNum: getAttr("GradeNum") || null,
+                gradingCompany: getAttr("Grading Company") || null,
+                year: getAttr("Year"),
+                ccCategory: getAttr("Category"),
+                insuredValue: getAttr("Insured Value") ? parseInt(getAttr("Insured Value")) : null,
+                vault: getAttr("Vault"),
+                seller: asset.ownership?.owner || (asset as any).owner,
+                subtitle: `${getAttr("Category")} • ${getAttr("Grading Company")} ${getAttr("GradeNum")} • ${getAttr("Vault") || "Vault"}`,
               });
               setLoading(false);
               return;
