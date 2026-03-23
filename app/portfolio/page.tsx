@@ -103,7 +103,7 @@ export default function PortfolioPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [floorPrices, setFloorPrices] = useState<Record<string, { name: string; floor: number }>>({});
   const [digitalCollectiblesValue, setDigitalCollectiblesValue] = useState(0);
-  const [digitalNfts, setDigitalNfts] = useState<Array<{ id: string; name: string; image: string; collection: string; floorPrice: number }>>([]);
+  const [digitalNfts, setDigitalNfts] = useState<Array<{ id: string; name: string; image: string; collection: string; floorPrice: number; tcg?: string }>>([]);
   const [artifacteRwaValue, setArtifacteRwaValue] = useState(0);
   const [artifacteRwaCount, setArtifacteRwaCount] = useState(0);
   
@@ -180,7 +180,7 @@ export default function PortfolioPage() {
             // Build digital NFTs list with floor prices
             let totalDigitalValue = 0;
             const digitalItems: typeof digitalNfts = [];
-            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string }[] = [];
+            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string; tcg: string }[] = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
               // Match by collection grouping (standard) or authority (WNS/Token-2022)
@@ -202,7 +202,8 @@ export default function PortfolioPage() {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const priceSource = attrs.find((a: any) => a.trait_type === "Price Source")?.value;
                 const priceSourceId = attrs.find((a: any) => a.trait_type === "Price Source ID")?.value;
-                artifacteItems.push({ asset, priceSource, priceSourceId });
+                const tcgName = attrs.find((a: any) => a.trait_type === "TCG")?.value || "Other";
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
@@ -247,10 +248,11 @@ export default function PortfolioPage() {
               totalArtifacteValue += price;
               digitalItems.push({
                 id: item.asset.id,
-                name: item.asset.content?.metadata?.name || "Unknown",
-                image: item.asset.content?.links?.image || "",
+                name: item.asset.content?.metadata?.name || item.asset.name || "Unknown",
+                image: item.asset.content?.links?.image || item.asset.image || "",
                 collection: "Artifacte",
-                floorPrice: price, // USD value from TCGplayer
+                floorPrice: price,
+                tcg: item.tcg,
               });
             }
 
@@ -451,8 +453,7 @@ export default function PortfolioPage() {
                 if (artifacteRwaValue > 0) {
                   const artifacteCards = digitalNfts.filter(d => d.collection === "Artifacte" && d.floorPrice > 0);
                   for (const card of artifacteCards) {
-                    // Group by collection name for now — could parse TCG from attributes later
-                    const cat = "Artifacte TCG";
+                    const cat = `Artifacte ${card.tcg || "Other"}`;
                     catValues[cat] = (catValues[cat] || 0) + card.floorPrice;
                   }
                 }
