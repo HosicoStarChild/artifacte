@@ -253,7 +253,7 @@ export default function CardDetailPage() {
 
             {/* Grading Info */}
             <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-              <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">Grading Details</h3>
+              <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">{card.source === "artifacte" && card.condition !== "Graded" ? "Card Details" : "Grading Details"}</h3>
               <div className="grid grid-cols-2 gap-4">
                 {card.gradingCompany && (
                   <div>
@@ -267,10 +267,10 @@ export default function CardDetailPage() {
                     <p className="text-white text-sm font-medium">{card.grade}</p>
                   </div>
                 )}
-                {card.gradeNum !== undefined && (
+                {(card.gradeNum !== undefined || card.source === "artifacte") && (
                   <div>
                     <p className="text-gray-500 text-xs mb-1">Grade Number</p>
-                    <p className="text-white text-sm font-medium">{card.gradeNum}</p>
+                    <p className="text-white text-sm font-medium">{card.gradeNum || (card.condition === "Graded" ? card.grade : "Ungraded")}</p>
                   </div>
                 )}
                 {card.year && (
