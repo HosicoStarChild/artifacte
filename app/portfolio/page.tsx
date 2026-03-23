@@ -680,7 +680,15 @@ export default function PortfolioPage() {
                     <div key={nft.id} onClick={() => { if (nft.collection === "Artifacte") window.location.href = `/auctions/cards/${nft.id}`; }} className={`bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group ${nft.collection === "Artifacte" ? "cursor-pointer" : ""}`}>
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
-                          <img src={nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          <img src={(() => {
+                            let u = nft.image;
+                            if (u.includes("nftstorage.link/") || u.includes("/ipfs/") || u.startsWith("ipfs://")) {
+                              if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://nftstorage.link/ipfs/");
+                              return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                            }
+                            if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                            return u;
+                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>
                         )}
