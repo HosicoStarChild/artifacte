@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { ADMIN_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { createV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
+import { createV1, createCollectionV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 
@@ -207,6 +207,55 @@ function MintFormInner() {
   const { connection } = useConnection();
   const [minting, setMinting] = useState(false);
   const [mintResult, setMintResult] = useState<string | null>(null);
+  const [collectionAddress, setCollectionAddress] = useState("");
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
+  const handleCreateCollection = async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) return;
+    setCreatingCollection(true);
+    setMintResult(null);
+    try {
+      const umi = createUmi(connection.rpcEndpoint)
+        .use(walletAdapterIdentity(wallet))
+        .use(irysUploader());
+
+      const collectionMeta = {
+        name: "Artifacte",
+        symbol: "ARTF",
+        description: "Artifacte — RWA tokenized collectibles on Solana. Trading cards, sealed products, and more.",
+        image: "",
+        external_url: "https://artifacte.io",
+      };
+
+      setMintResult("⏳ Uploading collection metadata...");
+      const metadataUri = await umi.uploader.uploadJson(collectionMeta);
+
+      setMintResult("⏳ Creating collection on-chain...");
+      const collection = generateSigner(umi);
+
+      await createCollectionV1(umi, {
+        collection,
+        name: "Artifacte",
+        uri: metadataUri,
+        plugins: [
+          pluginAuthorityPair({
+            type: "Royalties",
+            data: {
+              basisPoints: 500,
+              creators: [{ address: umi.identity.publicKey, percentage: 100 }],
+              ruleSet: ruleSet("None"),
+            },
+          }),
+        ],
+      }).sendAndConfirm(umi);
+
+      setCollectionAddress(collection.publicKey.toString());
+      setMintResult(`✅ Collection created!\nAddress: ${collection.publicKey}\n\nSave this address!`);
+    } catch (err: any) {
+      setMintResult(`❌ Error: ${err.message}`);
+    }
+    setCreatingCollection(false);
+  };
 
   const handleMint = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
@@ -248,7 +297,7 @@ function MintFormInner() {
       setMintResult("⏳ Creating NFT on-chain...");
       const asset = generateSigner(umi);
 
-      const tx = await createV1(umi, {
+      const createArgs: any = {
         asset,
         name: formData.name.slice(0, 32),
         uri: metadataUri,
@@ -263,7 +312,14 @@ function MintFormInner() {
             },
           }),
         ],
-      }).sendAndConfirm(umi);
+      };
+
+      // Assign to collection if set
+      if (collectionAddress) {
+        createArgs.collection = umiPublicKey(collectionAddress);
+      }
+
+      const tx = await createV1(umi, createArgs).sendAndConfirm(umi);
 
       const sig = Buffer.from(tx.signature).toString("base64");
       setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${sig}`);
@@ -280,6 +336,21 @@ function MintFormInner() {
       {/* Form */}
       <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
         <h3 className="font-serif text-xl font-bold text-white mb-6">Mint New NFT</h3>
+        
+        {/* Collection */}
+        <div className="mb-6 p-4 bg-dark-700 rounded-lg border border-white/5">
+          <h4 className="text-gold-400 font-semibold mb-2">Collection</h4>
+          <div className="flex gap-2 mb-2">
+            <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-gold-500" placeholder="Collection address (create one first)" />
+          </div>
+          {!collectionAddress && (
+            <button onClick={handleCreateCollection} disabled={creatingCollection} className={`w-full py-2 rounded-lg text-xs font-medium transition ${creatingCollection ? "bg-gray-700 text-gray-500" : "bg-gold-500/20 border border-gold-500/50 text-gold-400 hover:bg-gold-500/30"}`}>
+              {creatingCollection ? "Creating..." : "Create Artifacte Collection (one-time)"}
+            </button>
+          )}
+          {collectionAddress && <p className="text-green-400 text-xs">✅ Collection set</p>}
+        </div>
+
         {/* Basic Info */}
         <div className="mb-6">
           <h4 className="text-gold-400 font-semibold mb-3">Basic Info</h4>
