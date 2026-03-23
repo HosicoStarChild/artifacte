@@ -259,21 +259,28 @@ export default function CardDetailPage() {
               <ArtifactePriceSection card={card} />
             ) : (
               <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Price</p>
+                <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">{card.price ? "Price" : "Status"}</p>
                 <div className="flex items-baseline gap-3 mb-4">
                   <p className="text-white font-serif text-4xl">
-                    {card.currency === 'SOL' ? `◎ ${card.price?.toLocaleString()}` : `$${card.price?.toLocaleString()}`}
+                    {card.price 
+                      ? (card.currency === 'SOL' ? `◎ ${card.price.toLocaleString()}` : `$${card.price.toLocaleString()}`)
+                      : "Unlisted"
+                    }
                   </p>
-                  <span className="text-gold-500 text-sm font-medium">{card.currency}</span>
+                  {card.price && <span className="text-gold-500 text-sm font-medium">{card.currency}</span>}
                 </div>
 
-                <button
-                  disabled
-                  className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
-                >
-                  Buy Now — Coming Soon
-                </button>
-                <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>
+                {card.price ? (
+                  <button
+                    disabled
+                    className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
+                  >
+                    Buy Now — Coming Soon
+                  </button>
+                ) : (
+                  <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
+                )}
+                {card.price && <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>}
               </div>
             )}
 
