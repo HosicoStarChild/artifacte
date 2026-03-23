@@ -679,8 +679,7 @@ export default function PortfolioPage() {
                   {digitalNfts.map((nft) => (
                     <div key={nft.id} onClick={() => {
                       if (nft.collection === "Artifacte") window.location.href = `/auctions/cards/${nft.id}`;
-                      else window.open(`https://solscan.io/token/${nft.id}`, '_blank');
-                    }} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group cursor-pointer">
+                    }} className={`bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group ${nft.collection === "Artifacte" ? "cursor-pointer" : ""}`}>
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
                           <img src={(() => {
