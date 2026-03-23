@@ -443,9 +443,18 @@ export default function PortfolioPage() {
 
               {/* Portfolio Value by Category (Oracle) */}
               {(() => {
-                const catValues = { ...(portfolioData?.marketCategoriesByValue || {}) };
+                const catValues: Record<string, number> = { ...(portfolioData?.marketCategoriesByValue || {}) };
                 if (digitalCollectiblesValue > 0) {
                   catValues["Digital Collectibles"] = digitalCollectiblesValue;
+                }
+                // Add Artifacte RWA values by TCG category
+                if (artifacteRwaValue > 0) {
+                  const artifacteCards = digitalNfts.filter(d => d.collection === "Artifacte" && d.floorPrice > 0);
+                  for (const card of artifacteCards) {
+                    // Group by collection name for now — could parse TCG from attributes later
+                    const cat = "Artifacte TCG";
+                    catValues[cat] = (catValues[cat] || 0) + card.floorPrice;
+                  }
                 }
                 const maxVal = Math.max(...Object.values(catValues), 1);
                 return Object.keys(catValues).length > 0 ? (
@@ -466,7 +475,7 @@ export default function PortfolioPage() {
                             <div className="flex justify-between items-center mb-2">
                               <p className="text-sm text-gray-300">{category}</p>
                               <p className={`text-xs font-semibold ${category === "Digital Collectibles" ? "text-blue-400" : "text-gold-400"}`}>
-                                {category === "Digital Collectibles" ? formatSolPrice(value) : formatCurrency(value)}
+                                {category === "Digital Collectibles" ? formatSolPrice(value) : category.startsWith("Artifacte") ? `$${value.toFixed(2)}` : formatCurrency(value)}
                               </p>
                             </div>
                             <div className="w-full bg-dark-900 rounded-full h-2">
