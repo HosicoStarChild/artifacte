@@ -32,6 +32,11 @@ interface MintFormData {
   sealedLanguage: "English" | "Japanese" | "Chinese" | "Korean" | "French" | "German";
   sealedTcg: "Pokemon" | "One Piece" | "Dragon Ball" | "Yu-Gi-Oh" | "Sports" | "Other";
 
+  // Price Source
+  priceSource: "Alt.xyz" | "TCGplayer" | "None";
+  priceSourceId: string;
+  priceSourceName: string; // display name from search result
+
   // Images
   frontImage: File | null;
   frontImagePreview: string;
@@ -68,12 +73,67 @@ function MintFormInner() {
     sealedYear: "",
     sealedLanguage: "English",
     sealedTcg: "Pokemon",
+    priceSource: "Alt.xyz",
+    priceSourceId: "",
+    priceSourceName: "",
     frontImage: null,
     frontImagePreview: "",
     backImage: null,
     backImagePreview: "",
     recipientWallet: "",
   });
+
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // Search Alt.xyz / TCGplayer for matching cards
+  const handlePriceSourceSearch = async () => {
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const query = [formData.cardName, formData.variant, formData.set, formData.tcg, formData.language, formData.condition === "Graded" ? `${formData.gradingCompany} ${formData.grade}` : ""].filter(Boolean).join(" ");
+      
+      if (formData.priceSource === "Alt.xyz") {
+        const res = await fetch(`/api/oracle?endpoint=search&q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const variants = data.variants || [];
+          setSearchResults(variants.slice(0, 10).map((v: any) => ({
+            id: v.assetId,
+            name: v.name || v.subject,
+            variety: v.variety,
+            language: v.language,
+            price: v.price ? `$${(v.price / 100).toFixed(0)}` : "—",
+          })));
+        }
+      } else if (formData.priceSource === "TCGplayer") {
+        const tcgQuery = [formData.cardName, formData.set, formData.tcg].filter(Boolean).join(" ");
+        const res = await fetch(`/api/oracle?endpoint=tcgplayer-search&q=${encodeURIComponent(tcgQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults((data.results || []).slice(0, 10).map((r: any) => ({
+            id: r.productId?.toString(),
+            name: r.name,
+            variety: r.printingType || r.variant || "",
+            language: "",
+            price: r.marketPrice ? `$${r.marketPrice.toFixed(2)}` : "—",
+          })));
+        }
+      }
+    } catch (e) {
+      console.error("Price source search failed:", e);
+    }
+    setSearching(false);
+  };
+
+  const selectPriceSource = (result: any) => {
+    setFormData(prev => ({
+      ...prev,
+      priceSourceId: result.id,
+      priceSourceName: `${result.name} ${result.variety ? `[${result.variety}]` : ""} ${result.price}`.trim(),
+    }));
+    setSearchResults([]);
+  };
 
   // Auto-generate name when relevant fields change
   useEffect(() => {
@@ -127,7 +187,13 @@ function MintFormInner() {
         { trait_type: "Language", value: formData.sealedLanguage }, { trait_type: "TCG", value: formData.sealedTcg }
       );
     }
-    // No pricing attributes — pricing set at listing time
+    // Price source mapping
+    if (formData.priceSource !== "None" && formData.priceSourceId) {
+      metadata.attributes.push(
+        { trait_type: "Price Source", value: formData.priceSource },
+        { trait_type: "Price Source ID", value: formData.priceSourceId }
+      );
+    }
     return metadata;
   };
 
@@ -205,6 +271,43 @@ function MintFormInner() {
           </div>
         )}
 
+        {/* Price Source */}
+        <div className="mb-6">
+          <h4 className="text-gold-400 font-semibold mb-3">Price Source</h4>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Source</label>
+              <select value={formData.priceSource} onChange={(e) => setFormData(prev => ({ ...prev, priceSource: e.target.value as any, priceSourceId: "", priceSourceName: "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+                <option value="Alt.xyz">Alt.xyz (Graded)</option>
+                <option value="TCGplayer">TCGplayer (Ungraded/Sealed)</option>
+                <option value="None">None</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Source ID</label>
+              <input type="text" value={formData.priceSourceId} onChange={(e) => setFormData(prev => ({ ...prev, priceSourceId: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-gold-500" placeholder="Auto-filled from search" />
+            </div>
+          </div>
+          {formData.priceSourceName && (
+            <div className="mb-3 px-3 py-2 bg-green-900/20 border border-green-700/30 rounded-lg text-green-400 text-xs">✅ {formData.priceSourceName}</div>
+          )}
+          {formData.priceSource !== "None" && (
+            <button type="button" onClick={handlePriceSourceSearch} disabled={searching || !formData.cardName} className={`w-full py-2 rounded-lg text-sm font-medium transition ${searching || !formData.cardName ? "bg-gray-700 text-gray-500 cursor-not-allowed" : "bg-dark-700 border border-gold-500/50 text-gold-400 hover:bg-dark-600"}`}>
+              {searching ? "Searching..." : `Search ${formData.priceSource}`}
+            </button>
+          )}
+          {searchResults.length > 0 && (
+            <div className="mt-3 border border-white/10 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+              {searchResults.map((r, i) => (
+                <button key={i} onClick={() => selectPriceSource(r)} className="w-full text-left px-3 py-2 hover:bg-dark-700 border-b border-white/5 last:border-0 transition">
+                  <div className="text-white text-xs font-medium truncate">{r.name}</div>
+                  <div className="text-gray-400 text-xs">{r.variety} {r.language ? `• ${r.language}` : ""} {r.price ? `• ${r.price}` : ""}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Images */}
         <div className="mb-6">
           <h4 className="text-gold-400 font-semibold mb-3">Images</h4>
@@ -264,6 +367,9 @@ export function MintContent() {
     sealedYear: "",
     sealedLanguage: "English",
     sealedTcg: "Pokemon",
+    priceSource: "Alt.xyz",
+    priceSourceId: "",
+    priceSourceName: "",
     frontImage: null,
     frontImagePreview: "",
     backImage: null,
