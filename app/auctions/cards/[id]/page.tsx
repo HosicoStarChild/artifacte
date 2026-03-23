@@ -235,7 +235,14 @@ export default function CardDetailPage() {
           {/* Left: Image */}
           <div className="bg-dark-800 rounded-xl border border-white/5 p-6 flex items-start justify-center self-start lg:sticky lg:top-28">
             <img
-              src={card.image}
+              src={(() => {
+                let u = card.image || '';
+                if (u.includes('arweave.net/') || u.includes('nftstorage.link/') || u.includes('/ipfs/') || u.startsWith('ipfs://')) {
+                  if (u.startsWith('ipfs://')) u = u.replace('ipfs://', 'https://nftstorage.link/ipfs/');
+                  return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                }
+                return u;
+              })()}
               alt={card.name}
               className="max-h-[500px] w-auto object-contain rounded-lg"
               onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
