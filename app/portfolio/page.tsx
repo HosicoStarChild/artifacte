@@ -178,6 +178,7 @@ export default function PortfolioPage() {
             // Build digital NFTs list with floor prices
             let totalDigitalValue = 0;
             const digitalItems: typeof digitalNfts = [];
+            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string }[] = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
               // Match by collection grouping (standard) or authority (WNS/Token-2022)
@@ -194,17 +195,10 @@ export default function PortfolioPage() {
                 (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
               );
               if (isArtifacte) {
-                // Artifacte-minted NFT — get value from Price Source attribute
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const priceSource = attrs.find((a: any) => a.trait_type === "Price Source")?.value;
                 const priceSourceId = attrs.find((a: any) => a.trait_type === "Price Source ID")?.value;
-                digitalItems.push({
-                  id: asset.id,
-                  name: asset.content?.metadata?.name || "Unknown",
-                  image: asset.content?.links?.image || "",
-                  collection: "Artifacte",
-                  floorPrice: 0, // TODO: fetch from Price Source
-                });
+                artifacteItems.push({ asset, priceSource, priceSourceId });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
@@ -232,6 +226,31 @@ export default function PortfolioPage() {
                 });
               }
             });
+
+            // Fetch prices for Artifacte-minted NFTs
+            for (const item of artifacteItems) {
+              let price = 0;
+              if (item.priceSource === "TCGplayer" && item.priceSourceId) {
+                try {
+                  const tcgRes = await fetch(`https://mpapi.tcgplayer.com/v2/product/${item.priceSourceId}/pricepoints`);
+                  if (tcgRes.ok) {
+                    const tcgData = await tcgRes.json();
+                    // Find NM Foil or NM Normal price
+                    const pp = tcgData.find((p: any) => p.printingType === "Foil" && p.condition === "Near Mint") 
+                      || tcgData.find((p: any) => p.condition === "Near Mint")
+                      || tcgData[0];
+                    price = pp?.marketPrice || pp?.listedMedianPrice || 0;
+                  }
+                } catch {}
+              }
+              digitalItems.push({
+                id: item.asset.id,
+                name: item.asset.content?.metadata?.name || "Unknown",
+                image: item.asset.content?.links?.image || "",
+                collection: "Artifacte",
+                floorPrice: price, // USD value from TCGplayer
+              });
+            }
 
             if (!cancelled) {
               setDigitalCollectiblesValue(totalDigitalValue);
@@ -665,8 +684,8 @@ export default function PortfolioPage() {
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
                         <p className="text-gray-500 text-[10px] mt-1">{nft.collection}</p>
                         <div className="mt-3">
-                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Floor Price</p>
-                          <p className="text-blue-400 font-serif text-lg font-bold">◎ {nft.floorPrice.toFixed(2)}</p>
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">{nft.collection === "Artifacte" ? "Market Price" : "Floor Price"}</p>
+                          <p className="text-blue-400 font-serif text-lg font-bold">{nft.collection === "Artifacte" ? `$${nft.floorPrice.toFixed(2)}` : `◎ ${nft.floorPrice.toFixed(2)}`}</p>
                         </div>
                       </div>
                     </div>
