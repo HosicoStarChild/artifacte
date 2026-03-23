@@ -369,19 +369,8 @@ export default function CardDetailPage() {
               nftAddress={card.nftAddress}
             />
             )}
-            {card.priceSource === 'TCGplayer' && (
-              <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">Market Price</h3>
-                <p className="text-gray-400 text-xs mb-2">Current market price sourced from TCGplayer</p>
-                <a 
-                  href={`https://www.tcgplayer.com/product/${card.priceSourceId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gold-500 hover:text-gold-400 text-xs transition"
-                >
-                  View on TCGplayer →
-                </a>
-              </div>
+            {card.priceSource === 'TCGplayer' && card.priceSourceId && (
+              <TcgPlayerPriceBox productId={card.priceSourceId} />
             )}
 
             {/* NFT Details */}
@@ -419,6 +408,27 @@ export default function CardDetailPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TcgPlayerPriceBox({ productId }: { productId: string }) {
+  const [price, setPrice] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/tcgplayer-price?id=${productId}`)
+      .then(r => r.json())
+      .then(d => setPrice(d.marketPrice || d.listedMedianPrice || null))
+      .catch(() => {});
+  }, [productId]);
+
+  return (
+    <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+      <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">Market Price</h3>
+      <p className="text-white font-serif text-3xl font-bold mb-1">
+        {price ? `$${price.toFixed(2)}` : "Loading..."}
+      </p>
+      <p className="text-gray-500 text-xs">Current market price per TCGplayer</p>
     </div>
   );
 }
