@@ -665,20 +665,7 @@ export default function PortfolioPage() {
                       {card.vault && ` • ${card.vault}`}
                     </p>
 
-                    {/* Alt.xyz Research Link */}
-                    {card.altResearchUrl && (
-                      <a
-                        href={card.altResearchUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                        View Market Data on Alt.xyz
-                      </a>
-                    )}
+
                   </div>
                 </div>
               ))}
