@@ -47,6 +47,214 @@ interface MintFormData {
   recipientWallet: string;
 }
 
+/** Embeddable form content (no auth check, no page wrapper) — used by admin tab */
+export function MintFormContent() {
+  return <MintFormInner />;
+}
+
+function MintFormInner() {
+  const [formData, setFormData] = useState<MintFormData>({
+    type: "Card",
+    tcg: "Pokemon",
+    name: "",
+    cardName: "",
+    set: "",
+    cardNumber: "",
+    year: "",
+    language: "English",
+    variant: "",
+    condition: "Near Mint",
+    gradingCompany: "PSA",
+    grade: "",
+    gradeLabel: "",
+    certNumber: "",
+    productName: "",
+    sealedSet: "",
+    sealedYear: "",
+    sealedLanguage: "English",
+    sealedTcg: "Pokemon",
+    listingType: "Fixed Price",
+    startingPrice: "",
+    currency: "USD1",
+    frontImage: null,
+    frontImagePreview: "",
+    backImage: null,
+    backImagePreview: "",
+    recipientWallet: "",
+  });
+
+  // Auto-generate name when relevant fields change
+  useEffect(() => {
+    let generatedName = "";
+    if (formData.type === "Card") {
+      if (formData.condition === "Graded") {
+        generatedName = [formData.year, formData.cardName, formData.variant, formData.cardNumber ? `#${formData.cardNumber}` : "", formData.gradingCompany, formData.grade, formData.language, formData.set, formData.tcg].filter(Boolean).join(" ");
+      } else {
+        generatedName = [formData.year, formData.cardName, formData.variant, formData.cardNumber ? `#${formData.cardNumber}` : "", formData.condition, formData.language, formData.set, formData.tcg].filter(Boolean).join(" ");
+      }
+    } else {
+      generatedName = [formData.sealedYear, formData.sealedTcg, formData.sealedSet, formData.productName, formData.sealedLanguage].filter(Boolean).join(" ");
+    }
+    setFormData(prev => ({ ...prev, name: generatedName }));
+  }, [formData.type, formData.year, formData.cardName, formData.variant, formData.cardNumber, formData.condition, formData.gradingCompany, formData.grade, formData.language, formData.set, formData.tcg, formData.productName, formData.sealedSet, formData.sealedYear, formData.sealedLanguage, formData.sealedTcg]);
+
+  const handleImageUpload = (field: 'frontImage' | 'backImage') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const previewField = field === 'frontImage' ? 'frontImagePreview' : 'backImagePreview';
+        setFormData(prev => ({ ...prev, [field]: file, [previewField]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const generateMetadata = () => {
+    const metadata: Record<string, any> = {
+      name: formData.name, description: `${formData.type} listed on Artifacte`, image: formData.frontImagePreview || "", symbol: "Artifacte",
+      attributes: [], properties: { category: "Trading Card", creators: [{ address: ADMIN_WALLET, share: 100 }] }
+    };
+    if (formData.type === "Card") {
+      metadata.attributes.push(
+        { trait_type: "Type", value: "Card" }, { trait_type: "TCG", value: formData.tcg }, { trait_type: "Card Name", value: formData.cardName },
+        { trait_type: "Set", value: formData.set }, { trait_type: "Card Number", value: formData.cardNumber },
+        { trait_type: "Year", value: formData.year?.toString() || "" }, { trait_type: "Language", value: formData.language },
+        { trait_type: "Variant", value: formData.variant }, { trait_type: "Condition", value: formData.condition }
+      );
+      if (formData.condition === "Graded") {
+        metadata.attributes.push(
+          { trait_type: "Grading Company", value: formData.gradingCompany }, { trait_type: "Grade", value: formData.grade },
+          { trait_type: "Grade Label", value: formData.gradeLabel }, { trait_type: "Cert Number", value: formData.certNumber }
+        );
+      }
+    } else {
+      metadata.attributes.push(
+        { trait_type: "Type", value: "Sealed" }, { trait_type: "Product Name", value: formData.productName },
+        { trait_type: "Set", value: formData.sealedSet }, { trait_type: "Year", value: formData.sealedYear?.toString() || "" },
+        { trait_type: "Language", value: formData.sealedLanguage }, { trait_type: "TCG", value: formData.sealedTcg }
+      );
+    }
+    metadata.attributes.push({ trait_type: "Listing Type", value: formData.listingType }, { trait_type: "Starting Price", value: formData.startingPrice?.toString() || "" }, { trait_type: "Currency", value: formData.currency });
+    return metadata;
+  };
+
+  const handleMint = () => { alert("Ready to mint!\n\n" + JSON.stringify(generateMetadata(), null, 2)); };
+
+  // Reuse the same JSX but without the page wrapper
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Form */}
+      <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+        <h3 className="font-serif text-xl font-bold text-white mb-6">Mint New NFT</h3>
+        {/* Basic Info */}
+        <div className="mb-6">
+          <h4 className="text-gold-400 font-semibold mb-3">Basic Info</h4>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Type</label>
+              <select value={formData.type} onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+                <option value="Card">Card</option><option value="Sealed Product">Sealed Product</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">TCG</label>
+              <select value={formData.tcg} onChange={(e) => setFormData(prev => ({ ...prev, tcg: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+                <option value="Pokemon">Pokemon</option><option value="One Piece">One Piece</option><option value="Dragon Ball">Dragon Ball</option><option value="Yu-Gi-Oh">Yu-Gi-Oh</option><option value="Sports">Sports</option><option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Auto-Generated Name</label>
+            <input type="text" value={formData.name} readOnly className="w-full bg-dark-700 border border-white/10 rounded-lg px-3 py-2 text-gray-300 text-sm cursor-not-allowed" />
+          </div>
+        </div>
+        {/* Card Details */}
+        {formData.type === "Card" && (
+          <div className="mb-6">
+            <h4 className="text-gold-400 font-semibold mb-3">Card Details</h4>
+            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Card Name</label><input type="text" value={formData.cardName} onChange={(e) => setFormData(prev => ({ ...prev, cardName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Monkey D. Luffy" /></div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.set} onChange={(e) => setFormData(prev => ({ ...prev, set: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. OP09" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Card Number</label><input type="text" value={formData.cardNumber} onChange={(e) => setFormData(prev => ({ ...prev, cardNumber: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. 051" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.year} onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Language</label><select value={formData.language} onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="English">English</option><option value="Japanese">Japanese</option><option value="Chinese">Chinese</option><option value="Korean">Korean</option><option value="French">French</option><option value="German">German</option></select></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="block text-sm text-gray-400 mb-1">Variant</label><input type="text" value={formData.variant} onChange={(e) => setFormData(prev => ({ ...prev, variant: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Manga Alternate Art" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Condition</label><select value={formData.condition} onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="Graded">Graded</option><option value="Near Mint">Near Mint</option><option value="Lightly Played">Lightly Played</option><option value="Moderately Played">Moderately Played</option><option value="Heavily Played">Heavily Played</option></select></div>
+            </div>
+            {formData.condition === "Graded" && (
+              <div className="bg-dark-700 rounded-lg p-4 border border-white/5">
+                <h5 className="text-gold-400 font-medium mb-2 text-sm">Grading Details</h5>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div><label className="block text-xs text-gray-400 mb-1">Company</label><select value={formData.gradingCompany} onChange={(e) => setFormData(prev => ({ ...prev, gradingCompany: e.target.value as any }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="PSA">PSA</option><option value="BGS">BGS</option><option value="CGC">CGC</option></select></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Grade</label><input type="text" value={formData.grade} onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="10" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs text-gray-400 mb-1">Label</label><input type="text" value={formData.gradeLabel} onChange={(e) => setFormData(prev => ({ ...prev, gradeLabel: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="GEM-MT" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Cert #</label><input type="text" value={formData.certNumber} onChange={(e) => setFormData(prev => ({ ...prev, certNumber: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Sealed Details */}
+        {formData.type === "Sealed Product" && (
+          <div className="mb-6">
+            <h4 className="text-gold-400 font-semibold mb-3">Sealed Product Details</h4>
+            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Product Name</label><input type="text" value={formData.productName} onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Booster Box" /></div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.sealedSet} onChange={(e) => setFormData(prev => ({ ...prev, sealedSet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.sealedYear} onChange={(e) => setFormData(prev => ({ ...prev, sealedYear: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+            </div>
+          </div>
+        )}
+        {/* Pricing */}
+        <div className="mb-6">
+          <h4 className="text-gold-400 font-semibold mb-3">Pricing</h4>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className="block text-sm text-gray-400 mb-1">Type</label><select value={formData.listingType} onChange={(e) => setFormData(prev => ({ ...prev, listingType: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="Fixed Price">Fixed</option><option value="Auction">Auction</option></select></div>
+            <div><label className="block text-sm text-gray-400 mb-1">Price (USD)</label><input type="number" step="0.01" value={formData.startingPrice} onChange={(e) => setFormData(prev => ({ ...prev, startingPrice: e.target.value ? parseFloat(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+            <div><label className="block text-sm text-gray-400 mb-1">Currency</label><select value={formData.currency} onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="USD1">USD1</option><option value="USDC">USDC</option><option value="SOL">SOL</option></select></div>
+          </div>
+        </div>
+        {/* Images */}
+        <div className="mb-6">
+          <h4 className="text-gold-400 font-semibold mb-3">Images</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Front</label>
+              <input type="file" accept="image/*" onChange={handleImageUpload('frontImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
+              {formData.frontImagePreview && <img src={formData.frontImagePreview} alt="Front" className="mt-2 w-full h-24 object-cover rounded-lg border border-white/10" />}
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Back (Optional)</label>
+              <input type="file" accept="image/*" onChange={handleImageUpload('backImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
+              {formData.backImagePreview && <img src={formData.backImagePreview} alt="Back" className="mt-2 w-full h-24 object-cover rounded-lg border border-white/10" />}
+            </div>
+          </div>
+        </div>
+        {/* Recipient */}
+        <div className="mb-6">
+          <h4 className="text-gold-400 font-semibold mb-3">Recipient</h4>
+          <input type="text" value={formData.recipientWallet} onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-gold-500" placeholder="Solana wallet address" />
+        </div>
+        <button onClick={handleMint} disabled={!formData.name || !formData.recipientWallet} className={`w-full py-3 rounded-lg font-semibold text-sm transition ${!formData.name || !formData.recipientWallet ? "bg-gray-600 text-gray-400 cursor-not-allowed" : "bg-gold-500 hover:bg-gold-600 text-dark-900"}`}>Ready to Mint</button>
+      </div>
+      {/* Metadata Preview */}
+      <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
+        <h3 className="font-serif text-xl font-bold text-white mb-6">Metadata Preview</h3>
+        <div className="bg-dark-700 rounded-lg p-4 border border-white/5 overflow-auto max-h-[600px]">
+          <pre className="text-gray-300 text-xs whitespace-pre-wrap">{JSON.stringify(generateMetadata(), null, 2)}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MintContent() {
   const { publicKey, connected } = useWallet();
   const [isAdmin, setIsAdmin] = useState(false);

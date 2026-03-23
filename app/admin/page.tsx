@@ -3,6 +3,7 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { BAXUS_SELLER_FEE_ENABLED, TREASURY_WALLET, ADMIN_WALLET } from "@/lib/data";
+import { MintFormContent } from "./mint/content";
 
 interface AdminListing {
   id: string;
@@ -63,7 +64,7 @@ export default function AdminPage() {
     totalVolume: 0,
   });
   const [baxusFeesEnabled, setBaxusFeesEnabled] = useState(BAXUS_SELLER_FEE_ENABLED);
-  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings" | "submissions">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings" | "submissions" | "mint">("overview");
   const [whitelistedWallets, setWhitelistedWallets] = useState<any[]>([]);
   const [newWalletAddr, setNewWalletAddr] = useState("");
   const [newWalletName, setNewWalletName] = useState("");
@@ -334,7 +335,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="mb-8 flex gap-4 border-b border-white/10 overflow-x-auto">
-          {(["overview", "listings", "submissions", "whitelist", "settings"] as const).map((tab) => (
+          {(["overview", "listings", "submissions", "mint", "whitelist", "settings"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -939,6 +940,10 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+        )}
+
+        {!loading && activeTab === "mint" && (
+          <MintFormContent />
         )}
 
         {!loading && activeTab === "settings" && (
