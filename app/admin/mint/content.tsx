@@ -6,8 +6,9 @@ import { useState, useEffect } from "react";
 import { ADMIN_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { createV1, createCollectionV1 } from "@metaplex-foundation/mpl-core";
+import { createV1 } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
+import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 
 interface MintFormData {
   // Basic Info
@@ -214,30 +215,59 @@ function MintFormInner() {
     try {
       const metadata = generateMetadata();
       
-      // Step 1: Store metadata and get URI
-      const storeRes = await fetch("/api/admin/mint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "store-metadata", metadata }),
-      });
-      const { uri } = await storeRes.json();
-      if (!uri) throw new Error("Failed to store metadata");
+      // Step 1: Set up Umi with Irys uploader
+      const umi = createUmi(connection.rpcEndpoint)
+        .use(walletAdapterIdentity(wallet))
+        .use(irysUploader());
 
-      // Step 2: Create Metaplex Core asset
-      const umi = createUmi(connection.rpcEndpoint).use(walletAdapterIdentity(wallet));
+      // Step 2: Upload image to Arweave if provided
+      let imageUri = "";
+      if (formData.frontImage) {
+        setMintResult("⏳ Uploading image to Arweave...");
+        const arrayBuffer = await formData.frontImage.arrayBuffer();
+        const [imgUri] = await umi.uploader.upload([
+          {
+            buffer: Buffer.from(arrayBuffer),
+            fileName: formData.frontImage.name,
+            displayName: formData.frontImage.name,
+            uniqueName: `artifacte-${Date.now()}`,
+            contentType: formData.frontImage.type,
+            extension: formData.frontImage.name.split(".").pop() || "jpg",
+            tags: [],
+          } as any,
+        ]);
+        imageUri = imgUri;
+        metadata.image = imageUri;
+      }
+
+      // Step 3: Upload metadata JSON to Arweave
+      setMintResult("⏳ Uploading metadata to Arweave...");
+      const metadataUri = await umi.uploader.uploadJson(metadata);
+
+      // Step 4: Create Metaplex Core asset with royalties
+      setMintResult("⏳ Creating NFT on-chain...");
       const asset = generateSigner(umi);
 
       const tx = await createV1(umi, {
         asset,
         name: formData.name.slice(0, 32),
-        uri,
+        uri: metadataUri,
         owner: formData.recipientWallet ? umiPublicKey(formData.recipientWallet) : umi.identity.publicKey,
+        plugins: [
+          {
+            type: "Royalties",
+            basisPoints: 500,
+            creators: [{ address: umi.identity.publicKey, percentage: 100 }],
+            ruleSet: { type: "None" },
+          },
+        ],
       } as any).sendAndConfirm(umi);
 
       const sig = Buffer.from(tx.signature).toString("base64");
-      setMintResult(`✅ Minted! Asset: ${asset.publicKey}\nTx: ${sig}`);
+      setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${sig}`);
     } catch (err: any) {
       setMintResult(`❌ Error: ${err.message}`);
+      console.error("Mint error:", err);
     }
     setMinting(false);
   };
