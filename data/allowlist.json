@@ -295,6 +295,48 @@
       "links": {
         "twitter": "https://x.com/zeromonkebiz"
       }
+    },
+    {
+      "collectionAddress": "DGygonz7pn6AFrb1nUUyH3Bu5SVuuCSu38AZWT1cAC4B",
+      "name": "ZMB Wave 1",
+      "category": "Digital Art",
+      "image": "/collections/zmb.png",
+      "supply": 5000,
+      "addedAt": 1774287450000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "Zero Monke Biz (ZMB) Wave 1.",
+      "links": {
+        "twitter": "https://x.com/zeromonkebiz"
+      }
+    },
+    {
+      "collectionAddress": "DF9oV9ZeUPRh3XUS5opiivRHn9HjqW4kUxD6k1tK8Bqf",
+      "name": "ZMB Wave 2",
+      "category": "Digital Art",
+      "image": "/collections/zmb.png",
+      "supply": 5000,
+      "addedAt": 1774287450000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "Zero Monke Biz (ZMB) Wave 2.",
+      "links": {
+        "twitter": "https://x.com/zeromonkebiz"
+      }
+    },
+    {
+      "collectionAddress": "DC1vqfCoZbZT2jS6NDv1LAL4W3RvLKW5RPZfs13AhbsH",
+      "name": "ZMB Wave 3",
+      "category": "Digital Art",
+      "image": "/collections/zmb.png",
+      "supply": 5000,
+      "addedAt": 1774287450000,
+      "addedBy": "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX",
+      "verified": true,
+      "description": "Zero Monke Biz (ZMB) Wave 3.",
+      "links": {
+        "twitter": "https://x.com/zeromonkebiz"
+      }
     }
   ]
 }
