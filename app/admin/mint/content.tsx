@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { ADMIN_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { createV1 } from "@metaplex-foundation/mpl-core";
+import { createV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 
@@ -254,14 +254,16 @@ function MintFormInner() {
         uri: metadataUri,
         owner: formData.recipientWallet ? umiPublicKey(formData.recipientWallet) : umi.identity.publicKey,
         plugins: [
-          {
+          pluginAuthorityPair({
             type: "Royalties",
-            basisPoints: 500,
-            creators: [{ address: umi.identity.publicKey, percentage: 100 }],
-            ruleSet: { type: "None" },
-          },
+            data: {
+              basisPoints: 500,
+              creators: [{ address: umi.identity.publicKey, percentage: 100 }],
+              ruleSet: ruleSet("None"),
+            },
+          }),
         ],
-      } as any).sendAndConfirm(umi);
+      }).sendAndConfirm(umi);
 
       const sig = Buffer.from(tx.signature).toString("base64");
       setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${sig}`);
