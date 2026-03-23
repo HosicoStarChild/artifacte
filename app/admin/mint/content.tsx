@@ -1,8 +1,13 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { ADMIN_WALLET } from "@/lib/data";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+import { createV1, createCollectionV1 } from "@metaplex-foundation/mpl-core";
+import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 
 interface MintFormData {
   // Basic Info
@@ -197,7 +202,45 @@ function MintFormInner() {
     return metadata;
   };
 
-  const handleMint = () => { alert("Ready to mint!\n\n" + JSON.stringify(generateMetadata(), null, 2)); };
+  const wallet = useWallet();
+  const { connection } = useConnection();
+  const [minting, setMinting] = useState(false);
+  const [mintResult, setMintResult] = useState<string | null>(null);
+
+  const handleMint = async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) return;
+    setMinting(true);
+    setMintResult(null);
+    try {
+      const metadata = generateMetadata();
+      
+      // Step 1: Store metadata and get URI
+      const storeRes = await fetch("/api/admin/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "store-metadata", metadata }),
+      });
+      const { uri } = await storeRes.json();
+      if (!uri) throw new Error("Failed to store metadata");
+
+      // Step 2: Create Metaplex Core asset
+      const umi = createUmi(connection.rpcEndpoint).use(walletAdapterIdentity(wallet));
+      const asset = generateSigner(umi);
+
+      const tx = await createV1(umi, {
+        asset,
+        name: formData.name.slice(0, 32),
+        uri,
+        owner: formData.recipientWallet ? umiPublicKey(formData.recipientWallet) : umi.identity.publicKey,
+      } as any).sendAndConfirm(umi);
+
+      const sig = Buffer.from(tx.signature).toString("base64");
+      setMintResult(`✅ Minted! Asset: ${asset.publicKey}\nTx: ${sig}`);
+    } catch (err: any) {
+      setMintResult(`❌ Error: ${err.message}`);
+    }
+    setMinting(false);
+  };
 
   // Reuse the same JSX but without the page wrapper
   return (
@@ -329,7 +372,10 @@ function MintFormInner() {
           <h4 className="text-gold-400 font-semibold mb-3">Recipient</h4>
           <input type="text" value={formData.recipientWallet} onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-gold-500" placeholder="Solana wallet address" />
         </div>
-        <button onClick={handleMint} disabled={!formData.name || !formData.recipientWallet} className={`w-full py-3 rounded-lg font-semibold text-sm transition ${!formData.name || !formData.recipientWallet ? "bg-gray-600 text-gray-400 cursor-not-allowed" : "bg-gold-500 hover:bg-gold-600 text-dark-900"}`}>Ready to Mint</button>
+        <button onClick={handleMint} disabled={!formData.name || !formData.recipientWallet || minting} className={`w-full py-3 rounded-lg font-semibold text-sm transition ${!formData.name || !formData.recipientWallet || minting ? "bg-gray-600 text-gray-400 cursor-not-allowed" : "bg-gold-500 hover:bg-gold-600 text-dark-900"}`}>{minting ? "Minting..." : "Mint NFT"}</button>
+        {mintResult && (
+          <div className={`mt-3 p-3 rounded-lg text-xs font-mono whitespace-pre-wrap ${mintResult.startsWith("✅") ? "bg-green-900/20 border border-green-700/30 text-green-400" : "bg-red-900/20 border border-red-700/30 text-red-400"}`}>{mintResult}</div>
+        )}
       </div>
       {/* Metadata Preview */}
       <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
