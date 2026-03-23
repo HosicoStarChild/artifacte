@@ -32,11 +32,6 @@ interface MintFormData {
   sealedLanguage: "English" | "Japanese" | "Chinese" | "Korean" | "French" | "German";
   sealedTcg: "Pokemon" | "One Piece" | "Dragon Ball" | "Yu-Gi-Oh" | "Sports" | "Other";
 
-  // Pricing
-  listingType: "Fixed Price" | "Auction";
-  startingPrice: number | "";
-  currency: "USD1" | "USDC" | "SOL";
-
   // Images
   frontImage: File | null;
   frontImagePreview: string;
@@ -73,9 +68,6 @@ function MintFormInner() {
     sealedYear: "",
     sealedLanguage: "English",
     sealedTcg: "Pokemon",
-    listingType: "Fixed Price",
-    startingPrice: "",
-    currency: "USD1",
     frontImage: null,
     frontImagePreview: "",
     backImage: null,
@@ -135,7 +127,7 @@ function MintFormInner() {
         { trait_type: "Language", value: formData.sealedLanguage }, { trait_type: "TCG", value: formData.sealedTcg }
       );
     }
-    metadata.attributes.push({ trait_type: "Listing Type", value: formData.listingType }, { trait_type: "Starting Price", value: formData.startingPrice?.toString() || "" }, { trait_type: "Currency", value: formData.currency });
+    // No pricing attributes — pricing set at listing time
     return metadata;
   };
 
@@ -212,15 +204,7 @@ function MintFormInner() {
             </div>
           </div>
         )}
-        {/* Pricing */}
-        <div className="mb-6">
-          <h4 className="text-gold-400 font-semibold mb-3">Pricing</h4>
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className="block text-sm text-gray-400 mb-1">Type</label><select value={formData.listingType} onChange={(e) => setFormData(prev => ({ ...prev, listingType: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="Fixed Price">Fixed</option><option value="Auction">Auction</option></select></div>
-            <div><label className="block text-sm text-gray-400 mb-1">Price (USD)</label><input type="number" step="0.01" value={formData.startingPrice} onChange={(e) => setFormData(prev => ({ ...prev, startingPrice: e.target.value ? parseFloat(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
-            <div><label className="block text-sm text-gray-400 mb-1">Currency</label><select value={formData.currency} onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="USD1">USD1</option><option value="USDC">USDC</option><option value="SOL">SOL</option></select></div>
-          </div>
-        </div>
+
         {/* Images */}
         <div className="mb-6">
           <h4 className="text-gold-400 font-semibold mb-3">Images</h4>
@@ -280,9 +264,6 @@ export function MintContent() {
     sealedYear: "",
     sealedLanguage: "English",
     sealedTcg: "Pokemon",
-    listingType: "Fixed Price",
-    startingPrice: "",
-    currency: "USD1",
     frontImage: null,
     frontImagePreview: "",
     backImage: null,
@@ -424,11 +405,6 @@ export function MintContent() {
 
     // Add pricing info
     metadata.attributes.push(
-      { trait_type: "Listing Type", value: formData.listingType },
-      { trait_type: "Starting Price", value: formData.startingPrice?.toString() || "" },
-      { trait_type: "Currency", value: formData.currency }
-    );
-
     return metadata;
   };
 
@@ -771,52 +747,6 @@ export function MintContent() {
                 </div>
               </div>
             )}
-
-            {/* Pricing */}
-            <div className="mb-8">
-              <h3 className="text-gold-400 font-semibold mb-4 text-lg">Pricing</h3>
-              
-              <div className="grid grid-cols-1 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2 font-medium">Listing Type</label>
-                  <select
-                    value={formData.listingType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, listingType: e.target.value as typeof formData.listingType }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                  >
-                    <option value="Fixed Price">Fixed Price</option>
-                    <option value="Auction">Auction</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2 font-medium">Starting Price (USD)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.startingPrice}
-                    onChange={(e) => setFormData(prev => ({ ...prev, startingPrice: e.target.value ? parseFloat(e.target.value) : "" }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2 font-medium">Currency</label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value as typeof formData.currency }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
-                  >
-                    <option value="USD1">USD1</option>
-                    <option value="USDC">USDC</option>
-                    <option value="SOL">SOL</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
             {/* Images */}
             <div className="mb-8">
