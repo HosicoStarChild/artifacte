@@ -298,7 +298,7 @@
     },
     {
       "collectionAddress": "DGygonz7pn6AFrb1nUUyH3Bu5SVuuCSu38AZWT1cAC4B",
-      "name": "ZMB Wave 1",
+      "name": "ZMB",
       "category": "Digital Art",
       "image": "/collections/zmb.png",
       "supply": 5000,
@@ -312,7 +312,7 @@
     },
     {
       "collectionAddress": "DF9oV9ZeUPRh3XUS5opiivRHn9HjqW4kUxD6k1tK8Bqf",
-      "name": "ZMB Wave 2",
+      "name": "ZMB",
       "category": "Digital Art",
       "image": "/collections/zmb.png",
       "supply": 5000,
@@ -326,7 +326,7 @@
     },
     {
       "collectionAddress": "DC1vqfCoZbZT2jS6NDv1LAL4W3RvLKW5RPZfs13AhbsH",
-      "name": "ZMB Wave 3",
+      "name": "ZMB",
       "category": "Digital Art",
       "image": "/collections/zmb.png",
       "supply": 5000,
