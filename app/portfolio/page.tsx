@@ -190,6 +190,8 @@ export default function PortfolioPage() {
                 matchedAddress = auth?.address;
               }
               // Check for Artifacte-minted NFTs (admin wallet as creator/authority)
+              // Skip the collection NFT itself
+              if (asset.id === "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS") return;
               const isArtifacte = !matchedAddress && (
                 (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
                 (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
@@ -232,14 +234,10 @@ export default function PortfolioPage() {
               let price = 0;
               if (item.priceSource === "TCGplayer" && item.priceSourceId) {
                 try {
-                  const tcgRes = await fetch(`https://mpapi.tcgplayer.com/v2/product/${item.priceSourceId}/pricepoints`);
+                  const tcgRes = await fetch(`/api/tcgplayer-price?id=${item.priceSourceId}`);
                   if (tcgRes.ok) {
                     const tcgData = await tcgRes.json();
-                    // Find NM Foil or NM Normal price
-                    const pp = tcgData.find((p: any) => p.printingType === "Foil" && p.condition === "Near Mint") 
-                      || tcgData.find((p: any) => p.condition === "Near Mint")
-                      || tcgData[0];
-                    price = pp?.marketPrice || pp?.listedMedianPrice || 0;
+                    price = tcgData.marketPrice || tcgData.listedMedianPrice || 0;
                   }
                 } catch {}
               }
