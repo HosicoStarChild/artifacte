@@ -69,6 +69,14 @@ async function fetchFloorPrices(): Promise<Record<string, number>> {
     if (!floors[addr]) floors[addr] = floor;
   }
 
+  // ZMB waves mirror main ZMB floor
+  const zmbMain = floors['89Xwuah6o9Y2q91EREgsc1wKeFHYyfXEZKqPFRBNrfhv'];
+  if (zmbMain) {
+    for (const addr of ['DGygonz7pn6AFrb1nUUyH3Bu5SVuuCSu38AZWT1cAC4B', 'DF9oV9ZeUPRh3XUS5opiivRHn9HjqW4kUxD6k1tK8Bqf', 'DC1vqfCoZbZT2jS6NDv1LAL4W3RvLKW5RPZfs13AhbsH']) {
+      floors[addr] = zmbMain;
+    }
+  }
+
   cache = { data: floors, timestamp: Date.now() };
   return floors;
 }
