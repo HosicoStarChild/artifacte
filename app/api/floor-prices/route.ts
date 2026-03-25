@@ -15,7 +15,7 @@ const COLLECTION_MAP: Record<string, { symbol: string; name: string }> = {
   '2hwTMM3uWRvNny8YxSEKQkHZ8NHB5BRv7f35ccMWg1ay': { symbol: 'quekz', name: 'Quekz' },
   'CywHUY59AFi7nmGf9kVfNgd39TD9rnkyx6GfWsn5iNnE': { symbol: 'hot_heads', name: 'Hot Heads' },
   '6XxjKYFbcndh2gDcsUrmZgVEsoDxXMnfsaGY6fpTJzNr': { symbol: 'degods', name: 'DeGods' },
-  'DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD': { symbol: 'degen_ape_academy', name: 'Degen Ape Academy' },
+  'DSwfRF1jhhu6HpSuzaig1G19kzP73PfLZBPLofkw6fLD': { symbol: 'degenerate_ape_academy', name: 'Degen Ape Academy' },
   'GMoemLuVAksjvGph8dmujuqijWsodt7nJsvwoMph3uzj': { symbol: 'sensei', name: 'Sensei' },
   '7LxjzYdvXXDMxEmjS3aBC26ut4FMtDUae44nkHBPNVWP': { symbol: 'dead_king_society', name: 'Dead King Society' },
   '3saAedkM9o5g1u5DCqsuMZuC4GRqPB4TuMkvSsSVvGQ3': { symbol: 'okay_bears', name: 'Okay Bears' },
@@ -45,14 +45,18 @@ async function fetchFloorPrices(): Promise<Record<string, number>> {
   await Promise.all(
     Object.entries(COLLECTION_MAP).map(async ([address, { symbol }]) => {
       try {
-        const res = await fetch(
-          `https://api-mainnet.magiceden.dev/v2/collections/${symbol}/stats`,
-          { signal: AbortSignal.timeout(5000) }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.floorPrice) {
-            floors[address] = data.floorPrice / 1e9; // lamports to SOL
+        // Try symbol first, then collection address
+        for (const query of [symbol, address]) {
+          const res = await fetch(
+            `https://api-mainnet.magiceden.dev/v2/collections/${query}/stats`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.floorPrice) {
+              floors[address] = data.floorPrice / 1e9;
+              break;
+            }
           }
         }
       } catch {
