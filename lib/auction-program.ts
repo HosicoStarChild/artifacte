@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Transaction, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, SystemProgram, TransactionInstruction, ComputeBudgetProgram } from "@solana/web3.js";
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import { IDL } from "./auction-idl";
@@ -332,7 +332,10 @@ export class AuctionProgram {
         0
       );
       const listIx = await builder.instruction();
-      const tx = new Transaction().add(approveIx).add(listIx);
+      const tx = new Transaction()
+        .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+        .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }))
+        .add(approveIx).add(listIx);
       const { blockhash } = await this.connection.getLatestBlockhash();
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
@@ -492,9 +495,11 @@ export class AuctionProgram {
       );
     }
 
-    // Build final transaction
+    // Build final transaction with compute budget
     const buyIx = await builder.instruction();
-    const tx = new Transaction();
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+      .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }));
 
     if (isWNS) {
       const wnsGroupMint = await getWNSGroupMint(nftMint);
