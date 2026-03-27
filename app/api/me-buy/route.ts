@@ -86,7 +86,9 @@ export async function POST(req: NextRequest) {
         });
         const assetData = await assetRes.json();
         const currentOwner = assetData?.result?.ownership?.owner;
-        if (currentOwner && currentOwner !== seller) {
+        const ME_ESCROW = '1BWutmTvYPwDtmw9abTkS4Ssr8no61spGAvW1X6NDix';
+        // NFT is valid if owned by seller OR in ME escrow (listed cards transfer to escrow)
+        if (currentOwner && currentOwner !== seller && currentOwner !== ME_ESCROW) {
           return NextResponse.json({ 
             error: 'This listing is no longer available — the NFT has already been sold.' 
           }, { status: 410 });
