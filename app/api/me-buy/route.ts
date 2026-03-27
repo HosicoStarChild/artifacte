@@ -97,19 +97,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Call ME buy_now instructions API (returns notary-cosigned tx)
+    // 2. Call ME buy instructions API (works for Core + pNFT + standard)
+    // Uses /buy (not /buy_now) which supports Metaplex Core assets
     const params = new URLSearchParams({
       buyer,
       seller,
       tokenMint: mint,
-      tokenATA,
       price: price.toString(),
       auctionHouseAddress: auctionHouse,
-      sellerExpiry: sellerExpiry.toString(),
     });
+    // Add optional params if available
+    if (tokenATA) params.set('tokenATA', tokenATA);
+    if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
 
     const buyRes = await fetch(
-      `${ME_API_BASE}/instructions/buy_now?${params}`,
+      `${ME_API_BASE}/instructions/buy?${params}`,
       { headers: { 'Authorization': `Bearer ${ME_API_KEY}` } }
     );
     if (!buyRes.ok) {

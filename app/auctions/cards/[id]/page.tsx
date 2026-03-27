@@ -278,12 +278,21 @@ export default function CardDetailPage() {
                 </div>
 
                 {card.price ? (
-                  <button
-                    disabled
-                    className="w-full px-6 py-3.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-base font-semibold"
-                  >
-                    Buy Now — Coming Soon
-                  </button>
+                  connected ? (
+                    <button
+                      onClick={handleBuy}
+                      disabled={buying}
+                      className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
+                        buying 
+                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400" 
+                          : "bg-gold-500 hover:bg-gold-600 text-dark-900"
+                      }`}
+                    >
+                      {buying ? "Processing..." : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
+                    </button>
+                  ) : (
+                    <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
+                  )
                 ) : (
                   <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
                 )}
