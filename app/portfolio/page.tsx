@@ -129,6 +129,7 @@ export default function PortfolioPage() {
     "7cHTjqr2S8uUCrG3TVFvFix3vcLjhPiwrtRsAeJtESRj", // Drifella 2
     "ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ", // Drifella III
     "8vE4uASPp9WbS9Ls2qzJ9fpUBpR3UrTG3hBZXdAJQ9mz", // Monkey Baby Business
+    "54ZnA77u7j6niHEyyD9ZZ6QAkqjCqKY4k6iPT82wxgJ8", // CHADS
   ]);
 
   useEffect(() => {
