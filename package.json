@@ -15,6 +15,8 @@
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
     "@metaplex-foundation/umi-signer-wallet-adapters": "^1.5.1",
     "@metaplex-foundation/umi-uploader-irys": "^1.5.0",
+    "@said-protocol/a2a": "^1.2.0",
+    "@said-protocol/client": "^0.2.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",

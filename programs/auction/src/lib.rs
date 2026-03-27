@@ -979,7 +979,7 @@ pub struct PlaceBid<'info> {
 #[derive(Accounts)]
 pub struct BuyNow<'info> {
     #[account(mut)]
-    pub listing: Account<'info, Listing>,
+    pub listing: Box<Account<'info, Listing>>,
     pub nft_mint: InterfaceAccount<'info, IfaceMint>,
     #[account(
         mut,
