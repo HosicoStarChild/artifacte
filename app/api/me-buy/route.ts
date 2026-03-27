@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     // 1. Fetch active listing from ME
     const listingsRes = await fetch(
       `${ME_API_BASE}/tokens/${mint}/listings`,
-      { headers: { 'Authorization': `Bearer ${ME_API_KEY}` } }
+      { headers: { 'Authorization': `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(10000) }
     );
     if (!listingsRes.ok) {
       return NextResponse.json({ error: 'Failed to fetch listing' }, { status: 502 });
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
         const assetRes = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000),
           body: JSON.stringify({
             jsonrpc: '2.0', id: 1,
             method: 'getAsset',
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     const buyRes = await fetch(
       `${ME_API_BASE}/instructions/buy?${params}`,
-      { headers: { 'Authorization': `Bearer ${ME_API_KEY}` } }
+      { headers: { 'Authorization': `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(15000) }
     );
     if (!buyRes.ok) {
       const errText = await buyRes.text();
