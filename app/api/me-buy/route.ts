@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const auctionHouse = listing.auctionHouse || CC_AUCTION_HOUSE;
 
     // 1b. Verify NFT is still owned by the seller (catch stale listings)
-    const HELIUS_KEY = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+    const HELIUS_KEY = process.env.HELIUS_API_KEY;
     if (HELIUS_KEY) {
       try {
         const assetRes = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`, {

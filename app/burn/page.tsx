@@ -14,7 +14,7 @@ const WalletMultiButton = dynamic(
 
 const HELIUS_DAS_PROXY = "/api/helius-das";
 // Standard Solana RPC (blockhash, sendTransaction) — uses same key as WalletProvider
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+const HELIUS_RPC = `/api/rpc`;
 // Metaplex Core program
 const MPL_CORE_PROGRAM = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
 

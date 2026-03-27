@@ -155,6 +155,13 @@ pub mod auction {
             );
         }
 
+        // Validate token program is SPL Token or Token-2022
+        require!(
+            ctx.accounts.nft_token_program.key() == Token::id() || 
+            ctx.accounts.nft_token_program.key() == spl_token_2022::id(),
+            AuctionError::InvalidTokenProgram
+        );
+
         // Detect Token-2022
         let is_token2022 = ctx.accounts.nft_token_program.key() != Token::id();
 
@@ -1233,4 +1240,6 @@ pub enum AuctionError {
     InvalidBuyerAccount,
     #[msg("Invalid creator account — must be creator's ATA for payment mint")]
     InvalidCreatorAccount,
+    #[msg("Invalid token program — must be SPL Token or Token-2022")]
+    InvalidTokenProgram,
 }

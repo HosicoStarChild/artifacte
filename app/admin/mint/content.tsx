@@ -259,10 +259,33 @@ function MintFormInner() {
 
   const handleMint = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
+    
+    // Input validation
+    if (formData.recipientWallet) {
+      try {
+        umiPublicKey(formData.recipientWallet);
+      } catch {
+        setMintResult("❌ Invalid recipient wallet address");
+        return;
+      }
+    }
+    if (formData.name.length > 32) {
+      setMintResult("❌ Name too long (max 32 characters on-chain)");
+      return;
+    }
+
     setMinting(true);
     setMintResult(null);
     try {
       const metadata = generateMetadata();
+      
+      // Validate metadata size
+      const metaSize = JSON.stringify(metadata).length;
+      if (metaSize > 50000) {
+        setMintResult("❌ Metadata too large (" + metaSize + " bytes, max 50KB)");
+        setMinting(false);
+        return;
+      }
       
       // Step 1: Set up Umi with Irys uploader
       const umi = createUmi(connection.rpcEndpoint)
