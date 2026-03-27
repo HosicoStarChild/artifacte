@@ -317,7 +317,7 @@ function MintFormInner() {
       const metadataUri = await umi.uploader.uploadJson(metadata);
 
       // Step 4: Create Metaplex Core asset with royalties
-      setMintResult("⏳ Creating NFT on-chain...");
+      setMintResult("⏳ Simulating transaction...");
       const asset = generateSigner(umi);
 
       const createArgs: any = {
