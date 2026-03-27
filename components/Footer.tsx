@@ -34,13 +34,20 @@ export default function Footer() {
                 <li><a href="https://github.com/HosicoStarChild" className="hover:text-white transition" target="_blank" rel="noopener noreferrer">GitHub</a></li>
               </ul>
             </div>
+            <div>
+              <p className="text-xs font-semibold text-white tracking-widest uppercase mb-4">Legal</p>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="/privacy" className="hover:text-white transition">Privacy Policy</a></li>
+                <li><a href="/terms" className="hover:text-white transition">Terms of Service</a></li>
+              </ul>
+            </div>
           </div>
 
           {/* Status */}
           <div className="flex flex-col items-start md:items-end">
             <p className="text-xs font-semibold text-white tracking-widest uppercase mb-4">Status</p>
-            <p className="text-xs text-gray-500 mb-1">Solana Devnet</p>
-            <p className="text-xs text-gray-500">Graveyard Hackathon 2026</p>
+            <p className="text-xs text-gray-500 mb-1">Solana Mainnet</p>
+            <p className="text-xs text-gold-500/60">Beta</p>
           </div>
         </div>
 

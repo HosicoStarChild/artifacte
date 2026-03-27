@@ -9,11 +9,8 @@ import { clusterApiUrl } from "@solana/web3.js";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export const WalletProviderWrapper: FC<{ children: ReactNode }> = ({ children }) => {
-  // Use our server-side RPC proxy to avoid exposing API key in client bundle
-  const endpoint = useMemo(() => {
-    if (typeof window !== 'undefined') return `${window.location.origin}/api/rpc`;
-    return process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/rpc` : 'https://artifacte.io/api/rpc';
-  }, []);
+  // RPC proxy — keeps API key server-side  
+  const endpoint = useMemo(() => 'https://artifacte.io/api/rpc', []);
   const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
 
   return (
