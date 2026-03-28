@@ -125,10 +125,15 @@ export async function POST(req: NextRequest) {
 
     const buyData = await buyRes.json();
 
-    // 3. Return notary-cosigned tx as-is (no modifications)
+    // 3. Return UNSIGNED tx for wallet to sign cleanly (no pre-filled notary sig)
+    //    Plus the notary signature separately — frontend merges after wallet signs
+    const v0TxUnsigned = buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null;
+    const v0TxSigned = buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null;
+    
     return NextResponse.json({
-      v0Tx: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null,
-      legacyTx: buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
+      v0Tx: v0TxUnsigned,        // unsigned — wallet signs this cleanly
+      v0TxSigned: v0TxSigned,    // notary-signed — extract notary sig from this
+      legacyTx: buyData.tx?.data ? Buffer.from(buyData.tx.data).toString('base64') : null,
       blockhash: buyData.blockhashData?.blockhash,
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
       price,

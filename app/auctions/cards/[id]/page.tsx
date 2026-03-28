@@ -143,31 +143,32 @@ export default function CardDetailPage() {
         throw new Error(errData.error || 'Failed to build transaction');
       }
 
-      const { v0Tx, legacyTx, price } = await buildRes.json();
+      const { v0Tx, v0TxSigned, legacyTx, price } = await buildRes.json();
       
-      const txBase64 = v0Tx || legacyTx;
-      if (!txBase64) throw new Error("No transaction returned from API");
+      if (!v0Tx || !v0TxSigned) throw new Error("No transaction returned from API");
       
       if (!signTransaction) {
         throw new Error("Wallet does not support signing");
       }
 
       showToast.info(`💳 Confirm purchase — ${price} SOL`);
-      const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
+      
+      // Step 2: Give wallet the UNSIGNED tx (no notary sig) — clean simulation
+      const unsignedBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
+      const vTx = VersionedTransaction.deserialize(unsignedBytes);
+      const signed = await signTransaction(vTx as any);
+      
+      // Step 3: Merge notary signature from the pre-signed tx
+      const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+      const notaryTx = VersionedTransaction.deserialize(signedBytes);
+      // Notary is signature index 1 (buyer=0, notary=1)
+      (signed as any).signatures[1] = notaryTx.signatures[1];
       
       let sig: string;
-      if (v0Tx) {
-        const vTx = VersionedTransaction.deserialize(txBytes);
-        const signed = await signTransaction(vTx as any);
-        sig = await connection.sendRawTransaction((signed as any).serialize(), {
-          skipPreflight: true,
-          preflightCommitment: 'confirmed',
-        });
-      } else {
-        const tx = Transaction.from(txBytes);
-        const signed = await signTransaction(tx);
-        sig = await connection.sendRawTransaction(signed.serialize());
-      }
+      sig = await connection.sendRawTransaction((signed as any).serialize(), {
+        skipPreflight: true,
+        maxRetries: 3,
+      });
       
       showToast.info("⏳ Confirming purchase...");
       await connection.confirmTransaction(sig, "confirmed");
