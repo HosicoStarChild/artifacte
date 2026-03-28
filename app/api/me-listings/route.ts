@@ -17,13 +17,9 @@ export async function GET(request: Request) {
   // Forward all query params to Railway
   const params = new URLSearchParams(searchParams.toString());
 
-  try {
-    // Fetch oracle listings
-    const oraclePromise = fetch(`${ORACLE_API}/api/listings?${params}`, {
-      signal: AbortSignal.timeout(15000),
-      cache: 'no-store',
-    });
+  const isUngradedOnly = gradeFilter === 'Ungraded';
 
+  try {
     // Optionally fetch phygitals from ME and merge
     let phygitalListings: any[] = [];
     if (includePhygitals) {
@@ -35,7 +31,25 @@ export async function GET(request: Request) {
       }
     }
 
-    const res = await oraclePromise;
+    // If Ungraded filter, skip oracle (CC cards are all graded) — phygitals only
+    if (isUngradedOnly && phygitalListings.length > 0) {
+      const response = NextResponse.json({
+        listings: phygitalListings,
+        total: 11000, // ME phygitals collection size
+        page: parseInt(searchParams.get('page') || '1'),
+        perPage: parseInt(searchParams.get('perPage') || '20'),
+        totalPages: Math.ceil(11000 / parseInt(searchParams.get('perPage') || '20')),
+      });
+      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+      return response;
+    }
+
+    // Fetch oracle listings
+    const res = await fetch(`${ORACLE_API}/api/listings?${params}`, {
+      signal: AbortSignal.timeout(15000),
+      cache: 'no-store',
+    });
+
     if (!res.ok) {
       throw new Error(`Oracle returned ${res.status}`);
     }
@@ -71,11 +85,16 @@ export async function GET(request: Request) {
 async function fetchPhygitals(searchParams: URLSearchParams): Promise<any[]> {
   if (!ME_API_KEY) return [];
 
-  // Limit phygitals to 10 per page (mixed in with oracle results)
-  const limit = 10;
+  const gradeParam = searchParams.get('grade') || '';
+  const isUngradedOnly = gradeParam === 'Ungraded';
+  const perPage = parseInt(searchParams.get('perPage') || '20');
+  const page = parseInt(searchParams.get('page') || '1');
+  // When filtering for Ungraded specifically, phygitals are the main content
+  const limit = isUngradedOnly ? perPage : Math.min(perPage, 10);
+  const offset = isUngradedOnly ? (page - 1) * perPage : 0;
 
   const res = await fetch(
-    `${ME_API_BASE}/collections/phygitals/listings?offset=0&limit=${limit}`,
+    `${ME_API_BASE}/collections/phygitals/listings?offset=${offset}&limit=${limit}`,
     { 
       headers: { 'Authorization': `Bearer ${ME_API_KEY}` },
       signal: AbortSignal.timeout(8000),
