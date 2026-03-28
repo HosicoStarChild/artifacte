@@ -593,6 +593,11 @@ export default function CategoryAuctionsPage() {
                             PHYGITAL
                           </span>
                         )}
+                        {l.source === 'collector-crypt' && (
+                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            COLLECTOR CRYPT
+                          </span>
+                        )}
                       </div>
                       </Link>
                       {/* Details */}
