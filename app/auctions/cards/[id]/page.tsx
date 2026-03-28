@@ -35,11 +35,10 @@ export default function CardDetailPage() {
       if (cardId.startsWith('phyg-')) {
         const mint = cardId.replace('phyg-', '');
         try {
-          // Fetch metadata + listing in parallel
-          const [assetRes, listRes, meListingRes] = await Promise.all([
+          // Fetch metadata + ME listing in parallel
+          const [assetRes, meListingRes] = await Promise.all([
             fetch(`/api/nft?mint=${mint}`),
-            fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=100`),
-            fetch(`https://api-mainnet.magiceden.dev/v2/tokens/${mint}/listings`).catch(() => null),
+            fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=50`).catch(() => null),
           ]);
           
           if (assetRes.ok) {
@@ -48,23 +47,19 @@ export default function CardDetailPage() {
             const attrs = nft.attributes || [];
             const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
             
-            const listData = await listRes.json();
-            const listing = (listData.listings || []).find((l: any) => l.id === cardId);
-            
-            // Also try ME listing directly for price
-            let mePrice = listing?.solPrice || 0;
-            let meSeller = listing?.seller || '';
+            // Find this card's listing in phygitals results
+            let mePrice = 0;
+            let meSeller = '';
             if (meListingRes?.ok) {
               try {
-                const meListing = await meListingRes.json();
-                if (Array.isArray(meListing) && meListing.length > 0) {
-                  mePrice = mePrice || meListing[0].price;
-                  meSeller = meSeller || meListing[0].seller;
-                }
+                const listData = await meListingRes.json();
+                const listing = (listData.listings || []).find((l: any) => l.id === cardId || l.nftAddress === mint);
+                mePrice = listing?.solPrice || listing?.price || 0;
+                meSeller = listing?.seller || '';
               } catch {}
             }
 
-            const tcgPlayerId = getAttr('TCGplayer Product ID') || getAttr('TCGplayer_Product_ID') || '';
+            const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || getAttr('TCGplayer_Product_ID') || '';
             
             setCard({
               id: cardId,
