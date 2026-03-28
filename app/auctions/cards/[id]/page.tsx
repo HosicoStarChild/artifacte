@@ -143,7 +143,7 @@ export default function CardDetailPage() {
         throw new Error(errData.error || 'Failed to build transaction');
       }
 
-      const { v0Tx, v0TxSigned, legacyTx, price } = await buildRes.json();
+      const { v0Tx, v0TxSigned, legacyTx, price, blockhash, lastValidBlockHeight } = await buildRes.json();
       
       if (!v0Tx || !v0TxSigned) throw new Error("No transaction returned from API");
       
@@ -171,8 +171,17 @@ export default function CardDetailPage() {
       });
       
       showToast.info("⏳ Confirming purchase...");
-      await connection.confirmTransaction(sig, "confirmed");
-      showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
+      try {
+        await connection.confirmTransaction({
+          signature: sig,
+          blockhash: blockhash,
+          lastValidBlockHeight: lastValidBlockHeight,
+        }, "confirmed");
+        showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
+      } catch (confirmErr: any) {
+        // Confirmation timeout doesn't mean failure — tx may still land
+        showToast.info(`⏳ TX submitted: ${sig.slice(0, 16)}... — check your wallet in a moment`);
+      }
     } catch (err: any) {
       if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
         showToast.error("Transaction cancelled");
