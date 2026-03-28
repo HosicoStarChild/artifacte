@@ -153,16 +153,11 @@ export default function CardDetailPage() {
 
       showToast.info(`💳 Confirm purchase — ${price} SOL`);
       
-      // Step 2: Give wallet the UNSIGNED tx (no notary sig) — clean simulation
-      const unsignedBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
-      const vTx = VersionedTransaction.deserialize(unsignedBytes);
+      // Step 2: Sign the notary-presigned tx directly
+      // Solflare handles this fine; Phantom shows a domain warning but "Proceed anyway" works
+      const txBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+      const vTx = VersionedTransaction.deserialize(txBytes);
       const signed = await signTransaction(vTx as any);
-      
-      // Step 3: Merge notary signature from the pre-signed tx
-      const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
-      const notaryTx = VersionedTransaction.deserialize(signedBytes);
-      // Notary is signature index 1 (buyer=0, notary=1)
-      (signed as any).signatures[1] = notaryTx.signatures[1];
       
       const rawTx = (signed as any).serialize();
       
