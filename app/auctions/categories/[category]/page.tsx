@@ -580,7 +580,7 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `https://magiceden.io/item-details/${(l as any).nftAddress}` : '#'} target={l.source === 'phygitals' ? '_blank' : undefined} className="block">
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : '#'} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image}

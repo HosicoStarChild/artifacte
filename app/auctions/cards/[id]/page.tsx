@@ -31,6 +31,43 @@ export default function CardDetailPage() {
     if (!cardId) return;
     
     async function loadCard() {
+      // Phygital cards: load directly from Helius
+      if (cardId.startsWith('phyg-')) {
+        const mint = cardId.replace('phyg-', '');
+        try {
+          const assetRes = await fetch(`/api/nft?mint=${mint}`);
+          if (assetRes.ok) {
+            const asset = await assetRes.json();
+            const attrs = asset.attributes || [];
+            const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+            // Fetch listing price from ME
+            const listRes = await fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=100`);
+            const listData = await listRes.json();
+            const listing = (listData.listings || []).find((l: any) => l.id === cardId);
+            
+            setCard({
+              id: cardId,
+              name: asset.name || mint.slice(0, 12),
+              subtitle: [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
+              image: asset.image || '',
+              nftAddress: mint,
+              source: 'phygitals',
+              currency: 'SOL',
+              category: 'TCG_CARDS',
+              price: listing?.price || 0,
+              solPrice: listing?.solPrice || 0,
+              seller: listing?.seller || '',
+              grade: getAttr('Grade') || 'Ungraded',
+              tcg: getAttr('TCG') || '',
+              rarity: getAttr('Rarity') || '',
+              set: getAttr('Set') || '',
+            });
+            setLoading(false);
+            return;
+          }
+        } catch {}
+      }
+
       // First try: listing index (CC cards)
       try {
         const listRes = await fetch(`/api/me-listings?perPage=10000`);
