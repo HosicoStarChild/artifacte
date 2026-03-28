@@ -78,7 +78,6 @@ export default function Home() {
                 { name: "Sports Cards", emoji: "⚽", slug: "sports-cards", href: "/auctions/categories/sports-cards" },
                 { name: "Sealed Product", emoji: "📦", slug: "sealed", href: "/auctions/categories/sealed" },
                 { name: "Merchandise", emoji: "🛍️", slug: "merchandise", href: "/auctions/categories/merchandise" },
-                { name: "Phygitals", emoji: "🎴", slug: "phygitals", href: "/auctions/categories/phygitals" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">

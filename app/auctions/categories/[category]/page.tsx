@@ -34,7 +34,6 @@ const categoryEmojis: Record<string, string> = {
   "watches": "⌚",
   "sealed": "📦",
   "merchandise": "🛍️",
-  "phygitals": "🎴",
 };
 
 export default function CategoryAuctionsPage() {
@@ -118,7 +117,7 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "PHYGITALS";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE";
 
   useEffect(() => {
     if (!useMeApi || !category) return;
@@ -182,7 +181,7 @@ export default function CategoryAuctionsPage() {
     TCG_CARDS: [
       { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
       { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
-      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8"] },
+      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
     ],
     SPIRITS: [
@@ -201,10 +200,6 @@ export default function CategoryAuctionsPage() {
     ],
     SEALED: [
       { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
-    ],
-    PHYGITALS: [
-      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
-      { label: "Rarity", key: "rarity", options: ["All", "Common", "Uncommon", "Rare", "Holo Rare", "Ultra Rare"] },
     ],
   };
 
