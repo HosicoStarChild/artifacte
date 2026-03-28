@@ -89,8 +89,8 @@ async function fetchPhygitals(searchParams: URLSearchParams): Promise<any[]> {
   const isUngradedOnly = gradeParam === 'Ungraded';
   const perPage = parseInt(searchParams.get('perPage') || '20');
   const page = parseInt(searchParams.get('page') || '1');
-  // When filtering for Ungraded specifically, phygitals are the main content
-  const limit = isUngradedOnly ? perPage : Math.min(perPage, 10);
+  // Fetch enough phygitals to properly interleave with CC cards by price
+  const limit = isUngradedOnly ? perPage : perPage;
   const offset = isUngradedOnly ? (page - 1) * perPage : 0;
 
   const res = await fetch(
