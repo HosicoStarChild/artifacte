@@ -245,39 +245,38 @@ export default function CategoryAuctionsPage() {
         }
 
         const { v0Tx, v0TxSigned, legacyTx, price: mePrice, listingSource } = await buildRes.json();
-        const txBase64 = v0Tx || legacyTx;
-        if (!txBase64) throw new Error("No transaction returned from API");
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
-
         showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
-        const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
 
-        if (v0Tx) {
-          const { VersionedTransaction } = await import('@solana/web3.js');
+        const { VersionedTransaction } = await import('@solana/web3.js');
+
+        if (v0TxSigned && v0Tx) {
+          // Notary-cosigned flow (M3 phygitals + M2 CC cards)
+          // Send the notary-signed tx to wallet — wallet adds buyer sig
+          const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+          const notaryTx = VersionedTransaction.deserialize(signedBytes);
+          const signed = await signTransaction(notaryTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            skipPreflight: true,
+            preflightCommitment: 'confirmed',
+          });
+        } else if (v0Tx) {
+          // No notary needed — buyer-only signing
+          const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);
-
-          // For M3/M2 listings with notary cosigning: merge buyer sig into notary-signed tx
-          if (v0TxSigned) {
-            const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
-            const notaryTx = VersionedTransaction.deserialize(signedBytes);
-            // Copy buyer's signature (index 0) into the notary-signed tx
-            notaryTx.signatures[0] = (signed as any).signatures[0];
-            sig = await connection.sendRawTransaction(notaryTx.serialize(), {
-              skipPreflight: false,
-              preflightCommitment: 'confirmed',
-            });
-          } else {
-            sig = await connection.sendRawTransaction((signed as any).serialize(), {
-              skipPreflight: false,
-              preflightCommitment: 'confirmed',
-            });
-          }
-        } else {
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+          });
+        } else if (legacyTx) {
+          const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
           const tx = Transaction.from(txBytes);
           const signed = await signTransaction(tx);
           sig = await connection.sendRawTransaction(signed.serialize());
+        } else {
+          throw new Error("No transaction returned from API");
         }
 
         await connection.confirmTransaction(sig, "confirmed");
