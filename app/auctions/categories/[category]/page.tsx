@@ -34,6 +34,7 @@ const categoryEmojis: Record<string, string> = {
   "watches": "⌚",
   "sealed": "📦",
   "merchandise": "🛍️",
+  "phygitals": "🎴",
 };
 
 export default function CategoryAuctionsPage() {
@@ -117,7 +118,7 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "PHYGITALS";
 
   useEffect(() => {
     if (!useMeApi || !category) return;
@@ -201,6 +202,10 @@ export default function CategoryAuctionsPage() {
     SEALED: [
       { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     ],
+    PHYGITALS: [
+      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
+      { label: "Rarity", key: "rarity", options: ["All", "Common", "Uncommon", "Rare", "Holo Rare", "Ultra Rare"] },
+    ],
   };
 
   const isDigitalArt = category === "DIGITAL_ART";
@@ -215,8 +220,8 @@ export default function CategoryAuctionsPage() {
     try {
       let sig: string = "";
 
-      // CC / ME-listed cards: buy via ME notary-cosigned transaction
-      if (listing?.source === 'collector-crypt' || listing?.nftAddress) {
+      // CC / ME-listed cards / Phygitals: buy via ME notary-cosigned transaction
+      if (listing?.source === 'collector-crypt' || listing?.source === 'phygitals' || listing?.nftAddress) {
         const mintAddr = listing?.nftAddress || nftMint;
         if (!mintAddr) {
           showToast.error("NFT mint address not available");
@@ -580,14 +585,19 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : '#'} className="block">
-                      <div className="aspect-square overflow-hidden bg-dark-900">
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `https://magiceden.io/item-details/${(l as any).nftAddress}` : '#'} target={l.source === 'phygitals' ? '_blank' : undefined} className="block">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image}
                           alt={l.name}
-                          className={`w-full h-full ${l.source === 'collector-crypt' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
+                          className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
                         />
+                        {l.source === 'phygitals' && (
+                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            PHYGITAL
+                          </span>
+                        )}
                       </div>
                       </Link>
                       {/* Details */}
@@ -604,7 +614,12 @@ export default function CategoryAuctionsPage() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            {l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
+                            {l.source === 'phygitals' ? (
+                              <>
+                                <p className="text-white font-serif text-2xl">◎ {(l as any).solPrice?.toFixed(4) || l.price.toLocaleString()}</p>
+                                <p className="text-gold-500 text-xs mt-1">SOL</p>
+                              </>
+                            ) : l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
                               <>
                                 <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
@@ -638,6 +653,18 @@ export default function CategoryAuctionsPage() {
                             >
                               Coming Soon
                             </button>
+                          ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
+                            connected ? (
+                              <button
+                                onClick={() => handleBuyNow(l.id, (l as any).solPrice || l.price, (l as any).nftAddress, l)}
+                                disabled={buyingId === l.id}
+                                className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
+                              >
+                                {buyingId === l.id ? "Processing..." : `Buy Now`}
+                              </button>
+                            ) : (
+                              <WalletMultiButton className="w-full !bg-gold-500 hover:!bg-gold-600 !text-dark-900 !rounded-lg !text-sm !font-semibold !h-10 !justify-center" />
+                            )
                           ) : useMeApi ? (
                             <button
                               disabled
