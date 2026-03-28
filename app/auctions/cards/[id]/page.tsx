@@ -143,18 +143,19 @@ export default function CardDetailPage() {
         throw new Error(errData.error || 'Failed to build transaction');
       }
 
-      const { v0Tx, v0TxSigned, legacyTx, price, blockhash, lastValidBlockHeight } = await buildRes.json();
+      const { v0Tx, price, platformFee, blockhash, lastValidBlockHeight } = await buildRes.json();
       
-      if (!v0Tx || !v0TxSigned) throw new Error("No transaction returned from API");
+      if (!v0Tx) throw new Error("No transaction returned from API");
       
       if (!signTransaction) {
         throw new Error("Wallet does not support signing");
       }
 
-      showToast.info(`💳 Confirm purchase — ${price} SOL`);
+      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} fee` : '';
+      showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
       
       // Step 2: Deserialize and verify tx before signing
-      const txBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+      const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
       const vTx = VersionedTransaction.deserialize(txBytes);
       
       // Sanity check: fee payer must be the connected wallet

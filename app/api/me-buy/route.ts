@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { 
+  Connection, PublicKey, TransactionInstruction, TransactionMessage, 
+  VersionedTransaction, SystemProgram, AddressLookupTableAccount 
+} from '@solana/web3.js';
 
 /**
- * Artifacte ME Proxy Buy API
+ * Artifacte Buy API
  * 
- * Pure pass-through — no platform fee, exactly like Tensor.
+ * Rebuilds ME buy_now tx with 2% platform fee.
  * 
  * Flow:
  * 1. Fetch listing details from ME
- * 2. Call ME /v2/instructions/buy_now → get notary-cosigned tx
- * 3. Return serialized tx to frontend
- * 4. Frontend: buyer signs → submit to chain
+ * 2. Call ME /v2/instructions/buy_now → get base tx
+ * 3. Decompile tx, add platform fee, recompile with buyer-only signing
+ * 4. Return tx to frontend (no notary needed — requires_sign_off = false)
  */
 
 const ME_API_KEY = process.env.ME_API_KEY;
@@ -18,6 +22,10 @@ if (!ME_API_KEY) {
 }
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
+const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+const PLATFORM_TREASURY = new PublicKey('DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX');
+const PLATFORM_FEE_BPS = 200; // 2%
+const ME_NOTARY = 'NTYeYJ1wr4bpM5xo6zx5En44SvJFAd35zTxxNoERYqd';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -131,18 +139,102 @@ export async function POST(req: NextRequest) {
 
     const buyData = await buyRes.json();
 
-    // 3. Return UNSIGNED tx for wallet to sign cleanly (no pre-filled notary sig)
-    //    Plus the notary signature separately — frontend merges after wallet signs
-    const v0TxUnsigned = buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null;
-    const v0TxSigned = buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null;
+    // 3. Rebuild tx with platform fee — decompile ME tx, add fee, recompile
+    const conn = new Connection(HELIUS_RPC);
+    const meTx = VersionedTransaction.deserialize(Buffer.from(buyData.v0.tx.data));
+    const meKeys = meTx.message.staticAccountKeys;
+    const numSig = meTx.message.header.numRequiredSignatures;
+    const numReadonlySig = meTx.message.header.numReadonlySignedAccounts;
+    const numReadonlyUnsigned = meTx.message.header.numReadonlyUnsignedAccounts;
+    const totalStatic = meKeys.length;
+    
+    // Load address lookup tables
+    const lookupAddrs = meTx.message.addressTableLookups || [];
+    const lookupTables: AddressLookupTableAccount[] = [];
+    for (const lt of lookupAddrs) {
+      const ltAcct = await conn.getAddressLookupTable(lt.accountKey);
+      if (ltAcct.value) lookupTables.push(ltAcct.value);
+    }
+    
+    // Resolve account key by index (static + lookup table)
+    const getKey = (idx: number): PublicKey | null => {
+      if (idx < totalStatic) return meKeys[idx];
+      let offset = totalStatic;
+      for (const lt of lookupAddrs) {
+        const table = lookupTables.find(t => t.key.equals(lt.accountKey));
+        if (!table) continue;
+        if (idx < offset + lt.writableIndexes.length) {
+          return table.state.addresses[lt.writableIndexes[idx - offset]];
+        }
+        offset += lt.writableIndexes.length;
+        if (idx < offset + lt.readonlyIndexes.length) {
+          return table.state.addresses[lt.readonlyIndexes[idx - offset]];
+        }
+        offset += lt.readonlyIndexes.length;
+      }
+      return null;
+    }
+    
+    // Decompile all ME instructions (make notary non-signer)
+    const instructions = meTx.message.compiledInstructions.map(cix => {
+      return new TransactionInstruction({
+        programId: getKey(cix.programIdIndex)!,
+        keys: cix.accountKeyIndexes.map(idx => {
+          const pubkey = getKey(idx)!;
+          let isSigner = idx < numSig;
+          let isWritable: boolean;
+          if (idx < numSig) {
+            isWritable = idx < (numSig - numReadonlySig);
+          } else if (idx < totalStatic) {
+            isWritable = idx < (totalStatic - numReadonlyUnsigned);
+          } else {
+            isWritable = false;
+            let off = totalStatic;
+            for (const lt of lookupAddrs) {
+              if (idx < off + lt.writableIndexes.length) { isWritable = true; break; }
+              off += lt.writableIndexes.length;
+              if (idx < off + lt.readonlyIndexes.length) { isWritable = false; break; }
+              off += lt.readonlyIndexes.length;
+            }
+          }
+          // Notary doesn't need to sign (requires_sign_off = false)
+          if (pubkey.toString() === ME_NOTARY) isSigner = false;
+          return { pubkey, isSigner, isWritable };
+        }),
+        data: Buffer.from(cix.data),
+      });
+    });
+    
+    // Add 2% platform fee transfer
+    const buyerPK = new PublicKey(buyer);
+    const priceLamports = Math.round(price * 1e9);
+    const feeLamports = Math.round(priceLamports * PLATFORM_FEE_BPS / 10000);
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: buyerPK,
+      toPubkey: PLATFORM_TREASURY,
+      lamports: feeLamports,
+    });
+    
+    // Build new tx: [compute, compute, fee, deposit, buy, execute_sale]
+    const allIx = [instructions[0], instructions[1], feeIx, ...instructions.slice(2)];
+    
+    const { blockhash: freshBlockhash, lastValidBlockHeight: freshHeight } = await conn.getLatestBlockhash();
+    const msg = new TransactionMessage({
+      payerKey: buyerPK,
+      recentBlockhash: freshBlockhash,
+      instructions: allIx,
+    }).compileToV0Message(lookupTables.length ? lookupTables : undefined);
+    
+    const vtx = new VersionedTransaction(msg);
+    const txBase64 = Buffer.from(vtx.serialize()).toString('base64');
     
     return NextResponse.json({
-      v0Tx: v0TxUnsigned,        // unsigned — wallet signs this cleanly
-      v0TxSigned: v0TxSigned,    // notary-signed — extract notary sig from this
-      legacyTx: buyData.tx?.data ? Buffer.from(buyData.tx.data).toString('base64') : null,
-      blockhash: buyData.blockhashData?.blockhash,
-      lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
+      v0Tx: txBase64,
+      v0TxSigned: txBase64, // same — no notary sig needed
+      blockhash: freshBlockhash,
+      lastValidBlockHeight: freshHeight,
       price,
+      platformFee: feeLamports / 1e9,
       seller,
       mint,
       auctionHouse,
