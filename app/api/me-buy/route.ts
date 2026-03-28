@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Call ME buy instructions API (works for Core + pNFT + standard)
-    // Uses /buy (not /buy_now) which supports Metaplex Core assets
+    // 2. Call ME buy_now instructions API (atomic buy + execute_sale in one tx)
+    // /buy_now handles pNFT transfer via mip1_execute_sale_v2 — NOT /buy (which only places a bid)
     const params = new URLSearchParams({
       buyer,
       seller,
@@ -109,12 +109,12 @@ export async function POST(req: NextRequest) {
       price: price.toString(),
       auctionHouseAddress: auctionHouse,
     });
-    // Add optional params if available
+    // tokenATA is required — this is the escrow ATA where the NFT is held
     if (tokenATA) params.set('tokenATA', tokenATA);
     if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
 
     const buyRes = await fetch(
-      `${ME_API_BASE}/instructions/buy?${params}`,
+      `${ME_API_BASE}/instructions/buy_now?${params}`,
       { headers: { 'Authorization': `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(15000) }
     );
     if (!buyRes.ok) {
