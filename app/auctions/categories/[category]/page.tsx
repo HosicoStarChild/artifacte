@@ -244,7 +244,7 @@ export default function CategoryAuctionsPage() {
           throw new Error(errData.error || 'Failed to build transaction');
         }
 
-        const { v0Tx, legacyTx, price: mePrice } = await buildRes.json();
+        const { v0Tx, v0TxSigned, legacyTx, price: mePrice, listingSource } = await buildRes.json();
         const txBase64 = v0Tx || legacyTx;
         if (!txBase64) throw new Error("No transaction returned from API");
 
@@ -257,10 +257,23 @@ export default function CategoryAuctionsPage() {
           const { VersionedTransaction } = await import('@solana/web3.js');
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);
-          sig = await connection.sendRawTransaction((signed as any).serialize(), {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed',
-          });
+
+          // For M3/M2 listings with notary cosigning: merge buyer sig into notary-signed tx
+          if (v0TxSigned) {
+            const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+            const notaryTx = VersionedTransaction.deserialize(signedBytes);
+            // Copy buyer's signature (index 0) into the notary-signed tx
+            notaryTx.signatures[0] = (signed as any).signatures[0];
+            sig = await connection.sendRawTransaction(notaryTx.serialize(), {
+              skipPreflight: false,
+              preflightCommitment: 'confirmed',
+            });
+          } else {
+            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+              skipPreflight: false,
+              preflightCommitment: 'confirmed',
+            });
+          }
         } else {
           const tx = Transaction.from(txBytes);
           const signed = await signTransaction(tx);

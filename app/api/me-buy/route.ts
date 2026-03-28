@@ -3,13 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Artifacte ME Proxy Buy API
  * 
- * Pure pass-through — no platform fee, exactly like Tensor.
+ * Supports both M2 (auction house) and M3 (MMM pool) listings.
  * 
- * Flow:
- * 1. Fetch listing details from ME
- * 2. Call ME /v2/instructions/buy_now → get notary-cosigned tx
- * 3. Return serialized tx to frontend
- * 4. Frontend: buyer signs → submit to chain
+ * Flow for M2 (CC cards, pNFTs):
+ * 1. Fetch listing → call ME /v2/instructions/buy_now → return cosigned tx
+ * 
+ * Flow for M3 (Phygitals, cNFTs):
+ * 1. Fetch listing → detect M3 (empty auctionHouse)
+ * 2. Call ME /v2/instructions/batch with type "m3_buy_now"
+ * 3. Return cosigned tx (same format)
  */
 
 const ME_API_KEY = process.env.ME_API_KEY;
@@ -17,6 +19,7 @@ if (!ME_API_KEY) {
   console.error('[me-buy] ME_API_KEY not set in environment');
 }
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
+const ME_BATCH_BASE = 'https://api-mainnet.magiceden.us/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
@@ -69,9 +72,11 @@ export async function POST(req: NextRequest) {
     const tokenATA = listing.tokenAddress;
     const price = listing.price;
     const sellerExpiry = listing.expiry ?? -1;
-    const auctionHouse = listing.auctionHouse || CC_AUCTION_HOUSE;
+    const auctionHouse = listing.auctionHouse;
+    const listingSource = listing.listingSource;
+    const isM3 = !auctionHouse || listingSource === 'M3';
 
-    // 1b. Verify NFT is still owned by the seller (catch stale listings)
+    // 1b. Verify NFT is still available
     const HELIUS_KEY = process.env.HELIUS_API_KEY;
     if (HELIUS_KEY) {
       try {
@@ -86,52 +91,94 @@ export async function POST(req: NextRequest) {
         });
         const assetData = await assetRes.json();
         const currentOwner = assetData?.result?.ownership?.owner;
-        if (currentOwner && currentOwner !== seller) {
+        // For M3/MMM listings, NFT is held in ME's escrow PDA (2aSJBUGp...)
+        const ME_CNFT_ESCROW = '2aSJBUGpWWUZty3dafov1Z8Edw3YPA6Z1e2X3aqXu27i';
+        if (currentOwner && currentOwner !== seller && currentOwner !== ME_CNFT_ESCROW) {
           return NextResponse.json({ 
             error: 'This listing is no longer available — the NFT has already been sold.' 
           }, { status: 410 });
         }
       } catch (e) {
-        // Non-fatal — proceed with buy attempt
         console.warn('[me-buy] Ownership check failed, proceeding:', e);
       }
     }
 
-    // 2. Call ME buy instructions API (works for Core + pNFT + standard)
-    // Uses /buy (not /buy_now) which supports Metaplex Core assets
-    const params = new URLSearchParams({
-      buyer,
-      seller,
-      tokenMint: mint,
-      price: price.toString(),
-      auctionHouseAddress: auctionHouse,
-    });
-    // Add optional params if available
-    if (tokenATA) params.set('tokenATA', tokenATA);
-    if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
+    let buyData: any;
 
-    const buyRes = await fetch(
-      `${ME_API_BASE}/instructions/buy?${params}`,
-      { headers: { 'Authorization': `Bearer ${ME_API_KEY}` } }
-    );
-    if (!buyRes.ok) {
-      const errText = await buyRes.text();
-      console.error('[me-buy] ME API error:', errText);
-      return NextResponse.json({ error: `ME API error: ${errText}` }, { status: 502 });
+    if (isM3) {
+      // ── M3 path (Phygitals, cNFTs, MMM pool listings) ──
+      // Uses the batch endpoint on api-mainnet.magiceden.us
+      console.log('[me-buy] M3 listing detected, using batch endpoint');
+      
+      const q = JSON.stringify([{
+        type: 'm3_buy_now',
+        ins: {
+          buyer,
+          seller,
+          assetId: mint,
+          price,
+        }
+      }]);
+
+      const batchUrl = `${ME_BATCH_BASE}/instructions/batch?q=${encodeURIComponent(q)}&prioFeeMicroLamports=50000&maxPrioFeeLamports=10000000`;
+      
+      const batchRes = await fetch(batchUrl, {
+        headers: { 'Authorization': `Bearer ${ME_API_KEY}` },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!batchRes.ok) {
+        const errText = await batchRes.text();
+        console.error('[me-buy] ME batch API error:', errText);
+        return NextResponse.json({ error: `ME API error: ${errText}` }, { status: 502 });
+      }
+
+      const batchData = await batchRes.json();
+      const result = batchData[0];
+      
+      if (result.status === 'rejected') {
+        console.error('[me-buy] M3 buy rejected:', result.reason);
+        return NextResponse.json({ error: result.reason }, { status: 502 });
+      }
+
+      buyData = result.value;
+    } else {
+      // ── M2 path (CC cards, pNFTs, standard auction house listings) ──
+      const params = new URLSearchParams({
+        buyer,
+        seller,
+        tokenMint: mint,
+        price: price.toString(),
+        auctionHouseAddress: auctionHouse || CC_AUCTION_HOUSE,
+      });
+      if (tokenATA) params.set('tokenATA', tokenATA);
+      if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
+
+      const buyRes = await fetch(
+        `${ME_API_BASE}/instructions/buy_now?${params}`,
+        { headers: { 'Authorization': `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(15000) }
+      );
+      if (!buyRes.ok) {
+        const errText = await buyRes.text();
+        console.error('[me-buy] ME API error:', errText);
+        return NextResponse.json({ error: `ME API error: ${errText}` }, { status: 502 });
+      }
+
+      buyData = await buyRes.json();
     }
 
-    const buyData = await buyRes.json();
-
-    // 3. Return notary-cosigned tx as-is (no modifications)
+    // 3. Return cosigned tx (same format for both M2 and M3)
     return NextResponse.json({
-      v0Tx: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : null,
-      legacyTx: buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
+      v0Tx: buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null,
+      v0TxSigned: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : 
+                  buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
+      legacyTx: buyData.tx?.data ? Buffer.from(buyData.tx.data).toString('base64') : null,
       blockhash: buyData.blockhashData?.blockhash,
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
       price,
       seller,
       mint,
-      auctionHouse,
+      listingSource: isM3 ? 'M3' : 'M2',
+      auctionHouse: auctionHouse || null,
     });
 
   } catch (err: any) {
