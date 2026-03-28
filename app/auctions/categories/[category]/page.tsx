@@ -590,7 +590,7 @@ export default function CategoryAuctionsPage() {
                         />
                         {l.source === 'phygitals' && (
                           <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            PHYGITAL
+                            PHYGITALS
                           </span>
                         )}
                         {l.source === 'collector-crypt' && (
