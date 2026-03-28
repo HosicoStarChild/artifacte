@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
+    // Validate mint and buyer are valid base58 public keys (32 bytes)
+    const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    if (!base58Regex.test(mint) || !base58Regex.test(buyer)) {
+      return NextResponse.json({ error: 'Invalid address format' }, { status: 400 });
+    }
+
     // 1. Fetch active listing from ME
     const listingsRes = await fetch(
       `${ME_API_BASE}/tokens/${mint}/listings`,

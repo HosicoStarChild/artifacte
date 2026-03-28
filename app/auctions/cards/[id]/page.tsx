@@ -153,10 +153,23 @@ export default function CardDetailPage() {
 
       showToast.info(`💳 Confirm purchase — ${price} SOL`);
       
-      // Step 2: Sign the notary-presigned tx directly
-      // Solflare handles this fine; Phantom shows a domain warning but "Proceed anyway" works
+      // Step 2: Deserialize and verify tx before signing
       const txBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
       const vTx = VersionedTransaction.deserialize(txBytes);
+      
+      // Sanity check: fee payer must be the connected wallet
+      const feePayer = vTx.message.staticAccountKeys[0];
+      if (feePayer.toBase58() !== publicKey.toBase58()) {
+        throw new Error("Transaction fee payer doesn't match connected wallet");
+      }
+      
+      // Sanity check: must interact with M2 program
+      const M2_PROGRAM = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K';
+      const hasM2 = vTx.message.staticAccountKeys.some(k => k.toBase58() === M2_PROGRAM);
+      if (!hasM2) {
+        throw new Error("Transaction doesn't interact with ME marketplace");
+      }
+      
       const signed = await signTransaction(vTx as any);
       
       const rawTx = (signed as any).serialize();

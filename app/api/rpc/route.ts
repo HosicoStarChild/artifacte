@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 
-// Rate limit: 60 requests per minute per IP
+// Rate limit: 30 requests per minute per IP (tighter for RPC proxy)
 const rateLimit = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT = 60;
+const RATE_LIMIT = 30;
 const WINDOW_MS = 60000;
 
 function checkRateLimit(ip: string): boolean {
@@ -35,7 +35,6 @@ const ALLOWED_METHODS = new Set([
   "getMultipleAccounts",
   "getTokenAccountsByOwner",
   "isBlockhashValid",
-  "getTransaction",
 ]);
 
 export async function POST(req: NextRequest) {
