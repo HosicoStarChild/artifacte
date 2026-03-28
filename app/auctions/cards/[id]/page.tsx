@@ -472,14 +472,16 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Oracle Price History — skip for merchandise and TCGplayer-sourced cards */}
-            {card.category !== 'MERCHANDISE' && card.priceSource !== 'TCGplayer' && (
+            {/* Oracle Price History — skip for merchandise; phygitals get TCGplayer market price */}
+            {card.category !== 'MERCHANDISE' && (card.source !== 'phygitals' ? card.priceSource !== 'TCGplayer' : true) && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year}
               nftAddress={card.nftAddress}
+              source={card.source}
+              tcgPlayerId={card.tcgPlayerId}
             />
             )}
             {card.priceSource === 'TCGplayer' && card.priceSourceId && (

@@ -110,6 +110,8 @@ interface PriceHistoryProps {
   grade?: string;
   year?: number | string;
   nftAddress?: string;
+  source?: string;
+  tcgPlayerId?: string;
 }
 
 function normalizeGrade(g?: string): string | undefined {
@@ -124,7 +126,7 @@ function normalizeGrade(g?: string): string | undefined {
   return normalized;
 }
 
-export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId }: PriceHistoryProps) {
   const grade = normalizeGrade(rawGrade);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +154,42 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
       setSealedPrice(null);
 
       try {
+        // Phygitals: fetch TCGplayer ungraded market price
+        if (source === 'phygitals') {
+          const cleanName = cardName
+            .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, '')
+            .trim();
+          
+          const searchRes = await fetch(
+            `/api/oracle?endpoint=search&q=${encodeURIComponent(cleanName)}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.variants?.length > 0) {
+              // Find the ungraded/raw variant
+              const ungraded = searchData.variants.find((v: any) => 
+                !v.grade || v.grade === 'Ungraded' || v.grade === 'Raw'
+              ) || searchData.variants[0];
+              
+              if (ungraded.marketPrice || ungraded.lowestPrice) {
+                setSealedPrice({
+                  name: ungraded.fullName || ungraded.name || cleanName,
+                  marketPrice: ungraded.marketPrice || ungraded.lowestPrice || 0,
+                  lowestPrice: ungraded.lowestPrice || 0,
+                  tcg: ungraded.tcg || 'Pokemon',
+                });
+              } else {
+                setError("No TCGplayer price data found");
+              }
+            } else {
+              setError("No TCGplayer price data found");
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
         // Sealed products: fetch TCGplayer market price instead of graded chart
         if (category === "SEALED") {
           // Extract search terms from sealed product name
@@ -322,8 +360,8 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
     );
   }
 
-  // Sealed product pricing display
-  if (category === "SEALED" && sealedPrice) {
+  // Sealed / Phygital product pricing display
+  if ((category === "SEALED" || source === 'phygitals') && sealedPrice) {
     return (
       <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
         <div className="flex items-center justify-between gap-4 mb-6">
@@ -349,7 +387,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
     );
   }
 
-  if (category === "SEALED" && !sealedPrice && !loading) return null;
+  if ((category === "SEALED" || source === 'phygitals') && !sealedPrice && !loading) return null;
 
   if (error && !chartUrl && !sealedPrice) {
     return (
