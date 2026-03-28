@@ -204,9 +204,9 @@ export default function CardDetailPage() {
         throw new Error(errData.error || 'Failed to build transaction');
       }
 
-      const { v0Tx, price, platformFee, blockhash, lastValidBlockHeight } = await buildRes.json();
+      const { v0Tx, v0TxSigned, price, platformFee, blockhash, lastValidBlockHeight, listingSource } = await buildRes.json();
       
-      if (!v0Tx) throw new Error("No transaction returned from API");
+      if (!v0Tx && !v0TxSigned) throw new Error("No transaction returned from API");
       
       if (!signTransaction) {
         throw new Error("Wallet does not support signing");
@@ -216,7 +216,9 @@ export default function CardDetailPage() {
       showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
       
       // Step 2: Deserialize and verify tx before signing
-      const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
+      // For cosigned txs (M3/M2 with notary), use v0TxSigned so wallet can simulate
+      const txBase64 = v0TxSigned || v0Tx;
+      const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
       const vTx = VersionedTransaction.deserialize(txBytes);
       
       // Sanity check: fee payer must be the connected wallet
@@ -225,10 +227,13 @@ export default function CardDetailPage() {
         throw new Error("Transaction fee payer doesn't match connected wallet");
       }
       
-      // Sanity check: must interact with M2 program
+      // Sanity check: must interact with ME marketplace (M2 or M3)
       const M2_PROGRAM = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K';
-      const hasM2 = vTx.message.staticAccountKeys.some(k => k.toBase58() === M2_PROGRAM);
-      if (!hasM2) {
+      const M3_PROGRAM = 'M3mxk5W2tt27WGT7THox7PmgRDp4m6NEhL5xvxrBfS1';
+      const hasME = vTx.message.staticAccountKeys.some(k => 
+        k.toBase58() === M2_PROGRAM || k.toBase58() === M3_PROGRAM
+      );
+      if (!hasME) {
         throw new Error("Transaction doesn't interact with ME marketplace");
       }
       
