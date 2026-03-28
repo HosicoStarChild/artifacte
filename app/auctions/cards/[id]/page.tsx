@@ -467,20 +467,23 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Oracle Price History — skip for merchandise; phygitals get TCGplayer market price */}
-            {card.category !== 'MERCHANDISE' && (card.source !== 'phygitals' ? card.priceSource !== 'TCGplayer' : true) && (
+            {/* Phygitals: show TCGplayer price box */}
+            {card.source === 'phygitals' && card.priceSourceId && (
+              <TcgPlayerPriceBox productId={card.priceSourceId} />
+            )}
+            {/* CC cards with TCGplayer source: show TCGplayer price box */}
+            {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
+              <TcgPlayerPriceBox productId={card.priceSourceId} />
+            )}
+            {/* Oracle Price History — graded CC/Sports cards only */}
+            {card.category !== 'MERCHANDISE' && card.source !== 'phygitals' && card.priceSource !== 'TCGplayer' && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year}
               nftAddress={card.nftAddress}
-              source={card.source}
-              tcgPlayerId={card.tcgPlayerId}
             />
-            )}
-            {card.priceSource === 'TCGplayer' && card.priceSourceId && (
-              <TcgPlayerPriceBox productId={card.priceSourceId} />
             )}
 
             {/* NFT Details */}
