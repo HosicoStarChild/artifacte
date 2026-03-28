@@ -35,32 +35,59 @@ export default function CardDetailPage() {
       if (cardId.startsWith('phyg-')) {
         const mint = cardId.replace('phyg-', '');
         try {
-          const assetRes = await fetch(`/api/nft?mint=${mint}`);
+          // Fetch metadata + listing in parallel
+          const [assetRes, listRes, meListingRes] = await Promise.all([
+            fetch(`/api/nft?mint=${mint}`),
+            fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=100`),
+            fetch(`https://api-mainnet.magiceden.dev/v2/tokens/${mint}/listings`).catch(() => null),
+          ]);
+          
           if (assetRes.ok) {
-            const asset = await assetRes.json();
-            const attrs = asset.attributes || [];
+            const assetData = await assetRes.json();
+            const nft = assetData.nft || assetData;
+            const attrs = nft.attributes || [];
             const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
-            // Fetch listing price from ME
-            const listRes = await fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=100`);
+            
             const listData = await listRes.json();
             const listing = (listData.listings || []).find((l: any) => l.id === cardId);
             
+            // Also try ME listing directly for price
+            let mePrice = listing?.solPrice || 0;
+            let meSeller = listing?.seller || '';
+            if (meListingRes?.ok) {
+              try {
+                const meListing = await meListingRes.json();
+                if (Array.isArray(meListing) && meListing.length > 0) {
+                  mePrice = mePrice || meListing[0].price;
+                  meSeller = meSeller || meListing[0].seller;
+                }
+              } catch {}
+            }
+
+            const tcgPlayerId = getAttr('TCGplayer Product ID') || getAttr('TCGplayer_Product_ID') || '';
+            
             setCard({
               id: cardId,
-              name: asset.name || mint.slice(0, 12),
+              name: nft.name || mint.slice(0, 12),
               subtitle: [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
-              image: asset.image || '',
+              image: nft.image || '',
               nftAddress: mint,
               source: 'phygitals',
               currency: 'SOL',
               category: 'TCG_CARDS',
-              price: listing?.price || 0,
-              solPrice: listing?.solPrice || 0,
-              seller: listing?.seller || '',
+              price: mePrice,
+              solPrice: mePrice,
+              seller: meSeller,
               grade: getAttr('Grade') || 'Ungraded',
               tcg: getAttr('TCG') || '',
               rarity: getAttr('Rarity') || '',
               set: getAttr('Set') || '',
+              cardNumber: getAttr('Card Number') || '',
+              year: getAttr('Year') || '',
+              tcgPlayerId,
+              priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
+              priceSourceId: tcgPlayerId || undefined,
+              verifiedBy: 'TCGplayer',
             });
             setLoading(false);
             return;
