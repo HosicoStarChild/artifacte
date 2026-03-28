@@ -351,6 +351,14 @@
       "links": {
         "twitter": "https://x.com/ChadsNFT"
       }
+    },
+    {
+      "collectionAddress": "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf",
+      "name": "Collectors Crypt"
+    },
+    {
+      "collectionAddress": "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM",
+      "name": "Phygitals"
     }
   ]
 }
