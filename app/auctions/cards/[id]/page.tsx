@@ -164,23 +164,56 @@ export default function CardDetailPage() {
       // Notary is signature index 1 (buyer=0, notary=1)
       (signed as any).signatures[1] = notaryTx.signatures[1];
       
-      let sig: string;
-      sig = await connection.sendRawTransaction((signed as any).serialize(), {
+      const rawTx = (signed as any).serialize();
+      
+      // Step 4: Send with aggressive retry loop until blockhash expires
+      showToast.info("⏳ Submitting transaction...");
+      let sig = await connection.sendRawTransaction(rawTx, {
         skipPreflight: true,
-        maxRetries: 3,
+        maxRetries: 0, // we handle retries ourselves
       });
       
-      showToast.info("⏳ Confirming purchase...");
-      try {
-        await connection.confirmTransaction({
-          signature: sig,
-          blockhash: blockhash,
-          lastValidBlockHeight: lastValidBlockHeight,
-        }, "confirmed");
+      // Retry sending every 2s until confirmed or blockhash expires
+      const startTime = Date.now();
+      const MAX_RETRY_MS = 60_000; // 60s max
+      let confirmed = false;
+      
+      while (!confirmed && Date.now() - startTime < MAX_RETRY_MS) {
+        // Check if confirmed
+        const status = await connection.getSignatureStatus(sig);
+        if (status?.value?.confirmationStatus === 'confirmed' || 
+            status?.value?.confirmationStatus === 'finalized') {
+          confirmed = true;
+          break;
+        }
+        if (status?.value?.err) {
+          throw new Error('Transaction failed on-chain');
+        }
+        
+        // Check if blockhash still valid
+        const valid = await connection.isBlockhashValid(blockhash);
+        if (!valid?.value) {
+          // Blockhash expired — tx won't land
+          break;
+        }
+        
+        // Resend the same tx (idempotent — same sig won't double-execute)
+        try {
+          await connection.sendRawTransaction(rawTx, {
+            skipPreflight: true,
+            maxRetries: 0,
+          });
+        } catch {}
+        
+        // Wait 2s before next check
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      
+      if (confirmed) {
         showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
-      } catch (confirmErr: any) {
-        // Confirmation timeout doesn't mean failure — tx may still land
-        showToast.info(`⏳ TX submitted: ${sig.slice(0, 16)}... — check your wallet in a moment`);
+      } else {
+        // Not confirmed yet — might still land
+        showToast.info(`⏳ TX sent: ${sig.slice(0, 8)}... — check your wallet in a moment`);
       }
     } catch (err: any) {
       if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
