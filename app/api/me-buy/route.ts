@@ -76,9 +76,9 @@ export async function POST(req: NextRequest) {
     const listingSource = listing.listingSource;
     const isM3 = !auctionHouse || listingSource === 'M3';
 
-    // 1b. Verify NFT is still available
+    // 1b. Verify NFT is still available (skip for M3 — pool handles availability)
     const HELIUS_KEY = process.env.HELIUS_API_KEY;
-    if (HELIUS_KEY) {
+    if (HELIUS_KEY && !isM3) {
       try {
         const assetRes = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`, {
           method: 'POST',
@@ -93,7 +93,9 @@ export async function POST(req: NextRequest) {
         const currentOwner = assetData?.result?.ownership?.owner;
         // For M3/MMM listings, NFT is held in ME's escrow PDA (2aSJBUGp...)
         const ME_CNFT_ESCROW = '2aSJBUGpWWUZty3dafov1Z8Edw3YPA6Z1e2X3aqXu27i';
-        if (currentOwner && currentOwner !== seller && currentOwner !== ME_CNFT_ESCROW) {
+        const ME_M2_ESCROW = '1BWutmTvYPwDtmw9abTkS4Ssr8no61spGAvW1X6NDix';
+        if (currentOwner && currentOwner !== seller && currentOwner !== ME_CNFT_ESCROW && currentOwner !== ME_M2_ESCROW) {
+          console.log('[me-buy] Ownership mismatch:', { currentOwner, seller, mint, isM3 });
           return NextResponse.json({ 
             error: 'This listing is no longer available — the NFT has already been sold.' 
           }, { status: 410 });
