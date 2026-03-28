@@ -31,6 +31,65 @@ export default function CardDetailPage() {
     if (!cardId) return;
     
     async function loadCard() {
+      // Phygital cards: load directly from Helius
+      if (cardId.startsWith('phyg-')) {
+        const mint = cardId.replace('phyg-', '');
+        try {
+          // Fetch metadata + ME listing in parallel
+          const [assetRes, meListingRes] = await Promise.all([
+            fetch(`/api/nft?mint=${mint}`),
+            fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=50`).catch(() => null),
+          ]);
+          
+          if (assetRes.ok) {
+            const assetData = await assetRes.json();
+            const nft = assetData.nft || assetData;
+            const attrs = nft.attributes || [];
+            const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+            
+            // Find this card's listing in phygitals results
+            let mePrice = 0;
+            let meSeller = '';
+            if (meListingRes?.ok) {
+              try {
+                const listData = await meListingRes.json();
+                const listing = (listData.listings || []).find((l: any) => l.id === cardId || l.nftAddress === mint);
+                mePrice = listing?.solPrice || listing?.price || 0;
+                meSeller = listing?.seller || '';
+              } catch {}
+            }
+
+            const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || getAttr('TCGplayer_Product_ID') || '';
+            
+            setCard({
+              id: cardId,
+              name: nft.name || mint.slice(0, 12),
+              subtitle: [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
+              image: nft.image || '',
+              nftAddress: mint,
+              source: 'phygitals',
+              currency: 'SOL',
+              category: 'TCG_CARDS',
+              price: mePrice,
+              solPrice: mePrice,
+              seller: meSeller,
+              grade: getAttr('Grade') || 'Ungraded',
+              tcg: getAttr('TCG') || '',
+              rarity: getAttr('Rarity') || '',
+              set: getAttr('Set') || '',
+              cardNumber: getAttr('Card Number') || '',
+              year: getAttr('Year') || '',
+              tcgPlayerId,
+              priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
+              priceSourceId: tcgPlayerId || undefined,
+              verifiedBy: 'TCGplayer',
+            });
+            setLoading(false);
+            return;
+          }
+        } catch {}
+      }
+
       // First try: listing index (CC cards)
       try {
         const listRes = await fetch(`/api/me-listings?perPage=10000`);
@@ -467,8 +526,16 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Oracle Price History — skip for merchandise and TCGplayer-sourced cards */}
-            {card.category !== 'MERCHANDISE' && card.priceSource !== 'TCGplayer' && (
+            {/* Phygitals: show TCGplayer price box */}
+            {card.source === 'phygitals' && card.priceSourceId && (
+              <TcgPlayerPriceBox productId={card.priceSourceId} />
+            )}
+            {/* CC cards with TCGplayer source: show TCGplayer price box */}
+            {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
+              <TcgPlayerPriceBox productId={card.priceSourceId} />
+            )}
+            {/* Oracle Price History — graded CC/Sports cards only */}
+            {card.category !== 'MERCHANDISE' && card.source !== 'phygitals' && card.priceSource !== 'TCGplayer' && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
@@ -476,9 +543,6 @@ export default function CardDetailPage() {
               year={card.year}
               nftAddress={card.nftAddress}
             />
-            )}
-            {card.priceSource === 'TCGplayer' && card.priceSourceId && (
-              <TcgPlayerPriceBox productId={card.priceSourceId} />
             )}
 
             {/* NFT Details */}

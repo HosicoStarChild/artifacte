@@ -181,7 +181,7 @@ export default function CategoryAuctionsPage() {
     TCG_CARDS: [
       { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
       { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
-      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8"] },
+      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
     ],
     SPIRITS: [
@@ -215,8 +215,8 @@ export default function CategoryAuctionsPage() {
     try {
       let sig: string = "";
 
-      // CC / ME-listed cards: buy via ME notary-cosigned transaction
-      if (listing?.source === 'collector-crypt' || listing?.nftAddress) {
+      // CC / ME-listed cards / Phygitals: buy via ME notary-cosigned transaction
+      if (listing?.source === 'collector-crypt' || listing?.source === 'phygitals' || listing?.nftAddress) {
         const mintAddr = listing?.nftAddress || nftMint;
         if (!mintAddr) {
           showToast.error("NFT mint address not available");
@@ -244,7 +244,7 @@ export default function CategoryAuctionsPage() {
           throw new Error(errData.error || 'Failed to build transaction');
         }
 
-        const { v0Tx, legacyTx, price: mePrice } = await buildRes.json();
+        const { v0Tx, v0TxSigned, legacyTx, price: mePrice, listingSource } = await buildRes.json();
         const txBase64 = v0Tx || legacyTx;
         if (!txBase64) throw new Error("No transaction returned from API");
 
@@ -257,10 +257,23 @@ export default function CategoryAuctionsPage() {
           const { VersionedTransaction } = await import('@solana/web3.js');
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);
-          sig = await connection.sendRawTransaction((signed as any).serialize(), {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed',
-          });
+
+          // For M3/M2 listings with notary cosigning: merge buyer sig into notary-signed tx
+          if (v0TxSigned) {
+            const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
+            const notaryTx = VersionedTransaction.deserialize(signedBytes);
+            // Copy buyer's signature (index 0) into the notary-signed tx
+            notaryTx.signatures[0] = (signed as any).signatures[0];
+            sig = await connection.sendRawTransaction(notaryTx.serialize(), {
+              skipPreflight: false,
+              preflightCommitment: 'confirmed',
+            });
+          } else {
+            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+              skipPreflight: false,
+              preflightCommitment: 'confirmed',
+            });
+          }
         } else {
           const tx = Transaction.from(txBytes);
           const signed = await signTransaction(tx);
@@ -567,24 +580,31 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : '#'} className="block">
-                      <div className="aspect-square overflow-hidden bg-dark-900">
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : '#'} className="block">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image}
                           alt={l.name}
-                          className={`w-full h-full ${l.source === 'collector-crypt' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
+                          className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
                         />
+                        {l.source === 'phygitals' && (
+                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            PHYGITALS
+                          </span>
+                        )}
+                        {l.source === 'collector-crypt' && (
+                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            COLLECTOR CRYPT
+                          </span>
+                        )}
                       </div>
                       </Link>
                       {/* Details */}
                       <div className="p-6 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">
-                              {l.source === 'collector-crypt' ? 'Collectors Crypt' : l.source === 'artifacte' ? 'Artifacte' : 'Fixed Price'}
-                            </span>
-                            <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                          <div className="flex items-center gap-2 mb-3">
+                            <VerifiedBadge collectionName={l.name} verifiedBy={l.source === 'phygitals' ? 'TCGplayer' : l.verifiedBy} />
                           </div>
                           <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
                           <p className="text-gray-500 text-xs mb-1">{l.subtitle}</p>
@@ -593,7 +613,12 @@ export default function CategoryAuctionsPage() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            {l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
+                            {l.source === 'phygitals' ? (
+                              <>
+                                <p className="text-white font-serif text-2xl">◎ {(l as any).solPrice?.toFixed(4) || l.price.toLocaleString()}</p>
+                                <p className="text-gold-500 text-xs mt-1">SOL</p>
+                              </>
+                            ) : l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
                               <>
                                 <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
@@ -627,6 +652,18 @@ export default function CategoryAuctionsPage() {
                             >
                               Coming Soon
                             </button>
+                          ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
+                            connected ? (
+                              <button
+                                onClick={() => handleBuyNow(l.id, (l as any).solPrice || l.price, (l as any).nftAddress, l)}
+                                disabled={buyingId === l.id}
+                                className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
+                              >
+                                {buyingId === l.id ? "Processing..." : `Buy Now`}
+                              </button>
+                            ) : (
+                              <WalletMultiButton className="w-full !bg-gold-500 hover:!bg-gold-600 !text-dark-900 !rounded-lg !text-sm !font-semibold !h-10 !justify-center" />
+                            )
                           ) : useMeApi ? (
                             <button
                               disabled

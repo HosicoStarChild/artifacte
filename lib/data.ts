@@ -15,7 +15,8 @@ export const BAXUS_SELLER_FEE_PERCENT = 10;
 export type Category = 
   | "REAL_ESTATE" | "DIGITAL_ART" | "AGRICULTURE" 
   | "AVIATION" | "PRECIOUS_METALS" | "LUXURY" | "SPIRITS"
-  | "TCG_CARDS" | "SPORTS_CARDS" | "WATCHES" | "SEALED" | "MERCHANDISE";
+  | "TCG_CARDS" | "SPORTS_CARDS" | "WATCHES" | "SEALED" | "MERCHANDISE"
+  | "PHYGITALS";
 
 export interface Asset {
   id: string;
@@ -326,6 +327,7 @@ export const categoryColors: Record<Category, string> = {
   WATCHES: "text-gold-400",
   SEALED: "text-emerald-400",
   MERCHANDISE: "text-pink-400",
+  PHYGITALS: "text-violet-400",
 };
 
 export const categoryLabels: Record<Category, string> = {
@@ -341,6 +343,7 @@ export const categoryLabels: Record<Category, string> = {
   WATCHES: "WATCHES",
   SEALED: "SEALED PRODUCT",
   MERCHANDISE: "MERCHANDISE",
+  PHYGITALS: "PHYGITALS",
 };
 
 export const categorySlugMap: Record<string, Category> = {
@@ -351,6 +354,7 @@ export const categorySlugMap: Record<string, Category> = {
   "watches": "WATCHES",
   "sealed": "SEALED",
   "merchandise": "MERCHANDISE",
+  "phygitals": "PHYGITALS",
 };
 
 export function formatPrice(n: number): string {
