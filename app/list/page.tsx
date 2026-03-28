@@ -295,7 +295,7 @@ export default function ListNFTPage() {
                 {/* RWA Cards */}
                 {eligibleNfts.some(nft => {
                   const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                  return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                  return (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
                 }) && (
                   <div>
                     <h2 className="font-serif text-xl text-white mb-4">
@@ -303,14 +303,14 @@ export default function ListNFTPage() {
                       <span className="text-gray-500 text-sm ml-3 font-sans">
                         {eligibleNfts.filter(nft => {
                           const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                          return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                          return (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
                         }).length} items
                       </span>
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {eligibleNfts.filter(nft => {
                         const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                        return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                        return (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
                       }).map((nft) => {
                   const collection = getNftCollection(nft);
                   return (
@@ -362,7 +362,7 @@ export default function ListNFTPage() {
                 {/* Digital Collectibles */}
                 {eligibleNfts.some(nft => {
                   const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                  return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                  const isRwa = (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX"); return !isRwa;
                 }) && (
                   <div>
                     <h2 className="font-serif text-xl text-white mb-4">
@@ -370,14 +370,14 @@ export default function ListNFTPage() {
                       <span className="text-gray-500 text-sm ml-3 font-sans">
                         {eligibleNfts.filter(nft => {
                           const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                          return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                          const isRwa = (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX"); return !isRwa;
                         }).length} items
                       </span>
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {eligibleNfts.filter(nft => {
                         const g = nft.grouping?.find((g: any) => g.group_key === "collection");
-                        return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                        const isRwa = (g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value)) || (nft as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX"); return !isRwa;
                       }).map((nft) => {
                         const collection = getNftCollection(nft);
                         return (
