@@ -195,9 +195,11 @@ export default function PortfolioPage() {
               // Check for Artifacte-minted NFTs (admin wallet as creator/authority)
               // Skip the collection NFT itself
               if (asset.id === "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS") return;
-              // CC cards (CryptoCard collection) show as Artifacte cards
+              // CC cards + Phygitals show as Artifacte cards
               const CC_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
-              const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === CC_COLLECTION);
+              const PHYGITALS_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
+              const cardCollections = new Set([CC_COLLECTION, PHYGITALS_COLLECTION]);
+              const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && cardCollections.has(g.group_value));
               
               const isArtifacte = isCCCard || (!matchedAddress && (
                 (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
