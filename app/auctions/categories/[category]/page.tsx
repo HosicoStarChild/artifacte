@@ -603,9 +603,14 @@ export default function CategoryAuctionsPage() {
                       {/* Details */}
                       <div className="p-6 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
-                            <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                          <div className="flex items-center gap-2 mb-3">
+                            {l.source === 'phygitals' ? (
+                              <span className="text-xs font-semibold tracking-wider text-violet-400 flex items-center gap-1">
+                                <span className="text-green-400">✓</span> TCGplayer Verified
+                              </span>
+                            ) : (
+                              <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                            )}
                           </div>
                           <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
                           <p className="text-gray-500 text-xs mb-1">{l.subtitle}</p>
