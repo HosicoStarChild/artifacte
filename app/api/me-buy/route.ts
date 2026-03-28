@@ -23,7 +23,7 @@ if (!ME_API_KEY) {
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
-const PLATFORM_TREASURY = new PublicKey('DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX');
+const PLATFORM_TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
 const PLATFORM_FEE_BPS = 200; // 2%
 const ME_NOTARY = 'NTYeYJ1wr4bpM5xo6zx5En44SvJFAd35zTxxNoERYqd';
 
