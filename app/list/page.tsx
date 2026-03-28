@@ -257,10 +257,10 @@ export default function ListNFTPage() {
         {/* Header */}
         <div className="mb-10">
           <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
-          <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">List NFT</p>
-          <h1 className="font-serif text-4xl text-white mb-3">List Your Digital Collectible</h1>
+          <p className="text-gold-400 text-xs font-bold tracking-[0.2em] uppercase mb-3">List Item</p>
+          <h1 className="font-serif text-4xl text-white mb-3">List Your Item</h1>
           <p className="text-gray-400 text-base">
-            Select an NFT from an approved collection and set your price.
+            Select an item from your wallet and set your price.
           </p>
         </div>
 
@@ -273,30 +273,45 @@ export default function ListNFTPage() {
         {/* Step 1: Select NFT */}
         {!selectedNft ? (
           <div>
-            <h2 className="font-serif text-xl text-white mb-4">
-              Select NFT
-              <span className="text-gray-500 text-sm ml-3 font-sans">
-                {loadingNfts ? "Loading..." : `${eligibleNfts.length} eligible from approved collections`}
-              </span>
-            </h2>
-
             {loadingNfts ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="bg-dark-800 border border-white/5 rounded-xl h-64 animate-pulse" />
-                ))}
+              <div>
+                <h2 className="font-serif text-xl text-white mb-4">Loading...</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="bg-dark-800 border border-white/5 rounded-xl h-64 animate-pulse" />
+                  ))}
+                </div>
               </div>
             ) : eligibleNfts.length === 0 ? (
               <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
                 <div className="text-4xl mb-4">📭</div>
-                <p className="text-gray-400 mb-2">No eligible NFTs found</p>
+                <p className="text-gray-400 mb-2">No eligible items found</p>
                 <p className="text-gray-500 text-sm">
                   You need NFTs from an approved collection. Currently approved: {Object.values(allowedCollections).join(", ") || "None"}.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {eligibleNfts.map((nft) => {
+              <div className="space-y-10">
+                {/* RWA Cards */}
+                {eligibleNfts.some(nft => {
+                  const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                  return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                }) && (
+                  <div>
+                    <h2 className="font-serif text-xl text-white mb-4">
+                      <span className="text-gold-400">RWA Cards</span>
+                      <span className="text-gray-500 text-sm ml-3 font-sans">
+                        {eligibleNfts.filter(nft => {
+                          const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                          return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                        }).length} items
+                      </span>
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {eligibleNfts.filter(nft => {
+                        const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                        return g && ["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                      }).map((nft) => {
                   const collection = getNftCollection(nft);
                   return (
                     <button
@@ -341,6 +356,63 @@ export default function ListNFTPage() {
                     </button>
                   );
                 })}
+                    </div>
+                  </div>
+                )}
+                {/* Digital Collectibles */}
+                {eligibleNfts.some(nft => {
+                  const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                  return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                }) && (
+                  <div>
+                    <h2 className="font-serif text-xl text-white mb-4">
+                      <span className="text-blue-400">Digital Collectibles</span>
+                      <span className="text-gray-500 text-sm ml-3 font-sans">
+                        {eligibleNfts.filter(nft => {
+                          const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                          return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                        }).length} items
+                      </span>
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {eligibleNfts.filter(nft => {
+                        const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+                        return !g || !["CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf", "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM"].includes(g.group_value);
+                      }).map((nft) => {
+                        const collection = getNftCollection(nft);
+                        return (
+                          <button key={nft.id} onClick={() => {
+                            setSelectedNft(nft);
+                            setLoadingRoyalty(true);
+                            fetch(`/api/nft?mint=${nft.id}`)
+                              .then(r => r.json())
+                              .then(data => {
+                                const asset = data.nft || data;
+                                const addlMeta = asset.mint_extensions?.metadata?.additional_metadata || [];
+                                for (const [key, value] of addlMeta) {
+                                  if (key === 'royalty_basis_points') { setRoyaltyBps(parseInt(value) || 0); setLoadingRoyalty(false); return; }
+                                }
+                                setRoyaltyBps(asset.royalty?.basis_points || 0);
+                                setLoadingRoyalty(false);
+                              })
+                              .catch(() => { setRoyaltyBps(0); setLoadingRoyalty(false); });
+                          }}
+                          className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden text-left hover:border-blue-500/50 transition group">
+                            <div className="aspect-square bg-dark-700 relative overflow-hidden">
+                              <img src={getNftImage(nft)} alt={nft.content?.metadata?.name} loading="lazy"
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }} />
+                            </div>
+                            <div className="p-3">
+                              <p className="text-white text-sm font-semibold truncate">{nft.content?.metadata?.name || "Unnamed"}</p>
+                              <p className="text-gray-500 text-xs mt-1 truncate">{collection?.name}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
