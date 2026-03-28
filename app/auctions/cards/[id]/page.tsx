@@ -65,6 +65,7 @@ export default function CardDetailPage() {
                 nftAddress: asset.id || asset.mint || cardId,
                 category: "TCG_CARDS",
                 source: "artifacte",
+                collection: "Artifacte",
                 grade: getAttr("Condition") === "Graded" ? `${getAttr("Grading Company")} ${getAttr("Grade")}` : getAttr("Condition"),
                 gradeNum: getAttr("Grade") || null,
                 gradingCompany: getAttr("Grading Company") || null,
@@ -94,6 +95,7 @@ export default function CardDetailPage() {
                 nftAddress: asset.id || asset.mint || cardId,
                 category: "TCG_CARDS",
                 source: "collector-crypt",
+                collection: "Collectors Crypt",
                 grade: `${getAttr("Grading Company")} ${getAttr("The Grade") || getAttr("GradeNum")}`.trim(),
                 gradeNum: getAttr("GradeNum") || null,
                 gradingCompany: getAttr("Grading Company") || null,
@@ -308,6 +310,11 @@ export default function CardDetailPage() {
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-gold-500 text-xs font-semibold tracking-widest uppercase">{card.ccCategory}</span>
                 <VerifiedBadge collectionName={card.name} verifiedBy={card.verifiedBy} />
+                {card.collection && (
+                  <span className="px-2 py-0.5 rounded-full bg-gold-500/10 border border-gold-500/30 text-gold-400 text-xs font-semibold tracking-wide">
+                    {card.collection}
+                  </span>
+                )}
               </div>
               <h1 className="font-serif text-3xl md:text-4xl text-white mb-2">{card.name}</h1>
               <p className="text-gray-400 text-sm">{card.subtitle}</p>

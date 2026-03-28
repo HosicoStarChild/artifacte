@@ -581,7 +581,9 @@ export default function CategoryAuctionsPage() {
                       <div className="p-6 flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
+                            <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">
+                              {l.source === 'collector-crypt' ? 'Collectors Crypt' : l.source === 'artifacte' ? 'Artifacte' : 'Fixed Price'}
+                            </span>
                             <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
                           </div>
                           <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
