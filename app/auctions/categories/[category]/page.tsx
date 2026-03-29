@@ -579,7 +579,7 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : '#'} className="block">
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : l.source === 'baxus' ? (l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`) : '#'} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image}
@@ -644,13 +644,15 @@ export default function CategoryAuctionsPage() {
                               </>
                             )}
                           </div>
-                          {l.source === 'baxus' && l.externalUrl ? (
-                            <button
-                              disabled
-                              className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
+                          {l.source === 'baxus' && (l.externalUrl || (l as any).nftAddress) ? (
+                            <a
+                              href={l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
                             >
-                              Coming Soon
-                            </button>
+                              Buy on BAXUS
+                            </a>
                           ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
                             connected ? (
                               <button
