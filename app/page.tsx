@@ -77,7 +77,7 @@ export default function Home() {
                 { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
                 { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "" },
                 { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "https://images.unsplash.com/photo-1642427749670-f20e2e76ed8c?w=600&q=80", count: "" },
-                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=600&q=80", count: "" },
+                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=600&q=80", count: "" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
                   <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
