@@ -157,13 +157,11 @@ export default function Home() {
               <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Active Auctions</p>
               <h2 className="font-serif text-3xl md:text-4xl text-white">Live Now</h2>
             </div>
-            <Link href="/auctions" className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
-              View All Auctions →
-            </Link>
+            <span className="text-gold-500 text-sm font-semibold tracking-wide uppercase">Coming Soon</span>
           </div>
           <div className="text-center py-16">
-            <p className="text-gray-400 text-lg font-serif">Coming Soon</p>
-            <p className="text-gray-500 text-sm mt-2">Live auctions are being prepared. Stay tuned.</p>
+            <p className="text-gold-500/80 text-lg font-serif">Live auctions are being prepared.</p>
+            <p className="text-gray-500 text-sm mt-2">Stay tuned.</p>
           </div>
         </div>
       </section>
