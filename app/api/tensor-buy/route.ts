@@ -11,7 +11,7 @@ const ME_API_KEY = process.env.ME_API_KEY || '';
 
 const TENSOR_MARKETPLACE = new PublicKey('TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp');
 const BUBBLEGUM = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
-const SPL_NOOP = new PublicKey('noopb9bkMVfRPU8AsBRBV2dZzAccCQyztmttaRtMZpX');
+const SPL_NOOP = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
 const SPL_ACCOUNT_COMPRESSION = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const TENSOR_FEE_VAULT_PROGRAM = new PublicKey('TFEEgwDP6nn1s8mMX2tTNPPz8j2VomkphLUmyxKm17A');
@@ -134,32 +134,35 @@ export async function POST(request: Request) {
     ixData.writeUInt32LE(nonce, off); off += 4;
 
     // Build account keys (order matters — matches SDK's getBuySplCompressedInstruction)
+    // Account order MUST match Tensor SDK's getBuySplCompressedInstruction exactly
     const keys = [
-      { pubkey: feeVault, isSigner: false, isWritable: true },
-      { pubkey: feeVaultUsdcAta, isSigner: false, isWritable: true },
-      { pubkey: treeAuthority, isSigner: false, isWritable: false },
-      { pubkey: merkleTree, isSigner: false, isWritable: true },
-      { pubkey: SPL_NOOP, isSigner: false, isWritable: false },
-      { pubkey: SPL_ACCOUNT_COMPRESSION, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: BUBBLEGUM, isSigner: false, isWritable: false },
-      { pubkey: TENSOR_MARKETPLACE, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: listState, isSigner: false, isWritable: true },
-      { pubkey: buyerPk, isSigner: true, isWritable: true },  // buyer + payer
-      { pubkey: buyerUsdcAta, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: false, isWritable: false },
-      { pubkey: ownerUsdcAta, isSigner: false, isWritable: true },
-      { pubkey: USDC_MINT, isSigner: false, isWritable: false },
-      { pubkey: buyerPk, isSigner: false, isWritable: true }, // takerBroker (none, use buyer)
-      { pubkey: buyerUsdcAta, isSigner: false, isWritable: true }, // takerBrokerTa
-      { pubkey: owner, isSigner: false, isWritable: true }, // makerBroker (default to owner)
-      { pubkey: ownerUsdcAta, isSigner: false, isWritable: true }, // makerBrokerTa
-      { pubkey: owner, isSigner: false, isWritable: true }, // rentDestination
-      // Creators
+      { pubkey: feeVault, isSigner: false, isWritable: true },           // feeVault
+      { pubkey: feeVaultUsdcAta, isSigner: false, isWritable: true },    // feeVaultCurrencyTa
+      { pubkey: treeAuthority, isSigner: false, isWritable: false },     // treeAuthority
+      { pubkey: merkleTree, isSigner: false, isWritable: true },         // merkleTree
+      { pubkey: SPL_NOOP, isSigner: false, isWritable: false },          // logWrapper
+      { pubkey: SPL_ACCOUNT_COMPRESSION, isSigner: false, isWritable: false }, // compressionProgram
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // systemProgram
+      { pubkey: BUBBLEGUM, isSigner: false, isWritable: false },         // bubblegumProgram
+      { pubkey: TENSOR_MARKETPLACE, isSigner: false, isWritable: false },// marketplaceProgram
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },  // currencyTokenProgram
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // associatedTokenProgram
+      { pubkey: listState, isSigner: false, isWritable: true },          // listState
+      { pubkey: buyerPk, isSigner: true, isWritable: false },            // buyer
+      { pubkey: buyerPk, isSigner: true, isWritable: true },             // payer
+      { pubkey: buyerUsdcAta, isSigner: false, isWritable: true },       // payerCurrencyTa
+      { pubkey: owner, isSigner: false, isWritable: false },             // owner
+      { pubkey: ownerUsdcAta, isSigner: false, isWritable: true },       // ownerCurrencyTa
+      { pubkey: USDC_MINT, isSigner: false, isWritable: false },         // currency
+      { pubkey: buyerPk, isSigner: false, isWritable: true },            // takerBroker
+      { pubkey: buyerUsdcAta, isSigner: false, isWritable: true },       // takerBrokerTa
+      { pubkey: owner, isSigner: false, isWritable: true },              // makerBroker
+      { pubkey: ownerUsdcAta, isSigner: false, isWritable: true },       // makerBrokerTa
+      { pubkey: owner, isSigner: false, isWritable: true },              // rentDestination
+      { pubkey: owner, isSigner: false, isWritable: true },              // rentPayer
+      // Creators (remaining accounts)
       ...creators.map((c: any) => ({ pubkey: new PublicKey(c.address), isSigner: false, isWritable: true })),
-      // Proof path
+      // Proof path (remaining accounts)
       ...proofPath.map((p: PublicKey) => ({ pubkey: p, isSigner: false, isWritable: false })),
     ];
 
