@@ -127,9 +127,9 @@ export default async function Home() {
                 { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&q=80", count: "" },
                 { name: "Spirits", slug: "spirits", href: "/auctions/categories/spirits", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=600&q=80", count: "2,300+" },
                 { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
-                { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "" },
+                { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "110+" },
                 { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "https://arweave.net/_8W5-SxQ2FRpnItTJcNuk1mVlgGokNSSD4R7Kj1pffM", count: "130+" },
-                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=600&q=80", count: "" },
+                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=600&q=80", count: "500+" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
                   <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
