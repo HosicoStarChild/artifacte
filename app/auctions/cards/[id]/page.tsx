@@ -35,58 +35,45 @@ export default function CardDetailPage() {
       if (cardId.startsWith('phyg-')) {
         const mint = cardId.replace('phyg-', '');
         try {
-          // Fetch metadata + ME listing in parallel
-          const [assetRes, meListingRes] = await Promise.all([
-            fetch(`/api/nft?mint=${mint}`),
-            fetch(`/api/me-listings?category=TCG_CARDS&grade=Ungraded&perPage=50`).catch(() => null),
-          ]);
+          // Search oracle for this specific card by name/mint
+          const searchRes = await fetch(`/api/me-listings?category=TCG_CARDS&q=${encodeURIComponent(mint)}&perPage=1`);
+          const searchData = searchRes.ok ? await searchRes.json() : null;
+          const oracleListing = searchData?.listings?.find((l: any) => l.id === cardId || l.nftAddress === mint);
           
-          if (assetRes.ok) {
-            const assetData = await assetRes.json();
-            const nft = assetData.nft || assetData;
-            const attrs = nft.attributes || [];
-            const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
-            
-            // Find this card's listing in phygitals results
-            let mePrice = 0;
-            let meSeller = '';
-            if (meListingRes?.ok) {
-              try {
-                const listData = await meListingRes.json();
-                const listing = (listData.listings || []).find((l: any) => l.id === cardId || l.nftAddress === mint);
-                mePrice = listing?.solPrice || listing?.price || 0;
-                meSeller = listing?.seller || '';
-              } catch {}
-            }
+          // Also fetch Helius metadata for TCGPlayer ID
+          const assetRes = await fetch(`/api/nft?mint=${mint}`);
+          const assetData = assetRes.ok ? await assetRes.json() : null;
+          const nft = assetData?.nft || assetData || {};
+          const attrs = nft.attributes || [];
+          const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
 
-            const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || getAttr('TCGplayer_Product_ID') || '';
-            
-            setCard({
-              id: cardId,
-              name: nft.name || mint.slice(0, 12),
-              subtitle: [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
-              image: nft.image || '',
-              nftAddress: mint,
-              source: 'phygitals',
-              currency: 'SOL',
-              category: 'TCG_CARDS',
-              price: mePrice,
-              solPrice: mePrice,
-              seller: meSeller,
-              grade: getAttr('Grade') || 'Ungraded',
-              tcg: getAttr('TCG') || '',
-              rarity: getAttr('Rarity') || '',
-              set: getAttr('Set') || '',
-              cardNumber: getAttr('Card Number') || '',
-              year: getAttr('Year') || '',
-              tcgPlayerId,
-              priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
-              priceSourceId: tcgPlayerId || undefined,
-              verifiedBy: 'TCGplayer',
-            });
-            setLoading(false);
-            return;
-          }
+          const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
+          
+          setCard({
+            id: cardId,
+            name: oracleListing?.name || nft.name || mint.slice(0, 12),
+            subtitle: oracleListing?.subtitle || [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
+            image: oracleListing?.image || nft.image || '',
+            nftAddress: mint,
+            source: 'phygitals',
+            currency: 'SOL',
+            category: 'TCG_CARDS',
+            price: oracleListing?.solPrice || oracleListing?.price || 0,
+            solPrice: oracleListing?.solPrice || oracleListing?.price || 0,
+            seller: oracleListing?.seller || '',
+            grade: oracleListing?.grade || getAttr('Grade') || 'Ungraded',
+            tcg: oracleListing?.tcg || getAttr('TCG') || '',
+            rarity: oracleListing?.rarity || getAttr('Rarity') || '',
+            set: oracleListing?.set || getAttr('Set') || '',
+            cardNumber: oracleListing?.cardNumber || getAttr('Card Number') || '',
+            year: oracleListing?.year || getAttr('Year') || '',
+            tcgPlayerId,
+            priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
+            priceSourceId: tcgPlayerId || undefined,
+            verifiedBy: 'TCGplayer',
+          });
+          setLoading(false);
+          return;
         } catch {}
       }
 
@@ -523,9 +510,15 @@ export default function CardDetailPage() {
                 ) : (
                   <p className="text-gray-400 text-xs leading-relaxed">
                     📦 Physical card securely stored at {card.vault || 'vault facility'}. After purchase, you own the NFT representing this card. To claim the physical card, redeem via{' '}
-                    <a href="https://collectorcrypt.com" target="_blank" rel="noopener noreferrer" className="text-gold-500 hover:text-gold-400 underline">
-                      Collector Crypt
-                    </a>.
+                    {card.source === 'phygitals' ? (
+                      <a href="https://phygitals.io" target="_blank" rel="noopener noreferrer" className="text-gold-500 hover:text-gold-400 underline">
+                        Phygitals
+                      </a>
+                    ) : (
+                      <a href="https://collectorcrypt.com" target="_blank" rel="noopener noreferrer" className="text-gold-500 hover:text-gold-400 underline">
+                        Collector Crypt
+                      </a>
+                    )}.
                   </p>
                 )}
               </div>
