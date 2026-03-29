@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     // Build instruction data
     // Decode base58 hashes
     const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    function decodeBase58(str: string): Buffer {
+    const decodeBase58 = (str: string): Buffer => {
       let result = BigInt(0);
       for (const char of str) {
         const idx = BASE58_ALPHABET.indexOf(char);
