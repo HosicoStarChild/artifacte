@@ -7,6 +7,19 @@ import { HomeTCGSection } from "@/components/HomeTCGSection";
 
 const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
 
+async function getSpiritsCarousel() {
+  try {
+    const res = await fetch(`${ORACLE_API}/api/listings?category=SPIRITS&perPage=12&sort=price-desc`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.listings || []).filter((l: any) => l.image && l.price > 0);
+  } catch {
+    return [];
+  }
+}
+
 async function getFeaturedListing() {
   try {
     // Use day of year as seed for daily rotation
@@ -32,6 +45,7 @@ async function getFeaturedListing() {
 
 export default async function Home() {
   const heroListing = await getFeaturedListing();
+  const spiritsCarousel = await getSpiritsCarousel();
 
   return (
     <div>
@@ -152,8 +166,8 @@ export default async function Home() {
           </div>
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
-              {listings.filter(l => l.category === "SPIRITS").slice(0, 6).map((l) => (
-                <Link key={l.id} href={`/auctions?listing=${l.id}`} className="flex-shrink-0 w-80 snap-start group">
+              {spiritsCarousel.map((l: any) => (
+                <a key={l.id} href={l.externalUrl || `https://app.baxus.co/asset/${l.nftAddress}`} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-80 snap-start group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
                     <div className="aspect-square overflow-hidden bg-dark-900">
                       <img
@@ -166,20 +180,19 @@ export default async function Home() {
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
-                          <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                          <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy || 'BAXUS'} />
                         </div>
                         <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
                         <p className="text-gray-500 text-xs mb-1">{l.subtitle}</p>
-                        <p className="text-gray-600 text-xs mb-4">{l.spirit_type}</p>
+                        <p className="text-gray-600 text-xs mb-4">{l.spiritType}</p>
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
                         <p className="text-white font-serif text-2xl">{formatFullPrice(l.price)}</p>
-                        <p className="text-gold-500 text-xs mt-1">{l.price.toLocaleString()} USD1</p>
                       </div>
                     </div>
                   </div>
-                </Link>
+                </a>
               ))}
             </div>
           </div>
