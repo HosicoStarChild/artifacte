@@ -34,7 +34,7 @@ export default function NotFound() {
             Back to Home
           </Link>
           <Link
-            href="/auctions"
+            href="/"
             className="inline-block px-8 py-3 rounded-lg border border-[#d4af37]/30 text-[#d4af37] hover:bg-[#d4af37]/5 font-semibold transition-colors duration-200"
           >
             Browse Marketplace
@@ -45,7 +45,7 @@ export default function NotFound() {
         <div className="mt-12 pt-8 border-t border-white/10">
           <p className="text-gray-500 text-sm mb-6">Or explore these popular sections:</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/auctions" className="text-[#d4af37] hover:text-[#c9a55c] text-sm transition-colors">
+            <Link href="/" className="text-[#d4af37] hover:text-[#c9a55c] text-sm transition-colors">
               Auctions
             </Link>
             <span className="text-gray-700">•</span>
