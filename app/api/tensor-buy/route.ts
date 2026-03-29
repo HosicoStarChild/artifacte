@@ -88,11 +88,34 @@ export async function POST(request: Request) {
     const feeVaultUsdcAta = await getAssociatedTokenAddress(USDC_MINT, feeVault, true);
 
     // Build instruction data
-    // Hashes are base58 — decode using PublicKey (guaranteed to work)
-    const rootBytes = new PublicKey(proofResult.root).toBytes();
+    // Decode base58 hashes
+    const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    function decodeBase58(str: string): Buffer {
+      let result = BigInt(0);
+      for (const char of str) {
+        const idx = BASE58_ALPHABET.indexOf(char);
+        if (idx === -1) throw new Error(`Invalid base58 char: ${char}`);
+        result = result * BigInt(58) + BigInt(idx);
+      }
+      const bytes: number[] = [];
+      while (result > BigInt(0)) {
+        bytes.unshift(Number(result % BigInt(256)));
+        result = result / BigInt(256);
+      }
+      // Add leading zeros for leading '1's in base58
+      for (const char of str) {
+        if (char === '1') bytes.unshift(0);
+        else break;
+      }
+      // Pad to 32 bytes
+      while (bytes.length < 32) bytes.unshift(0);
+      return Buffer.from(bytes);
+    }
+    
     const compression = assetResult?.compression || {};
-    const dataHashBytes = new PublicKey(compression.data_hash || proofResult.data_hash).toBytes();
-    const creatorHashBytes = new PublicKey(compression.creator_hash || proofResult.creator_hash).toBytes();
+    const rootBytes = decodeBase58(proofResult.root);
+    const dataHashBytes = decodeBase58(compression.data_hash || '11111111111111111111111111111111');
+    const creatorHashBytes = decodeBase58(compression.creator_hash || '11111111111111111111111111111111');
     const nonce = compression.leaf_id ?? proofResult.node_index ?? 0;
 
     const ixData = Buffer.alloc(8 + 8 + 3 + 32 + 32 + 32 + 8 + 4);
