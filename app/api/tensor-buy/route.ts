@@ -177,7 +177,7 @@ export async function POST(request: Request) {
 
     // 5. Build the instruction data
     // BuySplCompressed data: discriminator (8) + maxAmount (u64) + optionalRoyaltyPct (option<u16>) + root (32) + dataHash (32) + creatorHash (32) + nonce (u64) + index (u32)
-    const maxAmount = amount + (amount * 5n / 100n); // 5% slippage
+    const maxAmount = amount + (amount * BigInt(5) / BigInt(100)); // 5% slippage
     const dataHashBytes = Buffer.from(dataHash, 'base64');
     const creatorHashBytes = Buffer.from(creatorHash, 'base64');
     
