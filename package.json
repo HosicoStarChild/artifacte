@@ -23,6 +23,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.95.0",
+    "@tensor-foundation/marketplace": "^1.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@xmtp/xmtp-js": "^13.0.4",
