@@ -259,49 +259,36 @@ export default function CategoryAuctionsPage() {
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
 
-          // Build platform fee transaction (2% of sale price)
+          // Build & send platform fee (2% of sale price)
           const { SystemProgram, Transaction: LegacyTx, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
           const PLATFORM_FEE_BPS = 200; // 2%
           const PLATFORM_WALLET = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
           const feeAmount = Math.ceil(mePrice * LAMPORTS_PER_SOL * PLATFORM_FEE_BPS / 10000);
           
           if (feeAmount > 0) {
-            const feeTx = new LegacyTx().add(
-              SystemProgram.transfer({
-                fromPubkey: publicKey,
-                toPubkey: PLATFORM_WALLET,
-                lamports: feeAmount,
-              })
-            );
-            feeTx.feePayer = publicKey;
-            feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-            // Sign both transactions atomically
-            if (signAllTransactions) {
-              const [signedFee, signedBuy] = await signAllTransactions([feeTx as any, notaryTx as any]);
-              // Send fee first, then buy
-              await connection.sendRawTransaction((signedFee as any).serialize(), { skipPreflight: true });
-              sig = await connection.sendRawTransaction((signedBuy as any).serialize(), {
-                skipPreflight: true,
-                preflightCommitment: 'confirmed',
-              });
-            } else {
-              // Fallback: sign individually
+            try {
+              const feeTx = new LegacyTx().add(
+                SystemProgram.transfer({
+                  fromPubkey: publicKey,
+                  toPubkey: PLATFORM_WALLET,
+                  lamports: feeAmount,
+                })
+              );
+              feeTx.feePayer = publicKey;
+              feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
               const signedFee = await signTransaction(feeTx as any);
               await connection.sendRawTransaction((signedFee as any).serialize(), { skipPreflight: true });
-              const signed = await signTransaction(notaryTx as any);
-              sig = await connection.sendRawTransaction((signed as any).serialize(), {
-                skipPreflight: true,
-                preflightCommitment: 'confirmed',
-              });
+            } catch (feeErr) {
+              console.warn('[buy] Fee tx failed, proceeding with purchase:', feeErr);
             }
-          } else {
-            const signed = await signTransaction(notaryTx as any);
-            sig = await connection.sendRawTransaction((signed as any).serialize(), {
-              skipPreflight: true,
-              preflightCommitment: 'confirmed',
-            });
           }
+
+          // Sign and send the ME buy transaction
+          const signed = await signTransaction(notaryTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            skipPreflight: true,
+            preflightCommitment: 'confirmed',
+          });
         } else if (v0Tx) {
           // No notary needed — buyer-only signing
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
