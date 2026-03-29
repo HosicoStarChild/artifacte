@@ -285,7 +285,8 @@ export default function CardDetailPage() {
       } else if (err.message?.includes("no longer available") || err.message?.includes("already been sold")) {
         showToast.error("This item has already been sold");
       } else if (err.message?.includes("No active listing")) {
-        showToast.error("This item is no longer listed");
+        showToast.error("This item has been sold or delisted. Refreshing...");
+        setTimeout(() => window.location.reload(), 2000);
       } else if (err.message?.includes("Simulation failed") || err.message?.includes("simulation failed")) {
         showToast.error("Transaction simulation failed. This listing may be stale — try refreshing the page.");
       } else {
