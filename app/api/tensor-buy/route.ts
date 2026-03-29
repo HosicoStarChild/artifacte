@@ -40,7 +40,8 @@ export async function POST(request: Request) {
     );
 
     // Parallel fetch: ME RPC listing + asset proof + asset data + blockhash
-    const meQ = JSON.stringify({ $match: { tokenMint: mint }, $sort: { 'tapioca.v': 1 }, $skip: 0, $limit: 1 });
+    // Must include collectionSymbol for splPrice to appear in RPC response
+    const meQ = JSON.stringify({ $match: { collectionSymbol: 'phygitals', tokenMint: mint }, $sort: { 'tapioca.v': 1 }, $skip: 0, $limit: 1 });
     const [meRes, proofResult, assetResult, blockhashResult, buyerAtaResult] = await Promise.all([
       fetch(`https://api-mainnet.magiceden.dev/rpc/getListedNFTsByQuery?q=${encodeURIComponent(meQ)}`, {
         headers: { Authorization: `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(8000),
