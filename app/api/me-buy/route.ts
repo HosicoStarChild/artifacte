@@ -54,27 +54,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
-    // 1. Fetch active listing from ME
+    // 1. Fetch active listing from ME (try v2 first, fall back to RPC)
+    let listing: any = null;
+    
     const listingsRes = await fetch(
       `${ME_API_BASE}/tokens/${mint}/listings`,
       { headers: { 'Authorization': `Bearer ${ME_API_KEY}` } }
     );
-    if (!listingsRes.ok) {
-      return NextResponse.json({ error: 'Failed to fetch listing' }, { status: 502 });
+    if (listingsRes.ok) {
+      const listings = await listingsRes.json();
+      if (listings?.length) listing = listings[0];
     }
-    const listings = await listingsRes.json();
-    if (!listings?.length) {
+
+    // v2 API doesn't return USDC/Tensor listings — fall back to RPC
+    if (!listing) {
+      try {
+        const q = JSON.stringify({ $match: { tokenMint: mint }, $sort: { 'tapioca.v': 1 }, $skip: 0, $limit: 1 });
+        const rpcRes = await fetch(
+          `${ME_API_BASE.replace('/v2', '')}/rpc/getListedNFTsByQuery?q=${encodeURIComponent(q)}`,
+          { headers: { 'Authorization': `Bearer ${ME_API_KEY}` }, signal: AbortSignal.timeout(10000) }
+        );
+        if (rpcRes.ok) {
+          const rpcData = await rpcRes.json();
+          const item = rpcData.results?.data?.[0];
+          if (item) {
+            listing = {
+              seller: item.owner,
+              price: item.price,
+              tokenAddress: null,
+              expiry: -1,
+              auctionHouse: null,
+              listingSource: item.listingType || 'M3',
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[me-buy] RPC fallback failed:', e);
+      }
+    }
+
+    if (!listing) {
       return NextResponse.json({ error: 'No active listing found' }, { status: 404 });
     }
 
-    const listing = listings[0];
     const seller = listing.seller;
     const tokenATA = listing.tokenAddress;
     const price = listing.price;
     const sellerExpiry = listing.expiry ?? -1;
     const auctionHouse = listing.auctionHouse;
     const listingSource = listing.listingSource;
-    const isM3 = !auctionHouse || listingSource === 'M3';
+    const isM3 = !auctionHouse || listingSource === 'M3' || listingSource === 'TENSOR_MARKETPLACE_LISTING';
 
     // 1b. Verify NFT is still available (skip for M3 — pool handles availability)
     const HELIUS_KEY = process.env.HELIUS_API_KEY;
