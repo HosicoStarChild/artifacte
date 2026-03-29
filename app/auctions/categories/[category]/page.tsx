@@ -256,7 +256,6 @@ export default function CategoryAuctionsPage() {
           // Send the notary-signed tx to wallet — wallet adds buyer sig
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
-
           const signed = await signTransaction(notaryTx as any);
           sig = await connection.sendRawTransaction((signed as any).serialize(), {
             skipPreflight: true,
