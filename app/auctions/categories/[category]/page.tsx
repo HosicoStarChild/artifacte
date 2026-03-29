@@ -242,6 +242,13 @@ export default function CategoryAuctionsPage() {
 
         if (!buildRes.ok) {
           const errData = await buildRes.json();
+          // If listing not found on ME v2 API, it may be USDC/Tensor — redirect to ME
+          if (errData.error?.includes('No active listing') || errData.error?.includes('no longer available')) {
+            showToast.info("Redirecting to Magic Eden...");
+            window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
+            setBuyingId(null);
+            return;
+          }
           throw new Error(errData.error || 'Failed to build transaction');
         }
 
