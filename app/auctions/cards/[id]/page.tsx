@@ -77,11 +77,12 @@ export default function CardDetailPage() {
         } catch {}
       }
 
-      // First try: listing index (CC cards)
+      // First try: search oracle by card ID
       try {
-        const listRes = await fetch(`/api/me-listings?perPage=10000`);
+        const ccId = cardId.replace('cc-', '');
+        const listRes = await fetch(`/api/me-listings?q=${encodeURIComponent(ccId)}&perPage=5`);
         const data = await listRes.json();
-        const found = (data.listings || []).find((l: any) => l.id === cardId || l.nftAddress === cardId || l.ccId === cardId.replace('cc-', ''));
+        const found = (data.listings || []).find((l: any) => l.id === cardId || l.nftAddress === cardId || l.ccId === ccId);
         if (found) {
           setCard(found);
           setLoading(false);
