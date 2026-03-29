@@ -88,11 +88,12 @@ export async function POST(request: Request) {
     const feeVaultUsdcAta = await getAssociatedTokenAddress(USDC_MINT, feeVault, true);
 
     // Build instruction data
-    const rootBytes = Buffer.from(proofResult.root, 'base64');
+    const bs58 = require('bs58');
+    const rootBytes = Buffer.from(bs58.decode(proofResult.root));
     // Get data_hash and creator_hash from asset data (not in proof response)
     const compression = assetResult?.compression || {};
-    const dataHashBytes = Buffer.from(compression.data_hash || proofResult.data_hash || '', 'base64');
-    const creatorHashBytes = Buffer.from(compression.creator_hash || proofResult.creator_hash || '', 'base64');
+    const dataHashBytes = Buffer.from(bs58.decode(compression.data_hash || proofResult.data_hash));
+    const creatorHashBytes = Buffer.from(bs58.decode(compression.creator_hash || proofResult.creator_hash));
     const nonce = compression.leaf_id ?? proofResult.node_index ?? 0;
 
     const ixData = Buffer.alloc(8 + 8 + 3 + 32 + 32 + 32 + 8 + 4);
