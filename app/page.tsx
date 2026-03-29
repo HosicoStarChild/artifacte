@@ -5,10 +5,33 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
 import { HomeTCGSection } from "@/components/HomeTCGSection";
 
-export default function Home() {
-  // Featured BAXUS listing for hero
-  const featuredBaxus = listings.find(l => l.source === 'baxus' && l.name?.toLowerCase().includes('pappy'));
-  const heroListing = featuredBaxus || listings.find(l => l.source === 'baxus');
+const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
+
+async function getFeaturedListing() {
+  try {
+    // Use day of year as seed for daily rotation
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor(((now as any) - (start as any)) / (1000 * 60 * 60 * 24));
+    
+    // Fetch premium listings ($500+) from all sources
+    const res = await fetch(`${ORACLE_API}/api/listings?perPage=100&sort=price-desc`, {
+      next: { revalidate: 3600 }, // revalidate every hour
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const premium = (data.listings || []).filter((l: any) => l.image && l.price >= 500);
+    if (premium.length === 0) return null;
+    
+    // Rotate through premium listings based on day of year
+    return premium[dayOfYear % premium.length];
+  } catch {
+    return null;
+  }
+}
+
+export default async function Home() {
+  const heroListing = await getFeaturedListing();
 
   return (
     <div>
@@ -31,7 +54,15 @@ export default function Home() {
                 <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
                   <div className="flex items-center gap-2 mb-3">
                     <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">Featured Listing</p>
-                    <span className="text-xs px-2 py-0.5 bg-gold-500/20 text-gold-400 rounded font-medium">BAXUS Verified</span>
+                    {heroListing.source === 'baxus' && (
+                      <span className="text-xs px-2 py-0.5 bg-gold-500/20 text-gold-400 rounded font-medium">BAXUS Verified</span>
+                    )}
+                    {heroListing.verifiedBy === 'TCGplayer' && (
+                      <span className="text-xs px-2 py-0.5 bg-gold-500/20 text-gold-400 rounded font-medium">TCGplayer Verified</span>
+                    )}
+                    {heroListing.source === 'collector-crypt' && (
+                      <span className="text-xs px-2 py-0.5 bg-violet-500/20 text-violet-400 rounded font-medium">Collector Crypt</span>
+                    )}
                   </div>
                   <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 max-w-2xl leading-tight">
                     {heroListing.name}
@@ -39,7 +70,9 @@ export default function Home() {
                   <p className="text-gray-300 text-base max-w-xl mb-2 leading-relaxed">
                     {heroListing.subtitle}
                   </p>
-                  <p className="text-white font-serif text-3xl mb-6">{formatFullPrice(heroListing.price)}</p>
+                  <p className="text-white font-serif text-3xl mb-6">
+                    {heroListing.currency === 'SOL' ? `◎${heroListing.solPrice?.toFixed(4) || heroListing.price}` : formatFullPrice(heroListing.price)}
+                  </p>
                   {heroListing.externalUrl ? (
                     <a
                       href={heroListing.externalUrl}
@@ -47,14 +80,21 @@ export default function Home() {
                       rel="noopener noreferrer"
                       className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
                     >
-                      Buy on BAXUS →
+                      {heroListing.source === 'baxus' ? 'Buy on BAXUS →' : 'View Listing →'}
                     </a>
-                  ) : (
+                  ) : heroListing.nftAddress ? (
                     <Link
-                      href="/auctions/categories/spirits"
+                      href={`/auctions/cards/${heroListing.id}`}
                       className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
                     >
-                      View Spirits →
+                      View Details →
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/auctions/categories/${heroListing.category?.toLowerCase().replace('_', '-')}`}
+                      className="inline-block px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
+                    >
+                      Browse Collection →
                     </Link>
                   )}
                 </div>
