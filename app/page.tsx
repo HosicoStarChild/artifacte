@@ -72,18 +72,24 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: "Digital Collectibles", emoji: "🎨", slug: "digital-art", href: "/digital-art" },
-                { name: "Spirits", emoji: "🥃", slug: "spirits", href: "/auctions/categories/spirits" },
-                { name: "TCG Cards", emoji: "🃏", slug: "tcg-cards", href: "/auctions/categories/tcg-cards" },
-                { name: "Sports Cards", emoji: "⚽", slug: "sports-cards", href: "/auctions/categories/sports-cards" },
-                { name: "Sealed Product", emoji: "📦", slug: "sealed", href: "/auctions/categories/sealed" },
-                { name: "Merchandise", emoji: "🛍️", slug: "merchandise", href: "/auctions/categories/merchandise" },
+                { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=600&q=80", count: "" },
+                { name: "Spirits", slug: "spirits", href: "/auctions/categories/spirits", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=600&q=80", count: "2,300+" },
+                { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
+                { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1578432156326-d23f0bae1b36?w=600&q=80", count: "" },
+                { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "https://images.unsplash.com/photo-1607082349566-187342175e2f?w=600&q=80", count: "" },
+                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=600&q=80", count: "" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
-                  <div className="bg-dark-800 rounded-lg border border-white/5 p-8 text-center card-hover h-full flex flex-col justify-center">
-                    <div className="text-5xl mb-6">{cat.emoji}</div>
-                    <h3 className="font-serif text-xl text-white mb-2">{cat.name}</h3>
-                    <p className="text-gray-400 text-sm">Explore collection →</p>
+                  <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
+                    <img src={cat.image} alt={cat.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+                    <div className="relative p-6">
+                      <h3 className="font-serif text-xl text-white mb-1">{cat.name}</h3>
+                      <div className="flex items-center justify-between">
+                        <p className="text-gray-300 text-sm">Explore collection →</p>
+                        {cat.count && <span className="text-gold-500 text-xs font-semibold">{cat.count} items</span>}
+                      </div>
+                    </div>
                   </div>
                 </Link>
               ))}
