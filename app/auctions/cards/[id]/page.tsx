@@ -285,8 +285,7 @@ export default function CardDetailPage() {
       } else if (err.message?.includes("no longer available") || err.message?.includes("already been sold")) {
         showToast.error("This item has already been sold");
       } else if (err.message?.includes("No active listing")) {
-        showToast.info("Opening on Magic Eden...");
-        window.open(`https://magiceden.io/item-details/${card.nftAddress}`, '_blank');
+        showToast.error("This item is no longer listed");
       } else if (err.message?.includes("Simulation failed") || err.message?.includes("simulation failed")) {
         showToast.error("Transaction simulation failed. This listing may be stale — try refreshing the page.");
       } else {
