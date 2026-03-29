@@ -262,7 +262,7 @@ export default function CategoryAuctionsPage() {
           // Build platform fee transaction (2% of sale price)
           const { SystemProgram, Transaction: LegacyTx, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
           const PLATFORM_FEE_BPS = 200; // 2%
-          const PLATFORM_WALLET = new PublicKey('DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX');
+          const PLATFORM_WALLET = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
           const feeAmount = Math.ceil(mePrice * LAMPORTS_PER_SOL * PLATFORM_FEE_BPS / 10000);
           
           if (feeAmount > 0) {
