@@ -88,12 +88,11 @@ export async function POST(request: Request) {
     const feeVaultUsdcAta = await getAssociatedTokenAddress(USDC_MINT, feeVault, true);
 
     // Build instruction data
-    const bs58 = require('bs58');
-    const rootBytes = Buffer.from(bs58.decode(proofResult.root));
-    // Get data_hash and creator_hash from asset data (not in proof response)
+    // Hashes are base58 — decode using PublicKey (guaranteed to work)
+    const rootBytes = new PublicKey(proofResult.root).toBytes();
     const compression = assetResult?.compression || {};
-    const dataHashBytes = Buffer.from(bs58.decode(compression.data_hash || proofResult.data_hash));
-    const creatorHashBytes = Buffer.from(bs58.decode(compression.creator_hash || proofResult.creator_hash));
+    const dataHashBytes = new PublicKey(compression.data_hash || proofResult.data_hash).toBytes();
+    const creatorHashBytes = new PublicKey(compression.creator_hash || proofResult.creator_hash).toBytes();
     const nonce = compression.leaf_id ?? proofResult.node_index ?? 0;
 
     const ixData = Buffer.alloc(8 + 8 + 3 + 32 + 32 + 32 + 8 + 4);
@@ -102,9 +101,9 @@ export async function POST(request: Request) {
     ixData.writeBigUInt64LE(maxAmount, off); off += 8;
     ixData.writeUInt8(1, off); off += 1; // Some(royaltyPct)
     ixData.writeUInt16LE(10000, off); off += 2; // 100% royalty
-    rootBytes.copy(ixData, off); off += 32;
-    dataHashBytes.copy(ixData, off); off += 32;
-    creatorHashBytes.copy(ixData, off); off += 32;
+    Buffer.from(rootBytes).copy(ixData, off); off += 32;
+    Buffer.from(dataHashBytes).copy(ixData, off); off += 32;
+    Buffer.from(creatorHashBytes).copy(ixData, off); off += 32;
     ixData.writeBigUInt64LE(BigInt(nonce), off); off += 8;
     ixData.writeUInt32LE(nonce, off); off += 4;
 
