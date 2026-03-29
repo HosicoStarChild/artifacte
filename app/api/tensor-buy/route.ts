@@ -69,7 +69,10 @@ export async function POST(request: Request) {
     // Parse proof
     if (!proofResult) return NextResponse.json({ error: 'Failed to get asset proof' }, { status: 502 });
     const merkleTree = new PublicKey(proofResult.tree_id);
-    const proofPath = proofResult.proof.map((p: string) => new PublicKey(p));
+    // Trim proof to fit tx size limit — tree has canopy that covers the rest
+    // Max ~12 proof nodes fit in a v0 transaction with all required accounts
+    const MAX_PROOF_NODES = 12;
+    const proofPath = proofResult.proof.slice(0, MAX_PROOF_NODES).map((p: string) => new PublicKey(p));
 
     // Creators
     const creators = assetResult?.creators || [];
@@ -144,8 +147,7 @@ export async function POST(request: Request) {
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: listState, isSigner: false, isWritable: true },
-      { pubkey: buyerPk, isSigner: true, isWritable: false }, // buyer
-      { pubkey: buyerPk, isSigner: true, isWritable: true },  // payer
+      { pubkey: buyerPk, isSigner: true, isWritable: true },  // buyer + payer
       { pubkey: buyerUsdcAta, isSigner: false, isWritable: true },
       { pubkey: owner, isSigner: false, isWritable: false },
       { pubkey: ownerUsdcAta, isSigner: false, isWritable: true },
