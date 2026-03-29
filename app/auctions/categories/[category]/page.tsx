@@ -41,7 +41,8 @@ export default function CategoryAuctionsPage() {
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
-  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, sendTransaction, signTransaction, signAllTransactions, connected } = wallet;
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -247,7 +248,8 @@ export default function CategoryAuctionsPage() {
         const { v0Tx, v0TxSigned, legacyTx, price: mePrice, listingSource } = await buildRes.json();
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
-        showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+        const platformFee = Math.ceil(mePrice * 200) / 10000; // 2%
+        showToast.info(`💳 Confirm purchase — ${mePrice} SOL + ${platformFee.toFixed(4)} SOL fee`);
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 
@@ -256,11 +258,50 @@ export default function CategoryAuctionsPage() {
           // Send the notary-signed tx to wallet — wallet adds buyer sig
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
-          const signed = await signTransaction(notaryTx as any);
-          sig = await connection.sendRawTransaction((signed as any).serialize(), {
-            skipPreflight: true,
-            preflightCommitment: 'confirmed',
-          });
+
+          // Build platform fee transaction (2% of sale price)
+          const { SystemProgram, Transaction: LegacyTx, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
+          const PLATFORM_FEE_BPS = 200; // 2%
+          const PLATFORM_WALLET = new PublicKey('DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX');
+          const feeAmount = Math.ceil(mePrice * LAMPORTS_PER_SOL * PLATFORM_FEE_BPS / 10000);
+          
+          if (feeAmount > 0) {
+            const feeTx = new LegacyTx().add(
+              SystemProgram.transfer({
+                fromPubkey: publicKey,
+                toPubkey: PLATFORM_WALLET,
+                lamports: feeAmount,
+              })
+            );
+            feeTx.feePayer = publicKey;
+            feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+            // Sign both transactions atomically
+            if (signAllTransactions) {
+              const [signedFee, signedBuy] = await signAllTransactions([feeTx as any, notaryTx as any]);
+              // Send fee first, then buy
+              await connection.sendRawTransaction((signedFee as any).serialize(), { skipPreflight: true });
+              sig = await connection.sendRawTransaction((signedBuy as any).serialize(), {
+                skipPreflight: true,
+                preflightCommitment: 'confirmed',
+              });
+            } else {
+              // Fallback: sign individually
+              const signedFee = await signTransaction(feeTx as any);
+              await connection.sendRawTransaction((signedFee as any).serialize(), { skipPreflight: true });
+              const signed = await signTransaction(notaryTx as any);
+              sig = await connection.sendRawTransaction((signed as any).serialize(), {
+                skipPreflight: true,
+                preflightCommitment: 'confirmed',
+              });
+            }
+          } else {
+            const signed = await signTransaction(notaryTx as any);
+            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+              skipPreflight: true,
+              preflightCommitment: 'confirmed',
+            });
+          }
         } else if (v0Tx) {
           // No notary needed — buyer-only signing
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
