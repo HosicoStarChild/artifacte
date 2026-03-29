@@ -117,7 +117,7 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS";
 
   useEffect(() => {
     if (!useMeApi || !category) return;
