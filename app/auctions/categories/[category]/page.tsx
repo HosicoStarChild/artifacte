@@ -586,6 +586,7 @@ export default function CategoryAuctionsPage() {
                           alt={l.name}
                           className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
+                          onLoad={(e) => { const img = e.target as HTMLImageElement; if (img.naturalWidth === 0) img.src = '/placeholder-card.svg'; }}
                         />
                         {l.source === 'phygitals' && (
                           <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
