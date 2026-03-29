@@ -89,9 +89,11 @@ export async function POST(request: Request) {
 
     // Build instruction data
     const rootBytes = Buffer.from(proofResult.root, 'base64');
-    const dataHashBytes = Buffer.from(proofResult.data_hash || '', 'base64');
-    const creatorHashBytes = Buffer.from(proofResult.creator_hash || '', 'base64');
-    const nonce = proofResult.leaf_id;
+    // Get data_hash and creator_hash from asset data (not in proof response)
+    const compression = assetResult?.compression || {};
+    const dataHashBytes = Buffer.from(compression.data_hash || proofResult.data_hash || '', 'base64');
+    const creatorHashBytes = Buffer.from(compression.creator_hash || proofResult.creator_hash || '', 'base64');
+    const nonce = compression.leaf_id ?? proofResult.node_index ?? 0;
 
     const ixData = Buffer.alloc(8 + 8 + 3 + 32 + 32 + 32 + 8 + 4);
     let off = 0;
