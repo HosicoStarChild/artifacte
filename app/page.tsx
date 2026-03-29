@@ -1,4 +1,4 @@
-import { assets, auctions, listings, formatFullPrice } from "@/lib/data";
+import { formatFullPrice } from "@/lib/data";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
 import { HomeTCGSection } from "@/components/HomeTCGSection";
