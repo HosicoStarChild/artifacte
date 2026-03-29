@@ -51,19 +51,20 @@ export default async function Home() {
       <section className="pt-24 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {heroListing && (
-            <div className="relative rounded-lg overflow-hidden mb-16">
-              {/* Hero Image */}
-              <div className="relative h-[300px] md:h-[400px] overflow-hidden group bg-dark-800">
-                <img
-                  src={heroListing.image}
-                  alt={heroListing.name}
-                  className="w-full h-full object-contain group-hover:scale-105 transition duration-700"
-                />
-                {/* Dark overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/40 to-transparent" />
+            <div className="rounded-lg overflow-hidden mb-16 bg-dark-800 border border-white/5">
+              {/* Split layout: stacked on mobile, side-by-side on desktop */}
+              <div className="flex flex-col md:flex-row">
+                {/* Image */}
+                <div className="h-[250px] md:h-[350px] md:w-1/2 overflow-hidden bg-dark-900 flex items-center justify-center group">
+                  <img
+                    src={heroListing.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(heroListing.image)}` : heroListing.image}
+                    alt={heroListing.name}
+                    className="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-700 p-4"
+                  />
+                </div>
                 
-                {/* Content overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
+                {/* Content */}
+                <div className="p-6 md:p-10 md:w-1/2 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-3">
                     <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase">Featured Listing</p>
                     {heroListing.source === 'baxus' && (
@@ -76,13 +77,13 @@ export default async function Home() {
                       <span className="text-xs px-2 py-0.5 bg-violet-500/20 text-violet-400 rounded font-medium">Collector Crypt</span>
                     )}
                   </div>
-                  <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 max-w-2xl leading-tight">
+                  <h1 className="font-serif text-2xl md:text-4xl text-white mb-3 leading-tight">
                     {heroListing.name}
                   </h1>
-                  <p className="text-gray-300 text-base max-w-xl mb-2 leading-relaxed">
+                  <p className="text-gray-400 text-sm mb-2">
                     {heroListing.subtitle}
                   </p>
-                  <p className="text-white font-serif text-3xl mb-6">
+                  <p className="text-white font-serif text-2xl md:text-3xl mb-6">
                     {heroListing.currency === 'SOL' ? `◎${heroListing.solPrice?.toFixed(4) || heroListing.price}` : formatFullPrice(heroListing.price)}
                   </p>
                   {heroListing.externalUrl ? (
