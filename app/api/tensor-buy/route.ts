@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     // Fee vault: Tensor uses TFEEgwDP... program, PDA from last byte of list state
     const listStateBytes = listState.toBytes();
     const [feeVault] = PublicKey.findProgramAddressSync(
-      [Buffer.from([listStateBytes[listStateBytes.length - 1]])], TENSOR_FEE_VAULT_PROGRAM
+      [Buffer.from('fee_vault'), Buffer.from([listStateBytes[listStateBytes.length - 1]])], TENSOR_FEE_VAULT_PROGRAM
     );
 
     const buyerUsdcAta = buyerAtaResult.ata;
