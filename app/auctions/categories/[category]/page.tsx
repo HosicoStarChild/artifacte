@@ -582,7 +582,7 @@ export default function CategoryAuctionsPage() {
                       <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : l.source === 'baxus' ? (l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`) : '#'} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
-                          src={l.image}
+                          src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
                           alt={l.name}
                           className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
