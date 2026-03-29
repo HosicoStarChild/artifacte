@@ -53,7 +53,7 @@ export default async function Home() {
           {heroListing && (
             <div className="relative rounded-lg overflow-hidden mb-16">
               {/* Hero Image */}
-              <div className="relative h-[500px] md:h-[600px] overflow-hidden group bg-dark-800">
+              <div className="relative h-[300px] md:h-[400px] overflow-hidden group bg-dark-800">
                 <img
                   src={heroListing.image}
                   alt={heroListing.name}
