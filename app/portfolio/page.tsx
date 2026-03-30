@@ -678,12 +678,15 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Artifacte RWA Cards (CC + Phygitals) — show under RWAs section */}
-            {digitalNfts.filter(d => d.collection === "Artifacte").length > 0 && filter !== "listed" && (
-              <div className={filteredCards.length === 0 ? "" : ""}>
+            {/* Artifacte RWA Cards (CC + Phygitals) — show under RWAs, deduplicated against CC cards */}
+            {(() => {
+              const ccIds = new Set(filteredCards.map(c => c.nftAddress));
+              const rwaCards = digitalNfts.filter(d => d.collection === "Artifacte" && !ccIds.has(d.id));
+              return rwaCards.length > 0 && filter !== "listed" ? (
+              <div>
                 {filteredCards.length === 0 && <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
-                  {digitalNfts.filter(d => d.collection === "Artifacte").map((nft) => (
+                  {rwaCards.map((nft) => (
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
                       <div className="aspect-square overflow-hidden bg-dark-900">
                         {nft.image ? (
@@ -712,7 +715,8 @@ export default function PortfolioPage() {
                   ))}
                 </div>
               </div>
-            )}
+              ) : null;
+            })()}
 
             {/* Digital Collectibles Grid — only non-Artifacte items */}
             {digitalNfts.filter(d => d.collection !== "Artifacte").length > 0 && filter !== "listed" && (
