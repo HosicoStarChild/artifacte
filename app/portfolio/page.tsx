@@ -462,7 +462,7 @@ export default function PortfolioPage() {
                 {/* Digital Collectibles */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Digital Collectibles</p>
-                  <p className="font-serif text-2xl text-blue-400 font-bold">{digitalNfts.filter(d => d.collection !== "Artifacte").length}</p>
+                  <p className="font-serif text-2xl text-blue-400 font-bold">{digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals" && d.collection !== "Collectors Crypt").length}</p>
                   <p className="text-gray-600 text-xs mt-1">In wallet</p>
                 </div>
 
@@ -476,7 +476,7 @@ export default function PortfolioPage() {
                 {/* Total Portfolio */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">Total Portfolio</p>
-                  <p className="font-serif text-2xl text-white font-bold">{pd.totalCards + artifacteRwaCount + digitalNfts.filter(d => d.collection !== "Artifacte").length}</p>
+                  <p className="font-serif text-2xl text-white font-bold">{pd.totalCards + artifacteRwaCount + digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals" && d.collection !== "Collectors Crypt").length}</p>
                   <p className="text-gray-600 text-xs mt-1">RWAs + Digital Collectibles</p>
                 </div>
               </div>
