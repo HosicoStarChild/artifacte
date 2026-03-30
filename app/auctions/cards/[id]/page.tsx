@@ -199,6 +199,7 @@ export default function CardDetailPage() {
         } else {
           showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
         }
+        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
         setBuying(false);
         return;
       }
@@ -271,6 +272,7 @@ export default function CardDetailPage() {
       } else {
         showToast.info(`⏳ TX sent: ${sig.slice(0, 8)}... — check your wallet in a moment`);
       }
+      setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
     } catch (err: any) {
       if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
         showToast.error("Transaction cancelled");
@@ -385,14 +387,14 @@ export default function CardDetailPage() {
                   connected ? (
                     <button
                       onClick={handleBuy}
-                      disabled={buying}
+                      disabled={buying || card.sold}
                       className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
-                        buying 
+                        buying || card.sold
                           ? "bg-gray-600/50 cursor-not-allowed text-gray-400" 
                           : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                       }`}
                     >
-                      {buying ? "Processing..." : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
+                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
                     </button>
                   ) : (
                     <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
