@@ -271,7 +271,7 @@ export default function PortfolioPage() {
                 id: item.asset.id,
                 name: item.asset.content?.metadata?.name || item.asset.name || "Unknown",
                 image: item.asset.content?.links?.image || item.asset.image || "",
-                collection: "Artifacte",
+                collection: item.isPhygital ? "Phygitals" : "Artifacte",
                 floorPrice: price,
                 tcg: item.tcg,
               });
@@ -279,8 +279,9 @@ export default function PortfolioPage() {
 
             if (!cancelled) {
               // Separate Artifacte RWAs from digital collectibles
-              const realDigital = digitalItems.filter(d => d.collection !== "Artifacte");
+              const realDigital = digitalItems.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals");
               const artifacteCards = digitalItems.filter(d => d.collection === "Artifacte");
+              const phygitalCards = digitalItems.filter(d => d.collection === "Phygitals");
               setDigitalCollectiblesValue(totalDigitalValue);
               setDigitalNfts(digitalItems); // Keep all for display
               setArtifacteRwaValue(totalArtifacteValue);
@@ -597,152 +598,108 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* RWAs — CC cards + Phygitals + Artifacte-minted, unified */}
-            {(() => {
-              const ccIds = new Set(filteredCards.map(c => c.nftAddress));
-              const extraRwaCards = digitalNfts.filter(d => d.collection === "Artifacte" && !ccIds.has(d.id));
-              const hasRwas = filteredCards.length > 0 || extraRwaCards.length > 0;
-              return hasRwas ? (
-              <>
-              <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
-              {filteredCards.map((card) => (
-                <div
-                  key={card.nftAddress}
-                  onClick={() => window.location.href = `/auctions/cards/${card.nftAddress}`}
-                  className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer"
-                >
-                  {/* Card Image */}
-                  <div className="aspect-square overflow-hidden bg-dark-900 relative">
-                    <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      CC
-                    </span>
-                    {card.frontImage ? (
-                      <img
-                        src={card.frontImage}
-                        alt={card.itemName}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display =
-                            "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">
-                        🎴
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Details */}
-                  <div className="p-4">
-                    <h3 className="text-white font-medium text-sm truncate">
-                      {card.itemName}
-                    </h3>
-
-                    {/* Grade Badge */}
-                    {card.grade && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span
-                          className={`${getGradeBgColor(card.gradingCompany)} text-white rounded-full px-2 py-0.5 text-xs font-semibold`}
-                        >
-                          {card.gradingCompany} {card.grade}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Market / Insured Value */}
-                    <div className="mt-3">
-                      {(card as any).oracleValue ? (
-                        <>
-                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
-                            Market Value
-                          </p>
-                          <p className="text-gold-400 font-serif text-lg font-bold">
-                            {formatCurrency((card as any).oracleValue)}
-                          </p>
-                          <p className="text-gray-600 text-[9px] mt-0.5">
-                            Insured: {formatCurrency(card.insuredValueNum)}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">
-                            Insured Value
-                          </p>
-                          <p className="text-gold-400 font-serif text-lg font-bold">
-                            {formatCurrency(card.insuredValueNum)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Listed Status */}
-                    <p className="text-gray-500 text-[10px] mt-3">
-                      {card.listing ? (
-                        <span className="text-green-400">
-                          Listed @ {formatCurrency(card.listing.price)}
-                        </span>
-                      ) : (
-                        <span>Unlisted</span>
-                      )}
-                    </p>
-
-                    {/* Category & Vault */}
-                    <p className="text-gray-600 text-[10px] mt-1 font-mono">
-                      {card.category}
-                      {card.vault && ` • ${card.vault}`}
-                    </p>
-
-
-                  </div>
-                </div>
-              ))}
-              {/* Phygitals + Artifacte-minted cards in same grid */}
-              {extraRwaCards.map((nft) => (
+            {/* 1. Artifacte RWA */}
+            {digitalNfts.filter(d => d.collection === "Artifacte").length > 0 && (
+              <div className="mb-12">
+                <h2 className="font-serif text-2xl text-white mb-6">Artifacte RWA</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {digitalNfts.filter(d => d.collection === "Artifacte").map((nft) => (
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
-                        {(nft as any).tcg && (
-                          <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            PHYGITALS
-                          </span>
-                        )}
-                        {nft.image ? (
-                          <img src={(() => {
-                            let u = nft.image;
-                            if (u.includes("nftstorage.link/") || u.includes("/ipfs/") || u.startsWith("ipfs://")) {
-                              if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://nftstorage.link/ipfs/");
-                              return `/api/img-proxy?url=${encodeURIComponent(u)}`;
-                            }
-                            if (u.includes("arweave.net/") || u.includes("gateway.irys.xyz")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
-                            return u;
-                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>
-                        )}
+                        <span className="absolute top-2 right-2 z-10 bg-gold-500/90 text-dark-900 text-[10px] font-bold px-2 py-0.5 rounded-full">ARTIFACTE</span>
+                        {nft.image ? <img src={nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
-                        <p className="text-gray-500 text-[10px] mt-1">{(nft as any).tcg || "Artifacte"}</p>
                         <div className="mt-3">
                           <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
                           <p className="text-gold-400 font-serif text-lg font-bold">${nft.floorPrice.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
-              ))}
+                  ))}
+                </div>
               </div>
-              </>
-              ) : null;
-            })()}
+            )}
 
-            {/* Digital Collectibles Grid — only non-Artifacte items */}
-            {digitalNfts.filter(d => d.collection !== "Artifacte").length > 0 && filter !== "listed" && (
-              <div className="mt-12">
+            {/* 2. Collectors Crypt RWA */}
+            {filteredCards.length > 0 && (
+              <div className="mb-12">
+                <h2 className="font-serif text-2xl text-white mb-6">Collectors Crypt RWA</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {filteredCards.map((card) => (
+                    <div key={card.nftAddress} onClick={() => window.location.href = `/auctions/cards/${card.nftAddress}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                        <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">CC</span>
+                        {card.frontImage ? <img src={card.frontImage} alt={card.itemName} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-sm truncate">{card.itemName}</h3>
+                        {card.grade && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className={`${getGradeBgColor(card.gradingCompany)} text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{card.gradingCompany} {card.grade}</span>
+                          </div>
+                        )}
+                        <div className="mt-3">
+                          {(card as any).oracleValue ? (
+                            <>
+                              <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Value</p>
+                              <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency((card as any).oracleValue)}</p>
+                              <p className="text-gray-600 text-[9px] mt-0.5">Insured: {formatCurrency(card.insuredValueNum)}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Insured Value</p>
+                              <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency(card.insuredValueNum)}</p>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-gray-500 text-[10px] mt-3">{card.listing ? <span className="text-green-400">Listed @ {formatCurrency(card.listing.price)}</span> : <span>Unlisted</span>}</p>
+                        <p className="text-gray-600 text-[10px] mt-1 font-mono">{card.category}{card.vault && ` • ${card.vault}`}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Phygitals RWA */}
+            {digitalNfts.filter(d => d.collection === "Phygitals").length > 0 && (
+              <div className="mb-12">
+                <h2 className="font-serif text-2xl text-white mb-6">Phygitals RWA</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  {digitalNfts.filter(d => d.collection === "Phygitals").map((nft) => (
+                    <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                        <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">PHYGITALS</span>
+                        {nft.image ? (
+                          <img src={(() => {
+                            let u = nft.image;
+                            if (u.includes("arweave.net/") || u.includes("gateway.irys.xyz")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                            return u;
+                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                        ) : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
+                        <p className="text-gray-500 text-[10px] mt-1">{(nft as any).tcg || "TCG Card"}</p>
+                        <div className="mt-3">
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">${nft.floorPrice.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Digital Collectibles */}
+            {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals").length > 0 && filter !== "listed" && (
+              <div className="mb-12">
                 <h2 className="font-serif text-2xl text-white mb-6">Digital Collectibles</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {digitalNfts.filter(d => d.collection !== "Artifacte").map((nft) => (
+                  {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals").map((nft) => (
                     <div key={nft.id} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group">
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
@@ -755,9 +712,7 @@ export default function PortfolioPage() {
                             if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
                             return u;
                           })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>
-                        )}
+                        ) : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>}
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
