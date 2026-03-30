@@ -263,21 +263,18 @@ export default function PortfolioPage() {
               let price = 0;
               
               if (item.isCC) {
-                // CC cards: lookup graded value on alt.xyz
-                const attrs = item.asset.content?.metadata?.attributes || [];
-                const cardName = item.asset.content?.metadata?.name || '';
-                const gradingCompany = attrs.find((a: any) => a.trait_type === "Grading Company")?.value || '';
-                const gradeNum = attrs.find((a: any) => a.trait_type === "GradeNum")?.value || '';
-                const gradeKey = gradingCompany && gradeNum ? `${gradingCompany}-${gradeNum}` : '';
+                // CC cards: use oracle's V3.5 valuate (alt.xyz graded pricing)
                 try {
-                  const altRes = await fetch(`/api/alt-value?name=${encodeURIComponent(cardName)}&grade=${encodeURIComponent(gradeKey)}`);
-                  if (altRes.ok) {
-                    const altData = await altRes.json();
-                    if (altData.altValue) price = altData.altValue;
+                  const nftAddr = item.asset.id || '';
+                  const valRes = await fetch(`/api/oracle?endpoint=valuate&nft=${encodeURIComponent(nftAddr)}`);
+                  if (valRes.ok) {
+                    const valData = await valRes.json();
+                    if (valData.value) price = valData.value;
                   }
                 } catch {}
                 // Fallback: Insured Value from on-chain
                 if (price === 0) {
+                  const attrs = item.asset.content?.metadata?.attributes || [];
                   const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
                   if (insured) price = parseFloat(insured);
                 }
