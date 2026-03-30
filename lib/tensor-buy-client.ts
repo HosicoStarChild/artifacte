@@ -35,25 +35,44 @@ export async function executeTensorBuy(
   }
 
   const tensorData = await tensorRes.json();
-  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC`);
+  const feeText = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} fee` : '';
+  onStatus?.(`💳 Confirm purchase — $${tensorData.price.toFixed(2)}${feeText} USDC`);
 
-  // Step 2: Deserialize and sign
+  // Step 2: Deserialize buy tx and fee tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
-  const tx = VersionedTransaction.deserialize(txBytes);
-  const signed = await signTransaction(tx);
-  const serialized = signed.serialize();
+  const buyTx = VersionedTransaction.deserialize(txBytes);
 
-  // Step 3: Patch signature if wallet inflated ALT references
-  let txToSend = serialized;
-  if (serialized.length > 1232) {
-    const signedTx = VersionedTransaction.deserialize(serialized);
+  // Step 3: Sign buy tx
+  const signedBuy = await signTransaction(buyTx);
+  let buyToSend = signedBuy.serialize();
+  if (buyToSend.length > 1232) {
+    // Wallet inflated ALT — patch signature into original compact tx
+    const inflated = VersionedTransaction.deserialize(buyToSend);
     const patched = new Uint8Array(txBytes);
-    patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
-    txToSend = patched;
+    patched.set(inflated.signatures[0], 2);
+    buyToSend = patched;
   }
 
-  // Step 4: Send via RPC proxy
-  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+  // Step 4: Sign and send fee tx (if present)
+  if (tensorData.feeTx) {
+    const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
+    const feeTx = VersionedTransaction.deserialize(feeBytes);
+    const signedFee = await signTransaction(feeTx);
+    const feeB64 = btoa(Array.from(new Uint8Array(signedFee.serialize())).map((b: number) => String.fromCharCode(b)).join(''));
+    // Send fee tx (fire and forget — don't block the buy)
+    fetch('/api/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method: 'sendTransaction',
+        params: [feeB64, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+      }),
+    }).catch(() => {}); // non-blocking
+  }
+
+  // Step 5: Send buy tx via RPC proxy
+  const b64Tx = btoa(Array.from(new Uint8Array(buyToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
