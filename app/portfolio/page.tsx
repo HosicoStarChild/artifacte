@@ -540,29 +540,7 @@ export default function PortfolioPage() {
 
 
 
-              {/* Grade Distribution */}
-              {Object.keys(pd.gradeDistribution).length > 0 && (
-                <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
-                  <h3 className="font-serif text-lg text-white mb-4">
-                    Grade Distribution
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {Object.entries(pd.gradeDistribution)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([grade, count]) => {
-                        const [company] = grade.split("-");
-                        return (
-                          <div
-                            key={grade}
-                            className={`${getGradeBgColor(company)} text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2`}
-                          >
-                            {grade.replace("-", " ")} <span className="opacity-70">×{count}</span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Filter Tabs */}
