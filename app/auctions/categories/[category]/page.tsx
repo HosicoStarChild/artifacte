@@ -259,7 +259,7 @@ export default function CategoryAuctionsPage() {
               new TransactionInstruction({
                 programId: new PK(ix.programId),
                 keys: ix.keys.map((k: any) => ({ pubkey: new PK(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })),
-                data: Buffer.from(ix.data, 'base64'),
+                data: Uint8Array.from(atob(ix.data), (c: string) => c.charCodeAt(0)),
               })
             );
             
