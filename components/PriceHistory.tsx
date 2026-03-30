@@ -112,6 +112,8 @@ interface PriceHistoryProps {
   nftAddress?: string;
   source?: string;
   tcgPlayerId?: string;
+  gradingId?: string;
+  gradingCompany?: string;
 }
 
 function normalizeGrade(g?: string): string | undefined {
@@ -126,7 +128,7 @@ function normalizeGrade(g?: string): string | undefined {
   return normalized;
 }
 
-export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany }: PriceHistoryProps) {
   const grade = normalizeGrade(rawGrade);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,6 +221,20 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
+        // Cert-based lookup for PSA/BGS graded cards — get exact assetId
+        let certAssetId: string | null = null;
+        let certValue: number | null = null;
+        if (gradingId && (gradingCompany === 'PSA' || gradingCompany === 'BGS')) {
+          try {
+            const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`, { signal: AbortSignal.timeout(8000) });
+            if (certRes.ok) {
+              const certData = await certRes.json();
+              if (certData.card?.assetId) certAssetId = certData.card.assetId;
+              if (certData.value) certValue = certData.value;
+            }
+          } catch {}
+        }
+
         // Live search using smart query extraction from card name
         const searchQuery = buildSearchQuery(cardName);
 
@@ -308,12 +324,14 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } catch {}
         }
 
-        // Build chart URL — use assetId for exact variant match, keep q for fallback
+        // Build chart URL — cert assetId > search assetId > name query
         const chartParams = new URLSearchParams();
         chartParams.set("endpoint", "chart");
         chartParams.set("q", searchQuery);
         if (nftAddress) chartParams.set("mint", nftAddress);
-        if (chosen.assetId) {
+        if (certAssetId) {
+          chartParams.set("assetId", certAssetId);
+        } else if (chosen.assetId) {
           chartParams.set("assetId", chosen.assetId);
         }
         if (grade) chartParams.set("grade", grade);

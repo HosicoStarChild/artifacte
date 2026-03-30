@@ -559,14 +559,18 @@ export default function CardDetailPage() {
             {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
               <TcgPlayerPriceBox productId={card.priceSourceId} />
             )}
-            {/* Oracle Price History — graded CC/Sports cards only */}
-            {card.category !== 'MERCHANDISE' && card.source !== 'phygitals' && card.priceSource !== 'TCGplayer' && (
+            {/* Oracle Price History — CC, Sports, Phygitals */}
+            {card.category !== 'MERCHANDISE' && (
             <PriceHistory 
               cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year}
               nftAddress={card.nftAddress}
+              source={card.source}
+              tcgPlayerId={card.tcgPlayerId || card.priceSourceId}
+              gradingId={card.gradingId}
+              gradingCompany={card.gradingCompany}
             />
             )}
 
