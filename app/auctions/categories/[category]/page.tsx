@@ -252,9 +252,29 @@ export default function CategoryAuctionsPage() {
             if (!signTransaction) throw new Error("Wallet does not support signing");
             showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
             
-            const { VersionedTransaction } = await import('@solana/web3.js');
-            const txBytes = Uint8Array.from(atob(tensorData.tx), c => c.charCodeAt(0));
-            const tx = VersionedTransaction.deserialize(txBytes);
+            const { VersionedTransaction, TransactionMessage, TransactionInstruction, PublicKey: PK } = await import('@solana/web3.js');
+            
+            // Rebuild instructions from serialized data
+            const instructions = tensorData.instructions.map((ix: any) => 
+              new TransactionInstruction({
+                programId: new PK(ix.programId),
+                keys: ix.keys.map((k: any) => ({ pubkey: new PK(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })),
+                data: Buffer.from(ix.data, 'base64'),
+              })
+            );
+            
+            // Fetch ALT for v0 message compilation
+            const altAccount = await connection.getAddressLookupTable(new PK(tensorData.altAddress));
+            const lookupTables = altAccount.value ? [altAccount.value] : [];
+            
+            const bh = await connection.getLatestBlockhash();
+            const msg = new TransactionMessage({
+              payerKey: publicKey,
+              recentBlockhash: bh.blockhash,
+              instructions,
+            }).compileToV0Message(lookupTables);
+            
+            const tx = new VersionedTransaction(msg);
             const signed = await signTransaction(tx as any);
             sig = await connection.sendRawTransaction((signed as any).serialize(), {
               skipPreflight: true,
