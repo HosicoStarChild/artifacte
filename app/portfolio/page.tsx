@@ -270,17 +270,26 @@ export default function PortfolioPage() {
                   }
                 } catch {}
               }
-              // Fallback: try oracle search by mint address
-              if (price === 0 && item.asset.id) {
-                try {
-                  const oracleRes = await fetch(`/api/oracle?endpoint=search&q=${encodeURIComponent(item.asset.id)}`);
-                  if (oracleRes.ok) {
-                    const oracleData = await oracleRes.json();
-                    const match = oracleData.results?.[0];
-                    if (match?.marketPrice) price = match.marketPrice;
-                    else if (match?.price) price = match.price;
-                  }
-                } catch {}
+              // Fallback: try oracle search by mint address or name
+              if (price === 0) {
+                const searchTerm = item.asset.id || item.asset.content?.metadata?.name || '';
+                if (searchTerm) {
+                  try {
+                    const oracleRes = await fetch(`/api/oracle?endpoint=search&q=${encodeURIComponent(searchTerm)}`);
+                    if (oracleRes.ok) {
+                      const oracleData = await oracleRes.json();
+                      const match = oracleData.results?.[0];
+                      if (match?.marketPrice) price = match.marketPrice;
+                      else if (match?.price) price = match.price;
+                    }
+                  } catch {}
+                }
+              }
+              // Fallback: use Insured Value from CC metadata
+              if (price === 0 && item.isCC) {
+                const attrs = item.asset.content?.metadata?.attributes || [];
+                const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
+                if (insured) price = parseFloat(insured);
               }
               totalArtifacteValue += price;
               digitalItems.push({
