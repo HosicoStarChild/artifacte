@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 
+const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+
 // Store metadata temporarily for minting (in production, upload to Arweave)
 const metadataStore = new Map<string, any>();
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action } = body;
+    const { action, adminWallet, adminSecret } = body;
+
+    // Auth required for all mint actions
+    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     if (action === "store-metadata") {
       // Store metadata JSON and return a temporary URI
