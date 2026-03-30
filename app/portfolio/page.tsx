@@ -705,7 +705,7 @@ export default function PortfolioPage() {
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         {(nft as any).tcg && (
                           <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            PHYGITAL
+                            PHYGITALS
                           </span>
                         )}
                         {nft.image ? (
