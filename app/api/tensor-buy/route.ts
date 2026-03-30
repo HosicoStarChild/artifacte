@@ -33,8 +33,9 @@ export async function POST(request: Request) {
       ? listState.data.makerBroker.value : undefined;
     const rentDest = listState.data.rentPayer || listState.data.owner;
     const creatorAddresses = (cnftArgs.creators ?? []).map((c: any) => c[0]); // Just Address, not [addr, share]
-    // Use ALL proof nodes (bypass canopy — canopy data can be stale)
-    const allProofNodes = proofFields.proof.map((p: string) => address(p));
+    // Use canopy-trimmed proof nodes (fits in regular tx without ALT)
+    const canopyDepth = cnftArgs.canopyDepth;
+    const trimmedProof = proofFields.proof.slice(0, proofFields.proof.length - canopyDepth).map((p: string) => address(p));
 
     const price = Number(listState.data.amount) / 1e6;
     const maxAmount = BigInt(listState.data.amount) * BigInt(105) / BigInt(100);
@@ -59,8 +60,8 @@ export async function POST(request: Request) {
       maxAmount,
       optionalRoyaltyPct: 100,
       creators: creatorAddresses,
-      proof: allProofNodes,
-      canopyDepth: 0, // Use all proof nodes — canopy data can be stale
+      proof: trimmedProof,
+      canopyDepth: canopyDepth,
     });
 
     // Build the full unsigned transaction server-side (server web3.js compiles correctly with ALT)
@@ -85,18 +86,14 @@ export async function POST(request: Request) {
       data: Buffer.from(buyIx.data),
     });
     
-    const ALT_KEY = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
-    const [altAccount, bh] = await Promise.all([
-      conn.getAddressLookupTable(ALT_KEY),
-      conn.getLatestBlockhash('finalized'),
-    ]);
+    const bh = await conn.getLatestBlockhash('finalized');
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
       instructions: [cuIx, v1Ix],
-    }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
+    }).compileToV0Message(); // No ALT needed with canopy-trimmed proof
     
     const tx = new VersionedTransaction(msg);
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
