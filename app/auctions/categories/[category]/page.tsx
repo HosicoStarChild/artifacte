@@ -257,7 +257,7 @@ export default function CategoryAuctionsPage() {
             // Deserialize pre-built transaction from API
             const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
             const tx = VersionedTransaction.deserialize(txBytes);
-            console.log('[tensor-buy] Pre-built tx size:', txBytes.length);
+            console.log('[tensor-buy] v5 Pre-built tx size:', txBytes.length);
             
             // Sign with wallet
             const signed = await signTransaction(tx as any);
