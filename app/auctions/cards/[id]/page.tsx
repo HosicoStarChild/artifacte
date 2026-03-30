@@ -264,7 +264,7 @@ export default function CardDetailPage() {
           await connection.sendRawTransaction(rawTx, { skipPreflight: true, maxRetries: 0 });
         } catch {}
         
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 1000));
       }
       
       if (confirmed) {
