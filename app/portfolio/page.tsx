@@ -599,7 +599,10 @@ export default function PortfolioPage() {
                   className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer"
                 >
                   {/* Card Image */}
-                  <div className="aspect-square overflow-hidden bg-dark-900">
+                  <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                    <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      CC
+                    </span>
                     {card.frontImage ? (
                       <img
                         src={card.frontImage}
