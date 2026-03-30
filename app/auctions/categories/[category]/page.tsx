@@ -249,7 +249,7 @@ export default function CategoryAuctionsPage() {
           
           if (tensorRes.ok) {
             const tensorData = await tensorRes.json();
-            if (!sendTransaction) throw new Error("Wallet does not support sending transactions");
+            if (!signTransaction) throw new Error("Wallet does not support signing");
             showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
             
             const { VersionedTransaction } = await import('@solana/web3.js');
@@ -259,11 +259,26 @@ export default function CategoryAuctionsPage() {
             const tx = VersionedTransaction.deserialize(txBytes);
             console.log('[tensor-buy] Pre-built tx size:', txBytes.length);
             
-            // Use sendTransaction (wallet adapter handles signing + sending for v0 txs)
-            sig = await sendTransaction(tx as any, connection, {
-              skipPreflight: true,
-              maxRetries: 5,
+            // Sign with wallet
+            const signed = await signTransaction(tx as any);
+            const serialized = (signed as any).serialize();
+            console.log('[tensor-buy] Signed tx size:', serialized.length);
+            
+            // Send directly via RPC (bypass wallet adapter sendTransaction)
+            const b64Tx = btoa(Array.from(new Uint8Array(serialized)).map((b: number) => String.fromCharCode(b)).join(''));
+            const sendRes = await fetch('/api/rpc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0', id: 1,
+                method: 'sendTransaction',
+                params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+              }),
             });
+            const sendData = await sendRes.json();
+            console.log('[tensor-buy] RPC response:', JSON.stringify(sendData).slice(0, 200));
+            if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+            sig = sendData.result;
             
             showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
             await connection.confirmTransaction(sig, "confirmed");
