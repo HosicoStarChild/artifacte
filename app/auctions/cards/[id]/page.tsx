@@ -103,7 +103,38 @@ export default function CardDetailPage() {
             const ccCollection = asset.grouping?.find((g: any) => g.group_value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") || 
                                  asset.collection === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
             const isCC = !!ccCollection;
+            const isPhygital = asset.grouping?.some((g: any) => g.group_value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM");
             
+            if (isPhygital) {
+              const phygAttrs = asset.content?.metadata?.attributes || [];
+              const getPhygAttr = (key: string) => phygAttrs.find((a: any) => a.trait_type === key)?.value || "";
+              const tcgPlayerId = getPhygAttr('TCGPlayer ID') || getPhygAttr('TCGplayer Product ID') || '';
+              setCard({
+                id: asset.id || cardId,
+                name: asset.content?.metadata?.name || "Unknown",
+                subtitle: [getPhygAttr('TCG'), getPhygAttr('Set'), getPhygAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
+                image: asset.content?.links?.image || asset.content?.links?.animation_url || "",
+                nftAddress: asset.id || cardId,
+                source: 'phygitals',
+                currency: 'USDC',
+                category: 'TCG_CARDS',
+                price: 0,
+                grade: getPhygAttr('Grade') || 'Ungraded',
+                tcg: getPhygAttr('TCG') || '',
+                rarity: getPhygAttr('Rarity') || '',
+                set: getPhygAttr('Set') || '',
+                cardNumber: getPhygAttr('Card Number') || '',
+                year: getPhygAttr('Year') || '',
+                tcgPlayerId,
+                priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
+                priceSourceId: tcgPlayerId || undefined,
+                verifiedBy: 'TCGplayer',
+                seller: asset.ownership?.owner || '',
+              });
+              setLoading(false);
+              return;
+            }
+
             if (isArtifacte) {
               setCard({
                 id: asset.id || asset.mint || cardId,
