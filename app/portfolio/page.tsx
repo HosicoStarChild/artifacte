@@ -452,7 +452,7 @@ export default function PortfolioPage() {
 
               {/* 3 Stat Cards */}
               {/* Platform Breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+              <div className="grid grid-cols-3 gap-4 mb-12">
                 {/* RWAs */}
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">RWAs</p>
