@@ -205,17 +205,7 @@ export default function PortfolioPage() {
                 (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
               );
               
-              // Artifacte-minted cards take priority (even if also in CC collection)
-              if (isArtifacteMinted && !isPhygital) {
-                const attrs = (asset.content?.metadata as any)?.attributes || [];
-                const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
-                const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
-                const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
-                const tcgName = getAttr("TCG") || "Other";
-                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: false });
-                return;
-              }
-              // CC cards (not Artifacte-minted) — deduplicated against CC API later
+              // CC cards first (even if also has Artifacte authority — CC vault takes priority)
               if (isCCCard) {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
@@ -229,6 +219,16 @@ export default function PortfolioPage() {
                 const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
                 const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
                 artifacteItems.push({ asset, priceSource, priceSourceId, tcg: getAttr("TCG") || "Other", isPhygital: true });
+                return;
+              }
+              // Artifacte-minted (not CC, not Phygitals)
+              if (isArtifacteMinted) {
+                const attrs = (asset.content?.metadata as any)?.attributes || [];
+                const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+                const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
+                const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
+                const tcgName = getAttr("TCG") || "Other";
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: false });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
