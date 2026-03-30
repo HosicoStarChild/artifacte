@@ -721,7 +721,7 @@ export default function PortfolioPage() {
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
-                        <p className="text-gray-500 text-[10px] mt-1">{(nft as any).tcg || "TCG Card"}</p>
+                        {(nft as any).tcg && (nft as any).tcg !== "Other" && <p className="text-gray-500 text-[10px] mt-1">{(nft as any).tcg}</p>}
                         <div className="mt-3">
                           <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
                           <p className="text-gold-400 font-serif text-lg font-bold">${nft.floorPrice.toFixed(2)}</p>
