@@ -191,71 +191,16 @@ export default function CardDetailPage() {
 
       if (!buildRes.ok) {
         // ME buy failed — try Tensor buy (phygitals/cNFT listings)
-        const tensorRes = await fetch('/api/tensor-buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mint: card.nftAddress, buyer: publicKey.toBase58() }),
-        });
-
-        if (tensorRes.ok) {
-          const tensorData = await tensorRes.json();
-          if (!signTransaction) throw new Error("Wallet does not support signing");
-          showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
-
-          const txBytes = Uint8Array.from(atob(tensorData.tx), c => c.charCodeAt(0));
-          const tx = VersionedTransaction.deserialize(txBytes);
-
-          const signed = await signTransaction(tx as any);
-          const serialized = (signed as any).serialize();
-
-          // Send signed tx via RPC proxy
-          let txToSend = serialized;
-          if (serialized.length > 1232) {
-            // Wallet expanded ALT references — patch signature into original compact tx
-            const signedTx = VersionedTransaction.deserialize(serialized);
-            const patched = new Uint8Array(txBytes);
-            patched.set(signedTx.signatures[0], 2);
-            txToSend = patched;
-          }
-          const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
-          const sendRes = await fetch('/api/rpc', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0', id: 1,
-              method: 'sendTransaction',
-              params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-            }),
-          });
-          const sendData = await sendRes.json();
-          if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-          sig = sendData.result;
-
-          showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
-          // Poll for confirmation
-          for (let i = 0; i < 30; i++) {
-            await new Promise(r => setTimeout(r, 2000));
-            const statusRes = await fetch('/api/rpc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
-            });
-            const statusData = await statusRes.json();
-            const status = statusData.result?.value?.[0];
-            if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
-              if (status.err) throw new Error('Transaction failed on-chain');
-              showToast.success(`✅ Card purchased for ${tensorData.price} USDC!`);
-              setBuying(false);
-              return;
-            }
-          }
+        if (!signTransaction) throw new Error("Wallet does not support signing");
+        const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
+        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info);
+        if (result.confirmed) {
+          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+        } else {
           showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
-          setBuying(false);
-          return;
         }
-
-        const errData = await tensorRes.json().catch(() => ({ error: 'Failed to build transaction' }));
-        throw new Error(errData.error || 'Failed to build transaction');
+        setBuying(false);
+        return;
       }
 
       const { v0Tx, v0TxSigned, price, platformFee, blockhash, lastValidBlockHeight, listingSource } = await buildRes.json();
