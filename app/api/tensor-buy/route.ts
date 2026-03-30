@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       data: Buffer.from(buyIx.data),
     });
     
-    const bh = await conn.getLatestBlockhash('finalized');
+    const bh = await conn.getLatestBlockhash('confirmed');
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
