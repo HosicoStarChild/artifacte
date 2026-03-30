@@ -256,7 +256,7 @@ export default function CategoryAuctionsPage() {
             } else {
               showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
             }
-            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr));
+            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr && l.nftAddress !== mintAddr));
             setBuyingId(null);
             return;
           }
