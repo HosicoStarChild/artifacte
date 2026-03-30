@@ -263,18 +263,21 @@ export default function PortfolioPage() {
               let price = 0;
               
               if (item.isCC) {
-                // CC cards: use oracle's V3.5 valuate (alt.xyz graded pricing)
-                try {
-                  const nftAddr = item.asset.id || '';
-                  const valRes = await fetch(`/api/oracle?endpoint=valuate&nft=${encodeURIComponent(nftAddr)}`);
-                  if (valRes.ok) {
-                    const valData = await valRes.json();
-                    if (valData.value) price = valData.value;
-                  }
-                } catch {}
+                // CC cards: cert-based valuation via alt.xyz
+                const attrs = item.asset.content?.metadata?.attributes || [];
+                const gradingId = attrs.find((a: any) => a.trait_type === "Grading ID")?.value;
+                const gradingCompany = attrs.find((a: any) => a.trait_type === "Grading Company")?.value || '';
+                if (gradingId && (gradingCompany === 'PSA' || gradingCompany === 'BGS')) {
+                  try {
+                    const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`);
+                    if (certRes.ok) {
+                      const certData = await certRes.json();
+                      if (certData.value) price = certData.value;
+                    }
+                  } catch {}
+                }
                 // Fallback: Insured Value from on-chain
                 if (price === 0) {
-                  const attrs = item.asset.content?.metadata?.attributes || [];
                   const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
                   if (insured) price = parseFloat(insured);
                 }

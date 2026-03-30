@@ -124,6 +124,12 @@ export async function GET(req: NextRequest) {
       } else {
         url = `${ORACLE_API}/api/live/valuate?name=${encodeURIComponent(name)}`;
       }
+    } else if (endpoint === "cert") {
+      const cert = searchParams.get("cert") || "";
+      if (!cert) {
+        return NextResponse.json({ error: "Missing cert parameter" }, { status: 400 });
+      }
+      url = `${ORACLE_API}/api/cert/${encodeURIComponent(cert)}`;
     } else {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
     }
