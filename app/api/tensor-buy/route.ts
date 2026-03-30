@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     const ALT_ADDRESS = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
     const [altAccount, bh] = await Promise.all([
       conn.getAddressLookupTable(ALT_ADDRESS),
-      conn.getLatestBlockhash('confirmed'),
+      conn.getLatestBlockhash('finalized'),
     ]);
     
     const lookupTables = altAccount.value ? [altAccount.value] : [];
