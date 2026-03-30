@@ -685,7 +685,12 @@ export default function PortfolioPage() {
               {/* Phygitals + Artifacte-minted cards in same grid */}
               {extraRwaCards.map((nft) => (
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
-                      <div className="aspect-square overflow-hidden bg-dark-900">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                        {(nft as any).tcg && (
+                          <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            PHYGITAL
+                          </span>
+                        )}
                         {nft.image ? (
                           <img src={(() => {
                             let u = nft.image;
