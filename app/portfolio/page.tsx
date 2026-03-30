@@ -263,10 +263,24 @@ export default function PortfolioPage() {
               let price = 0;
               
               if (item.isCC) {
-                // CC cards: use Insured Value (graded cards, TCGPlayer doesn't apply)
+                // CC cards: lookup graded value on alt.xyz
                 const attrs = item.asset.content?.metadata?.attributes || [];
-                const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
-                if (insured) price = parseFloat(insured);
+                const cardName = item.asset.content?.metadata?.name || '';
+                const gradingCompany = attrs.find((a: any) => a.trait_type === "Grading Company")?.value || '';
+                const gradeNum = attrs.find((a: any) => a.trait_type === "GradeNum")?.value || '';
+                const gradeKey = gradingCompany && gradeNum ? `${gradingCompany}-${gradeNum}` : '';
+                try {
+                  const altRes = await fetch(`/api/alt-value?name=${encodeURIComponent(cardName)}&grade=${encodeURIComponent(gradeKey)}`);
+                  if (altRes.ok) {
+                    const altData = await altRes.json();
+                    if (altData.altValue) price = altData.altValue;
+                  }
+                } catch {}
+                // Fallback: Insured Value from on-chain
+                if (price === 0) {
+                  const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
+                  if (insured) price = parseFloat(insured);
+                }
               } else if (item.priceSource === "TCGplayer" && item.priceSourceId) {
                 // Artifacte-minted + Phygitals: TCGPlayer lookup
                 try {
