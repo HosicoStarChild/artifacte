@@ -678,15 +678,49 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* Digital Collectibles Grid — hide when "Listed" filter active */}
-            {digitalNfts.length > 0 && filter !== "listed" && (
+            {/* Artifacte RWA Cards (CC + Phygitals) — show under RWAs section */}
+            {digitalNfts.filter(d => d.collection === "Artifacte").length > 0 && filter !== "listed" && (
+              <div className={filteredCards.length === 0 ? "" : ""}>
+                {filteredCards.length === 0 && <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
+                  {digitalNfts.filter(d => d.collection === "Artifacte").map((nft) => (
+                    <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
+                      <div className="aspect-square overflow-hidden bg-dark-900">
+                        {nft.image ? (
+                          <img src={(() => {
+                            let u = nft.image;
+                            if (u.includes("nftstorage.link/") || u.includes("/ipfs/") || u.startsWith("ipfs://")) {
+                              if (u.startsWith("ipfs://")) u = u.replace("ipfs://", "https://nftstorage.link/ipfs/");
+                              return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                            }
+                            if (u.includes("arweave.net/") || u.includes("gateway.irys.xyz")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
+                            return u;
+                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
+                        <p className="text-gray-500 text-[10px] mt-1">{(nft as any).tcg || "Artifacte"}</p>
+                        <div className="mt-3">
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">${nft.floorPrice.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Digital Collectibles Grid — only non-Artifacte items */}
+            {digitalNfts.filter(d => d.collection !== "Artifacte").length > 0 && filter !== "listed" && (
               <div className="mt-12">
                 <h2 className="font-serif text-2xl text-white mb-6">Digital Collectibles</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {digitalNfts.map((nft) => (
-                    <div key={nft.id} onClick={() => {
-                      if (nft.collection === "Artifacte") window.location.href = `/auctions/cards/${nft.id}`;
-                    }} className={`bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group ${nft.collection === "Artifacte" ? "cursor-pointer" : ""}`}>
+                  {digitalNfts.filter(d => d.collection !== "Artifacte").map((nft) => (
+                    <div key={nft.id} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group">
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
                           <img src={(() => {
@@ -706,8 +740,8 @@ export default function PortfolioPage() {
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
                         <p className="text-gray-500 text-[10px] mt-1">{nft.collection}</p>
                         <div className="mt-3">
-                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">{nft.collection === "Artifacte" ? "Market Price" : "Floor Price"}</p>
-                          <p className="text-blue-400 font-serif text-lg font-bold">{nft.collection === "Artifacte" ? `$${nft.floorPrice.toFixed(2)}` : `◎ ${nft.floorPrice.toFixed(2)}`}</p>
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Floor Price</p>
+                          <p className="text-blue-400 font-serif text-lg font-bold">◎ {nft.floorPrice.toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
