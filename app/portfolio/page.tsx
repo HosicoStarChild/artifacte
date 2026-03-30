@@ -301,7 +301,8 @@ export default function PortfolioPage() {
               setDigitalCollectiblesValue(totalDigitalValue);
               setDigitalNfts(digitalItems); // Keep all for display
               setArtifacteRwaValue(totalArtifacteValue);
-              setArtifacteRwaCount(artifacteCards.length);
+              const ccDasCards = digitalItems.filter(d => d.collection === "Collectors Crypt");
+              setArtifacteRwaCount(artifacteCards.length + phygitalCards.length + ccDasCards.length);
             }
           }
         }
@@ -456,7 +457,7 @@ export default function PortfolioPage() {
                 <div className="bg-dark-800 rounded-xl border border-white/5 p-5">
                   <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest mb-2">RWAs</p>
                   <p className="font-serif text-2xl text-gold-400 font-bold">{pd.totalCards + artifacteRwaCount}</p>
-                  <p className="text-gray-600 text-xs mt-1">{pd.totalCards > 0 ? `${pd.listedCards} listed · ${pd.unlistedCards} unlisted` : ""}{artifacteRwaCount > 0 ? `${pd.totalCards > 0 ? " · " : ""}${artifacteRwaCount} Artifacte` : ""}</p>
+                  <p className="text-gray-600 text-xs mt-1">Artifacte · CC · Phygitals</p>
                 </div>
 
                 {/* Digital Collectibles */}
