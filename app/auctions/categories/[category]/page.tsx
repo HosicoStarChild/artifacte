@@ -257,32 +257,80 @@ export default function CategoryAuctionsPage() {
             // Deserialize pre-built transaction from API
             const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
             const tx = VersionedTransaction.deserialize(txBytes);
-            console.log('[tensor-buy] v5 Pre-built tx size:', txBytes.length);
+            console.log('[tensor-buy] v6 raw bytes:', txBytes.length, 'deserialized:', tx.serialize().length);
             
-            // Sign with wallet
+            // Sign with wallet — wallet may expand ALT references
             const signed = await signTransaction(tx as any);
             const serialized = (signed as any).serialize();
-            console.log('[tensor-buy] Signed tx size:', serialized.length);
+            console.log('[tensor-buy] Signed:', serialized.length);
             
-            // Send directly via RPC (bypass wallet adapter sendTransaction)
-            const b64Tx = btoa(Array.from(new Uint8Array(serialized)).map((b: number) => String.fromCharCode(b)).join(''));
-            const sendRes = await fetch('/api/rpc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0', id: 1,
-                method: 'sendTransaction',
-                params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-              }),
-            });
-            const sendData = await sendRes.json();
-            console.log('[tensor-buy] RPC response:', JSON.stringify(sendData).slice(0, 200));
-            if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-            sig = sendData.result;
+            if (serialized.length > 1232) {
+              // Wallet expanded ALT — send the ORIGINAL tx bytes with signature patched in
+              console.log('[tensor-buy] Wallet inflated tx, patching signature...');
+              // Extract signature from signed tx (first 64 bytes after version prefix)
+              const signedTx = VersionedTransaction.deserialize(serialized);
+              const signature = signedTx.signatures[0];
+              // Patch signature into original compact tx
+              const patched = new Uint8Array(txBytes);
+              // v0 tx format: [0x80] [num_sigs] [sig1(64)] [message...]
+              // The signature starts at offset 1 + compact_array_len
+              patched.set(signature, 1 + 1); // offset after version(1) + sig_count(1)
+              console.log('[tensor-buy] Patched tx size:', patched.length);
+              
+              // Send patched tx directly
+              const b64Tx = btoa(Array.from(patched).map((b: number) => String.fromCharCode(b)).join(''));
+              const sendRes = await fetch('/api/rpc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  jsonrpc: '2.0', id: 1,
+                  method: 'sendTransaction',
+                  params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+                }),
+              });
+              const sendData = await sendRes.json();
+              console.log('[tensor-buy] RPC response:', JSON.stringify(sendData).slice(0, 200));
+              if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+              sig = sendData.result;
+            } else {
+              // Normal size — send directly
+              const b64Tx = btoa(Array.from(new Uint8Array(serialized)).map((b: number) => String.fromCharCode(b)).join(''));
+              const sendRes = await fetch('/api/rpc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  jsonrpc: '2.0', id: 1,
+                  method: 'sendTransaction',
+                  params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+                }),
+              });
+              const sendData = await sendRes.json();
+              console.log('[tensor-buy] RPC response:', JSON.stringify(sendData).slice(0, 200));
+              if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+              sig = sendData.result;
+            }
             
             showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
-            await connection.confirmTransaction(sig, "confirmed");
-            showToast.success(`✅ Card purchased for ${tensorData.price} USDC! TX: ${sig.slice(0, 16)}...`);
+            // Poll for confirmation instead of WebSocket
+            for (let i = 0; i < 30; i++) {
+              await new Promise(r => setTimeout(r, 2000));
+              const statusRes = await fetch('/api/rpc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
+              });
+              const statusData = await statusRes.json();
+              const status = statusData.result?.value?.[0];
+              if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
+                if (status.err) {
+                  throw new Error('Transaction failed on-chain');
+                }
+                showToast.success(`✅ Card purchased for ${tensorData.price} USDC!`);
+                setBuyingId(null);
+                return;
+              }
+            }
+            showToast.info(`Transaction sent but not confirmed yet. Check Solscan: ${sig.slice(0, 16)}...`);
             setBuyingId(null);
             return;
           }
