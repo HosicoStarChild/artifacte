@@ -69,9 +69,9 @@ export async function executeTensorBuy(
 
   onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
 
-  // Step 5: Poll for confirmation
+  // Step 5: Poll for confirmation (1s intervals for faster UX)
   for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1000));
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
