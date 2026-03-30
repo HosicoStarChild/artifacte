@@ -287,7 +287,7 @@ export default function PortfolioPage() {
 
             if (!cancelled) {
               // Separate Artifacte RWAs from digital collectibles
-              const realDigital = digitalItems.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals");
+              const realDigital = digitalItems.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals" && d.collection !== "Collectors Crypt");
               const artifacteCards = digitalItems.filter(d => d.collection === "Artifacte");
               const phygitalCards = digitalItems.filter(d => d.collection === "Phygitals");
               setDigitalCollectiblesValue(totalDigitalValue);
@@ -734,11 +734,11 @@ export default function PortfolioPage() {
             )}
 
             {/* 4. Digital Collectibles */}
-            {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals").length > 0 && filter !== "listed" && (
+            {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals" && d.collection !== "Collectors Crypt").length > 0 && filter !== "listed" && (
               <div className="mb-12">
                 <h2 className="font-serif text-2xl text-white mb-6">Digital Collectibles</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals").map((nft) => (
+                  {digitalNfts.filter(d => d.collection !== "Artifacte" && d.collection !== "Phygitals" && d.collection !== "Collectors Crypt").map((nft) => (
                     <div key={nft.id} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden hover:border-blue-500/30 transition group">
                       <div className="aspect-square overflow-hidden bg-dark-700">
                         {nft.image ? (
