@@ -257,13 +257,10 @@ export default function CategoryAuctionsPage() {
             // Deserialize pre-built transaction from API
             const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
             const tx = VersionedTransaction.deserialize(txBytes);
-            // v0 tx with ALT, built server-side
-            
-            // Sign with wallet — wallet may expand ALT references
+            // Sign with wallet
             const signed = await signTransaction(tx as any);
             const serialized = (signed as any).serialize();
-            
-            
+
             // Send signed tx via RPC proxy
             let txToSend = serialized;
             if (serialized.length > 1232) {
