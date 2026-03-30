@@ -125,7 +125,7 @@ export default async function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
-                { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&q=80", count: "" },
+                { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "/images/digital-collectibles-collage.jpg", count: "" },
                 { name: "Spirits", slug: "spirits", href: "/auctions/categories/spirits", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=600&q=80", count: "2,300+" },
                 { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
                 { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "110+" },
