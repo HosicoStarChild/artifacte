@@ -250,68 +250,35 @@ export default function CategoryAuctionsPage() {
           if (tensorRes.ok) {
             const tensorData = await tensorRes.json();
             if (!signTransaction) throw new Error("Wallet does not support signing");
-            showToast.info(`💳 Building fresh transaction...`);
-            
-            const { VersionedTransaction, TransactionMessage, TransactionInstruction, PublicKey: PK } = await import('@solana/web3.js');
-            
-            // Fetch fresh proof RIGHT BEFORE signing (avoids stale merkle root)
-            const freshProofRes = await fetch('/api/nft', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ method: 'getAssetProof', id: mintAddr }),
-            });
-            
-            // Rebuild instructions — update root in the buy instruction data
-            const instructions = tensorData.instructions.map((ix: any, idx: number) => {
-              let data = Uint8Array.from(atob(ix.data), (c: string) => c.charCodeAt(0));
-              
-              // If fresh proof available, update root in the buy instruction (last ix)
-              if (freshProofRes.ok && idx === tensorData.instructions.length - 1 && data.length > 20) {
-                // Root is at offset 20 (disc:8 + nonce:8 + index:4 = 20)
-                // We'll use the server-provided data as-is for now
-                // The root was fetched server-side moments ago
-              }
-              
-              return new TransactionInstruction({
-                programId: new PK(ix.programId),
-                keys: ix.keys.map((k: any) => ({ pubkey: new PK(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })),
-                data,
-              });
-            });
-            
-            // Fetch ALT + fresh blockhash in parallel
-            const [altAccount, bh] = await Promise.all([
-              connection.getAddressLookupTable(new PK(tensorData.altAddress)),
-              connection.getLatestBlockhash('confirmed'),
-            ]);
-            const lookupTables = altAccount.value ? [altAccount.value] : [];
-            
             showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
             
+            const { VersionedTransaction, TransactionMessage, TransactionInstruction, PublicKey: PK, ComputeBudgetProgram } = await import('@solana/web3.js');
+            
+            // Rebuild instruction from serialized data
+            const ix = new TransactionInstruction({
+              programId: new PK(tensorData.instruction.programId),
+              keys: tensorData.instruction.keys.map((k: any) => ({
+                pubkey: new PK(k.pubkey),
+                isSigner: k.isSigner,
+                isWritable: k.isWritable,
+              })),
+              data: Buffer.from(Uint8Array.from(atob(tensorData.instruction.data), (c: string) => c.charCodeAt(0))),
+            });
+            
+            const bh = await connection.getLatestBlockhash('confirmed');
+            const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
             const msg = new TransactionMessage({
               payerKey: publicKey,
               recentBlockhash: bh.blockhash,
-              instructions,
-            }).compileToV0Message(lookupTables);
+              instructions: [cuIx, ix],
+            }).compileToV0Message();
             
             const tx = new VersionedTransaction(msg);
             const signed = await signTransaction(tx as any);
-            
-            // Send with skipPreflight AND retry
-            let txSig = '';
-            for (let attempt = 0; attempt < 3; attempt++) {
-              try {
-                txSig = await connection.sendRawTransaction((signed as any).serialize(), {
-                  skipPreflight: true,
-                  maxRetries: 3,
-                });
-                break;
-              } catch (e: any) {
-                if (attempt === 2) throw e;
-                await new Promise(r => setTimeout(r, 1000));
-              }
-            }
-            sig = txSig;
+            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+              skipPreflight: true,
+              maxRetries: 5,
+            });
             
             showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
             await connection.confirmTransaction(sig, "confirmed");
