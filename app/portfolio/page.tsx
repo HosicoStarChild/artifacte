@@ -181,7 +181,7 @@ export default function PortfolioPage() {
             // Build digital NFTs list with floor prices
             let totalDigitalValue = 0;
             const digitalItems: typeof digitalNfts = [];
-            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string; tcg: string; isPhygital?: boolean }[] = [];
+            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string; tcg: string; isPhygital?: boolean; isCC?: boolean }[] = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
               // Match by collection grouping (standard) or authority (WNS/Token-2022)
@@ -201,8 +201,13 @@ export default function PortfolioPage() {
               const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === CC_COLLECTION);
               const isPhygital = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === PHYGITALS_COLLECTION);
               
-              // CC cards are handled by the CC API (filteredCards) — skip here to avoid duplicates
-              if (isCCCard) return;
+              // CC cards — add to artifacteItems as CC type (will be deduplicated against filteredCards later)
+              if (isCCCard) {
+                const attrs = (asset.content?.metadata as any)?.attributes || [];
+                const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+                artifacteItems.push({ asset, priceSource: getAttr("Price Source") || '', priceSourceId: getAttr("Price Source ID") || '', tcg: getAttr("TCG") || getAttr("Category") || "Other", isPhygital: false, isCC: true });
+                return;
+              }
               
               // Phygitals or Artifacte-minted
               const isArtifacteMinted = !matchedAddress && !isPhygital && (
@@ -274,7 +279,7 @@ export default function PortfolioPage() {
                 id: item.asset.id,
                 name: item.asset.content?.metadata?.name || item.asset.name || "Unknown",
                 image: item.asset.content?.links?.image || item.asset.image || "",
-                collection: item.isPhygital ? "Phygitals" : "Artifacte",
+                collection: item.isCC ? "Collectors Crypt" : item.isPhygital ? "Phygitals" : "Artifacte",
                 floorPrice: price,
                 tcg: item.tcg,
               });
@@ -475,7 +480,9 @@ export default function PortfolioPage() {
                 const artifacteTotal = digitalNfts.filter(d => d.collection === "Artifacte").reduce((sum, d) => sum + d.floorPrice, 0);
                 if (artifacteTotal > 0) catValues["Artifacte RWA"] = artifacteTotal;
                 // Collectors Crypt RWA
-                const ccTotal = portfolioData ? Object.values(portfolioData.marketCategoriesByValue || {}).reduce((a: number, b: number) => a + b, 0) : 0;
+                const ccApiTotal = portfolioData ? Object.values(portfolioData.marketCategoriesByValue || {}).reduce((a: number, b: number) => a + b, 0) : 0;
+                const ccDasTotal = digitalNfts.filter(d => d.collection === "Collectors Crypt").reduce((sum, d) => sum + d.floorPrice, 0);
+                const ccTotal = ccApiTotal + ccDasTotal;
                 if (ccTotal > 0) catValues["Collectors Crypt RWA"] = ccTotal;
                 else if (filteredCards.length > 0) {
                   const insuredTotal = filteredCards.reduce((sum, c) => sum + (c.insuredValueNum || 0), 0);
@@ -634,7 +641,11 @@ export default function PortfolioPage() {
             )}
 
             {/* 2. Collectors Crypt RWA */}
-            {filteredCards.length > 0 && (
+            {(() => {
+              const ccFromDas = digitalNfts.filter(d => d.collection === "Collectors Crypt");
+              const ccIds = new Set(filteredCards.map(c => c.nftAddress));
+              const extraCC = ccFromDas.filter(d => !ccIds.has(d.id));
+              return (filteredCards.length > 0 || extraCC.length > 0) ? (
               <div className="mb-12">
                 <h2 className="font-serif text-2xl text-white mb-6">Collectors Crypt RWA</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -670,9 +681,26 @@ export default function PortfolioPage() {
                       </div>
                     </div>
                   ))}
+                  {/* Extra CC cards found via DAS but not in CC API */}
+                  {extraCC.map((nft) => (
+                    <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
+                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                        <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COLLECTOR CRYPT</span>
+                        {nft.image ? <img src={nft.image.includes("arweave.net/") ? `/api/img-proxy?url=${encodeURIComponent(nft.image)}` : nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
+                        <div className="mt-3">
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">${nft.floorPrice.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+              ) : null;
+            })()}
 
             {/* 3. Phygitals RWA */}
             {digitalNfts.filter(d => d.collection === "Phygitals").length > 0 && (
