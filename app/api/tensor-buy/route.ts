@@ -185,12 +185,6 @@ export async function POST(request: Request) {
     const instructions: TransactionInstruction[] = [];
     instructions.push(ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }));
 
-    // Check if buyer has USDC ATA
-    const buyerAtaInfo = await heliusRpc('getAccountInfo', [buyerAta.toBase58()]);
-    if (!buyerAtaInfo?.value) {
-      instructions.push(createAssociatedTokenAccountInstruction(buyerPk, buyerAta, buyerPk, USDC_MINT));
-    }
-
     instructions.push(new TransactionInstruction({ programId: TENSOR, keys, data: ixData.slice(0, off) }));
 
     // Return unsigned tx + ALT address for frontend to resolve
