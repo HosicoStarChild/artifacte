@@ -195,24 +195,27 @@ export default function PortfolioPage() {
               // Check for Artifacte-minted NFTs (admin wallet as creator/authority)
               // Skip the collection NFT itself
               if (asset.id === "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS") return;
-              // CC cards + Phygitals show as Artifacte cards
+              // Detect source: CC, Phygitals, or Artifacte-minted
               const CC_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
               const PHYGITALS_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
-              const cardCollections = new Set([CC_COLLECTION, PHYGITALS_COLLECTION]);
-              const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && cardCollections.has(g.group_value));
+              const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === CC_COLLECTION);
+              const isPhygital = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === PHYGITALS_COLLECTION);
               
-              const isArtifacte = isCCCard || (!matchedAddress && (
+              // CC cards are handled by the CC API (filteredCards) — skip here to avoid duplicates
+              if (isCCCard) return;
+              
+              // Phygitals or Artifacte-minted
+              const isArtifacteMinted = !matchedAddress && !isPhygital && (
                 (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
                 (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
-              ));
-              if (isArtifacte) {
+              );
+              if (isPhygital || isArtifacteMinted) {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
                 const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
                 const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
                 const tcgName = getAttr("TCG") || "Other";
-                const isPhyg = asset.grouping?.some((g: any) => g.group_value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM");
-                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: !!isPhyg });
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: !!isPhygital });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
