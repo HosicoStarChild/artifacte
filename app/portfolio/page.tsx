@@ -195,32 +195,40 @@ export default function PortfolioPage() {
               // Check for Artifacte-minted NFTs (admin wallet as creator/authority)
               // Skip the collection NFT itself
               if (asset.id === "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS") return;
-              // Detect source: CC, Phygitals, or Artifacte-minted
+              // Detect source: Artifacte-minted, CC, Phygitals
               const CC_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
               const PHYGITALS_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
               const isCCCard = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === CC_COLLECTION);
               const isPhygital = asset.grouping?.some((g: any) => g.group_key === "collection" && g.group_value === PHYGITALS_COLLECTION);
+              const isArtifacteMinted = (
+                (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
+                (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
+              );
               
-              // CC cards — add to artifacteItems as CC type (will be deduplicated against filteredCards later)
+              // Artifacte-minted cards take priority (even if also in CC collection)
+              if (isArtifacteMinted && !isPhygital) {
+                const attrs = (asset.content?.metadata as any)?.attributes || [];
+                const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+                const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
+                const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
+                const tcgName = getAttr("TCG") || "Other";
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: false });
+                return;
+              }
+              // CC cards (not Artifacte-minted) — deduplicated against CC API later
               if (isCCCard) {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
                 artifacteItems.push({ asset, priceSource: getAttr("Price Source") || '', priceSourceId: getAttr("Price Source ID") || '', tcg: getAttr("TCG") || getAttr("Category") || "Other", isPhygital: false, isCC: true });
                 return;
               }
-              
-              // Phygitals or Artifacte-minted
-              const isArtifacteMinted = !matchedAddress && !isPhygital && (
-                (asset as any).authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX") ||
-                (asset as any).creators?.some((c: any) => c.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX")
-              );
-              if (isPhygital || isArtifacteMinted) {
+              // Phygitals
+              if (isPhygital) {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
                 const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
                 const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
                 const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
-                const tcgName = getAttr("TCG") || "Other";
-                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: !!isPhygital });
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: getAttr("TCG") || "Other", isPhygital: true });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
