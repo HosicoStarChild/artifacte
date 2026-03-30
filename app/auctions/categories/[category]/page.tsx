@@ -300,11 +300,15 @@ export default function CategoryAuctionsPage() {
                   throw new Error('Transaction failed on-chain');
                 }
                 showToast.success(`✅ Card purchased for ${tensorData.price} USDC!`);
+                // Remove purchased card from listings
+                setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr));
                 setBuyingId(null);
                 return;
               }
             }
-            showToast.info(`Transaction sent but not confirmed yet. Check Solscan: ${sig.slice(0, 16)}...`);
+            showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+            // Remove from listings optimistically
+            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr));
             setBuyingId(null);
             return;
           }
