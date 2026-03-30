@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 
-// Rate limit: 30 requests per minute per IP (tighter for RPC proxy)
+// Rate limits per minute per IP
 const rateLimit = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT = 30;
+const sendRateLimit = new Map<string, { count: number; reset: number }>();
+const RATE_LIMIT = 30;        // General: 30 req/min
+const SEND_RATE_LIMIT = 5;    // sendTransaction: 5 req/min (prevents relay abuse)
 const WINDOW_MS = 60000;
 
 function checkRateLimit(ip: string): boolean {
@@ -15,6 +17,18 @@ function checkRateLimit(ip: string): boolean {
     return true;
   }
   if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+function checkSendRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = sendRateLimit.get(ip);
+  if (!entry || now > entry.reset) {
+    sendRateLimit.set(ip, { count: 1, reset: now + WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= SEND_RATE_LIMIT) return false;
   entry.count++;
   return true;
 }
@@ -51,6 +65,11 @@ export async function POST(req: NextRequest) {
     // Validate method is allowed
     if (body.method && !ALLOWED_METHODS.has(body.method)) {
       return NextResponse.json({ error: `Method ${body.method} not allowed` }, { status: 403 });
+    }
+
+    // Stricter rate limit for sendTransaction (prevents relay abuse)
+    if (body.method === 'sendTransaction' && !checkSendRateLimit(ip)) {
+      return NextResponse.json({ error: "Send rate limit exceeded" }, { status: 429 });
     }
 
     const res = await fetch(HELIUS_RPC, {

@@ -3,8 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 if (!process.env.HELIUS_API_KEY) console.warn("[nft] HELIUS_API_KEY not set");
 
+// Rate limit: 30 requests per minute per IP
+const rateMap = new Map<string, { count: number; reset: number }>();
+function checkRate(ip: string): boolean {
+  const now = Date.now();
+  const e = rateMap.get(ip);
+  if (!e || now > e.reset) { rateMap.set(ip, { count: 1, reset: now + 60000 }); return true; }
+  if (e.count >= 30) return false;
+  e.count++;
+  return true;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    if (!checkRate(ip)) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+
     const mint = request.nextUrl.searchParams.get("mint");
     if (!mint) {
       return NextResponse.json({ error: "Missing mint parameter" }, { status: 400 });
