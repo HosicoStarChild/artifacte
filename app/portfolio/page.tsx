@@ -181,7 +181,7 @@ export default function PortfolioPage() {
             // Build digital NFTs list with floor prices
             let totalDigitalValue = 0;
             const digitalItems: typeof digitalNfts = [];
-            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string; tcg: string }[] = [];
+            const artifacteItems: { asset: any; priceSource: string; priceSourceId: string; tcg: string; isPhygital?: boolean }[] = [];
             
             nftData.result.items.forEach((asset: HeliumAsset) => {
               // Match by collection grouping (standard) or authority (WNS/Token-2022)
@@ -207,10 +207,12 @@ export default function PortfolioPage() {
               ));
               if (isArtifacte) {
                 const attrs = (asset.content?.metadata as any)?.attributes || [];
-                const priceSource = attrs.find((a: any) => a.trait_type === "Price Source")?.value;
-                const priceSourceId = attrs.find((a: any) => a.trait_type === "Price Source ID")?.value;
-                const tcgName = attrs.find((a: any) => a.trait_type === "TCG")?.value || "Other";
-                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName });
+                const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
+                const priceSource = getAttr("Price Source") || (getAttr("TCGPlayer ID") ? "TCGplayer" : undefined);
+                const priceSourceId = getAttr("Price Source ID") || getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID");
+                const tcgName = getAttr("TCG") || "Other";
+                const isPhyg = asset.grouping?.some((g: any) => g.group_value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM");
+                artifacteItems.push({ asset, priceSource, priceSourceId, tcg: tcgName, isPhygital: !!isPhyg });
                 return;
               }
               if (matchedAddress && WHITELISTED_COLLECTIONS.has(matchedAddress)) {
@@ -239,7 +241,7 @@ export default function PortfolioPage() {
               }
             });
 
-            // Fetch prices for Artifacte-minted NFTs
+            // Fetch prices for Artifacte-minted NFTs (batch TCGPlayer lookups)
             let totalArtifacteValue = 0;
             for (const item of artifacteItems) {
               let price = 0;
@@ -249,6 +251,18 @@ export default function PortfolioPage() {
                   if (tcgRes.ok) {
                     const tcgData = await tcgRes.json();
                     price = tcgData.marketPrice || tcgData.listedMedianPrice || 0;
+                  }
+                } catch {}
+              }
+              // Fallback: try oracle search by mint address
+              if (price === 0 && item.asset.id) {
+                try {
+                  const oracleRes = await fetch(`/api/oracle?endpoint=search&q=${encodeURIComponent(item.asset.id)}`);
+                  if (oracleRes.ok) {
+                    const oracleData = await oracleRes.json();
+                    const match = oracleData.results?.[0];
+                    if (match?.marketPrice) price = match.marketPrice;
+                    else if (match?.price) price = match.price;
                   }
                 } catch {}
               }
