@@ -262,7 +262,7 @@ export default function CategoryAuctionsPage() {
                 isSigner: k.isSigner,
                 isWritable: k.isWritable,
               })),
-              data: Buffer.from(Uint8Array.from(atob(tensorData.instruction.data), (c: string) => c.charCodeAt(0))),
+              data: new Uint8Array(atob(tensorData.instruction.data).split('').map((c: string) => c.charCodeAt(0))),
             });
             
             // Fetch ALT via direct RPC call (not through proxy — ensure full resolution)
@@ -279,6 +279,7 @@ export default function CategoryAuctionsPage() {
               if (altAccount.value) lookupTables = [altAccount.value];
             }
             console.log('[tensor-buy] ALT loaded:', lookupTables.length > 0 ? lookupTables[0].state.addresses.length + ' addrs' : 'NONE');
+            console.log('[tensor-buy] API response keys:', Object.keys(tensorData).join(','));
             
             const bh = await connection.getLatestBlockhash('confirmed');
             const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
