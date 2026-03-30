@@ -35,6 +35,7 @@ const ALLOWED_METHODS = new Set([
   "getMultipleAccounts",
   "getTokenAccountsByOwner",
   "isBlockhashValid",
+  "getAddressLookupTable",
 ]);
 
 export async function POST(req: NextRequest) {

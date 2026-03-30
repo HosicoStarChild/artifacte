@@ -267,11 +267,20 @@ export default function CategoryAuctionsPage() {
             
             // Fetch ALT + blockhash for v0 message (tx needs all 20 proof nodes)
             const ALT_ADDRESS = '4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN';
-            const [altAccount, bh] = await Promise.all([
-              connection.getAddressLookupTable(new PK(ALT_ADDRESS)),
-              connection.getLatestBlockhash('confirmed'),
-            ]);
-            const lookupTables = altAccount.value ? [altAccount.value] : [];
+            let lookupTables: any[] = [];
+            let bh: any;
+            try {
+              const [altAccount, bhResult] = await Promise.all([
+                connection.getAddressLookupTable(new PK(ALT_ADDRESS)),
+                connection.getLatestBlockhash('confirmed'),
+              ]);
+              bh = bhResult;
+              if (altAccount.value) lookupTables = [altAccount.value];
+              else console.warn('ALT not found, tx may be too large');
+            } catch (e) {
+              console.error('ALT fetch error:', e);
+              bh = await connection.getLatestBlockhash('confirmed');
+            }
             const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
             const msg = new TransactionMessage({
               payerKey: publicKey,
