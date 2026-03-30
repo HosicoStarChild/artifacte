@@ -257,11 +257,18 @@ export default function PortfolioPage() {
               }
             });
 
-            // Fetch prices for Artifacte-minted NFTs (batch TCGPlayer lookups)
+            // Fetch prices for RWA cards
             let totalArtifacteValue = 0;
             for (const item of artifacteItems) {
               let price = 0;
-              if (item.priceSource === "TCGplayer" && item.priceSourceId) {
+              
+              if (item.isCC) {
+                // CC cards: use Insured Value (graded cards, TCGPlayer doesn't apply)
+                const attrs = item.asset.content?.metadata?.attributes || [];
+                const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
+                if (insured) price = parseFloat(insured);
+              } else if (item.priceSource === "TCGplayer" && item.priceSourceId) {
+                // Artifacte-minted + Phygitals: TCGPlayer lookup
                 try {
                   const tcgRes = await fetch(`/api/tcgplayer-price?id=${item.priceSourceId}`);
                   if (tcgRes.ok) {
@@ -270,7 +277,7 @@ export default function PortfolioPage() {
                   }
                 } catch {}
               }
-              // Fallback: try oracle search by mint address or name
+              // Fallback: oracle search
               if (price === 0) {
                 const searchTerm = item.asset.id || item.asset.content?.metadata?.name || '';
                 if (searchTerm) {
@@ -284,12 +291,6 @@ export default function PortfolioPage() {
                     }
                   } catch {}
                 }
-              }
-              // Fallback: use Insured Value from CC metadata
-              if (price === 0 && item.isCC) {
-                const attrs = item.asset.content?.metadata?.attributes || [];
-                const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
-                if (insured) price = parseFloat(insured);
               }
               totalArtifacteValue += price;
               digitalItems.push({
