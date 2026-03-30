@@ -265,13 +265,19 @@ export default function CategoryAuctionsPage() {
               data: Buffer.from(Uint8Array.from(atob(tensorData.instruction.data), (c: string) => c.charCodeAt(0))),
             });
             
-            const bh = await connection.getLatestBlockhash('confirmed');
+            // Fetch ALT + blockhash for v0 message (tx needs all 20 proof nodes)
+            const ALT_ADDRESS = '4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN';
+            const [altAccount, bh] = await Promise.all([
+              connection.getAddressLookupTable(new PK(ALT_ADDRESS)),
+              connection.getLatestBlockhash('confirmed'),
+            ]);
+            const lookupTables = altAccount.value ? [altAccount.value] : [];
             const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
             const msg = new TransactionMessage({
               payerKey: publicKey,
               recentBlockhash: bh.blockhash,
               instructions: [cuIx, ix],
-            }).compileToV0Message();
+            }).compileToV0Message(lookupTables);
             
             const tx = new VersionedTransaction(msg);
             const signed = await signTransaction(tx as any);

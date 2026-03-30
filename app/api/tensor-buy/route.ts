@@ -33,7 +33,8 @@ export async function POST(request: Request) {
       ? listState.data.makerBroker.value : undefined;
     const rentDest = listState.data.rentPayer || listState.data.owner;
     const creatorAddresses = (cnftArgs.creators ?? []).map((c: any) => c[0]); // Just Address, not [addr, share]
-    const proofTrimmed = (cnftArgs.proof ?? []).slice(0, (cnftArgs.proof ?? []).length - cnftArgs.canopyDepth);
+    // Use ALL proof nodes (bypass canopy — canopy data can be stale)
+    const allProofNodes = proofFields.proof.map((p: string) => address(p));
 
     const price = Number(listState.data.amount) / 1e6;
     const maxAmount = BigInt(listState.data.amount) * BigInt(105) / BigInt(100);
@@ -58,8 +59,8 @@ export async function POST(request: Request) {
       maxAmount,
       optionalRoyaltyPct: 100,
       creators: creatorAddresses,
-      proof: proofTrimmed,
-      canopyDepth: cnftArgs.canopyDepth,
+      proof: allProofNodes,
+      canopyDepth: 0, // Use all proof nodes — canopy data can be stale
     });
 
     // Serialize instruction for frontend (convert v2 format to JSON)
