@@ -583,9 +583,15 @@ export default function PortfolioPage() {
               ))}
             </div>
 
-            {/* RWAs */}
-            {filteredCards.length > 0 && <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
+            {/* RWAs — CC cards + Phygitals + Artifacte-minted, unified */}
+            {(() => {
+              const ccIds = new Set(filteredCards.map(c => c.nftAddress));
+              const extraRwaCards = digitalNfts.filter(d => d.collection === "Artifacte" && !ccIds.has(d.id));
+              const hasRwas = filteredCards.length > 0 || extraRwaCards.length > 0;
+              return hasRwas ? (
+              <>
+              <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
               {filteredCards.map((card) => (
                 <div
                   key={card.nftAddress}
@@ -676,17 +682,8 @@ export default function PortfolioPage() {
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Artifacte RWA Cards (CC + Phygitals) — show under RWAs, deduplicated against CC cards */}
-            {(() => {
-              const ccIds = new Set(filteredCards.map(c => c.nftAddress));
-              const rwaCards = digitalNfts.filter(d => d.collection === "Artifacte" && !ccIds.has(d.id));
-              return rwaCards.length > 0 && filter !== "listed" ? (
-              <div>
-                {filteredCards.length === 0 && <h2 className="font-serif text-2xl text-white mb-6">RWAs</h2>}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
-                  {rwaCards.map((nft) => (
+              {/* Phygitals + Artifacte-minted cards in same grid */}
+              {extraRwaCards.map((nft) => (
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
                       <div className="aspect-square overflow-hidden bg-dark-900">
                         {nft.image ? (
@@ -712,9 +709,9 @@ export default function PortfolioPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+              ))}
               </div>
+              </>
               ) : null;
             })()}
 
