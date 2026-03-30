@@ -63,25 +63,46 @@ export async function POST(request: Request) {
       canopyDepth: 0, // Use all proof nodes — canopy data can be stale
     });
 
-    // Serialize instruction for frontend (convert v2 format to JSON)
-    const accounts = buyIx.accounts.map((acct: any) => {
+    // Build the full unsigned transaction server-side (server web3.js compiles correctly with ALT)
+    const { PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram, Connection: SolConnection } = await import('@solana/web3.js');
+    
+    const conn = new SolConnection(HELIUS_RPC, 'confirmed');
+    const buyerPk = new PublicKey(buyer);
+    
+    const v1Keys = buyIx.accounts.map((acct: any) => {
       const addr = typeof acct.address === 'object' && acct.address.address
-        ? acct.address.address // TransactionSigner
-        : String(acct.address);
+        ? acct.address.address : String(acct.address);
       return {
-        pubkey: addr,
+        pubkey: new PublicKey(addr),
         isSigner: acct.role >= 2,
         isWritable: acct.role === 1 || acct.role === 3,
       };
     });
+    
+    const v1Ix = new TransactionInstruction({
+      programId: new PublicKey(buyIx.programAddress),
+      keys: v1Keys,
+      data: Buffer.from(buyIx.data),
+    });
+    
+    const ALT_KEY = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
+    const [altAccount, bh] = await Promise.all([
+      conn.getAddressLookupTable(ALT_KEY),
+      conn.getLatestBlockhash('finalized'),
+    ]);
+    
+    const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
+    const msg = new TransactionMessage({
+      payerKey: buyerPk,
+      recentBlockhash: bh.blockhash,
+      instructions: [cuIx, v1Ix],
+    }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
+    
+    const tx = new VersionedTransaction(msg);
+    const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
     return NextResponse.json({
-      instruction: {
-        programId: String(buyIx.programAddress),
-        keys: accounts,
-        data: Buffer.from(buyIx.data).toString('base64'),
-      },
-      altAddress: '4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN',
+      tx: txBase64,
       price,
       currency: 'USDC',
       seller: String(listState.data.owner),

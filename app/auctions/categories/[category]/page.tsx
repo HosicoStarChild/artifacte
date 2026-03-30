@@ -249,53 +249,18 @@ export default function CategoryAuctionsPage() {
           
           if (tensorRes.ok) {
             const tensorData = await tensorRes.json();
-            if (!signTransaction) throw new Error("Wallet does not support signing");
+            if (!sendTransaction) throw new Error("Wallet does not support sending transactions");
             showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
             
-            const { VersionedTransaction, TransactionMessage, TransactionInstruction, PublicKey: PK, ComputeBudgetProgram, Connection: SolConn } = await import('@solana/web3.js');
+            const { VersionedTransaction } = await import('@solana/web3.js');
             
-            // Build instruction from API response
-            const ix = new TransactionInstruction({
-              programId: new PK(tensorData.instruction.programId),
-              keys: tensorData.instruction.keys.map((k: any) => ({
-                pubkey: new PK(k.pubkey),
-                isSigner: k.isSigner,
-                isWritable: k.isWritable,
-              })),
-              data: new Uint8Array(atob(tensorData.instruction.data).split('').map((c: string) => c.charCodeAt(0))),
-            });
+            // Deserialize pre-built transaction from API
+            const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
+            const tx = VersionedTransaction.deserialize(txBytes);
+            console.log('[tensor-buy] Pre-built tx size:', txBytes.length);
             
-            // Fetch ALT via direct RPC call (not through proxy — ensure full resolution)
-            const altRes = await fetch('/api/rpc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getAccountInfo', params: [tensorData.altAddress, { encoding: 'base64' }] }),
-            });
-            const altData = await altRes.json();
-            
-            let lookupTables: any[] = [];
-            if (altData.result?.value) {
-              const altAccount = await connection.getAddressLookupTable(new PK(tensorData.altAddress));
-              if (altAccount.value) lookupTables = [altAccount.value];
-            }
-            console.log('[tensor-buy] ALT loaded:', lookupTables.length > 0 ? lookupTables[0].state.addresses.length + ' addrs' : 'NONE');
-            console.log('[tensor-buy] API response keys:', Object.keys(tensorData).join(','));
-            
-            const bh = await connection.getLatestBlockhash('confirmed');
-            const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
-            const msg = new TransactionMessage({
-              payerKey: publicKey,
-              recentBlockhash: bh.blockhash,
-              instructions: [cuIx, ix],
-            }).compileToV0Message(lookupTables);
-            
-            const tx = new VersionedTransaction(msg);
-            console.log('[tensor-buy] Compiled tx size:', tx.serialize().length);
-            
-            const signed = await signTransaction(tx as any);
-            const serialized = (signed as any).serialize();
-            console.log('[tensor-buy] Signed tx size:', serialized.length);
-            sig = await connection.sendRawTransaction(serialized, {
+            // Use sendTransaction (wallet adapter handles signing + sending for v0 txs)
+            sig = await sendTransaction(tx as any, connection, {
               skipPreflight: true,
               maxRetries: 5,
             });
