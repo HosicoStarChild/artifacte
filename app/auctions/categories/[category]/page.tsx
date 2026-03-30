@@ -252,51 +252,23 @@ export default function CategoryAuctionsPage() {
             if (!signTransaction) throw new Error("Wallet does not support signing");
             showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
             
-            const { VersionedTransaction, TransactionMessage, TransactionInstruction, PublicKey: PK, ComputeBudgetProgram } = await import('@solana/web3.js');
+            const { VersionedTransaction } = await import('@solana/web3.js');
             
-            // Rebuild instruction from serialized data
-            const ix = new TransactionInstruction({
-              programId: new PK(tensorData.instruction.programId),
-              keys: tensorData.instruction.keys.map((k: any) => ({
-                pubkey: new PK(k.pubkey),
-                isSigner: k.isSigner,
-                isWritable: k.isWritable,
-              })),
-              data: Buffer.from(Uint8Array.from(atob(tensorData.instruction.data), (c: string) => c.charCodeAt(0))),
+            // Deserialize pre-built transaction from API (already has ALT + compute budget)
+            const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
+            const tx = VersionedTransaction.deserialize(txBytes);
+            
+            const signed = await signTransaction(tx as any);
+            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+              skipPreflight: true,
+              maxRetries: 5,
             });
             
-            // Fetch ALT + blockhash for v0 message (tx needs all 20 proof nodes)
-            const ALT_ADDRESS = '4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN';
-            const [altAccount, bh] = await Promise.all([
-              connection.getAddressLookupTable(new PK(ALT_ADDRESS)),
-              connection.getLatestBlockhash('confirmed'),
-            ]);
-            const lookupTables = altAccount.value ? [altAccount.value] : [];
-            console.log('[tensor-buy] ALT loaded:', altAccount.value ? 'yes' : 'NO', '| Keys:', tensorData.instruction.keys.length);
-            const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
-            try {
-              const msg = new TransactionMessage({
-                payerKey: publicKey,
-                recentBlockhash: bh.blockhash,
-                instructions: [cuIx, ix],
-              }).compileToV0Message(lookupTables);
-              const tx = new VersionedTransaction(msg);
-              console.log('[tensor-buy] TX size:', tx.serialize().length);
-              const signed = await signTransaction(tx as any);
-              sig = await connection.sendRawTransaction((signed as any).serialize(), {
-                skipPreflight: true,
-                maxRetries: 5,
-              });
-              
-              showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
-              await connection.confirmTransaction(sig, "confirmed");
-              showToast.success(`✅ Card purchased for ${tensorData.price} USDC! TX: ${sig.slice(0, 16)}...`);
-              setBuyingId(null);
-              return;
-            } catch (compileErr: any) {
-              console.error('[tensor-buy] Compile error:', compileErr);
-              throw compileErr;
-            }
+            showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
+            await connection.confirmTransaction(sig, "confirmed");
+            showToast.success(`✅ Card purchased for ${tensorData.price} USDC! TX: ${sig.slice(0, 16)}...`);
+            setBuyingId(null);
+            return;
           }
           
           const errData = await buildRes.json().catch(() => ({ error: 'Failed to build transaction' }));
