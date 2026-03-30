@@ -467,18 +467,22 @@ export default function PortfolioPage() {
 
               {/* Portfolio Value by Category (Oracle) */}
               {(() => {
-                const catValues: Record<string, number> = { ...(portfolioData?.marketCategoriesByValue || {}) };
-                if (digitalCollectiblesValue > 0) {
-                  catValues["Digital Collectibles"] = digitalCollectiblesValue;
+                const catValues: Record<string, number> = {};
+                // Artifacte RWA
+                const artifacteTotal = digitalNfts.filter(d => d.collection === "Artifacte").reduce((sum, d) => sum + d.floorPrice, 0);
+                if (artifacteTotal > 0) catValues["Artifacte RWA"] = artifacteTotal;
+                // Collectors Crypt RWA
+                const ccTotal = portfolioData ? Object.values(portfolioData.marketCategoriesByValue || {}).reduce((a: number, b: number) => a + b, 0) : 0;
+                if (ccTotal > 0) catValues["Collectors Crypt RWA"] = ccTotal;
+                else if (filteredCards.length > 0) {
+                  const insuredTotal = filteredCards.reduce((sum, c) => sum + (c.insuredValueNum || 0), 0);
+                  if (insuredTotal > 0) catValues["Collectors Crypt RWA"] = insuredTotal;
                 }
-                // Add Artifacte RWA values by TCG category
-                if (artifacteRwaValue > 0) {
-                  const artifacteCards = digitalNfts.filter(d => d.collection === "Artifacte" && d.floorPrice > 0);
-                  for (const card of artifacteCards) {
-                    const cat = `Artifacte ${card.tcg || "Other"}`;
-                    catValues[cat] = (catValues[cat] || 0) + card.floorPrice;
-                  }
-                }
+                // Phygitals RWA
+                const phygTotal = digitalNfts.filter(d => d.collection === "Phygitals").reduce((sum, d) => sum + d.floorPrice, 0);
+                if (phygTotal > 0) catValues["Phygitals RWA"] = phygTotal;
+                // Digital Collectibles
+                if (digitalCollectiblesValue > 0) catValues["Digital Collectibles"] = digitalCollectiblesValue;
                 const maxVal = Math.max(...Object.values(catValues), 1);
                 return Object.keys(catValues).length > 0 ? (
                   <div className="bg-dark-800 rounded-xl border border-white/5 p-6 mb-12">
@@ -497,8 +501,8 @@ export default function PortfolioPage() {
                           <div key={category}>
                             <div className="flex justify-between items-center mb-2">
                               <p className="text-sm text-gray-300">{category}</p>
-                              <p className={`text-xs font-semibold ${category === "Digital Collectibles" ? "text-blue-400" : "text-gold-400"}`}>
-                                {category === "Digital Collectibles" ? formatSolPrice(value) : category.startsWith("Artifacte") ? `$${value.toFixed(2)}` : formatCurrency(value)}
+                              <p className={`text-xs font-semibold ${category === "Digital Collectibles" ? "text-blue-400" : category === "Phygitals RWA" ? "text-violet-400" : "text-gold-400"}`}>
+                                {category === "Digital Collectibles" ? formatSolPrice(value) : formatCurrency(value)}
                               </p>
                             </div>
                             <div className="w-full bg-dark-900 rounded-full h-2">
@@ -506,6 +510,10 @@ export default function PortfolioPage() {
                                 className={`h-2 rounded-full transition-all duration-500 ${
                                   category === "Digital Collectibles"
                                     ? "bg-gradient-to-r from-blue-400 to-blue-600"
+                                    : category === "Phygitals RWA"
+                                    ? "bg-gradient-to-r from-violet-400 to-violet-600"
+                                    : category === "Collectors Crypt RWA"
+                                    ? "bg-gradient-to-r from-violet-400 to-purple-600"
                                     : "bg-gradient-to-r from-gold-400 to-gold-600"
                                 }`}
                                 style={{ width: `${(value / maxVal) * 100}%` }}
