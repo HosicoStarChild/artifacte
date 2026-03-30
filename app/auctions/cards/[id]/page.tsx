@@ -187,8 +187,74 @@ export default function CardDetailPage() {
         }),
       });
 
+      let sig = '';
+
       if (!buildRes.ok) {
-        const errData = await buildRes.json();
+        // ME buy failed — try Tensor buy (phygitals/cNFT listings)
+        const tensorRes = await fetch('/api/tensor-buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: card.nftAddress, buyer: publicKey.toBase58() }),
+        });
+
+        if (tensorRes.ok) {
+          const tensorData = await tensorRes.json();
+          if (!signTransaction) throw new Error("Wallet does not support signing");
+          showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
+
+          const txBytes = Uint8Array.from(atob(tensorData.tx), c => c.charCodeAt(0));
+          const tx = VersionedTransaction.deserialize(txBytes);
+
+          const signed = await signTransaction(tx as any);
+          const serialized = (signed as any).serialize();
+
+          // Send signed tx via RPC proxy
+          let txToSend = serialized;
+          if (serialized.length > 1232) {
+            // Wallet expanded ALT references — patch signature into original compact tx
+            const signedTx = VersionedTransaction.deserialize(serialized);
+            const patched = new Uint8Array(txBytes);
+            patched.set(signedTx.signatures[0], 2);
+            txToSend = patched;
+          }
+          const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+          const sendRes = await fetch('/api/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0', id: 1,
+              method: 'sendTransaction',
+              params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+            }),
+          });
+          const sendData = await sendRes.json();
+          if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+          sig = sendData.result;
+
+          showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
+          // Poll for confirmation
+          for (let i = 0; i < 30; i++) {
+            await new Promise(r => setTimeout(r, 2000));
+            const statusRes = await fetch('/api/rpc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
+            });
+            const statusData = await statusRes.json();
+            const status = statusData.result?.value?.[0];
+            if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
+              if (status.err) throw new Error('Transaction failed on-chain');
+              showToast.success(`✅ Card purchased for ${tensorData.price} USDC!`);
+              setBuying(false);
+              return;
+            }
+          }
+          showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+          setBuying(false);
+          return;
+        }
+
+        const errData = await tensorRes.json().catch(() => ({ error: 'Failed to build transaction' }));
         throw new Error(errData.error || 'Failed to build transaction');
       }
 
@@ -203,19 +269,15 @@ export default function CardDetailPage() {
       const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} fee` : '';
       showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
       
-      // Step 2: Deserialize and verify tx before signing
-      // For cosigned txs (M3/M2 with notary), use v0TxSigned so wallet can simulate
       const txBase64 = v0TxSigned || v0Tx;
       const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
       const vTx = VersionedTransaction.deserialize(txBytes);
       
-      // Sanity check: fee payer must be the connected wallet
       const feePayer = vTx.message.staticAccountKeys[0];
       if (feePayer.toBase58() !== publicKey.toBase58()) {
         throw new Error("Transaction fee payer doesn't match connected wallet");
       }
       
-      // Sanity check: must interact with ME marketplace (M2 or M3)
       const M2_PROGRAM = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K';
       const M3_PROGRAM = 'M3mxk5W2tt27WGT7THox7PmgRDp4m6NEhL5xvxrBfS1';
       const hasME = vTx.message.staticAccountKeys.some(k => 
@@ -226,23 +288,19 @@ export default function CardDetailPage() {
       }
       
       const signed = await signTransaction(vTx as any);
-      
       const rawTx = (signed as any).serialize();
       
-      // Step 4: Send with aggressive retry loop until blockhash expires
       showToast.info("⏳ Submitting transaction...");
-      let sig = await connection.sendRawTransaction(rawTx, {
+      sig = await connection.sendRawTransaction(rawTx, {
         skipPreflight: true,
-        maxRetries: 0, // we handle retries ourselves
+        maxRetries: 0,
       });
       
-      // Retry sending every 2s until confirmed or blockhash expires
       const startTime = Date.now();
-      const MAX_RETRY_MS = 60_000; // 60s max
+      const MAX_RETRY_MS = 60_000;
       let confirmed = false;
       
       while (!confirmed && Date.now() - startTime < MAX_RETRY_MS) {
-        // Check if confirmed
         const status = await connection.getSignatureStatus(sig);
         if (status?.value?.confirmationStatus === 'confirmed' || 
             status?.value?.confirmationStatus === 'finalized') {
@@ -253,29 +311,19 @@ export default function CardDetailPage() {
           throw new Error('Transaction failed on-chain');
         }
         
-        // Check if blockhash still valid
         const valid = await connection.isBlockhashValid(blockhash);
-        if (!valid?.value) {
-          // Blockhash expired — tx won't land
-          break;
-        }
+        if (!valid?.value) break;
         
-        // Resend the same tx (idempotent — same sig won't double-execute)
         try {
-          await connection.sendRawTransaction(rawTx, {
-            skipPreflight: true,
-            maxRetries: 0,
-          });
+          await connection.sendRawTransaction(rawTx, { skipPreflight: true, maxRetries: 0 });
         } catch {}
         
-        // Wait 2s before next check
         await new Promise(r => setTimeout(r, 2000));
       }
       
       if (confirmed) {
         showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
       } else {
-        // Not confirmed yet — might still land
         showToast.info(`⏳ TX sent: ${sig.slice(0, 8)}... — check your wallet in a moment`);
       }
     } catch (err: any) {
