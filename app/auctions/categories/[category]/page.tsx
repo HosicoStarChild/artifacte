@@ -259,7 +259,9 @@ export default function CategoryAuctionsPage() {
             const tx = VersionedTransaction.deserialize(txBytes);
             
             const signed = await signTransaction(tx as any);
-            sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            const serialized = (signed as any).serialize();
+            console.log('[tensor-buy] Signed tx size:', serialized.length);
+            sig = await connection.sendRawTransaction(serialized, {
               skipPreflight: true,
               maxRetries: 5,
             });

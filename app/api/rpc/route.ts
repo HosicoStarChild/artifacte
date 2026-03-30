@@ -30,6 +30,7 @@ const ALLOWED_METHODS = new Set([
   "getLatestBlockhash",
   "getSignatureStatuses",
   "sendTransaction",
+  "getFeeForMessage",
   "simulateTransaction",
   "getAccountInfo",
   "getMultipleAccounts",
