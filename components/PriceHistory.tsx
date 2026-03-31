@@ -241,7 +241,9 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               const cgcRes = await fetch(`/api/oracle?endpoint=cert-cgc&cert=${encodeURIComponent(gradingId)}&grade=${encodeURIComponent(gradeKey)}`, { signal: AbortSignal.timeout(8000) });
               if (cgcRes.ok) {
                 const cgcData = await cgcRes.json();
-                if (cgcData.card?.cardName) certCardName = [cgcData.card.cardName, cgcData.card.cardSet, cgcData.card.cardNumber].filter(Boolean).join(' ');
+                if (cgcData.assetId) certAssetId = cgcData.assetId;
+                if (cgcData.matchedName) certCardName = cgcData.matchedName;
+                else if (cgcData.card?.cardName) certCardName = [cgcData.card.cardName, cgcData.card.cardSet, cgcData.card.cardNumber].filter(Boolean).join(' ');
                 if (cgcData.value) certValue = cgcData.value;
               }
             }
