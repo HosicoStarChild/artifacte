@@ -161,6 +161,11 @@ export default function CategoryAuctionsPage() {
     if (brandFilter && brandFilter !== 'All') params.set('brand', brandFilter);
     const spiritFilter = filters['spiritType'];
     if (spiritFilter && spiritFilter !== 'All') params.set('spiritType', spiritFilter);
+    const sourceFilter = filters['source'];
+    if (sourceFilter && sourceFilter !== 'All') {
+      const sourceMap: Record<string, string> = { 'Collector Crypt': 'collector-crypt', 'Phygitals': 'phygitals', 'Artifacte': 'artifacte' };
+      params.set('source', sourceMap[sourceFilter] || sourceFilter.toLowerCase());
+    }
 
     fetch(`/api/me-listings?${params}`)
       .then(r => r.json())
@@ -179,6 +184,7 @@ export default function CategoryAuctionsPage() {
   // Category-specific filter options
   const categoryFilters: Record<string, { label: string; key: string; options: string[] }[]> = {
     TCG_CARDS: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
       { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
       { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
