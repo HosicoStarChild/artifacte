@@ -432,7 +432,8 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
     );
   }
 
-  if ((category === "SEALED" || source === 'phygitals') && !sealedPrice && !loading) return null;
+  if (category === "SEALED" && !sealedPrice && !loading && !chartUrl) return null;
+  if (source === 'phygitals' && !sealedPrice && !loading && !chartUrl && !error && !gradingId) return null;
 
   if (error && !chartUrl && !sealedPrice) {
     return (
