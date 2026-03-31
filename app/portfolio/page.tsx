@@ -623,7 +623,7 @@ export default function PortfolioPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {filteredCards.map((card) => (
                     <div key={card.nftAddress} onClick={() => window.location.href = `/auctions/cards/${card.nftAddress}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
-                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                      <div className="aspect-[3/4] overflow-hidden bg-dark-900 relative">
                         <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COLLECTOR CRYPT</span>
                         {card.frontImage ? <img src={card.frontImage} alt={card.itemName} loading="lazy" className="w-full h-full object-contain group-hover:scale-105 transition duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
                       </div>
@@ -639,7 +639,7 @@ export default function PortfolioPage() {
                   {/* Extra CC cards found via DAS but not in CC API */}
                   {extraCC.map((nft) => (
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
-                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
+                      <div className="aspect-[3/4] overflow-hidden bg-dark-900 relative">
                         <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COLLECTOR CRYPT</span>
                         {nft.image ? <img src={nft.image.includes("arweave.net/") ? `/api/img-proxy?url=${encodeURIComponent(nft.image)}` : nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-contain group-hover:scale-105 transition duration-500" /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
                       </div>
