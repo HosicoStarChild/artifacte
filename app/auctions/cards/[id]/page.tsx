@@ -52,7 +52,10 @@ export default function CardDetailPage() {
           setCard({
             id: cardId,
             name: oracleListing?.name || nft.name || mint.slice(0, 12),
-            subtitle: oracleListing?.subtitle || [getAttr('TCG'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
+            subtitle: (() => {
+              const parts = [getAttr('TCG') || getAttr('Category'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean);
+              return parts.length > 1 ? parts.join(' • ') : (oracleListing?.subtitle || '• Phygital');
+            })(),
             image: oracleListing?.image || nft.image || '',
             nftAddress: mint,
             source: 'phygitals',
@@ -79,7 +82,7 @@ export default function CardDetailPage() {
             tcgPlayerId,
             priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
             priceSourceId: tcgPlayerId || undefined,
-            verifiedBy: 'TCGplayer',
+            verifiedBy: (getAttr('Cert Number') || getAttr('Grading ID')) ? (getAttr('Grader') || 'Graded') : (tcgPlayerId ? 'TCGplayer' : 'Phygitals'),
           });
           setLoading(false);
           return;
