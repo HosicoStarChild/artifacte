@@ -249,9 +249,9 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } catch {}
         }
 
-        // If CGC cert lookup gave us an assetId, skip search and go straight to chart
-        // Only for CGC — PSA cards should still go through search for best variant matching
-        if (certAssetId && gradingCompany === 'CGC') {
+        // If cert lookup gave us an assetId and search would likely fail (CGC or phygitals),
+        // skip search and go straight to chart
+        if (certAssetId && (gradingCompany === 'CGC' || source === 'phygitals')) {
           const chartParams = new URLSearchParams();
           chartParams.set("endpoint", "chart");
           chartParams.set("assetId", certAssetId);
