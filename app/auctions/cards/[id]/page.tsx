@@ -44,7 +44,7 @@ export default function CardDetailPage() {
           const assetRes = await fetch(`/api/nft?mint=${mint}`);
           const assetData = assetRes.ok ? await assetRes.json() : null;
           const nft = assetData?.nft || assetData || {};
-          const attrs = nft.attributes || [];
+          const attrs = nft?.content?.metadata?.attributes || nft?.attributes || [];
           const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
 
           const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
@@ -62,6 +62,15 @@ export default function CardDetailPage() {
             solPrice: oracleListing?.solPrice || oracleListing?.price || 0,
             seller: oracleListing?.seller || '',
             grade: oracleListing?.grade || getAttr('Grade') || 'Ungraded',
+            gradingCompany: oracleListing?.gradingCompany || (() => {
+              const g = (getAttr('Grade') || '').match(/^(PSA|BGS|CGC|SGC)\s/i);
+              return g ? g[1].toUpperCase() : (getAttr('Grader') || null);
+            })(),
+            gradeNum: oracleListing?.gradeNum || (() => {
+              const g = (getAttr('Grade') || '').match(/^(?:PSA|BGS|CGC|SGC)\s+(.+)$/i);
+              return g ? g[1] : null;
+            })(),
+            gradingId: getAttr('Cert Number') || getAttr('Grading ID') || null,
             tcg: oracleListing?.tcg || getAttr('TCG') || '',
             rarity: oracleListing?.rarity || getAttr('Rarity') || '',
             set: oracleListing?.set || getAttr('Set') || '',
