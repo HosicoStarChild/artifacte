@@ -625,7 +625,7 @@ export default function PortfolioPage() {
                     <div key={card.nftAddress} onClick={() => window.location.href = `/auctions/cards/${card.nftAddress}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COLLECTOR CRYPT</span>
-                        {card.frontImage ? <img src={card.frontImage} alt={card.itemName} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
+                        {card.frontImage ? <img src={card.frontImage} alt={card.itemName} loading="lazy" className="w-full h-full object-contain group-hover:scale-105 transition duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{card.itemName}</h3>
