@@ -221,22 +221,35 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        // Cert-based lookup for PSA/BGS graded cards — get exact assetId
+        // Cert-based lookup — get exact assetId (PSA/BGS) or matched card name (CGC)
         let certAssetId: string | null = null;
         let certValue: number | null = null;
-        if (gradingId && (gradingCompany === 'PSA' || gradingCompany === 'BGS')) {
+        let certCardName: string | null = null;
+        if (gradingId) {
           try {
-            const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`, { signal: AbortSignal.timeout(8000) });
-            if (certRes.ok) {
-              const certData = await certRes.json();
-              if (certData.card?.assetId) certAssetId = certData.card.assetId;
-              if (certData.value) certValue = certData.value;
+            if (gradingCompany === 'PSA' || gradingCompany === 'BGS') {
+              const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`, { signal: AbortSignal.timeout(8000) });
+              if (certRes.ok) {
+                const certData = await certRes.json();
+                if (certData.card?.assetId) certAssetId = certData.card.assetId;
+                if (certData.card?.assetName) certCardName = certData.card.assetName;
+                if (certData.value) certValue = certData.value;
+              }
+            } else if (gradingCompany === 'CGC') {
+              // CGC: use the same valuateByCgcCert path as portfolio (with language filter)
+              const gradeKey = grade || '';
+              const cgcRes = await fetch(`/api/oracle?endpoint=cert-cgc&cert=${encodeURIComponent(gradingId)}&grade=${encodeURIComponent(gradeKey)}`, { signal: AbortSignal.timeout(8000) });
+              if (cgcRes.ok) {
+                const cgcData = await cgcRes.json();
+                if (cgcData.card?.cardName) certCardName = [cgcData.card.cardName, cgcData.card.cardSet, cgcData.card.cardNumber].filter(Boolean).join(' ');
+                if (cgcData.value) certValue = cgcData.value;
+              }
             }
           } catch {}
         }
 
-        // Live search using smart query extraction from card name
-        const searchQuery = buildSearchQuery(cardName);
+        // Live search using cert card name if available, otherwise build from CC name
+        const searchQuery = certCardName ? certCardName : buildSearchQuery(cardName);
 
         const searchRes = await fetch(
           `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,

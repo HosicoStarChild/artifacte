@@ -130,6 +130,13 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Missing cert parameter" }, { status: 400 });
       }
       url = `${ORACLE_API}/api/cert/${encodeURIComponent(cert)}`;
+    } else if (endpoint === "cert-cgc") {
+      const cert = searchParams.get("cert") || "";
+      const gradeParam = searchParams.get("grade") || "";
+      if (!cert) {
+        return NextResponse.json({ error: "Missing cert parameter" }, { status: 400 });
+      }
+      url = `${ORACLE_API}/api/cert/cgc/${encodeURIComponent(cert)}?grade=${encodeURIComponent(gradeParam)}`;
     } else {
       return NextResponse.json({ error: "Invalid endpoint" }, { status: 400 });
     }
