@@ -156,8 +156,9 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
       setSealedPrice(null);
 
       try {
-        // Phygitals: fetch TCGplayer ungraded market price
-        if (source === 'phygitals') {
+        // Phygitals without grading: fetch TCGplayer ungraded market price
+        // Graded phygitals with cert numbers fall through to cert lookup below
+        if (source === 'phygitals' && !gradingId) {
           const cleanName = cardName
             .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, '')
             .trim();
