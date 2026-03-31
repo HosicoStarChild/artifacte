@@ -250,6 +250,21 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } catch {}
         }
 
+        // If CGC cert lookup gave us an assetId, skip search and go straight to chart
+        if (certAssetId && gradingCompany === 'CGC') {
+          const chartParams = new URLSearchParams();
+          chartParams.set("endpoint", "chart");
+          chartParams.set("assetId", certAssetId);
+          if (grade) chartParams.set("grade", grade);
+          if (certCardName) chartParams.set("q", certCardName);
+          setChartUrl(`/api/oracle?${chartParams.toString()}`);
+          if (certValue) {
+            setAltValue({ value: certValue, lower: null, upper: null, confidence: null, sales: null, pop: null });
+          }
+          setLoading(false);
+          return;
+        }
+
         // Live search using cert card name if available, otherwise build from CC name
         const searchQuery = certCardName ? certCardName : buildSearchQuery(cardName);
 
