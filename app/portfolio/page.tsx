@@ -635,21 +635,9 @@ export default function PortfolioPage() {
                           </div>
                         )}
                         <div className="mt-3">
-                          {(card as any).oracleValue ? (
-                            <>
-                              <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Value</p>
-                              <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency((card as any).oracleValue)}</p>
-                              <p className="text-gray-600 text-[9px] mt-0.5">Insured: {formatCurrency(card.insuredValueNum)}</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Insured Value</p>
-                              <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency(card.insuredValueNum)}</p>
-                            </>
-                          )}
+                          <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
+                          <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency((card as any).oracleValue || card.insuredValueNum)}</p>
                         </div>
-                        <p className="text-gray-500 text-[10px] mt-3">{card.listing ? <span className="text-green-400">Listed @ {formatCurrency(card.listing.price)}</span> : <span>Unlisted</span>}</p>
-                        <p className="text-gray-600 text-[10px] mt-1 font-mono">{card.category}{card.vault && ` • ${card.vault}`}</p>
                       </div>
                     </div>
                   ))}
@@ -658,7 +646,7 @@ export default function PortfolioPage() {
                     <div key={nft.id} onClick={() => window.location.href = `/auctions/cards/${nft.id}`} className="bg-dark-800 rounded-xl border border-white/5 overflow-hidden card-hover group cursor-pointer">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <span className="absolute top-2 right-2 z-10 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COLLECTOR CRYPT</span>
-                        {nft.image ? <img src={nft.image.includes("arweave.net/") ? `/api/img-proxy?url=${encodeURIComponent(nft.image)}` : nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
+                        {nft.image ? <img src={nft.image.includes("arweave.net/") ? `/api/img-proxy?url=${encodeURIComponent(nft.image)}` : nft.image} alt={nft.name} loading="lazy" className="w-full h-full object-contain group-hover:scale-105 transition duration-500" /> : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🎴</div>}
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{nft.name}</h3>
