@@ -232,7 +232,6 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
               if (certRes.ok) {
                 const certData = await certRes.json();
                 if (certData.card?.assetId) certAssetId = certData.card.assetId;
-                if (certData.card?.assetName) certCardName = certData.card.assetName;
                 if (certData.value) certValue = certData.value;
               }
             } else if (gradingCompany === 'CGC') {
@@ -250,8 +249,8 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } catch {}
         }
 
-        // If CGC cert lookup gave us an assetId, skip search and go straight to chart
-        if (certAssetId && gradingCompany === 'CGC') {
+        // If cert lookup gave us an assetId, skip search and go straight to chart
+        if (certAssetId) {
           const chartParams = new URLSearchParams();
           chartParams.set("endpoint", "chart");
           chartParams.set("assetId", certAssetId);
