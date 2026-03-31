@@ -114,6 +114,8 @@ interface PriceHistoryProps {
   tcgPlayerId?: string;
   gradingId?: string;
   gradingCompany?: string;
+  priceSource?: string;
+  priceSourceId?: string;
 }
 
 function normalizeGrade(g?: string): string | undefined {
@@ -128,7 +130,7 @@ function normalizeGrade(g?: string): string | undefined {
   return normalized;
 }
 
-export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany, priceSource, priceSourceId }: PriceHistoryProps) {
   const grade = normalizeGrade(rawGrade);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +158,53 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
       setSealedPrice(null);
 
       try {
+        // Artifacte-minted cards: respect on-chain priceSource (TCGplayer or alt.xyz)
+        if (source === 'artifacte' && priceSource) {
+          const srcId = priceSourceId || tcgPlayerId;
+          if (priceSource === 'TCGplayer' && srcId) {
+            const tcgRes = await fetch(`/api/tcgplayer-price?id=${srcId}`, { signal: AbortSignal.timeout(10000) });
+            if (tcgRes.ok) {
+              const tcgData = await tcgRes.json();
+              if (tcgData.marketPrice || tcgData.lowestPrice) {
+                setUngradedPrice({
+                  name: tcgData.name || cardName,
+                  marketPrice: tcgData.marketPrice || tcgData.lowestPrice || 0,
+                  lowestPrice: tcgData.lowestPrice || 0,
+                  rarity: tcgData.rarity || '',
+                });
+              } else {
+                setError("No TCGplayer price data found");
+              }
+            } else {
+              setError("TCGplayer lookup failed");
+            }
+            setLoading(false);
+            return;
+          } else if (priceSource === 'alt.xyz' && srcId) {
+            // alt.xyz: srcId is the assetId — go straight to chart
+            const chartParams = new URLSearchParams();
+            chartParams.set("endpoint", "chart");
+            chartParams.set("assetId", srcId);
+            if (cardName) chartParams.set("q", cardName);
+            const chartRes = await fetch(`/api/oracle?${chartParams}`, { signal: AbortSignal.timeout(15000) });
+            if (chartRes.ok) {
+              const blob = await chartRes.blob();
+              if (blob.size > 1000) {
+                setChartUrl(URL.createObjectURL(blob));
+                // Get sales count from header
+                const sc = chartRes.headers.get("x-sales-count");
+                if (sc) setSalesCount(parseInt(sc));
+              } else {
+                setError("No alt.xyz price data found");
+              }
+            } else {
+              setError("alt.xyz chart unavailable");
+            }
+            setLoading(false);
+            return;
+          }
+        }
+
         // Phygitals without grading: fetch TCGplayer ungraded market price
         // Graded phygitals with cert numbers fall through to cert lookup below
         if (source === 'phygitals' && !gradingId) {

@@ -594,6 +594,8 @@ export default function CardDetailPage() {
               tcgPlayerId={card.tcgPlayerId || card.priceSourceId}
               gradingId={card.gradingId}
               gradingCompany={card.gradingCompany}
+              priceSource={card.priceSource}
+              priceSourceId={card.priceSourceId}
             />
             )}
 
