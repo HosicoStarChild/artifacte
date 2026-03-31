@@ -505,7 +505,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
             <span className="text-gray-600 text-xs ml-2">({ungradedPrice.name})</span>
           </div>
           <div className="text-right">
-            <span className="text-white font-medium">${ungradedPrice.marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="text-white font-medium">${(ungradedPrice.marketPrice ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             <span className="text-gray-500 text-xs ml-2">market</span>
           </div>
         </div>

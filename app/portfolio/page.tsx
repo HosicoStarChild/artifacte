@@ -293,7 +293,7 @@ export default function PortfolioPage() {
               // Fallback: Insured Value from on-chain (CC cards)
               if (price === 0 && item.isCC) {
                 const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
-                if (insured) price = parseFloat(insured);
+                if (insured) { const p = parseFloat(insured); if (!isNaN(p)) price = p; }
               }
 
               // Fallback: TCGplayer (ungraded phygitals / Artifacte-minted)
