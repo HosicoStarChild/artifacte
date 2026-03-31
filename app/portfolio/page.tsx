@@ -705,7 +705,7 @@ export default function PortfolioPage() {
                             }
                             if (u.includes("arweave.net/")) return `/api/img-proxy?url=${encodeURIComponent(u)}`;
                             return u;
-                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          })()} alt={nft.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>'; }} />
                         ) : <div className="w-full h-full flex items-center justify-center text-4xl bg-dark-800">🖼️</div>}
                       </div>
                       <div className="p-4">
