@@ -191,12 +191,7 @@ export default function CategoryAuctionsPage() {
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
     ],
     SPIRITS: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
-    ],
-    WATCHES: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
-      { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
     ],
     SPORTS_CARDS: [
       { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
