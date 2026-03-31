@@ -112,9 +112,9 @@ export default function CardDetailPage() {
               // Parse grade into company + number (e.g. "PSA 10" → PSA + 10)
               const gradeRaw = getPhygAttr('Grade') || 'Ungraded';
               const gradeMatch = gradeRaw.match(/^(PSA|BGS|CGC|SGC)\s+(.+)$/i);
-              const phygGradingCompany = gradeMatch ? gradeMatch[1].toUpperCase() : null;
+              const phygGradingCompany = gradeMatch ? gradeMatch[1].toUpperCase() : (getPhygAttr('Grader') || null);
               const phygGradeNum = gradeMatch ? gradeMatch[2] : null;
-              const phygGradingId = getPhygAttr('Grading ID') || getPhygAttr('Cert Number') || null;
+              const phygGradingId = getPhygAttr('Cert Number') || getPhygAttr('Grading ID') || null;
               setCard({
                 id: asset.id || cardId,
                 name: asset.content?.metadata?.name || "Unknown",
