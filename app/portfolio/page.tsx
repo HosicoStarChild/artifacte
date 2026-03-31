@@ -629,11 +629,6 @@ export default function PortfolioPage() {
                       </div>
                       <div className="p-4">
                         <h3 className="text-white font-medium text-sm truncate">{card.itemName}</h3>
-                        {card.grade && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className={`${getGradeBgColor(card.gradingCompany)} text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{card.gradingCompany} {card.grade}</span>
-                          </div>
-                        )}
                         <div className="mt-3">
                           <p className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest mb-1">Market Price</p>
                           <p className="text-gold-400 font-serif text-lg font-bold">{formatCurrency((card as any).oracleValue || card.insuredValueNum)}</p>
