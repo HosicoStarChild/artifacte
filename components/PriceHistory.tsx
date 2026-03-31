@@ -258,9 +258,6 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           if (grade) chartParams.set("grade", grade);
           if (certCardName) chartParams.set("q", certCardName);
           setChartUrl(`/api/oracle?${chartParams.toString()}`);
-          if (certValue) {
-            setAltValue({ value: certValue, lower: null, upper: null, confidence: null, sales: null, pop: null });
-          }
           setLoading(false);
           return;
         }
