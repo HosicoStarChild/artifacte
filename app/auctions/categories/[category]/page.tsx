@@ -191,15 +191,24 @@ export default function CategoryAuctionsPage() {
       { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
     ],
     SPIRITS: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
     ],
     WATCHES: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
     ],
     SPORTS_CARDS: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "Sport", key: "sport", options: ["All", "Baseball", "Basketball", "Football", "Soccer"] },
       { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "BGS 9.5", "BGS 10", "SGC 10"] },
       { label: "Brand", key: "brand", options: ["All", "Topps", "Panini", "Upper Deck"] },
+    ],
+    SEALED: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
+    ],
+    MERCHANDISE: [
+      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
     ],
     DIGITAL_ART: [
       { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
