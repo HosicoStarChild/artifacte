@@ -262,27 +262,42 @@ export default function PortfolioPage() {
             for (const item of artifacteItems) {
               let price = 0;
               
-              if (item.isCC) {
-                // CC cards: cert-based valuation via alt.xyz
-                const attrs = item.asset.content?.metadata?.attributes || [];
-                const gradingId = attrs.find((a: any) => a.trait_type === "Grading ID")?.value;
-                const gradingCompany = attrs.find((a: any) => a.trait_type === "Grading Company")?.value || '';
-                if (gradingId && (gradingCompany === 'PSA' || gradingCompany === 'BGS')) {
-                  try {
-                    const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`);
-                    if (certRes.ok) {
-                      const certData = await certRes.json();
-                      if (certData.value) price = certData.value;
-                    }
-                  } catch {}
-                }
-                // Fallback: Insured Value from on-chain
-                if (price === 0) {
-                  const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
-                  if (insured) price = parseFloat(insured);
-                }
-              } else if (item.priceSource === "TCGplayer" && item.priceSourceId) {
-                // Artifacte-minted + Phygitals: TCGPlayer lookup
+              // Cert-based pricing — same lookup for CC and graded phygitals
+              const attrs = item.asset.content?.metadata?.attributes || [];
+              const gradingId = attrs.find((a: any) => a.trait_type === "Grading ID")?.value
+                || attrs.find((a: any) => a.trait_type === "Cert Number")?.value;
+              const gradingCompany = attrs.find((a: any) => a.trait_type === "Grading Company")?.value
+                || attrs.find((a: any) => a.trait_type === "Grader")?.value
+                || (() => { const g = (attrs.find((a: any) => a.trait_type === "Grade")?.value || '').match(/^(PSA|BGS|CGC|SGC)\s/i); return g ? g[1].toUpperCase() : ''; })();
+
+              if (gradingId && (gradingCompany === 'PSA' || gradingCompany === 'BGS')) {
+                try {
+                  const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`);
+                  if (certRes.ok) {
+                    const certData = await certRes.json();
+                    if (certData.value) price = certData.value;
+                  }
+                } catch {}
+              } else if (gradingId && gradingCompany === 'CGC') {
+                try {
+                  const gradeVal = attrs.find((a: any) => a.trait_type === "Grade" || a.trait_type === "The Grade")?.value || '';
+                  const gradeKey = `CGC-${gradeVal.replace(/[^0-9.]/g, '')}`;
+                  const cgcRes = await fetch(`/api/oracle?endpoint=cert-cgc&cert=${encodeURIComponent(gradingId)}&grade=${encodeURIComponent(gradeKey)}`);
+                  if (cgcRes.ok) {
+                    const cgcData = await cgcRes.json();
+                    if (cgcData.value) price = cgcData.value;
+                  }
+                } catch {}
+              }
+
+              // Fallback: Insured Value from on-chain (CC cards)
+              if (price === 0 && item.isCC) {
+                const insured = attrs.find((a: any) => a.trait_type === "Insured Value")?.value;
+                if (insured) price = parseFloat(insured);
+              }
+
+              // Fallback: TCGplayer (ungraded phygitals / Artifacte-minted)
+              if (price === 0 && item.priceSource === "TCGplayer" && item.priceSourceId) {
                 try {
                   const tcgRes = await fetch(`/api/tcgplayer-price?id=${item.priceSourceId}`);
                   if (tcgRes.ok) {
