@@ -130,7 +130,7 @@ export default async function Home() {
                 { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "110+" },
                 { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
                 { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "/images/sealed-packs.jpg", count: "130+" },
-                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=600&q=80", count: "500+" },
+                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "/images/merchandise-hero.jpg", count: "500+" },
               ].map((cat, i) => (
                 <Link key={i} href={cat.href} className="group">
                   <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
