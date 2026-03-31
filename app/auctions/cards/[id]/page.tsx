@@ -109,6 +109,12 @@ export default function CardDetailPage() {
               const phygAttrs = asset.content?.metadata?.attributes || [];
               const getPhygAttr = (key: string) => phygAttrs.find((a: any) => a.trait_type === key)?.value || "";
               const tcgPlayerId = getPhygAttr('TCGPlayer ID') || getPhygAttr('TCGplayer Product ID') || '';
+              // Parse grade into company + number (e.g. "PSA 10" → PSA + 10)
+              const gradeRaw = getPhygAttr('Grade') || 'Ungraded';
+              const gradeMatch = gradeRaw.match(/^(PSA|BGS|CGC|SGC)\s+(.+)$/i);
+              const phygGradingCompany = gradeMatch ? gradeMatch[1].toUpperCase() : null;
+              const phygGradeNum = gradeMatch ? gradeMatch[2] : null;
+              const phygGradingId = getPhygAttr('Grading ID') || getPhygAttr('Cert Number') || null;
               setCard({
                 id: asset.id || cardId,
                 name: asset.content?.metadata?.name || "Unknown",
@@ -119,7 +125,10 @@ export default function CardDetailPage() {
                 currency: 'USDC',
                 category: 'TCG_CARDS',
                 price: 0,
-                grade: getPhygAttr('Grade') || 'Ungraded',
+                grade: gradeRaw,
+                gradeNum: phygGradeNum,
+                gradingCompany: phygGradingCompany,
+                gradingId: phygGradingId,
                 tcg: getPhygAttr('TCG') || '',
                 rarity: getPhygAttr('Rarity') || '',
                 set: getPhygAttr('Set') || '',

@@ -201,15 +201,13 @@ export default function CategoryAuctionsPage() {
     ],
     SEALED: [
       { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
+      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     ],
     MERCHANDISE: [
       { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
     ],
     DIGITAL_ART: [
       { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
-    ],
-    SEALED: [
-      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     ],
   };
 
