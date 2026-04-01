@@ -215,7 +215,7 @@ export class AuctionProgram {
       const bps = asset.royalty?.basis_points || 0;
       const creators = asset.creators || [];
       // Find primary creator (highest share)
-      let primaryCreator = SystemProgram.programId; // fallback
+      let primaryCreator = TREASURY_WALLET; // fallback to treasury (safe ATA exists)
       let maxShare = 0;
       for (const c of creators) {
         if (c.share > maxShare) {
@@ -398,9 +398,8 @@ export class AuctionProgram {
     // Fetch listing to get creator_address for royalty payment
     const listingData = await this.program.account.listing.fetch(listing);
     const creatorAddr = listingData.creatorAddress as PublicKey;
-    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
-      ? await getAssociatedTokenAddress(paymentMint, creatorAddr, true)
-      : SystemProgram.programId;
+    // Always derive the correct ATA — program now always validates it
+    const creatorPaymentAccount = await getAssociatedTokenAddress(paymentMint, creatorAddr, true);
 
     let builder = this.program.methods
       .buyNow()
@@ -482,19 +481,17 @@ export class AuctionProgram {
       );
     }
 
-    // Check creator payment ATA
-    if (listingData.royaltyBasisPoints > 0) {
-      const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
-      if (!creatorAtaInfo) {
-        preInstructions.push(
-          createAssociatedTokenAccountInstruction(
-            this.wallet.publicKey,
-            creatorPaymentAccount,
-            creatorAddr,
-            paymentMint
-          )
-        );
-      }
+    // Always check and create creator payment ATA if missing (program always validates it)
+    const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+    if (!creatorAtaInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          creatorPaymentAccount,
+          creatorAddr,
+          paymentMint
+        )
+      );
     }
 
     // Check buyer NFT ATA
@@ -721,9 +718,8 @@ export class AuctionProgram {
     // Fetch listing to get creator_address for royalty payment
     const listingData = await this.program.account.listing.fetch(listing);
     const creatorAddr = listingData.creatorAddress as PublicKey;
-    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
-      ? await getAssociatedTokenAddress(paymentMint, creatorAddr, true)
-      : SystemProgram.programId;
+    // Always derive the correct ATA — program now always validates it
+    const creatorPaymentAccount = await getAssociatedTokenAddress(paymentMint, creatorAddr, true);
 
     const sellerAddress = listingData.seller as PublicKey;
     const highestBidder = listingData.highestBidder as PublicKey;
@@ -771,13 +767,12 @@ export class AuctionProgram {
     }
 
     // Creator payment ATA (for royalties) — skip if no royalties
-    if (creatorPaymentAccount.toBase58() !== SystemProgram.programId.toBase58()) {
-      const creatorInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
-      if (!creatorInfo) {
-        preIxs.push(createAssociatedTokenAccountInstruction(
-          this.wallet.publicKey, creatorPaymentAccount, creatorAddr, paymentMint
-        ));
-      }
+    // Always create creator ATA if missing (program always validates it now)
+    const creatorInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+    if (!creatorInfo) {
+      preIxs.push(createAssociatedTokenAccountInstruction(
+        this.wallet.publicKey, creatorPaymentAccount, creatorAddr, paymentMint
+      ));
     }
 
     // Buyer NFT ATA (to receive the NFT)
