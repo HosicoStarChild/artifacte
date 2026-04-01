@@ -281,19 +281,28 @@ export default function CategoryAuctionsPage() {
         const { VersionedTransaction } = await import('@solana/web3.js');
 
         if (v0TxSigned && v0Tx) {
-          // Notary-cosigned flow — server has already signed, wallet adds buyer sig via sendTransaction
+          // Notary-cosigned flow — server pre-signs, wallet adds buyer sig
+          // Must use sendRawTransaction — simulation fails on partial-signed txs
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
-          sig = await sendTransaction(notaryTx as any, connection);
+          const signed = await signTransaction(notaryTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            skipPreflight: true,
+            preflightCommitment: 'confirmed',
+          });
         } else if (v0Tx) {
-          // No notary needed — buyer-only signing via sendTransaction
+          // No notary needed — buyer-only signing
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
           const vTx = VersionedTransaction.deserialize(txBytes);
-          sig = await sendTransaction(vTx as any, connection);
+          const signed = await signTransaction(vTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            preflightCommitment: 'confirmed',
+          });
         } else if (legacyTx) {
           const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
           const tx = Transaction.from(txBytes);
-          sig = await sendTransaction(tx, connection);
+          const signed = await signTransaction(tx);
+          sig = await connection.sendRawTransaction(signed.serialize());
         } else {
           throw new Error("No transaction returned from API");
         }
