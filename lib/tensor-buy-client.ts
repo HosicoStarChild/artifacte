@@ -1,10 +1,10 @@
 /**
  * Shared Tensor cNFT buy flow — used by both category grid and card detail pages.
  * 
- * 1. Calls /api/tensor-buy to get server-built v0 tx (with ALT) + fee tx
- * 2. Wallet signs both at once via signAllTransactions (correct balance simulation)
+ * 1. Calls /api/tensor-buy to get server-built v0 tx (with ALT)
+ * 2. Wallet signs (may inflate ALT references)
  * 3. Patches signature into original compact tx if inflated
- * 4. Sends buy tx + fee tx via /api/rpc proxy
+ * 4. Sends via /api/rpc proxy
  * 5. Polls for confirmation
  */
 
@@ -21,7 +21,6 @@ export async function executeTensorBuy(
   buyer: string,
   signTransaction: (tx: any) => Promise<any>,
   onStatus?: (msg: string) => void,
-  signAllTransactions?: (txs: any[]) => Promise<any[]>,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
@@ -39,35 +38,28 @@ export async function executeTensorBuy(
   const feeText = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} fee` : '';
   onStatus?.(`💳 Confirm purchase — $${tensorData.price.toFixed(2)}${feeText} USDC`);
 
-  // Step 2: Deserialize buy tx
+  // Step 2: Deserialize buy tx and fee tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
   const buyTx = VersionedTransaction.deserialize(txBytes);
 
-  // Step 3: Sign buy tx first
+  // Step 3: Sign buy tx
   const signedBuy = await signTransaction(buyTx);
-  let signedBuyBytes = new Uint8Array(signedBuy.serialize());
-  let signedFeeBytes: Uint8Array | null = null;
-
-  // Step 4: Sign fee tx separately after buy tx is signed
-  if (tensorData.feeTx) {
-    const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
-    const feeTx = VersionedTransaction.deserialize(feeBytes);
-    const signedFee = await signTransaction(feeTx);
-    signedFeeBytes = new Uint8Array(signedFee.serialize());
-  }
-
-  // Patch signature if wallet inflated ALT
-  let buyToSend = signedBuyBytes;
+  let buyToSend = signedBuy.serialize();
   if (buyToSend.length > 1232) {
+    // Wallet inflated ALT — patch signature into original compact tx
     const inflated = VersionedTransaction.deserialize(buyToSend);
     const patched = new Uint8Array(txBytes);
     patched.set(inflated.signatures[0], 2);
     buyToSend = patched;
   }
 
-  // Send fee tx (fire and forget)
-  if (signedFeeBytes) {
-    const feeB64 = btoa(Array.from(signedFeeBytes).map((b: number) => String.fromCharCode(b)).join(''));
+  // Step 4: Sign and send fee tx (if present)
+  if (tensorData.feeTx) {
+    const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
+    const feeTx = VersionedTransaction.deserialize(feeBytes);
+    const signedFee = await signTransaction(feeTx);
+    const feeB64 = btoa(Array.from(new Uint8Array(signedFee.serialize())).map((b: number) => String.fromCharCode(b)).join(''));
+    // Send fee tx (fire and forget — don't block the buy)
     fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -76,11 +68,11 @@ export async function executeTensorBuy(
         method: 'sendTransaction',
         params: [feeB64, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
       }),
-    }).catch(() => {});
+    }).catch(() => {}); // non-blocking
   }
 
-  // Send buy tx
-  const b64Tx = btoa(Array.from(buyToSend).map((b: number) => String.fromCharCode(b)).join(''));
+  // Step 5: Send buy tx via RPC proxy
+  const b64Tx = btoa(Array.from(new Uint8Array(buyToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -96,7 +88,7 @@ export async function executeTensorBuy(
 
   onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
 
-  // Poll for confirmation
+  // Step 5: Poll for confirmation (1s intervals for faster UX)
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
     const statusRes = await fetch('/api/rpc', {
