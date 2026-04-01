@@ -84,7 +84,16 @@ export async function POST(request: Request) {
     
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
     const buyerPk = new PublicKey(buyer);
-    
+
+    // 2% platform fee to treasury (separate tx — buy tx is maxed at 49 accounts)
+    const { createTransferCheckedInstruction, getAssociatedTokenAddress } = await import('@solana/spl-token');
+    const TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
+    const USDC_PK = new PublicKey(USDC_MINT);
+    const feeAmount = BigInt(listState.data.amount) * BigInt(200) / BigInt(10000); // 2%
+    const buyerUsdcAta = await getAssociatedTokenAddress(USDC_PK, buyerPk);
+    const treasuryUsdcAta = await getAssociatedTokenAddress(USDC_PK, TREASURY);
+    const feeIx = createTransferCheckedInstruction(buyerUsdcAta, USDC_PK, treasuryUsdcAta, buyerPk, feeAmount, 6);
+
     const v1Keys = buyIx.accounts.map((acct: any) => {
       const addr = typeof acct.address === 'object' && acct.address.address
         ? acct.address.address : String(acct.address);
@@ -110,7 +119,7 @@ export async function POST(request: Request) {
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     
-    // Build buy tx — 3 instructions: 2 compute budget + 1 Tensor BuySpl
+    // Build buy tx — 3 instructions: 2 compute budget + 1 Tensor BuySpl (no fee here, tx is maxed)
     const buyMsg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
@@ -118,9 +127,21 @@ export async function POST(request: Request) {
     }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
     const buyTx = new VersionedTransaction(buyMsg);
 
+    // Build separate fee tx (small, no ALT needed)
+    const feeMsg = new TransactionMessage({
+      payerKey: buyerPk,
+      recentBlockhash: bh.blockhash,
+      instructions: [feeIx],
+    }).compileToV0Message();
+    const feeTx = new VersionedTransaction(feeMsg);
+
+    const platformFee = Number(feeAmount) / 1e6;
     return NextResponse.json({
       tx: Buffer.from(buyTx.serialize()).toString('base64'),
+      feeTx: Buffer.from(feeTx.serialize()).toString('base64'),
       price,
+      platformFee,
+      total: price + platformFee,
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,
