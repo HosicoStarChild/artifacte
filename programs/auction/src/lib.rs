@@ -364,15 +364,17 @@ pub mod auction {
             .and_then(|x| x.checked_div(10000))
             .ok_or(AuctionError::CalculationError)?;
 
-        // Always validate creator_payment_account (even when royalty = 0)
-        let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
-            &listing.creator_address,
-            &listing.payment_mint,
-        );
-        require!(
-            ctx.accounts.creator_payment_account.key() == expected_creator_ata,
-            AuctionError::InvalidCreatorAccount
-        );
+        // Validate creator_payment_account when royalty > 0 (prevents royalty redirection)
+        if creator_royalty > 0 {
+            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                &listing.creator_address,
+                &listing.payment_mint,
+            );
+            require!(
+                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                AuctionError::InvalidCreatorAccount
+            );
+        }
 
         let seller_amount = listing
             .price
@@ -632,15 +634,17 @@ pub mod auction {
                 .and_then(|x| x.checked_div(10000))
                 .ok_or(AuctionError::CalculationError)?;
 
-            // Always validate creator_payment_account
-            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
-                &listing.creator_address,
-                &listing.payment_mint,
-            );
-            require!(
-                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
-                AuctionError::InvalidCreatorAccount
-            );
+            // Validate creator_payment_account when royalty > 0 (prevents royalty redirection)
+            if creator_royalty > 0 {
+                let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                    &listing.creator_address,
+                    &listing.payment_mint,
+                );
+                require!(
+                    ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                    AuctionError::InvalidCreatorAccount
+                );
+            }
 
             let seller_amount = listing
                 .current_bid

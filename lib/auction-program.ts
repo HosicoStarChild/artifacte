@@ -429,8 +429,9 @@ export class AuctionProgram {
     // Fetch listing to get creator_address for royalty payment
     const listingData = await this.program.account.listing.fetch(listing);
     const creatorAddr = listingData.creatorAddress as PublicKey;
-    // Always derive the correct ATA — program now always validates it
-    const creatorPaymentAccount = await getAssociatedTokenAddress(paymentMint, creatorAddr, true);
+    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddr, true)
+      : SystemProgram.programId;
 
     let builder = this.program.methods
       .buyNow()
@@ -512,17 +513,19 @@ export class AuctionProgram {
       );
     }
 
-    // Always check and create creator payment ATA if missing (program always validates it)
-    const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
-    if (!creatorAtaInfo) {
-      preInstructions.push(
-        createAssociatedTokenAccountInstruction(
-          this.wallet.publicKey,
-          creatorPaymentAccount,
-          creatorAddr,
-          paymentMint
-        )
-      );
+    // Only create creator ATA if royalty > 0 (avoids suspicious-looking ATA creation on zero-royalty buys)
+    if (listingData.royaltyBasisPoints > 0) {
+      const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+      if (!creatorAtaInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            creatorPaymentAccount,
+            creatorAddr,
+            paymentMint
+          )
+        );
+      }
     }
 
     // Check buyer NFT ATA
@@ -798,12 +801,14 @@ export class AuctionProgram {
     }
 
     // Creator payment ATA (for royalties) — skip if no royalties
-    // Always create creator ATA if missing (program always validates it now)
-    const creatorInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
-    if (!creatorInfo) {
-      preIxs.push(createAssociatedTokenAccountInstruction(
-        this.wallet.publicKey, creatorPaymentAccount, creatorAddr, paymentMint
-      ));
+    // Create creator ATA if missing and royalty > 0
+    if (listingData.royaltyBasisPoints > 0) {
+      const creatorInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+      if (!creatorInfo) {
+        preIxs.push(createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey, creatorPaymentAccount, creatorAddr, paymentMint
+        ));
+      }
     }
 
     // Buyer NFT ATA (to receive the NFT)
