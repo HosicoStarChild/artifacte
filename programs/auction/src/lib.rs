@@ -364,6 +364,12 @@ pub mod auction {
             .and_then(|x| x.checked_div(10000))
             .ok_or(AuctionError::CalculationError)?;
 
+        // Royalty floor: must be 0 or at least 1% (100 bps) to prevent rounding-to-zero bypass
+        require!(
+            listing.royalty_basis_points == 0 || listing.royalty_basis_points >= 100,
+            AuctionError::InvalidRoyaltyBps
+        );
+
         // Validate creator_payment_account when royalty > 0 (prevents royalty redirection)
         if creator_royalty > 0 {
             let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
@@ -375,6 +381,9 @@ pub mod auction {
                 AuctionError::InvalidCreatorAccount
             );
         }
+
+        // Mark settled BEFORE transfers (checks-effects-interactions — prevents reentrancy)
+        listing.status = ListingStatus::Settled;
 
         let seller_amount = listing
             .price
@@ -462,8 +471,6 @@ pub mod auction {
                 1,
             )?;
         }
-
-        listing.status = ListingStatus::Settled;
 
         emit!(ItemPurchased {
             nft_mint: listing.nft_mint,
@@ -634,6 +641,12 @@ pub mod auction {
                 .and_then(|x| x.checked_div(10000))
                 .ok_or(AuctionError::CalculationError)?;
 
+            // Royalty floor: must be 0 or at least 1% (100 bps) to prevent rounding-to-zero bypass
+            require!(
+                listing.royalty_basis_points == 0 || listing.royalty_basis_points >= 100,
+                AuctionError::InvalidRoyaltyBps
+            );
+
             // Validate creator_payment_account when royalty > 0 (prevents royalty redirection)
             if creator_royalty > 0 {
                 let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
@@ -645,6 +658,9 @@ pub mod auction {
                     AuctionError::InvalidCreatorAccount
                 );
             }
+
+            // Mark settled BEFORE transfers (checks-effects-interactions — prevents reentrancy)
+            listing.status = ListingStatus::Settled;
 
             let seller_amount = listing
                 .current_bid
@@ -739,8 +755,6 @@ pub mod auction {
                     1,
                 )?;
             }
-
-            listing.status = ListingStatus::Settled;
 
             emit!(AuctionSettled {
                 nft_mint: listing.nft_mint,
@@ -1269,4 +1283,6 @@ pub enum AuctionError {
     InvalidCreatorAccount,
     #[msg("Invalid token program — must be SPL Token or Token-2022")]
     InvalidTokenProgram,
+    #[msg("Invalid royalty basis points — must be 0 or >= 100 (1%)")]
+    InvalidRoyaltyBps,
 }
