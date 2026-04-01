@@ -354,6 +354,7 @@ export default function CategoryAuctionsPage() {
 
         await connection.confirmTransaction(sig, "confirmed");
         showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
+        setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr && l.nftAddress !== mintAddr));
         setBuyingId(null);
         return;
       }
