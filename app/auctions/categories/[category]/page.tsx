@@ -282,19 +282,25 @@ export default function CategoryAuctionsPage() {
 
         if (v0TxSigned && v0Tx) {
           // Notary-cosigned flow (M3 phygitals + M2 CC cards)
-          // Use sendTransaction so Phantom/Blowfish can simulate it properly
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
-          sig = await sendTransaction(notaryTx as any, connection, { preflightCommitment: 'confirmed' });
+          const signed = await signTransaction(notaryTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            preflightCommitment: 'confirmed',
+          });
         } else if (v0Tx) {
           // No notary needed — buyer-only signing
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
           const vTx = VersionedTransaction.deserialize(txBytes);
-          sig = await sendTransaction(vTx as any, connection, { preflightCommitment: 'confirmed' });
+          const signed = await signTransaction(vTx as any);
+          sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            preflightCommitment: 'confirmed',
+          });
         } else if (legacyTx) {
           const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
           const tx = Transaction.from(txBytes);
-          sig = await sendTransaction(tx, connection);
+          const signed = await signTransaction(tx);
+          sig = await connection.sendRawTransaction(signed.serialize());
         } else {
           throw new Error("No transaction returned from API");
         }
