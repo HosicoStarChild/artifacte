@@ -204,7 +204,8 @@ export function AgentRegistrationContent() {
       const tx = new VersionedTransaction(message);
       const signed = await signTransaction(tx);
       const sig = await connection.sendTransaction(signed, { skipPreflight: false });
-      await connection.confirmTransaction(sig, "confirmed");
+      const { blockhash: bh2, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({ signature: sig, blockhash: bh2, lastValidBlockHeight }, "confirmed");
       
       setSaidStatus(prev => ({ ...prev, isRegistered: true }));
     } catch (err: any) {
@@ -247,7 +248,8 @@ export function AgentRegistrationContent() {
       const tx = new VersionedTransaction(message);
       const signed = await signTransaction(tx);
       const sig = await connection.sendTransaction(signed, { skipPreflight: false });
-      await connection.confirmTransaction(sig, "confirmed");
+      const { blockhash: bh2, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({ signature: sig, blockhash: bh2, lastValidBlockHeight }, "confirmed");
       
       setSaidStatus(prev => ({ ...prev, isVerified: true }));
     } catch (err: any) {
