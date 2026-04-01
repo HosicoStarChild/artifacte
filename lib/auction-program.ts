@@ -294,8 +294,7 @@ export class AuctionProgram {
     const { blockhash: bhS, lastValidBlockHeight: lvbhS } = await this.connection.getLatestBlockhash("confirmed");
     staleTx.recentBlockhash = bhS;
     staleTx.feePayer = this.wallet.publicKey;
-    const signedStale = await this.wallet.signTransaction(staleTx);
-    const staleSig = await this.connection.sendRawTransaction(signedStale.serialize());
+    const staleSig = await this.wallet.sendTransaction(staleTx, this.connection);
     await confirmTx(this.connection, staleSig, bhS, lvbhS);
     return staleSig;
   }
@@ -378,8 +377,7 @@ export class AuctionProgram {
       const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.wallet.sendTransaction(tx, this.connection);
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
@@ -388,8 +386,7 @@ export class AuctionProgram {
       const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.wallet.sendTransaction(tx, this.connection);
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     }
@@ -565,8 +562,7 @@ export class AuctionProgram {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
-    const signed = await this.wallet.signTransaction(tx);
-    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    const sig = await this.wallet.sendTransaction(tx, this.connection);
     await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
@@ -639,8 +635,7 @@ export class AuctionProgram {
     const { blockhash: bh2, lastValidBlockHeight: lvbh2 } = await this.connection.getLatestBlockhash("confirmed");
     bidTx.recentBlockhash = bh2;
     bidTx.feePayer = this.wallet.publicKey;
-    const signedBid = await this.wallet.signTransaction(bidTx);
-    const tx = await this.connection.sendRawTransaction(signedBid.serialize());
+    const tx = await this.wallet.sendTransaction(bidTx, this.connection);
     await confirmTx(this.connection, tx, bh2, lvbh2);
 
     return tx;
@@ -697,8 +692,7 @@ export class AuctionProgram {
       const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.wallet.sendTransaction(tx, this.connection);
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
@@ -707,8 +701,7 @@ export class AuctionProgram {
       const { blockhash: bh3, lastValidBlockHeight: lvbh3 } = await this.connection.getLatestBlockhash("confirmed");
       cancelTx.recentBlockhash = bh3;
       cancelTx.feePayer = this.wallet.publicKey;
-      const signedCancel = await this.wallet.signTransaction(cancelTx);
-      const cancelSig = await this.connection.sendRawTransaction(signedCancel.serialize());
+      const cancelSig = await this.wallet.sendTransaction(cancelTx, this.connection);
       await confirmTx(this.connection, cancelSig, bh3, lvbh3);
       return cancelSig;
     }
@@ -845,8 +838,7 @@ export class AuctionProgram {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
-    const signed = await this.wallet.signTransaction(tx);
-    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    const sig = await this.wallet.sendTransaction(tx, this.connection);
     await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
