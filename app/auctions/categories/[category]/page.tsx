@@ -248,6 +248,27 @@ export default function CategoryAuctionsPage() {
         });
 
         if (!buildRes.ok) {
+          // ME buy failed — try Tensor buy for USDC/Tensor listings
+          const tensorRes = await fetch('/api/tensor-buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+          });
+          
+          if (tensorRes.ok) {
+            if (!signTransaction) throw new Error("Wallet does not support signing");
+            const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
+            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info);
+            if (result.confirmed) {
+              showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+            } else {
+              showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+            }
+            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr && l.nftAddress !== mintAddr));
+            setBuyingId(null);
+            return;
+          }
+          
           const errData = await buildRes.json().catch(() => ({ error: 'Failed to build transaction' }));
           throw new Error(errData.error || 'Failed to build transaction');
         }
