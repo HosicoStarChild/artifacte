@@ -1,8 +1,32 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { ADMIN_WALLET } from "@/lib/data";
+import { PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, SystemProgram } from "@solana/web3.js";
+import { createHash } from "crypto";
+
+const SAID_PROGRAM_ID = new PublicKey("5dpw6KEQPn248pnkkaYyWfHwu2nfb3LUMbTucb6LaA8G");
+
+function getSaidDiscriminator(name: string): Buffer {
+  const hash = createHash("sha256").update(name).digest();
+  return hash.subarray(0, 8);
+}
+
+function getAgentPDA(owner: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("agent"), owner.toBuffer()],
+    SAID_PROGRAM_ID
+  );
+}
+
+function getTreasuryPDA(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("treasury")],
+    SAID_PROGRAM_ID
+  );
+}
 
 interface SAIDStatus {
   isRegistered: boolean;
@@ -20,7 +44,8 @@ interface ArtifactePermissions {
 }
 
 export function AgentRegistrationContent() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, signTransaction } = useWallet();
+  const { connection } = useConnection();
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -137,6 +162,96 @@ export function AgentRegistrationContent() {
       setStep(4);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function registerOnChain() {
+    if (!publicKey || !signTransaction) {
+      setError("Wallet not connected or doesn't support signing");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const wallet = publicKey.toBase58();
+      const metadataUri = `https://api.saidprotocol.com/api/cards/${wallet}.json`;
+      const discriminator = getSaidDiscriminator("global:register_agent");
+      const uriBytes = Buffer.from(metadataUri, "utf8");
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32LE(uriBytes.length, 0);
+      const data = Buffer.concat([discriminator, lenBuf, uriBytes]);
+      const [agentPDA] = getAgentPDA(publicKey);
+
+      const ix = new TransactionInstruction({
+        programId: SAID_PROGRAM_ID,
+        keys: [
+          { pubkey: agentPDA, isSigner: false, isWritable: true },
+          { pubkey: publicKey, isSigner: true, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data,
+      });
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      const message = new TransactionMessage({
+        payerKey: publicKey,
+        recentBlockhash: blockhash,
+        instructions: [ix],
+      }).compileToV0Message();
+
+      const tx = new VersionedTransaction(message);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendTransaction(signed, { skipPreflight: false });
+      await connection.confirmTransaction(sig, "confirmed");
+      
+      setSaidStatus(prev => ({ ...prev, isRegistered: true }));
+    } catch (err: any) {
+      setError("On-chain registration failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyOnChain() {
+    if (!publicKey || !signTransaction) {
+      setError("Wallet not connected or doesn't support signing");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const [agentPDA] = getAgentPDA(publicKey);
+      const [treasuryPDA] = getTreasuryPDA();
+      const discriminator = getSaidDiscriminator("global:get_verified");
+
+      const ix = new TransactionInstruction({
+        programId: SAID_PROGRAM_ID,
+        keys: [
+          { pubkey: agentPDA, isSigner: false, isWritable: true },
+          { pubkey: treasuryPDA, isSigner: false, isWritable: true },
+          { pubkey: publicKey, isSigner: true, isWritable: true },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: discriminator,
+      });
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      const message = new TransactionMessage({
+        payerKey: publicKey,
+        recentBlockhash: blockhash,
+        instructions: [ix],
+      }).compileToV0Message();
+
+      const tx = new VersionedTransaction(message);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendTransaction(signed, { skipPreflight: false });
+      await connection.confirmTransaction(sig, "confirmed");
+      
+      setSaidStatus(prev => ({ ...prev, isVerified: true }));
+    } catch (err: any) {
+      setError("Verification failed: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -294,6 +409,28 @@ export function AgentRegistrationContent() {
                   >
                     Register on SAID (Free)
                   </button>
+                </div>
+              )}
+              
+              {saidStatus.isRegistered && !saidStatus.isVerified && (
+                <div className="mt-6 space-y-3">
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={registerOnChain}
+                      disabled={loading}
+                      className="px-6 py-3 bg-dark-700 border border-gold-500/50 text-gold-400 hover:bg-dark-600 font-semibold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      {loading ? "Processing..." : "1. Register On-Chain (~0.005 SOL)"}
+                    </button>
+                    <button
+                      onClick={verifyOnChain}
+                      disabled={loading}
+                      className="px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      {loading ? "Processing..." : "2. Get Verified (0.01 SOL)"}
+                    </button>
+                  </div>
+                  <p className="text-gray-500 text-xs text-center">Register on-chain first, then verify. Two separate transactions.</p>
                 </div>
               )}
             </div>
