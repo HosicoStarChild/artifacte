@@ -36,25 +36,25 @@ async function confirmTx(
   blockhash: string,
   lastValidBlockHeight: number
 ): Promise<void> {
-  try {
-    const result = await connection.confirmTransaction(
-      { signature: sig, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
-    if (result.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(result.value.err)}`);
+  // Poll signature status directly — more reliable than confirmTransaction
+  const start = Date.now();
+  const timeout = 60_000; // 60s max
+  while (Date.now() - start < timeout) {
+    const status = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+    const val = status?.value;
+    if (val) {
+      if (val.err) throw new Error(`Transaction failed: ${JSON.stringify(val.err)}`);
+      if (val.confirmationStatus === "confirmed" || val.confirmationStatus === "finalized") return;
     }
-  } catch (err: any) {
-    // If blockheight expired, check if tx actually landed
-    if (err?.name === "TransactionExpiredBlockheightExceededError" || err?.message?.includes("block height exceeded")) {
-      const status = await connection.getSignatureStatus(sig);
-      if (status?.value?.confirmationStatus === "confirmed" || status?.value?.confirmationStatus === "finalized") {
-        if (status.value.err) throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
-        return; // tx landed, ignore blockheight expiry
-      }
-    }
-    throw err;
+    await new Promise(r => setTimeout(r, 1500));
   }
+  // Last resort: if we timed out, check once more
+  const final = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+  if (final?.value?.confirmationStatus === "confirmed" || final?.value?.confirmationStatus === "finalized") {
+    if (final.value.err) throw new Error(`Transaction failed: ${JSON.stringify(final.value.err)}`);
+    return;
+  }
+  throw new Error("Transaction confirmation timeout — check explorer for status");
 }
 
 /**
@@ -379,7 +379,7 @@ export class AuctionProgram {
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 3 });
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
@@ -389,7 +389,7 @@ export class AuctionProgram {
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 3 });
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     }
@@ -563,7 +563,7 @@ export class AuctionProgram {
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
     const signed = await this.wallet.signTransaction(tx);
-    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    const sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 3 });
     await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
@@ -695,7 +695,7 @@ export class AuctionProgram {
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      const sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 3 });
       await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
@@ -841,7 +841,7 @@ export class AuctionProgram {
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
     const signed = await this.wallet.signTransaction(tx);
-    const sig = await this.connection.sendRawTransaction(signed.serialize());
+    const sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: true, maxRetries: 3 });
     await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
