@@ -80,27 +80,10 @@ export async function POST(request: Request) {
 
     // Build the full unsigned transaction server-side (server web3.js compiles correctly with ALT)
     const { PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram, Connection: SolConnection } = await import('@solana/web3.js');
-    const { createTransferCheckedInstruction, getAssociatedTokenAddress } = await import('@solana/spl-token');
+
     
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
     const buyerPk = new PublicKey(buyer);
-    
-    // 2% platform fee to treasury
-    const TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
-    const USDC_PK = new PublicKey(USDC_MINT);
-    const PLATFORM_FEE_BPS = 200; // 2%
-    const feeAmount = BigInt(listState.data.amount) * BigInt(PLATFORM_FEE_BPS) / BigInt(10000);
-    const buyerUsdcAta = await getAssociatedTokenAddress(USDC_PK, buyerPk);
-    const treasuryUsdcAta = await getAssociatedTokenAddress(USDC_PK, TREASURY);
-    
-    const feeIx = createTransferCheckedInstruction(
-      buyerUsdcAta,   // from: buyer's USDC ATA
-      USDC_PK,        // mint
-      treasuryUsdcAta, // to: treasury USDC ATA
-      buyerPk,         // owner (signer)
-      feeAmount,       // amount in raw units
-      6,               // USDC decimals
-    );
     
     const v1Keys = buyIx.accounts.map((acct: any) => {
       const addr = typeof acct.address === 'object' && acct.address.address
@@ -127,20 +110,17 @@ export async function POST(request: Request) {
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     
-    // Build single tx with both buy + fee instructions (1 signature required)
+    // Build buy tx — 3 instructions: 2 compute budget + 1 Tensor BuySpl
     const buyMsg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix, feeIx],
+      instructions: [cuIx, v1Ix],
     }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
     const buyTx = new VersionedTransaction(buyMsg);
 
-    const platformFee = Number(feeAmount) / 1e6;
     return NextResponse.json({
       tx: Buffer.from(buyTx.serialize()).toString('base64'),
       price,
-      platformFee,
-      total: price + platformFee,
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,
