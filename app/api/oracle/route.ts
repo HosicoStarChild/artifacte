@@ -192,12 +192,38 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const endpoint = searchParams.get("endpoint");
+    const body = await req.json();
+
+    if (endpoint === "agents-register") {
+      // Proxy to oracle agent registration (admin-authed)
+      const res = await fetchWithTimeout(`${ORACLE_API}/api/agents/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.ORACLE_ADMIN_TOKEN || "oracle-admin-2026-Qr7nWz"}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      return NextResponse.json(data, { status: res.status });
+    }
+
+    return NextResponse.json({ error: "Unknown POST endpoint" }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "POST failed" }, { status: 500 });
+  }
+}
+
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
     },
   });
 }

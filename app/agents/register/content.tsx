@@ -263,15 +263,34 @@ export function AgentRegistrationContent() {
     if (!publicKey) return;
     
     setLoading(true);
+    setError("");
     try {
-      // In a real implementation, this would call an API to generate a key
-      const key = `ak_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-      setGeneratedApiKey(key);
-      setPermissions(prev => ({ ...prev, apiKey: key }));
+      // Register agent on Artifacte backend with permissions
+      const res = await fetch(`/api/oracle?endpoint=agents-register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet: publicKey.toBase58(),
+          name: saidStatus.name || agentName || 'Unnamed Agent',
+          description: saidStatus.description || agentDescription || '',
+          saidVerified: saidStatus.isVerified,
+          categories: permissions.categories,
+          spendingLimit: permissions.spendingLimit,
+          autoBuy: permissions.autoBuy,
+        }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Registration failed');
+      }
+      
+      setGeneratedApiKey(data.apiKey);
+      setPermissions(prev => ({ ...prev, apiKey: data.apiKey }));
       setShowApiKey(true);
       setStep(5);
     } catch (err: any) {
-      setError("Failed to generate API key");
+      setError("Failed to generate API key: " + err.message);
     } finally {
       setLoading(false);
     }
