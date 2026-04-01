@@ -27,6 +27,37 @@ export enum ItemCategory {
 }
 
 /**
+ * Confirm a transaction with blockhash strategy, with fallback signature status check.
+ * Prevents false-positive errors when tx lands but blockheight expires before confirmation.
+ */
+async function confirmTx(
+  connection: Connection,
+  sig: string,
+  blockhash: string,
+  lastValidBlockHeight: number
+): Promise<void> {
+  try {
+    const result = await connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      "confirmed"
+    );
+    if (result.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(result.value.err)}`);
+    }
+  } catch (err: any) {
+    // If blockheight expired, check if tx actually landed
+    if (err?.name === "TransactionExpiredBlockheightExceededError" || err?.message?.includes("block height exceeded")) {
+      const status = await connection.getSignatureStatus(sig);
+      if (status?.value?.confirmationStatus === "confirmed" || status?.value?.confirmationStatus === "finalized") {
+        if (status.value.err) throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+        return; // tx landed, ignore blockheight expiry
+      }
+    }
+    throw err;
+  }
+}
+
+/**
  * Detect if an NFT mint is Token-2022 by checking its owner program
  */
 async function detectTokenProgram(connection: Connection, mintAddress: PublicKey): Promise<PublicKey> {
@@ -265,7 +296,7 @@ export class AuctionProgram {
     staleTx.feePayer = this.wallet.publicKey;
     const signedStale = await this.wallet.signTransaction(staleTx);
     const staleSig = await this.connection.sendRawTransaction(signedStale.serialize());
-    await this.connection.confirmTransaction({ signature: staleSig, blockhash: bhS, lastValidBlockHeight: lvbhS }, "confirmed");
+    await confirmTx(this.connection, staleSig, bhS, lvbhS);
     return staleSig;
   }
 
@@ -349,7 +380,7 @@ export class AuctionProgram {
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
       const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
       const listIx = await builder.instruction();
@@ -359,7 +390,7 @@ export class AuctionProgram {
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
       const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     }
   }
@@ -533,7 +564,7 @@ export class AuctionProgram {
     tx.feePayer = this.wallet.publicKey;
     const signed = await this.wallet.signTransaction(tx);
     const sig = await this.connection.sendRawTransaction(signed.serialize());
-    await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
 
@@ -607,7 +638,7 @@ export class AuctionProgram {
     bidTx.feePayer = this.wallet.publicKey;
     const signedBid = await this.wallet.signTransaction(bidTx);
     const tx = await this.connection.sendRawTransaction(signedBid.serialize());
-    await this.connection.confirmTransaction({ signature: tx, blockhash: bh2, lastValidBlockHeight: lvbh2 }, "confirmed");
+    await confirmTx(this.connection, tx, bh2, lvbh2);
 
     return tx;
   }
@@ -665,7 +696,7 @@ export class AuctionProgram {
       tx.feePayer = this.wallet.publicKey;
       const signed = await this.wallet.signTransaction(tx);
       const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
       return sig;
     } else {
       const cancelIx2 = await builder.instruction();
@@ -675,7 +706,7 @@ export class AuctionProgram {
       cancelTx.feePayer = this.wallet.publicKey;
       const signedCancel = await this.wallet.signTransaction(cancelTx);
       const cancelSig = await this.connection.sendRawTransaction(signedCancel.serialize());
-      await this.connection.confirmTransaction({ signature: cancelSig, blockhash: bh3, lastValidBlockHeight: lvbh3 }, "confirmed");
+      await confirmTx(this.connection, cancelSig, bh3, lvbh3);
       return cancelSig;
     }
   }
@@ -811,7 +842,7 @@ export class AuctionProgram {
     tx.feePayer = this.wallet.publicKey;
     const signed = await this.wallet.signTransaction(tx);
     const sig = await this.connection.sendRawTransaction(signed.serialize());
-    await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
     return sig;
   }
 
