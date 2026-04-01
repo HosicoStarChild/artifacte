@@ -261,14 +261,11 @@ export default function AuctionDetailPage() {
           tokenProgramId,
           ASSOCIATED_TOKEN_PROGRAM_ID
         );
-        const { blockhash } = await connection.getLatestBlockhash();
-        const ataTx = new (await import("@solana/web3.js")).Transaction().add(createAtaIx);
-        ataTx.recentBlockhash = blockhash;
-        ataTx.feePayer = publicKey;
-        const signed = await wallet.signTransaction(ataTx);
-        await connection.sendRawTransaction(signed.serialize());
-        // Wait for ATA to be created
-        await new Promise(r => setTimeout(r, 2000));
+        const { Transaction } = await import("@solana/web3.js");
+        const ataTx = new Transaction().add(createAtaIx);
+        const ataSig = await sendTransaction(ataTx, connection);
+        // Wait for ATA confirmation
+        await connection.confirmTransaction(ataSig, "confirmed");
       }
 
       const auctionProgram = new AuctionProgram(connection, wallet, sendTransaction);
