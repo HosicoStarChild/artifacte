@@ -37,8 +37,11 @@ fn close_token_account_cpi<'info>(
     Ok(())
 }
 
-// Treasury wallet
-const TREASURY: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
+// Deploy authority — can initialize and update treasury config
+const DEPLOY_AUTHORITY: &str = "H3s3zhbcDNrLgPbUQFZYvRd9xy58nVNRC3vdg1hK1KPt";
+
+// Fallback treasury (used only if config not yet initialized)
+const TREASURY_FALLBACK: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
 
 // Standard token mints
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
@@ -116,6 +119,34 @@ fn transfer_checked_with_hook<'info>(
 #[program]
 pub mod auction {
     use super::*;
+
+    /// Initialize the treasury config PDA (one-time setup by deploy authority)
+    pub fn initialize_treasury(ctx: Context<InitializeTreasury>) -> Result<()> {
+        require!(
+            ctx.accounts.authority.key().to_string() == DEPLOY_AUTHORITY,
+            AuctionError::Unauthorized
+        );
+        let config = &mut ctx.accounts.treasury_config;
+        config.treasury = ctx.accounts.authority.key(); // set initial treasury = deploy authority, update after
+        config.authority = ctx.accounts.authority.key();
+        config.bump = ctx.bumps.treasury_config;
+        Ok(())
+    }
+
+    /// Update treasury address (deploy authority only)
+    pub fn update_treasury(ctx: Context<UpdateTreasury>, new_treasury: Pubkey) -> Result<()> {
+        require!(
+            ctx.accounts.authority.key().to_string() == DEPLOY_AUTHORITY,
+            AuctionError::Unauthorized
+        );
+        ctx.accounts.treasury_config.treasury = new_treasury;
+        emit!(TreasuryUpdated {
+            old_treasury: ctx.accounts.treasury_config.treasury,
+            new_treasury,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+        Ok(())
+    }
 
     /// List an item for sale (either fixed price or auction)
     ///
@@ -344,6 +375,21 @@ pub mod auction {
         require!(
             listing.status == ListingStatus::Active,
             AuctionError::ListingNotActive
+        );
+
+        // Resolve treasury address: use config PDA if initialized, else fallback
+        let treasury_address = if let Some(ref config) = ctx.accounts.treasury_config {
+            config.treasury
+        } else {
+            TREASURY_FALLBACK.parse::<anchor_lang::prelude::Pubkey>().unwrap()
+        };
+        require!(
+            ctx.accounts.treasury_payment_account.owner == treasury_address,
+            AuctionError::Unauthorized
+        );
+        require!(
+            ctx.accounts.treasury.key() == treasury_address,
+            AuctionError::Unauthorized
         );
 
         // Calculate fees (checked arithmetic to prevent overflow)
@@ -593,6 +639,21 @@ pub mod auction {
     /// For WNS/Token-2022: client MUST include WNS `approve_transfer` (amount=0)
     /// remaining_accounts: same layout as list_item
     pub fn settle_auction<'info>(ctx: Context<'_, '_, '_, 'info, SettleAuction<'info>>) -> Result<()> {
+        // Resolve treasury address: use config PDA if initialized, else fallback
+        let treasury_address = if let Some(ref config) = ctx.accounts.treasury_config {
+            config.treasury
+        } else {
+            TREASURY_FALLBACK.parse::<anchor_lang::prelude::Pubkey>().unwrap()
+        };
+        require!(
+            ctx.accounts.treasury_payment_account.owner == treasury_address,
+            AuctionError::Unauthorized
+        );
+        require!(
+            ctx.accounts.treasury.key() == treasury_address,
+            AuctionError::Unauthorized
+        );
+
         let listing = &mut ctx.accounts.listing;
         let clock = Clock::get()?;
 
@@ -1035,8 +1096,8 @@ pub struct BuyNow<'info> {
     /// Seller payment account — must be owned by listing.seller
     #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
     pub seller_payment_account: Account<'info, TokenAccount>,
-    /// Treasury payment account — must be owned by treasury wallet
-    #[account(mut, constraint = treasury_payment_account.owner.to_string() == TREASURY @ AuctionError::Unauthorized)]
+    /// Treasury payment account — validated in instruction body against treasury_config or fallback
+    #[account(mut)]
     pub treasury_payment_account: Account<'info, TokenAccount>,
     /// CHECK: Creator payment account — validated in instruction body
     #[account(mut)]
@@ -1045,9 +1106,15 @@ pub struct BuyNow<'info> {
     pub buyer_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
     #[account(mut)]
     pub buyer: Signer<'info>,
-    /// CHECK: Treasury wallet for rent collection. Validated against hardcoded TREASURY constant.
-    #[account(mut, constraint = treasury.key().to_string() == TREASURY)]
+    /// CHECK: Treasury wallet for rent collection. Validated in instruction body.
+    #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
+    /// Treasury config PDA — if present, overrides hardcoded treasury address
+    #[account(
+        seeds = [b"treasury_config"],
+        bump,
+    )]
+    pub treasury_config: Option<Account<'info, TreasuryConfig>>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -1113,8 +1180,8 @@ pub struct SettleAuction<'info> {
     /// Seller's payment token account — must be owned by listing.seller
     #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
     pub seller_payment_account: Box<Account<'info, TokenAccount>>,
-    /// Treasury payment account — must be owned by treasury wallet
-    #[account(mut, constraint = treasury_payment_account.owner.to_string() == TREASURY @ AuctionError::Unauthorized)]
+    /// Treasury payment account — validated in instruction body against treasury_config or fallback
+    #[account(mut)]
     pub treasury_payment_account: Box<Account<'info, TokenAccount>>,
     /// CHECK: Creator payment account — validated in instruction body if royalty > 0
     #[account(mut)]
@@ -1128,9 +1195,15 @@ pub struct SettleAuction<'info> {
     /// CHECK: The original seller, validated against listing.seller.
     #[account(mut, constraint = seller.key() == listing.seller)]
     pub seller: UncheckedAccount<'info>,
-    /// CHECK: Treasury wallet for rent collection on sales. Validated against hardcoded TREASURY constant.
-    #[account(mut, constraint = treasury.key().to_string() == TREASURY)]
+    /// CHECK: Treasury wallet for rent collection on sales. Validated in instruction body.
+    #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
+    /// Treasury config PDA — if present, overrides hardcoded treasury address
+    #[account(
+        seeds = [b"treasury_config"],
+        bump,
+    )]
+    pub treasury_config: Option<Account<'info, TreasuryConfig>>,
     pub nft_token_program: Interface<'info, TokenInterface>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -1235,6 +1308,51 @@ pub struct ListingCancelled {
 pub struct AuctionCancelled {
     pub nft_mint: Pubkey,
     pub reason: String,
+}
+
+// ============================================================================
+// Treasury Config
+// ============================================================================
+
+#[account]
+#[derive(InitSpace)]
+pub struct TreasuryConfig {
+    pub treasury: Pubkey,
+    pub authority: Pubkey,
+    pub bump: u8,
+}
+
+#[derive(Accounts)]
+pub struct InitializeTreasury<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + TreasuryConfig::INIT_SPACE,
+        seeds = [b"treasury_config"],
+        bump,
+    )]
+    pub treasury_config: Account<'info, TreasuryConfig>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateTreasury<'info> {
+    #[account(
+        mut,
+        seeds = [b"treasury_config"],
+        bump = treasury_config.bump,
+    )]
+    pub treasury_config: Account<'info, TreasuryConfig>,
+    pub authority: Signer<'info>,
+}
+
+#[event]
+pub struct TreasuryUpdated {
+    pub old_treasury: Pubkey,
+    pub new_treasury: Pubkey,
+    pub timestamp: i64,
 }
 
 // ============================================================================
