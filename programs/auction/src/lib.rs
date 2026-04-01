@@ -269,14 +269,18 @@ pub mod auction {
                 ctx.accounts.previous_bidder_account.key() != Pubkey::default(),
                 AuctionError::InvalidRefundAccount
             );
-            // The token account owner must be the previous highest bidder
-            // We verify by checking the ATA derivation matches
+            // The token account address must match the expected ATA
             let expected_ata = anchor_spl::associated_token::get_associated_token_address(
                 &listing.highest_bidder,
                 &listing.payment_mint,
             );
             require!(
                 ctx.accounts.previous_bidder_account.key() == expected_ata,
+                AuctionError::InvalidRefundAccount
+            );
+            // Also validate the token account is owned by the SPL token program (not tampered)
+            require!(
+                ctx.accounts.previous_bidder_account.owner == &spl_token::ID,
                 AuctionError::InvalidRefundAccount
             );
 
@@ -342,26 +346,33 @@ pub mod auction {
             AuctionError::ListingNotActive
         );
 
-        // Calculate fees
-        let platform_fee = (listing.price * 200) / 10000; // 2%
+        // Calculate fees (checked arithmetic to prevent overflow)
+        let platform_fee = listing.price
+            .checked_mul(200)
+            .and_then(|x| x.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?; // 2%
         let baxus_fee = if listing.baxus_fee {
-            (listing.price * 1000) / 10000 // 10%
+            listing.price
+                .checked_mul(1000)
+                .and_then(|x| x.checked_div(10000))
+                .ok_or(AuctionError::CalculationError)? // 10%
         } else {
             0u64
         };
-        let creator_royalty = (listing.price * listing.royalty_basis_points as u64) / 10000;
+        let creator_royalty = listing.price
+            .checked_mul(listing.royalty_basis_points as u64)
+            .and_then(|x| x.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?;
 
-        // Validate creator_payment_account if royalty > 0
-        if creator_royalty > 0 {
-            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
-                &listing.creator_address,
-                &listing.payment_mint,
-            );
-            require!(
-                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
-                AuctionError::InvalidCreatorAccount
-            );
-        }
+        // Always validate creator_payment_account (even when royalty = 0)
+        let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+            &listing.creator_address,
+            &listing.payment_mint,
+        );
+        require!(
+            ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+            AuctionError::InvalidCreatorAccount
+        );
 
         let seller_amount = listing
             .price
@@ -603,25 +614,33 @@ pub mod auction {
             );
 
             // Auction has bids: distribute payments + transfer NFT to winner
-            let platform_fee = (listing.current_bid * 200) / 10000;
+            // Checked arithmetic to prevent overflow
+            let platform_fee = listing.current_bid
+                .checked_mul(200)
+                .and_then(|x| x.checked_div(10000))
+                .ok_or(AuctionError::CalculationError)?; // 2%
             let baxus_fee = if listing.baxus_fee {
-                (listing.current_bid * 1000) / 10000
+                listing.current_bid
+                    .checked_mul(1000)
+                    .and_then(|x| x.checked_div(10000))
+                    .ok_or(AuctionError::CalculationError)? // 10%
             } else {
                 0u64
             };
-            let creator_royalty = (listing.current_bid * listing.royalty_basis_points as u64) / 10000;
+            let creator_royalty = listing.current_bid
+                .checked_mul(listing.royalty_basis_points as u64)
+                .and_then(|x| x.checked_div(10000))
+                .ok_or(AuctionError::CalculationError)?;
 
-            // Validate creator_payment_account if royalty > 0
-            if creator_royalty > 0 {
-                let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
-                    &listing.creator_address,
-                    &listing.payment_mint,
-                );
-                require!(
-                    ctx.accounts.creator_payment_account.key() == expected_creator_ata,
-                    AuctionError::InvalidCreatorAccount
-                );
-            }
+            // Always validate creator_payment_account
+            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                &listing.creator_address,
+                &listing.payment_mint,
+            );
+            require!(
+                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                AuctionError::InvalidCreatorAccount
+            );
 
             let seller_amount = listing
                 .current_bid
@@ -964,7 +983,11 @@ pub struct PlaceBid<'info> {
         bump,
     )]
     pub bid_escrow: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(
+        mut,
+        token::mint = payment_mint,
+        token::authority = bidder,
+    )]
     pub bidder_token_account: Account<'info, TokenAccount>,
     /// CHECK: Only used when refunding previous bidder (current_bid > 0). Validated in instruction body.
     #[account(mut)]

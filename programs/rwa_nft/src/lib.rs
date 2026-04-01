@@ -231,9 +231,16 @@ pub struct UpdateAppraisal<'info> {
 #[derive(Accounts)]
 pub struct TransferRwa<'info> {
     pub mint: Account<'info, Mint>,
-    #[account(mut)]
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = owner,
+    )]
     pub from_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(
+        mut,
+        token::mint = mint,
+    )]
     pub to_token_account: Account<'info, TokenAccount>,
     pub owner: Signer<'info>,
     pub token_program: Program<'info, Token>,
