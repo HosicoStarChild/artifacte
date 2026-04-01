@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server';
 
-// Rate limit: 5 requests per minute per IP
-const rateMap = new Map<string, { count: number; reset: number }>();
-function checkRate(ip: string): boolean {
-  const now = Date.now();
-  const e = rateMap.get(ip);
-  if (!e || now > e.reset) { rateMap.set(ip, { count: 1, reset: now + 60000 }); return true; }
-  if (e.count >= 5) return false;
-  e.count++;
-  return true;
-}
-
 export async function POST(request: Request) {
   try {
-    const ip = (request as any).headers?.get?.('x-forwarded-for') || 'unknown';
-    if (!checkRate(ip)) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
-
     const { mint, buyer } = await request.json();
     if (!mint || !buyer) return NextResponse.json({ error: 'Missing mint or buyer' }, { status: 400 });
 
