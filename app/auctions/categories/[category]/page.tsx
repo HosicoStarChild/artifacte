@@ -258,7 +258,7 @@ export default function CategoryAuctionsPage() {
           if (tensorRes.ok) {
             if (!signTransaction) throw new Error("Wallet does not support signing");
             const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info, signAllTransactions);
+            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info);
             if (result.confirmed) {
               showToast.success(`✅ Card purchased for ${result.price} USDC!`);
             } else {

@@ -247,7 +247,7 @@ export default function CardDetailPage() {
         // ME buy failed — try Tensor buy (phygitals/cNFT listings)
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info, signAllTransactions);
+        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info);
         if (result.confirmed) {
           showToast.success(`✅ Card purchased for ${result.price} USDC!`);
         } else {
