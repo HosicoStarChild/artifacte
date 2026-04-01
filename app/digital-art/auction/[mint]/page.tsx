@@ -392,7 +392,7 @@ export default function AuctionDetailPage() {
             </div>
 
             {/* Bidding Section (for auctions) */}
-            {isAuction && !isSettled && !isCancelled && !auctionEnded && !isSeller && (
+            {isAuction && !isSettled && !isCancelled && !auctionEnded && (
               <div className="bg-dark-800 border border-white/10 rounded-xl p-6 space-y-4">
                 <p className="text-gold-400 text-sm font-medium uppercase tracking-wider">Place Your Bid</p>
                 <div className="space-y-3">
