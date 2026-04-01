@@ -138,8 +138,10 @@ export default function AuctionDetail() {
           );
         }
 
+        const { blockhash: bh, lastValidBlockHeight: lvbh } = await connection.getLatestBlockhash("confirmed");
+        tx.recentBlockhash = bh;
         txSignature = await sendTransaction(tx, connection);
-        await connection.confirmTransaction(txSignature, "confirmed");
+        await connection.confirmTransaction({ signature: txSignature, blockhash: bh, lastValidBlockHeight: lvbh }, "confirmed");
       }
 
       const shortKey = `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`;
