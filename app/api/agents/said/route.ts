@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        url = "https://api.saidprotocol.com/api/agents/register";
+        url = "https://api.saidprotocol.com/api/register/pending";
         payload = { wallet, name, description };
         break;
         

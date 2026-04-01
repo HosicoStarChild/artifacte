@@ -77,21 +77,23 @@ export function AgentRegistrationContent() {
       const passportData = await passportRes.json();
       
       setSaidStatus({
-        isRegistered: statusData.success && statusData.registered,
-        isVerified: statusData.success && statusData.verified,
-        hasPassport: passportData.success && !!passportData.passport,
-        name: passportData.passport?.name,
-        description: passportData.passport?.description,
+        isRegistered: !!statusData.registered,
+        isVerified: !!statusData.verified,
+        hasPassport: !!passportData.passport,
+        name: passportData.passport?.name || statusData.name,
+        description: passportData.passport?.description || statusData.description,
       });
       
       // Move to appropriate step
-      if (statusData.success && statusData.registered) {
+      if (statusData.registered) {
         setStep(4); // Skip to Artifacte permissions
       } else {
         setStep(2); // Show SAID registration
       }
+      setError(""); // Clear any previous errors
     } catch (err: any) {
-      setError("Failed to check SAID status: " + err.message);
+      // Don't show error for status check — just default to registration step
+      setStep(2);
     } finally {
       setLoading(false);
     }
