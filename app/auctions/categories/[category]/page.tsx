@@ -41,7 +41,7 @@ export default function CategoryAuctionsPage() {
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
-  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, signAllTransactions, connected } = useWallet();
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -258,7 +258,7 @@ export default function CategoryAuctionsPage() {
           if (tensorRes.ok) {
             if (!signTransaction) throw new Error("Wallet does not support signing");
             const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info);
+            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info, signAllTransactions);
             if (result.confirmed) {
               showToast.success(`✅ Card purchased for ${result.price} USDC!`);
             } else {
