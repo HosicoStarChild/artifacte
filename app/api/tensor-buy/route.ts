@@ -127,10 +127,11 @@ export async function POST(request: Request) {
     }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
     const buyTx = new VersionedTransaction(buyMsg);
 
-    // Build separate fee tx (small, no ALT needed)
+    // Build separate fee tx with fresh blockhash so it doesn't expire
+    const feeBh = await conn.getLatestBlockhash('confirmed');
     const feeMsg = new TransactionMessage({
       payerKey: buyerPk,
-      recentBlockhash: bh.blockhash,
+      recentBlockhash: feeBh.blockhash,
       instructions: [feeIx],
     }).compileToV0Message();
     const feeTx = new VersionedTransaction(feeMsg);
