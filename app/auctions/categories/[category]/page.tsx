@@ -41,7 +41,7 @@ export default function CategoryAuctionsPage() {
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
-  const { publicKey, sendTransaction, signTransaction, signAllTransactions, connected } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, connected } = useWallet();
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -161,11 +161,6 @@ export default function CategoryAuctionsPage() {
     if (brandFilter && brandFilter !== 'All') params.set('brand', brandFilter);
     const spiritFilter = filters['spiritType'];
     if (spiritFilter && spiritFilter !== 'All') params.set('spiritType', spiritFilter);
-    const sourceFilter = filters['source'];
-    if (sourceFilter && sourceFilter !== 'All') {
-      const sourceMap: Record<string, string> = { 'Collector Crypt': 'collector-crypt', 'Phygitals': 'phygitals', 'Artifacte': 'artifacte' };
-      params.set('source', sourceMap[sourceFilter] || sourceFilter.toLowerCase());
-    }
 
     fetch(`/api/me-listings?${params}`)
       .then(r => r.json())
@@ -184,7 +179,6 @@ export default function CategoryAuctionsPage() {
   // Category-specific filter options
   const categoryFilters: Record<string, { label: string; key: string; options: string[] }[]> = {
     TCG_CARDS: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
       { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
       { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
@@ -193,21 +187,19 @@ export default function CategoryAuctionsPage() {
     SPIRITS: [
       { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
     ],
+    WATCHES: [
+      { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
+    ],
     SPORTS_CARDS: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
       { label: "Sport", key: "sport", options: ["All", "Baseball", "Basketball", "Football", "Soccer"] },
       { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "BGS 9.5", "BGS 10", "SGC 10"] },
       { label: "Brand", key: "brand", options: ["All", "Topps", "Panini", "Upper Deck"] },
     ],
-    SEALED: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
-      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
-    ],
-    MERCHANDISE: [
-      { label: "Source", key: "source", options: ["All", "Collector Crypt", "Phygitals", "Artifacte"] },
-    ],
     DIGITAL_ART: [
       { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
+    ],
+    SEALED: [
+      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     ],
   };
 
@@ -256,15 +248,67 @@ export default function CategoryAuctionsPage() {
           });
           
           if (tensorRes.ok) {
+            const tensorData = await tensorRes.json();
             if (!signTransaction) throw new Error("Wallet does not support signing");
-            const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-            const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info);
-            if (result.confirmed) {
-              showToast.success(`✅ Card purchased for ${result.price} USDC!`);
-            } else {
-              showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+            showToast.info(`💳 Confirm purchase — ${tensorData.price} USDC`);
+            
+            const { VersionedTransaction } = await import('@solana/web3.js');
+            
+            // Deserialize pre-built transaction from API
+            const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
+            const tx = VersionedTransaction.deserialize(txBytes);
+            // Sign with wallet
+            const signed = await signTransaction(tx as any);
+            const serialized = (signed as any).serialize();
+
+            // Send signed tx via RPC proxy
+            let txToSend = serialized;
+            if (serialized.length > 1232) {
+              // Wallet expanded ALT references — patch signature into original compact tx
+              const signedTx = VersionedTransaction.deserialize(serialized);
+              const patched = new Uint8Array(txBytes);
+              patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
+              txToSend = patched;
             }
-            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr && l.nftAddress !== mintAddr));
+            const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+            const sendRes = await fetch('/api/rpc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0', id: 1,
+                method: 'sendTransaction',
+                params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+              }),
+            });
+            const sendData = await sendRes.json();
+            if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+            sig = sendData.result;
+            
+            showToast.info(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
+            // Poll for confirmation instead of WebSocket
+            for (let i = 0; i < 30; i++) {
+              await new Promise(r => setTimeout(r, 2000));
+              const statusRes = await fetch('/api/rpc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
+              });
+              const statusData = await statusRes.json();
+              const status = statusData.result?.value?.[0];
+              if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
+                if (status.err) {
+                  throw new Error('Transaction failed on-chain');
+                }
+                showToast.success(`✅ Card purchased for ${tensorData.price} USDC!`);
+                // Remove purchased card from listings
+                setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr));
+                setBuyingId(null);
+                return;
+              }
+            }
+            showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+            // Remove from listings optimistically
+            setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr));
             setBuyingId(null);
             return;
           }
@@ -281,8 +325,8 @@ export default function CategoryAuctionsPage() {
         const { VersionedTransaction } = await import('@solana/web3.js');
 
         if (v0TxSigned && v0Tx) {
-          // Notary-cosigned flow — server pre-signs, wallet adds buyer sig
-          // Must use sendRawTransaction — simulation fails on partial-signed txs
+          // Notary-cosigned flow (M3 phygitals + M2 CC cards)
+          // Send the notary-signed tx to wallet — wallet adds buyer sig
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
           const signed = await signTransaction(notaryTx as any);
@@ -296,6 +340,7 @@ export default function CategoryAuctionsPage() {
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);
           sig = await connection.sendRawTransaction((signed as any).serialize(), {
+            skipPreflight: false,
             preflightCommitment: 'confirmed',
           });
         } else if (legacyTx) {
