@@ -127,26 +127,17 @@ export async function POST(request: Request) {
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     
-    // Build buy tx (with ALT for compression)
+    // Build single tx with both buy + fee instructions (1 signature required)
     const buyMsg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix],
+      instructions: [cuIx, v1Ix, feeIx],
     }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
     const buyTx = new VersionedTransaction(buyMsg);
-    
-    // Build separate fee tx (small, no ALT needed)
-    const feeMsg = new TransactionMessage({
-      payerKey: buyerPk,
-      recentBlockhash: bh.blockhash,
-      instructions: [feeIx],
-    }).compileToV0Message();
-    const feeTx = new VersionedTransaction(feeMsg);
 
     const platformFee = Number(feeAmount) / 1e6;
     return NextResponse.json({
       tx: Buffer.from(buyTx.serialize()).toString('base64'),
-      feeTx: Buffer.from(feeTx.serialize()).toString('base64'),
       price,
       platformFee,
       total: price + platformFee,

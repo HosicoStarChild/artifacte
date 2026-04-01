@@ -53,25 +53,7 @@ export async function executeTensorBuy(
     buyToSend = patched;
   }
 
-  // Step 4: Sign and send fee tx (if present)
-  if (tensorData.feeTx) {
-    const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
-    const feeTx = VersionedTransaction.deserialize(feeBytes);
-    const signedFee = await signTransaction(feeTx);
-    const feeB64 = btoa(Array.from(new Uint8Array(signedFee.serialize())).map((b: number) => String.fromCharCode(b)).join(''));
-    // Send fee tx (fire and forget — don't block the buy)
-    fetch('/api/rpc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1,
-        method: 'sendTransaction',
-        params: [feeB64, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-      }),
-    }).catch(() => {}); // non-blocking
-  }
-
-  // Step 5: Send buy tx via RPC proxy
+  // Step 4: Send buy tx via RPC proxy (fee is included in same tx)
   const b64Tx = btoa(Array.from(new Uint8Array(buyToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
     method: 'POST',
