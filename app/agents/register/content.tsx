@@ -48,7 +48,7 @@ export function AgentRegistrationContent() {
     "TCG Cards",
     "Sports Cards", 
     "Sealed Product",
-    "Watches",
+
     "Spirits",
     "Digital Art",
     "Merchandise"
