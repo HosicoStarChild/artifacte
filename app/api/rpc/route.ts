@@ -50,6 +50,7 @@ const ALLOWED_METHODS = new Set([
   "getMultipleAccounts",
   "getTokenAccountsByOwner",
   "isBlockhashValid",
+  "getProgramAccounts",
 ]);
 
 export async function POST(req: NextRequest) {
