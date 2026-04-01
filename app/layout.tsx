@@ -7,7 +7,24 @@ import { ToastContainer } from "@/components/ToastContainer";
 
 export const metadata: Metadata = {
   title: "Artifacte — RWA Tokenization on Solana",
-  description: "Institutional-grade real world asset tokenization platform on Solana",
+  description: "Buy, sell and trade tokenized collectibles on Solana. PSA & CGC graded trading cards, spirits, sealed products and more — verified on-chain.",
+  metadataBase: new URL("https://artifacte.io"),
+  openGraph: {
+    title: "Artifacte — RWA Tokenization on Solana",
+    description: "Buy, sell and trade tokenized collectibles on Solana. PSA & CGC graded trading cards, spirits, sealed products and more.",
+    url: "https://artifacte.io",
+    siteName: "Artifacte",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "Artifacte — RWA Marketplace" }],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Artifacte — RWA Tokenization on Solana",
+    description: "Buy, sell and trade tokenized collectibles on Solana.",
+    images: ["/og-image.jpg"],
+  },
+  keywords: ["Solana", "NFT", "trading cards", "PSA", "CGC", "graded cards", "RWA", "tokenization", "collectibles", "Pokemon cards", "sports cards"],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
