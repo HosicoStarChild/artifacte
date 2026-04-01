@@ -35,26 +35,25 @@ export async function executeTensorBuy(
   }
 
   const tensorData = await tensorRes.json();
-  const feeText = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} fee` : '';
-  onStatus?.(`💳 Confirm purchase — $${tensorData.price.toFixed(2)}${feeText} USDC`);
+  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC`);
 
-  // Step 2: Deserialize buy tx and fee tx
+  // Step 2: Deserialize and sign
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
-  const buyTx = VersionedTransaction.deserialize(txBytes);
+  const tx = VersionedTransaction.deserialize(txBytes);
+  const signed = await signTransaction(tx);
+  const serialized = signed.serialize();
 
-  // Step 3: Sign buy tx
-  const signedBuy = await signTransaction(buyTx);
-  let buyToSend = signedBuy.serialize();
-  if (buyToSend.length > 1232) {
-    // Wallet inflated ALT — patch signature into original compact tx
-    const inflated = VersionedTransaction.deserialize(buyToSend);
+  // Step 3: Patch signature if wallet inflated ALT references
+  let txToSend = serialized;
+  if (serialized.length > 1232) {
+    const signedTx = VersionedTransaction.deserialize(serialized);
     const patched = new Uint8Array(txBytes);
-    patched.set(inflated.signatures[0], 2);
-    buyToSend = patched;
+    patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
+    txToSend = patched;
   }
 
-  // Step 4: Send buy tx via RPC proxy (fee included in same tx via ALT)
-  const b64Tx = btoa(Array.from(new Uint8Array(buyToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+  // Step 4: Send via RPC proxy
+  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

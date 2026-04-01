@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       rentDestination: rentDest,
       currency: address(USDC_MINT),
       makerBroker,
-      takerBroker: TREASURY,
+      takerBroker: buyerAddress,
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
@@ -80,13 +80,9 @@ export async function POST(request: Request) {
 
     // Build the full unsigned transaction server-side (server web3.js compiles correctly with ALT)
     const { PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram, Connection: SolConnection } = await import('@solana/web3.js');
-
     
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
     const buyerPk = new PublicKey(buyer);
-    
-    // Treasury collects taker broker fee via Tensor protocol (no extra instruction needed)
-    const TREASURY = address('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
     
     const v1Keys = buyIx.accounts.map((acct: any) => {
       const addr = typeof acct.address === 'object' && acct.address.address
@@ -112,21 +108,18 @@ export async function POST(request: Request) {
     ]);
     
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
-    
-    // Build buy tx — treasury collects taker broker fee automatically via Tensor protocol
-    const buyMsg = new TransactionMessage({
+    const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
       instructions: [cuIx, v1Ix],
     }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
-    const buyTx = new VersionedTransaction(buyMsg);
+    
+    const tx = new VersionedTransaction(msg);
+    const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
-    const platformFee = Number(feeAmount) / 1e6;
     return NextResponse.json({
-      tx: Buffer.from(buyTx.serialize()).toString('base64'),
+      tx: txBase64,
       price,
-      platformFee,
-      total: price + platformFee,
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,
