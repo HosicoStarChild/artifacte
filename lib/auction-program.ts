@@ -193,13 +193,31 @@ export class AuctionProgram {
   private program: any;
   private connection: Connection;
   private wallet: any;
+  private sendTx: ((tx: Transaction, connection: Connection) => Promise<string>) | null;
 
-  constructor(connection: Connection, wallet: any) {
+  constructor(connection: Connection, wallet: any, sendTransaction?: (tx: Transaction, connection: Connection) => Promise<string>) {
     this.connection = connection;
     this.wallet = wallet;
+    this.sendTx = sendTransaction || null;
     const provider = new anchor.AnchorProvider(connection, wallet, {});
     const idl = { ...IDL, address: AUCTION_PROGRAM_ID.toBase58() } as any;
     this.program = new (anchor.Program as any)(idl, provider);
+  }
+
+  private async sendAndConfirm(tx: Transaction): Promise<string> {
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = this.wallet.publicKey;
+    let sig: string;
+    if (this.sendTx) {
+      // Use wallet adapter's sendTransaction — goes through Phantom's native flow, no Blowfish warning
+      sig = await this.sendTx(tx, this.connection);
+    } else {
+      const signed = await this.wallet.signTransaction(tx);
+      sig = await this.connection.sendRawTransaction(signed.serialize());
+    }
+    await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
+    return sig;
   }
 
   /**
@@ -291,12 +309,7 @@ export class AuctionProgram {
       })
       .instruction();
     const staleTx = new Transaction().add(staleIx);
-    const { blockhash: bhS, lastValidBlockHeight: lvbhS } = await this.connection.getLatestBlockhash("confirmed");
-    staleTx.recentBlockhash = bhS;
-    staleTx.feePayer = this.wallet.publicKey;
-    const signedStale = await this.wallet.signTransaction(staleTx);
-    const staleSig = await this.connection.sendRawTransaction(signedStale.serialize());
-    await confirmTx(this.connection, staleSig, bhS, lvbhS);
+    const staleSig = await this.sendAndConfirm(staleTx);
     return staleSig;
   }
 
@@ -375,23 +388,11 @@ export class AuctionProgram {
         .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
         .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }))
         .add(approveIx).add(listIx);
-      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
-      return sig;
+      return await this.sendAndConfirm(tx);
     } else {
       const listIx = await builder.instruction();
       const tx = new Transaction().add(listIx);
-      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
-      return sig;
+      return await this.sendAndConfirm(tx);
     }
   }
 
@@ -562,13 +563,7 @@ export class AuctionProgram {
       tx.add(...preInstructions, buyIx);
     }
 
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = this.wallet.publicKey;
-    const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-    await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
-    return sig;
+    return await this.sendAndConfirm(tx);
   }
 
   /**
@@ -636,12 +631,7 @@ export class AuctionProgram {
       });
     const bidIx = await bidBuilder.instruction();
     const bidTx = new Transaction().add(...preInstructions, bidIx);
-    const { blockhash: bh2, lastValidBlockHeight: lvbh2 } = await this.connection.getLatestBlockhash("confirmed");
-    bidTx.recentBlockhash = bh2;
-    bidTx.feePayer = this.wallet.publicKey;
-    const signedBid = await this.wallet.signTransaction(bidTx);
-    const tx = await this.connection.sendRawTransaction(signedBid.serialize());
-    await confirmTx(this.connection, tx, bh2, lvbh2);
+    const tx = await this.sendAndConfirm(bidTx);
 
     return tx;
   }
@@ -694,22 +684,11 @@ export class AuctionProgram {
       );
       const cancelIx = await builder.instruction();
       const tx = new Transaction().add(approveIx).add(cancelIx);
-      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = this.wallet.publicKey;
-      const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-      await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
-      return sig;
+      return await this.sendAndConfirm(tx);
     } else {
       const cancelIx2 = await builder.instruction();
       const cancelTx = new Transaction().add(cancelIx2);
-      const { blockhash: bh3, lastValidBlockHeight: lvbh3 } = await this.connection.getLatestBlockhash("confirmed");
-      cancelTx.recentBlockhash = bh3;
-      cancelTx.feePayer = this.wallet.publicKey;
-      const signedCancel = await this.wallet.signTransaction(cancelTx);
-      const cancelSig = await this.connection.sendRawTransaction(signedCancel.serialize());
-      await confirmTx(this.connection, cancelSig, bh3, lvbh3);
+      const cancelSig = await this.sendAndConfirm(cancelTx);
       return cancelSig;
     }
   }
@@ -842,13 +821,7 @@ export class AuctionProgram {
     }
 
     tx.add(settleIx);
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = this.wallet.publicKey;
-    const signed = await this.wallet.signTransaction(tx);
-      const sig = await this.connection.sendRawTransaction(signed.serialize());
-    await confirmTx(this.connection, sig, blockhash, lastValidBlockHeight);
-    return sig;
+    return await this.sendAndConfirm(tx);
   }
 
   /**

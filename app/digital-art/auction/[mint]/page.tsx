@@ -37,7 +37,7 @@ interface NFTData {
 export default function AuctionDetailPage() {
   const params = useParams();
   const mint = params.mint as string;
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
 
@@ -123,7 +123,7 @@ export default function AuctionDetailPage() {
       const sellerPaymentAccount = await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.seller));
       const buyerNftAccount = await getAssociatedTokenAddress(nftMint, publicKey, false, nftProgBuy);
 
-      const auctionProgram = new AuctionProgram(connection, wallet);
+      const auctionProgram = new AuctionProgram(connection, wallet, sendTransaction);
       const tx = await auctionProgram.buyNow(
         nftMint,
         sellerPaymentAccount,
@@ -174,7 +174,7 @@ export default function AuctionDetailPage() {
         ? await getAssociatedTokenAddress(SOL_MINT, new PublicKey(listing.highestBidder))
         : publicKey;
 
-      const auctionProgram = new AuctionProgram(connection, wallet);
+      const auctionProgram = new AuctionProgram(connection, wallet, sendTransaction);
       const tx = await auctionProgram.placeBid(
         nftMint,
         newBidLamports,
@@ -213,7 +213,7 @@ export default function AuctionDetailPage() {
       const buyerNftAccount = await getAssociatedTokenAddress(nftMint, new PublicKey(listing.highestBidder), false, nftTokenProgramId);
       const sellerNftAccount = await getAssociatedTokenAddress(nftMint, new PublicKey(listing.seller), false, nftTokenProgramId);
 
-      const auctionProgram = new AuctionProgram(connection, wallet);
+      const auctionProgram = new AuctionProgram(connection, wallet, sendTransaction);
       const tx = await auctionProgram.settleAuction(
         nftMint,
         sellerPaymentAccount,
@@ -271,7 +271,7 @@ export default function AuctionDetailPage() {
         await new Promise(r => setTimeout(r, 2000));
       }
 
-      const auctionProgram = new AuctionProgram(connection, wallet);
+      const auctionProgram = new AuctionProgram(connection, wallet, sendTransaction);
       const tx = await auctionProgram.cancelListing(nftMint, sellerNftAccount);
 
       showToast.success("Listing cancelled successfully!");

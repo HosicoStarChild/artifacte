@@ -26,7 +26,7 @@ interface WhitelistStatus {
 }
 
 export default function ListNFTPage() {
-  const { publicKey, connected, wallet } = useWallet();
+  const { publicKey, connected, wallet, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
   const [nfts, setNfts] = useState<NFTAsset[]>([]);
@@ -159,7 +159,7 @@ export default function ListNFTPage() {
         isToken2022 ? TOKEN_2022_PROGRAM_ID : undefined
       );
 
-      const auctionProgram = new AuctionProgram(connection, wallet.adapter);
+      const auctionProgram = new AuctionProgram(connection, wallet.adapter, sendTransaction);
 
       // Check for stale listing PDA and close it first
       const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
