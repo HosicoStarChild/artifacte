@@ -67,10 +67,16 @@ export const IDL = {
         },
         {
           "name": "seller_payment_account",
+          "docs": [
+            "Seller payment account — must be owned by listing.seller"
+          ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
+          "docs": [
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
+          ],
           "writable": true
         },
         {
@@ -89,6 +95,37 @@ export const IDL = {
         {
           "name": "treasury",
           "writable": true
+        },
+        {
+          "name": "treasury_config",
+          "docs": [
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "nft_token_program"
@@ -231,6 +268,62 @@ export const IDL = {
         },
         {
           "name": "nft_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_treasury",
+      "docs": [
+        "Initialize the treasury config PDA (one-time setup by deploy authority)"
+      ],
+      "discriminator": [
+        124,
+        186,
+        211,
+        195,
+        85,
+        165,
+        129,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "treasury_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -398,7 +491,10 @@ export const IDL = {
           "writable": true
         },
         {
-          "name": "payment_mint"
+          "name": "payment_mint",
+          "docs": [
+            "Payment mint — must match the listing's payment mint"
+          ]
         },
         {
           "name": "bid_escrow",
@@ -545,10 +641,16 @@ export const IDL = {
         },
         {
           "name": "seller_payment_account",
+          "docs": [
+            "Seller's payment token account — must be owned by listing.seller"
+          ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
+          "docs": [
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
+          ],
           "writable": true
         },
         {
@@ -557,10 +659,16 @@ export const IDL = {
         },
         {
           "name": "buyer_nft_account",
+          "docs": [
+            "Buyer NFT account — must be owned by highest bidder (or seller if no bids for return)"
+          ],
           "writable": true
         },
         {
           "name": "seller_nft_account",
+          "docs": [
+            "Seller NFT account — must be owned by listing.seller (for no-bid return)"
+          ],
           "writable": true
         },
         {
@@ -570,6 +678,37 @@ export const IDL = {
         {
           "name": "treasury",
           "writable": true
+        },
+        {
+          "name": "treasury_config",
+          "docs": [
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
+          ],
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "nft_token_program"
@@ -584,6 +723,62 @@ export const IDL = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "update_treasury",
+      "docs": [
+        "Update treasury address (deploy authority only)"
+      ],
+      "discriminator": [
+        60,
+        16,
+        243,
+        66,
+        96,
+        59,
+        254,
+        131
+      ],
+      "accounts": [
+        {
+          "name": "treasury_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_treasury",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -598,6 +793,19 @@ export const IDL = {
         134,
         26,
         58
+      ]
+    },
+    {
+      "name": "TreasuryConfig",
+      "discriminator": [
+        124,
+        54,
+        212,
+        227,
+        213,
+        189,
+        168,
+        41
       ]
     }
   ],
@@ -679,6 +887,19 @@ export const IDL = {
         12,
         96
       ]
+    },
+    {
+      "name": "TreasuryUpdated",
+      "discriminator": [
+        80,
+        239,
+        54,
+        168,
+        43,
+        38,
+        85,
+        145
+      ]
     }
   ],
   "errors": [
@@ -751,6 +972,41 @@ export const IDL = {
       "code": 6013,
       "name": "TransferFailed",
       "msg": "Token-2022 transfer with hook failed"
+    },
+    {
+      "code": 6014,
+      "name": "SellerCannotBid",
+      "msg": "Seller cannot bid on their own auction"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidRefundAccount",
+      "msg": "Invalid refund account — must be previous bidder's ATA"
+    },
+    {
+      "code": 6016,
+      "name": "RoyaltyTooHigh",
+      "msg": "Royalty basis points too high (max 1000 = 10%)"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBuyerAccount",
+      "msg": "Invalid buyer account — must be owned by highest bidder"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidCreatorAccount",
+      "msg": "Invalid creator account — must be creator's ATA for payment mint"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidTokenProgram",
+      "msg": "Invalid token program — must be SPL Token or Token-2022"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidRoyaltyBps",
+      "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
     }
   ],
   "types": [
@@ -1051,6 +1307,46 @@ export const IDL = {
           }
         ]
       }
+    },
+    {
+      "name": "TreasuryConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
     }
   ]
-} as const;
+};
