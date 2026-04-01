@@ -249,7 +249,7 @@ export class AuctionProgram {
       AUCTION_PROGRAM_ID
     )[0];
 
-    return await this.program.methods
+    const staleIx = await this.program.methods
       .closeStaleListing()
       .accounts({
         listing,
@@ -258,7 +258,15 @@ export class AuctionProgram {
         seller: this.wallet.publicKey,
         nftTokenProgram,
       })
-      .rpc();
+      .instruction();
+    const staleTx = new Transaction().add(staleIx);
+    const { blockhash: bhS, lastValidBlockHeight: lvbhS } = await this.connection.getLatestBlockhash("confirmed");
+    staleTx.recentBlockhash = bhS;
+    staleTx.feePayer = this.wallet.publicKey;
+    const signedStale = await this.wallet.signTransaction(staleTx);
+    const staleSig = await this.connection.sendRawTransaction(signedStale.serialize());
+    await this.connection.confirmTransaction({ signature: staleSig, blockhash: bhS, lastValidBlockHeight: lvbhS }, "confirmed");
+    return staleSig;
   }
 
   /**
@@ -344,7 +352,15 @@ export class AuctionProgram {
       await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
       return sig;
     } else {
-      return await builder.rpc();
+      const listIx = await builder.instruction();
+      const tx = new Transaction().add(listIx);
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = this.wallet.publicKey;
+      const signed = await this.wallet.signTransaction(tx);
+      const sig = await this.connection.sendRawTransaction(signed.serialize());
+      await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      return sig;
     }
   }
 
@@ -574,7 +590,7 @@ export class AuctionProgram {
       preInstructions.push(createSyncNativeInstruction(bidderTokenAccount));
     }
 
-    const tx = await this.program.methods
+    const bidBuilder = this.program.methods
       .placeBid(new anchor.BN(bidAmount))
       .accounts({
         listing,
@@ -586,9 +602,15 @@ export class AuctionProgram {
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      })
-      .preInstructions(preInstructions)
-      .rpc();
+      });
+    const bidIx = await bidBuilder.instruction();
+    const bidTx = new Transaction().add(...preInstructions, bidIx);
+    const { blockhash: bh2, lastValidBlockHeight: lvbh2 } = await this.connection.getLatestBlockhash("confirmed");
+    bidTx.recentBlockhash = bh2;
+    bidTx.feePayer = this.wallet.publicKey;
+    const signedBid = await this.wallet.signTransaction(bidTx);
+    const tx = await this.connection.sendRawTransaction(signedBid.serialize());
+    await this.connection.confirmTransaction({ signature: tx, blockhash: bh2, lastValidBlockHeight: lvbh2 }, "confirmed");
 
     return tx;
   }
@@ -649,7 +671,15 @@ export class AuctionProgram {
       await this.connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
       return sig;
     } else {
-      return await builder.rpc();
+      const cancelIx2 = await builder.instruction();
+      const cancelTx = new Transaction().add(cancelIx2);
+      const { blockhash: bh3, lastValidBlockHeight: lvbh3 } = await this.connection.getLatestBlockhash("confirmed");
+      cancelTx.recentBlockhash = bh3;
+      cancelTx.feePayer = this.wallet.publicKey;
+      const signedCancel = await this.wallet.signTransaction(cancelTx);
+      const cancelSig = await this.connection.sendRawTransaction(signedCancel.serialize());
+      await this.connection.confirmTransaction({ signature: cancelSig, blockhash: bh3, lastValidBlockHeight: lvbh3 }, "confirmed");
+      return cancelSig;
     }
   }
 
