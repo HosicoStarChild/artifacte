@@ -43,28 +43,17 @@ export async function executeTensorBuy(
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
   const buyTx = VersionedTransaction.deserialize(txBytes);
 
-  let signedBuyBytes: Uint8Array;
+  // Step 3: Sign buy tx first
+  const signedBuy = await signTransaction(buyTx);
+  let signedBuyBytes = new Uint8Array(signedBuy.serialize());
   let signedFeeBytes: Uint8Array | null = null;
 
-  if (tensorData.feeTx && signAllTransactions) {
-    // Sign both txs together — wallet simulates them in sequence, correct balance context
+  // Step 4: Sign fee tx separately after buy tx is signed
+  if (tensorData.feeTx) {
     const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
     const feeTx = VersionedTransaction.deserialize(feeBytes);
-    const [signedBuy, signedFee] = await signAllTransactions([buyTx, feeTx]);
-    signedBuyBytes = new Uint8Array(signedBuy.serialize());
+    const signedFee = await signTransaction(feeTx);
     signedFeeBytes = new Uint8Array(signedFee.serialize());
-  } else {
-    // Fallback: sign buy tx only
-    const signedBuy = await signTransaction(buyTx);
-    signedBuyBytes = new Uint8Array(signedBuy.serialize());
-
-    // Sign fee tx separately if present
-    if (tensorData.feeTx) {
-      const feeBytes = Uint8Array.from(atob(tensorData.feeTx), (c: string) => c.charCodeAt(0));
-      const feeTx = VersionedTransaction.deserialize(feeBytes);
-      const signedFee = await signTransaction(feeTx);
-      signedFeeBytes = new Uint8Array(signedFee.serialize());
-    }
   }
 
   // Patch signature if wallet inflated ALT
