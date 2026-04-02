@@ -231,8 +231,16 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // Phygitals are Tensor listings — route directly, skip ME
-        if (listing?.source === 'phygitals') {
+        // SOL listings: buy directly via ME API
+        showToast.info("Building transaction...");
+        const buildRes = await fetch('/api/me-buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+        });
+
+        if (!buildRes.ok) {
+          // ME buy failed — try Tensor buy for USDC/Tensor listings
           const tensorRes = await fetch('/api/tensor-buy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -305,19 +313,6 @@ export default function CategoryAuctionsPage() {
             return;
           }
           
-          const errData = await tensorRes.json().catch(() => ({ error: 'Failed to build transaction' }));
-          throw new Error(errData.error || 'Failed to build Tensor transaction');
-        }
-
-        // CC cards — use ME buy route
-        showToast.info("Building transaction...");
-        const buildRes = await fetch('/api/me-buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
-        });
-
-        if (!buildRes.ok) {
           const errData = await buildRes.json().catch(() => ({ error: 'Failed to build transaction' }));
           throw new Error(errData.error || 'Failed to build transaction');
         }
@@ -359,7 +354,6 @@ export default function CategoryAuctionsPage() {
 
         await connection.confirmTransaction(sig, "confirmed");
         showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
-        setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.id !== mintAddr && l.nftAddress !== mintAddr));
         setBuyingId(null);
         return;
       }
