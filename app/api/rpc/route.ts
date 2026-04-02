@@ -43,6 +43,8 @@ const ALLOWED_METHODS = new Set([
   "getBalance",
   "getLatestBlockhash",
   "getSignatureStatuses",
+  "getSignaturesForAddress",
+  "getTransaction",
   "sendTransaction",
   "getFeeForMessage",
   "simulateTransaction",

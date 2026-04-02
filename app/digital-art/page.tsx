@@ -67,7 +67,9 @@ export default function DigitalArtPage() {
         const enriched: ActiveListing[] = [];
         for (const listing of listings) {
           try {
-            const res = await fetch(`/api/nft?mint=${listing.nft_mint.toBase58()}`);
+            const mintStr = listing.nft_mint?.toBase58?.() || listing.nft_mint;
+            if (!mintStr) continue;
+            const res = await fetch(`/api/nft?mint=${mintStr}`);
             const nftData = await res.json();
 
             enriched.push({
