@@ -224,8 +224,8 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // USDC listings: redirect to ME (SPL flow not built yet)
-        if (listing?.currency === 'USDC') {
+        // USDC listings: redirect to ME only for CC cards, not phygitals (phygitals use Tensor)
+        if (listing?.currency === 'USDC' && listing?.source !== 'phygitals') {
           window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
           setBuyingId(null);
           return;
