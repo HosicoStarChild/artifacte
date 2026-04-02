@@ -145,15 +145,12 @@ export async function POST(req: NextRequest) {
       buyData = result.value;
     } else {
       // ── M2 path (CC cards, pNFTs, standard auction house listings) ──
-      const TREASURY = '6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P';
       const params = new URLSearchParams({
         buyer,
         seller,
         tokenMint: mint,
         price: price.toString(),
         auctionHouseAddress: auctionHouse || CC_AUCTION_HOUSE,
-        takerFeeReceiver: TREASURY,
-        takerFeeBp: '200', // 2%
       });
       if (tokenATA) params.set('tokenATA', tokenATA);
       if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
