@@ -114,7 +114,12 @@ export async function POST(request: Request) {
 
   } catch (err: any) {
     console.error('[tensor-buy] Error:', err);
-    return NextResponse.json({ error: err.message || 'Failed to build Tensor buy tx' }, { status: 500 });
+    const msg = err.message || '';
+    // Account not found = listing no longer exists (delisted/sold)
+    if (msg.includes('Account not found') || msg.includes('3230000')) {
+      return NextResponse.json({ error: 'This listing is no longer available. It may have been sold or delisted.' }, { status: 404 });
+    }
+    return NextResponse.json({ error: msg || 'Failed to build Tensor buy tx' }, { status: 500 });
   }
 }
 
