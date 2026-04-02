@@ -224,23 +224,9 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // USDC listings: redirect to ME only for CC cards, not phygitals (phygitals use Tensor)
-        if (listing?.currency === 'USDC' && listing?.source !== 'phygitals') {
-          window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
-          setBuyingId(null);
-          return;
-        }
-
-        // SOL listings: buy directly via ME API
-        showToast.info("Building transaction...");
-        const buildRes = await fetch('/api/me-buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
-        });
-
-        if (!buildRes.ok) {
-          // ME buy failed — try Tensor buy for USDC/Tensor listings
+        // Phygitals: always use Tensor directly
+        if (listing?.source === 'phygitals' || listingId.startsWith('phyg-')) {
+          showToast.info("Building transaction...");
           const tensorRes = await fetch('/api/tensor-buy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -313,6 +299,25 @@ export default function CategoryAuctionsPage() {
             return;
           }
           
+          throw new Error('Tensor buy failed');
+        }
+
+        // USDC listings for non-phygitals: redirect to ME
+        if (listing?.currency === 'USDC') {
+          window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
+          setBuyingId(null);
+          return;
+        }
+
+        // CC cards: buy via ME notary-cosigned transaction
+        showToast.info("Building transaction...");
+        const buildRes = await fetch('/api/me-buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+        });
+
+        if (!buildRes.ok) {
           const errData = await buildRes.json().catch(() => ({ error: 'Failed to build transaction' }));
           throw new Error(errData.error || 'Failed to build transaction');
         }
