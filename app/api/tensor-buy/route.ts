@@ -86,16 +86,18 @@ export async function POST(request: Request) {
       data: Buffer.from(buyIx.data),
     });
     
-    // Load both ALTs for compression (ALT #1 + ALT #2 cover all proof nodes)
+    // Load all ALTs for compression (ALT #1 + #2 + #3 cover all proof nodes)
     const ALT_KEY_1 = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
     const ALT_KEY_2 = new PublicKey('2tk5qN1U7kY6SJAcL5dngCV4xEUz7McVWygXQzBUEbMo');
-    const [altAccount1, altAccount2, bh] = await Promise.all([
+    const ALT_KEY_3 = new PublicKey('E7ug9cuR8sshu4UNJkSrw7ukSJC4QMry6WVLZZ1e3mJp');
+    const [altAccount1, altAccount2, altAccount3, bh] = await Promise.all([
       conn.getAddressLookupTable(ALT_KEY_1),
       conn.getAddressLookupTable(ALT_KEY_2),
+      conn.getAddressLookupTable(ALT_KEY_3),
       conn.getLatestBlockhash('confirmed'),
     ]);
     
-    const alts = [altAccount1.value, altAccount2.value].filter((a): a is NonNullable<typeof a> => a != null);
+    const alts = [altAccount1.value, altAccount2.value, altAccount3.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
