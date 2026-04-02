@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       conn.getLatestBlockhash('confirmed'),
     ]);
     
-    const alts = [altAccount1.value, altAccount2.value].filter(Boolean);
+    const alts = [altAccount1.value, altAccount2.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
