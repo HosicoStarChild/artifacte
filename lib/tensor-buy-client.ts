@@ -56,7 +56,7 @@ export async function executeTensorBuy(
     txToSend = patched;
   }
 
-  const b64Tx = Buffer.from(txToSend).toString('base64');
+  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
