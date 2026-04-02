@@ -86,19 +86,22 @@ export async function POST(request: Request) {
       data: Buffer.from(buyIx.data),
     });
     
-    // Load ALT for compression (45 addresses)
-    const ALT_KEY = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
-    const [altAccount, bh] = await Promise.all([
-      conn.getAddressLookupTable(ALT_KEY),
+    // Load both ALTs for compression (ALT #1 + ALT #2 cover all proof nodes)
+    const ALT_KEY_1 = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
+    const ALT_KEY_2 = new PublicKey('2tk5qN1U7kY6SJAcL5dngCV4xEUz7McVWygXQzBUEbMo');
+    const [altAccount1, altAccount2, bh] = await Promise.all([
+      conn.getAddressLookupTable(ALT_KEY_1),
+      conn.getAddressLookupTable(ALT_KEY_2),
       conn.getLatestBlockhash('confirmed'),
     ]);
     
+    const alts = [altAccount1.value, altAccount2.value].filter(Boolean);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
       instructions: [cuIx, v1Ix],
-    }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
+    }).compileToV0Message(alts);
     
     const tx = new VersionedTransaction(msg);
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
