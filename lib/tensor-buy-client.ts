@@ -47,14 +47,11 @@ export async function executeTensorBuy(
   const signed = await signTransaction(tx);
   const serialized = signed.serialize();
 
-  // Patch signature if wallet inflated ALT references
-  let txToSend = serialized;
-  if (serialized.length > 1232) {
-    const signedTx = VersionedTransaction.deserialize(serialized);
-    const patched = new Uint8Array(txBytes);
-    patched.set(signedTx.signatures[0], 2);
-    txToSend = patched;
-  }
+  // Always patch signature into original compact tx — wallet may re-serialize with expanded accounts
+  const signedTx = VersionedTransaction.deserialize(serialized);
+  const patched = new Uint8Array(txBytes);
+  patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
+  const txToSend = patched;
 
   const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
   const sendRes = await fetch('/api/rpc', {
