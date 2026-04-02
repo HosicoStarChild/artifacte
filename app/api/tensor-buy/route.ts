@@ -86,56 +86,20 @@ export async function POST(request: Request) {
       data: Buffer.from(buyIx.data),
     });
     
-    // Load all ALTs for compression (ALT #1 + #2 + #3 cover proof nodes)
-    const ALT_KEY_1 = new PublicKey('4jyK7BDF6NQA87R5NFDyMHNkHuQQNa5uYreGZ7kpYaCN');
-    const ALT_KEY_2 = new PublicKey('2tk5qN1U7kY6SJAcL5dngCV4xEUz7McVWygXQzBUEbMo');
-    const ALT_KEY_3 = new PublicKey('E7ug9cuR8sshu4UNJkSrw7ukSJC4QMry6WVLZZ1e3mJp');
-    const [altAccount1, altAccount2, altAccount3, bh] = await Promise.all([
-      conn.getAddressLookupTable(ALT_KEY_1),
-      conn.getAddressLookupTable(ALT_KEY_2),
-      conn.getAddressLookupTable(ALT_KEY_3),
+    // Program-only ALT: compresses fixed Tensor program addresses (saves ~200 bytes).
+    // Proof nodes stay as static accounts — Solflare can simulate static accounts cleanly.
+    // This fixes simulation failures caused by ALT-indexed proof nodes on unverified domains.
+    const PROGRAM_ALT = new PublicKey('B9zD5xH85HSCU5Lc8WAfPn4S3UWDevhch4efEqjYK2yx');
+    const [altAccount, bh] = await Promise.all([
+      conn.getAddressLookupTable(PROGRAM_ALT),
       conn.getLatestBlockhash('confirmed'),
     ]);
-
-    // Auto-extend ALT #3 with any missing proof nodes (tree grows over time)
-    const existingAddrs = new Set([
-      ...(altAccount1.value?.state.addresses || []),
-      ...(altAccount2.value?.state.addresses || []),
-      ...(altAccount3.value?.state.addresses || []),
-    ].map((a: any) => a.toBase58()));
-    const missingNodes = proofFields.proof.filter((p: string) => !existingAddrs.has(p));
-    if (missingNodes.length > 0) {
-      console.log(`[tensor-buy] Auto-extending ALT #3 with ${missingNodes.length} missing proof nodes`);
-      const { AddressLookupTableProgram, Transaction, Keypair } = await import('@solana/web3.js');
-      const authoritySecret = JSON.parse(process.env.SOLANA_AUTHORITY_SECRET || '[]');
-      if (authoritySecret.length > 0) {
-        const authority = Keypair.fromSecretKey(Uint8Array.from(authoritySecret));
-        const extendIx = AddressLookupTableProgram.extendLookupTable({
-          payer: authority.publicKey,
-          authority: authority.publicKey,
-          lookupTable: ALT_KEY_3,
-          addresses: missingNodes.map((a: string) => new PublicKey(a)),
-        });
-        const extendTx = new Transaction().add(extendIx);
-        extendTx.recentBlockhash = bh.blockhash;
-        extendTx.feePayer = authority.publicKey;
-        extendTx.sign(authority);
-        const sig = await conn.sendRawTransaction(extendTx.serialize());
-        await conn.confirmTransaction(sig, 'confirmed');
-        // Refresh ALT #3 after extension
-        const refreshed = await conn.getAddressLookupTable(ALT_KEY_3);
-        if (refreshed.value) altAccount3.value = refreshed.value;
-        console.log(`[tensor-buy] ALT #3 extended ✅ sig: ${sig.slice(0, 20)}...`);
-      }
-    }
-
-    const alts = [altAccount1.value, altAccount2.value, altAccount3.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
       instructions: [cuIx, v1Ix],
-    }).compileToV0Message(alts);
+    }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
     
     const tx = new VersionedTransaction(msg);
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
