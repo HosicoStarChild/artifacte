@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       rentDestination: rentDest,
       currency: address(USDC_MINT),
       makerBroker,
-      takerBroker: buyerAddress,
+      takerBroker: address('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P'), // platform fee recipient
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
