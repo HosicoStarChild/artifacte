@@ -43,39 +43,32 @@ export async function executeTensorBuy(
   const HELIUS_RPC = 'https://margy-w7f73z-fast-mainnet.helius-rpc.com';
   const conn = new Connection(HELIUS_RPC, 'confirmed');
 
-  let sig: string;
+  // Sign with wallet, then send directly via RPC (bypasses Phantom/Blowfish block on Tensor txs)
+  const signed = await signTransaction(tx);
+  const serialized = signed.serialize();
 
-  if (sendTransaction) {
-    // Use wallet's native sendTransaction — clean flow, no Blowfish warning
-    sig = await sendTransaction(tx, conn);
-  } else {
-    // Fallback: sign + send manually (for wallets that don't support sendTransaction)
-    const signed = await signTransaction(tx);
-    const serialized = signed.serialize();
-
-    // Patch signature if wallet inflated ALT references
-    let txToSend = serialized;
-    if (serialized.length > 1232) {
-      const signedTx = VersionedTransaction.deserialize(serialized);
-      const patched = new Uint8Array(txBytes);
-      patched.set(signedTx.signatures[0], 2);
-      txToSend = patched;
-    }
-
-    const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
-    const sendRes = await fetch('/api/rpc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1,
-        method: 'sendTransaction',
-        params: [b64Tx, { skipPreflight: false, encoding: 'base64', maxRetries: 5 }],
-      }),
-    });
-    const sendData = await sendRes.json();
-    if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-    sig = sendData.result;
+  // Patch signature if wallet inflated ALT references
+  let txToSend = serialized;
+  if (serialized.length > 1232) {
+    const signedTx = VersionedTransaction.deserialize(serialized);
+    const patched = new Uint8Array(txBytes);
+    patched.set(signedTx.signatures[0], 2);
+    txToSend = patched;
   }
+
+  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+  const sendRes = await fetch('/api/rpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1,
+      method: 'sendTransaction',
+      params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+    }),
+  });
+  const sendData = await sendRes.json();
+  if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+  const sig = sendData.result;
 
   onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
 
