@@ -1,12 +1,13 @@
 /**
  * Shared Tensor cNFT buy flow — used by both category grid and card detail pages.
  * 
- * 1. Calls /api/tensor-buy to get server-built v0 tx (with ALT)
- * 2. Wallet sends via sendTransaction (native flow — no Blowfish warning)
- * 3. Polls for confirmation
+ * Uses wallet adapter's sendTransaction with skipPreflight: true.
+ * - Phantom: skips internal security simulation (no "Failed to simulate" warning)
+ * - Solflare: still shows balance preview (uses own backend sim), approve stays active
+ * - RPC node: skipPreflight bypasses RPC-level simulation, tx goes straight to chain
  */
 
-import { VersionedTransaction, Connection, clusterApiUrl } from '@solana/web3.js';
+import { VersionedTransaction, Connection } from '@solana/web3.js';
 
 interface TensorBuyResult {
   sig: string;
@@ -19,7 +20,7 @@ export async function executeTensorBuy(
   buyer: string,
   signTransaction: (tx: any) => Promise<any>,
   onStatus?: (msg: string) => void,
-  sendTransaction?: (tx: any, connection: Connection) => Promise<string>,
+  sendTransaction?: (tx: any, connection: Connection, options?: any) => Promise<string>,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
@@ -43,32 +44,41 @@ export async function executeTensorBuy(
   const HELIUS_RPC = 'https://margy-w7f73z-fast-mainnet.helius-rpc.com';
   const conn = new Connection(HELIUS_RPC, 'confirmed');
 
-  // Sign with wallet, then send directly via RPC (bypasses Phantom/Blowfish block on Tensor txs)
-  const signed = await signTransaction(tx);
-  const serialized = signed.serialize();
+  let sig: string;
 
-  // Patch signature if wallet inflated ALT references
-  let txToSend = serialized;
-  if (serialized.length > 1232) {
-    const signedTx = VersionedTransaction.deserialize(serialized);
-    const patched = new Uint8Array(txBytes);
-    patched.set(signedTx.signatures[0], 2);
-    txToSend = patched;
+  if (sendTransaction) {
+    // Use wallet adapter's sendTransaction with skipPreflight: true
+    // - Phantom: signAndSendTransaction({ skipPreflight: true }) — skips security simulation, no warning
+    // - Solflare: signAndSendTransaction({ skipPreflight: true }) — balance preview still works via Solflare's own backend sim
+    sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
+  } else {
+    // Fallback: signTransaction + manual RPC send (for wallets without sendTransaction)
+    const signed = await signTransaction(tx);
+    const serialized = signed.serialize();
+
+    // Patch signature if wallet inflated ALT references
+    let txToSend = serialized;
+    if (serialized.length > 1232) {
+      const signedTx = VersionedTransaction.deserialize(serialized);
+      const patched = new Uint8Array(txBytes);
+      patched.set(signedTx.signatures[0], 2);
+      txToSend = patched;
+    }
+
+    const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+    const sendRes = await fetch('/api/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method: 'sendTransaction',
+        params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+      }),
+    });
+    const sendData = await sendRes.json();
+    if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+    sig = sendData.result;
   }
-
-  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
-  const sendRes = await fetch('/api/rpc', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', id: 1,
-      method: 'sendTransaction',
-      params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-    }),
-  });
-  const sendData = await sendRes.json();
-  if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-  const sig = sendData.result;
 
   onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
 
