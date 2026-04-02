@@ -2,13 +2,11 @@
  * Shared Tensor cNFT buy flow — used by both category grid and card detail pages.
  * 
  * 1. Calls /api/tensor-buy to get server-built v0 tx (with ALT)
- * 2. Wallet signs (may inflate ALT references)
- * 3. Patches signature into original compact tx if inflated
- * 4. Sends via /api/rpc proxy
- * 5. Polls for confirmation
+ * 2. Wallet sends via sendTransaction (native flow — no Blowfish warning)
+ * 3. Polls for confirmation
  */
 
-import { VersionedTransaction } from '@solana/web3.js';
+import { VersionedTransaction, Connection, clusterApiUrl } from '@solana/web3.js';
 
 interface TensorBuyResult {
   sig: string;
@@ -21,6 +19,7 @@ export async function executeTensorBuy(
   buyer: string,
   signTransaction: (tx: any) => Promise<any>,
   onStatus?: (msg: string) => void,
+  sendTransaction?: (tx: any, connection: Connection) => Promise<string>,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
@@ -37,39 +36,50 @@ export async function executeTensorBuy(
   const tensorData = await tensorRes.json();
   onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC`);
 
-  // Step 2: Deserialize and sign
+  // Step 2: Deserialize tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
   const tx = VersionedTransaction.deserialize(txBytes);
-  const signed = await signTransaction(tx);
-  const serialized = signed.serialize();
 
-  // Step 3: Patch signature if wallet inflated ALT references
-  let txToSend = serialized;
-  if (serialized.length > 1232) {
-    const signedTx = VersionedTransaction.deserialize(serialized);
-    const patched = new Uint8Array(txBytes);
-    patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
-    txToSend = patched;
+  const HELIUS_RPC = 'https://margy-w7f73z-fast-mainnet.helius-rpc.com';
+  const conn = new Connection(HELIUS_RPC, 'confirmed');
+
+  let sig: string;
+
+  if (sendTransaction) {
+    // Use wallet's native sendTransaction — clean flow, no Blowfish warning
+    sig = await sendTransaction(tx, conn);
+  } else {
+    // Fallback: sign + send manually (for wallets that don't support sendTransaction)
+    const signed = await signTransaction(tx);
+    const serialized = signed.serialize();
+
+    // Patch signature if wallet inflated ALT references
+    let txToSend = serialized;
+    if (serialized.length > 1232) {
+      const signedTx = VersionedTransaction.deserialize(serialized);
+      const patched = new Uint8Array(txBytes);
+      patched.set(signedTx.signatures[0], 2);
+      txToSend = patched;
+    }
+
+    const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+    const sendRes = await fetch('/api/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method: 'sendTransaction',
+        params: [b64Tx, { skipPreflight: false, encoding: 'base64', maxRetries: 5 }],
+      }),
+    });
+    const sendData = await sendRes.json();
+    if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+    sig = sendData.result;
   }
-
-  // Step 4: Send via RPC proxy
-  const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
-  const sendRes = await fetch('/api/rpc', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', id: 1,
-      method: 'sendTransaction',
-      params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-    }),
-  });
-  const sendData = await sendRes.json();
-  if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-  const sig = sendData.result;
 
   onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
 
-  // Step 5: Poll for confirmation (1s intervals for faster UX)
+  // Step 3: Poll for confirmation
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
     const statusRes = await fetch('/api/rpc', {
