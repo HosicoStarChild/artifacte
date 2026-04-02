@@ -86,7 +86,9 @@ export default function CardDetailPage() {
           });
           setLoading(false);
           return;
-        } catch {}
+        } catch (e) {
+          console.error('[phyg] loadCard error:', e);
+        }
       }
 
       // First try: search oracle by card ID
