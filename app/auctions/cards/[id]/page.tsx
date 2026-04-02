@@ -229,9 +229,24 @@ export default function CardDetailPage() {
     setBuying(true);
 
     try {
-      // Step 1: Get ME notary-cosigned transaction from our API
       showToast.info("Building transaction...");
-      
+
+      // Route phygitals directly to Tensor — skip ME entirely
+      if (card.source === 'phygitals') {
+        if (!signTransaction) throw new Error("Wallet does not support signing");
+        const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
+        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info);
+        if (result.confirmed) {
+          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+        } else {
+          showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
+        }
+        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
+        setBuying(false);
+        return;
+      }
+
+      // Step 1: Get ME notary-cosigned transaction from our API (CC cards)
       const buildRes = await fetch('/api/me-buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,18 +259,7 @@ export default function CardDetailPage() {
       let sig = '';
 
       if (!buildRes.ok) {
-        // ME buy failed — try Tensor buy (phygitals/cNFT listings)
-        if (!signTransaction) throw new Error("Wallet does not support signing");
-        const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info);
-        if (result.confirmed) {
-          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
-        } else {
-          showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
-        }
-        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
-        setBuying(false);
-        return;
+        throw new Error(`Buy failed: ${buildRes.status}`);
       }
 
       const { v0Tx, v0TxSigned, price, platformFee, blockhash, lastValidBlockHeight, listingSource } = await buildRes.json();
