@@ -49,10 +49,13 @@ export async function executeTensorBuy(
   // Try sendTransaction first (Solflare: works natively with balance preview)
   // Fall back to signTransaction + manual send (Phantom: sendTransaction blocked by security layer)
   let usedSendTransaction = false;
+  let txToRebroadcast: Uint8Array | null = null;
   if (sendTransaction) {
     try {
       sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
       usedSendTransaction = true;
+      // Capture signed tx for rebroadcast in case wallet doesn't broadcast reliably
+      try { txToRebroadcast = tx.serialize(); } catch {}
     } catch (e: any) {
       // Phantom throws WalletSendTransactionError — fall through to signTransaction
       console.log('[tensor-buy] sendTransaction failed, falling back to signTransaction:', e?.message);
@@ -94,6 +97,17 @@ export async function executeTensorBuy(
   // Step 3: Poll for confirmation (60s window, 3s interval = 20 requests max)
   for (let i = 0; i < 20; i++) {
     await new Promise(r => setTimeout(r, 3000));
+
+    // Rebroadcast via Helius every ~9s in case wallet didn't submit reliably
+    if (txToRebroadcast && i > 0 && i % 3 === 0) {
+      const b64 = Buffer.from(txToRebroadcast).toString('base64');
+      fetch('/api/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'sendTransaction', params: [b64, { skipPreflight: true, encoding: 'base64', maxRetries: 0 }] }),
+      }).catch(() => {});
+    }
+
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
