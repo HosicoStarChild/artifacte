@@ -91,14 +91,15 @@ export async function executeTensorBuy(
 
   onStatus?.(`⏳ Transaction sent: ${sig!.slice(0, 8)}...`);
 
-  // Step 3: Poll for confirmation (60s window — Solana can be slow)
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 1000));
+  // Step 3: Poll for confirmation (60s window, 3s interval = 20 requests max)
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 3000));
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig!]] }),
     });
+    if (statusRes.status === 429) continue; // rate limited — skip this poll, try again
     const statusData = await statusRes.json();
     const status = statusData.result?.value?.[0];
     if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
