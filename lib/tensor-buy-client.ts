@@ -2,9 +2,8 @@
  * Shared Tensor cNFT buy flow — used by both category grid and card detail pages.
  *
  * Strategy:
- * 1. Try sendTransaction with skipPreflight (works for Solflare — native flow, balance preview)
- * 2. If sendTransaction fails (Phantom throws WalletSendTransactionError), fall back to
- *    signTransaction + manual RPC send (works for Phantom — user signs, we send directly)
+ * - Solflare: sendTransaction (wallet handles submission natively — balance preview, reliable)
+ * - Phantom + others: signTransaction + manual send via Helius (we own the submission — reliable)
  */
 
 import { VersionedTransaction, Connection } from '@solana/web3.js';
@@ -21,6 +20,7 @@ export async function executeTensorBuy(
   signTransaction: (tx: any) => Promise<any>,
   onStatus?: (msg: string) => void,
   sendTransaction?: (tx: any, connection: Connection, options?: any) => Promise<string>,
+  walletName?: string,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
@@ -46,25 +46,25 @@ export async function executeTensorBuy(
 
   let sig: string;
 
-  // Try sendTransaction first (Solflare: works natively with balance preview)
-  // Fall back to signTransaction + manual send (Phantom: sendTransaction blocked by security layer)
+  // Solflare: use sendTransaction — wallet submits natively with balance preview
+  // Phantom + all others: use signTransaction + manual Helius send — we control submission
+  const isSolflare = walletName?.toLowerCase().includes('solflare');
   let usedSendTransaction = false;
-  let txToRebroadcast: Uint8Array | null = null;
-  if (sendTransaction) {
+
+  if (isSolflare && sendTransaction) {
     try {
       sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
       usedSendTransaction = true;
-      // Capture signed tx for rebroadcast in case wallet doesn't broadcast reliably
-      try { txToRebroadcast = tx.serialize(); } catch {}
+      console.log('[tensor-buy] Solflare: sendTransaction used');
     } catch (e: any) {
-      // Phantom throws WalletSendTransactionError — fall through to signTransaction
-      console.log('[tensor-buy] sendTransaction failed, falling back to signTransaction:', e?.message);
+      console.log('[tensor-buy] Solflare sendTransaction failed, falling back:', e?.message);
     }
   }
 
   if (!usedSendTransaction) {
-    // Fallback: signTransaction + manual RPC send
-    // Phantom: shows "Failed to simulate" warning, user clicks "Confirm unsafe", we sign and send directly
+    // Phantom + fallback: signTransaction + manual send via Helius
+    // We own the submission — reliable, no silent drops
+    console.log(`[tensor-buy] ${walletName || 'unknown'}: using signTransaction + Helius send`);
     const signed = await signTransaction(tx);
     const serialized = signed.serialize();
 
@@ -77,7 +77,7 @@ export async function executeTensorBuy(
       txToSend = patched;
     }
 
-    const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+    const b64Tx = Buffer.from(txToSend).toString('base64');
     const sendRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,17 +97,6 @@ export async function executeTensorBuy(
   // Step 3: Poll for confirmation (60s window, 3s interval = 20 requests max)
   for (let i = 0; i < 20; i++) {
     await new Promise(r => setTimeout(r, 3000));
-
-    // Rebroadcast via Helius every ~9s in case wallet didn't submit reliably
-    if (txToRebroadcast && i > 0 && i % 3 === 0) {
-      const b64 = Buffer.from(txToRebroadcast).toString('base64');
-      fetch('/api/rpc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'sendTransaction', params: [b64, { skipPreflight: true, encoding: 'base64', maxRetries: 0 }] }),
-      }).catch(() => {});
-    }
-
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
