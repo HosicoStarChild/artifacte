@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -9,95 +9,49 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 );
 
+const PULL_PRICE = 40;
+
 const TIERS = [
   { id: "common", name: "Common", color: "#94a3b8", glow: "rgba(148,163,184,0.3)", odds: "80%", valueRange: "$24–48" },
-  { id: "uncommon", name: "Uncommon", color: "#f97316", glow: "rgba(249,115,22,0.5)", odds: "15%", valueRange: "$48–88" },
-  { id: "rare", name: "Rare", color: "#ef4444", glow: "rgba(239,68,68,0.6)", odds: "4%", valueRange: "$88–200" },
-  { id: "epic", name: "Epic", color: "#d4af37", glow: "rgba(212,175,55,0.7)", odds: "1%", valueRange: "$200+" },
+  { id: "uncommon", name: "Uncommon", color: "#f97316", glow: "rgba(249,115,22,0.4)", odds: "15%", valueRange: "$48–88" },
+  { id: "rare", name: "Rare", color: "#ef4444", glow: "rgba(239,68,68,0.4)", odds: "4%", valueRange: "$88–200" },
+  { id: "epic", name: "Epic", color: "#d4af37", glow: "rgba(212,175,55,0.5)", odds: "1%", valueRange: "$200+" },
 ];
 
-type PullState = "idle" | "paying" | "blackout" | "charge" | "flash" | "reveal" | "done";
+type PullState = "idle" | "paying" | "spinning" | "revealing" | "done";
 
 export default function GachaPage() {
   const [pullState, setPullState] = useState<PullState>("idle");
   const [revealedCard, setRevealedCard] = useState<any>(null);
   const [revealedTier, setRevealedTier] = useState<any>(null);
-  const [shake, setShake] = useState(false);
-  const [flashOpacity, setFlashOpacity] = useState(0);
-  const [cardScale, setCardScale] = useState(0);
-  const [cardOpacity, setCardOpacity] = useState(0);
-  const [glowIntensity, setGlowIntensity] = useState(0);
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number; angle: number; dist: number }[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
 
   const handlePull = async () => {
     if (pullState !== "idle") return;
-
-    // 1. Payment processing
     setPullState("paying");
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1200));
+    setPullState("spinning");
+    await new Promise(r => setTimeout(r, 2500));
 
-    // 2. Determine result
+    // Mock result — weighted random
     const rand = Math.random() * 100;
     const tier = rand < 1 ? TIERS[3] : rand < 5 ? TIERS[2] : rand < 20 ? TIERS[1] : TIERS[0];
     setRevealedTier(tier);
-    setRevealedCard({ name: "Son Goku, Awakened Power", set: "Fusion World OP08", number: "OP08-001", rarity: tier.name });
+    setRevealedCard({
+      name: "Son Goku, Awakened Power",
+      set: "Fusion World OP08",
+      rarity: tier.name,
+      number: "OP08-001",
+    });
 
-    // 3. Blackout — screen goes dark
-    setPullState("blackout");
-    await new Promise(r => setTimeout(r, 600));
-
-    // 4. Charge up — energy building
-    setPullState("charge");
-    setGlowIntensity(0);
-    for (let i = 0; i <= 10; i++) {
-      await new Promise(r => setTimeout(r, 80));
-      setGlowIntensity(i / 10);
-    }
-
-    // 5. Flash explosion
-    setPullState("flash");
-    setFlashOpacity(1);
-    // Screen shake for rare/epic
-    if (tier.id === "rare" || tier.id === "epic") {
-      setShake(true);
-      setTimeout(() => setShake(false), 600);
-    }
-    await new Promise(r => setTimeout(r, 100));
-    setFlashOpacity(0.6);
-    await new Promise(r => setTimeout(r, 100));
-    setFlashOpacity(0.3);
-    await new Promise(r => setTimeout(r, 150));
-    setFlashOpacity(0);
-
-    // 6. Card materializes
-    setPullState("reveal");
-    setCardScale(0);
-    setCardOpacity(0);
-
-    // Spawn burst particles
-    const burst = Array.from({ length: 32 }, (_, i) => ({
+    const newParticles = Array.from({ length: 24 }, (_, i) => ({
       id: i,
-      x: 50,
-      y: 50,
-      angle: (i / 32) * 360,
-      dist: 30 + Math.random() * 40,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
     }));
-    setParticles(burst);
-
-    // Card scales in with bounce
-    for (let i = 0; i <= 10; i++) {
-      await new Promise(r => setTimeout(r, 30));
-      const t = i / 10;
-      // Ease out elastic
-      const scale = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      setCardScale(Math.min(scale * 1.1, 1.08));
-      setCardOpacity(Math.min(t * 2, 1));
-    }
-    setCardScale(1);
-
-    await new Promise(r => setTimeout(r, 200));
-    setParticles([]);
+    setParticles(newParticles);
+    setPullState("revealing");
+    await new Promise(r => setTimeout(r, 500));
     setPullState("done");
   };
 
@@ -105,17 +59,11 @@ export default function GachaPage() {
     setPullState("idle");
     setRevealedCard(null);
     setRevealedTier(null);
-    setShake(false);
-    setFlashOpacity(0);
-    setCardScale(0);
-    setCardOpacity(0);
-    setGlowIntensity(0);
     setParticles([]);
   };
 
-  const isRevealing = pullState === "reveal" || pullState === "done";
-  const activeColor = revealedTier?.color || "#ef4444";
-  const activeGlow = revealedTier?.glow || "rgba(239,68,68,0.4)";
+  const activeColor = revealedTier?.color || "#f97316";
+  const activeGlow = revealedTier?.glow || "rgba(249,115,22,0.4)";
 
   return (
     <div
@@ -125,14 +73,6 @@ export default function GachaPage() {
         backgroundColor: "#070b1a",
       }}
     >
-      {/* Global flash overlay */}
-      {flashOpacity > 0 && (
-        <div
-          className="fixed inset-0 z-50 pointer-events-none"
-          style={{ background: `rgba(255,255,255,${flashOpacity})`, transition: "opacity 0.1s" }}
-        />
-      )}
-
       {/* Nav */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
         <Link href="/" className="flex items-center gap-2.5">
@@ -150,21 +90,22 @@ export default function GachaPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">Powered by Artifacte</p>
-          <h1 className="font-serif text-4xl font-bold text-white mb-1">Dragon Ball Z</h1>
-          <h2 className="font-serif text-2xl font-bold mb-3" style={{ color: "#f97316" }}>Fusion World Machine</h2>
+          <h1 className="font-serif text-4xl font-bold text-white mb-1">
+            Dragon Ball Z
+          </h1>
+          <h2 className="font-serif text-2xl font-bold mb-3" style={{ color: "#f97316" }}>
+            Fusion World Machine
+          </h2>
           <p className="text-gray-400 text-sm">Every pull is on-chain. Cards delivered to your wallet.</p>
         </div>
 
         {/* Machine */}
         <div
-          ref={containerRef}
           className="rounded-2xl overflow-hidden"
           style={{
             background: "linear-gradient(180deg, #13172b 0%, #0a0d1c 100%)",
             border: "1px solid rgba(239,68,68,0.25)",
             boxShadow: "0 0 80px rgba(239,68,68,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
-            transform: shake ? "translateX(0)" : "none",
-            animation: shake ? "shake 0.6s cubic-bezier(.36,.07,.19,.97) both" : "none",
           }}
         >
           {/* Top bar */}
@@ -189,122 +130,82 @@ export default function GachaPage() {
             <div
               className="relative rounded-xl overflow-hidden flex items-center justify-center"
               style={{
-                height: 300,
-                background: pullState === "blackout" ? "#000"
-                  : pullState === "charge" ? `radial-gradient(circle at 50% 50%, ${activeColor}${Math.floor(glowIntensity * 30).toString(16).padStart(2, "0")} 0%, #090c18 70%)`
-                  : "linear-gradient(135deg, #090c18 0%, #0f1424 100%)",
-                border: `1px solid ${isRevealing || pullState === "charge" ? `${activeColor}60` : "rgba(239,68,68,0.2)"}`,
-                boxShadow: isRevealing
-                  ? `inset 0 0 80px ${activeGlow}, 0 0 40px ${activeGlow}`
-                  : pullState === "charge"
-                  ? `inset 0 0 ${Math.floor(glowIntensity * 60)}px ${activeGlow}`
-                  : "inset 0 0 40px rgba(239,68,68,0.06)",
-                transition: pullState === "blackout" ? "background 0.3s, box-shadow 0.3s" : "none",
+                height: 280,
+                background: "linear-gradient(135deg, #090c18 0%, #0f1424 100%)",
+                border: `1px solid ${pullState === "idle" ? "rgba(239,68,68,0.2)" : `${activeColor}40`}`,
+                boxShadow: pullState !== "idle" ? `inset 0 0 60px ${activeGlow}` : "inset 0 0 40px rgba(239,68,68,0.06)",
+                transition: "all 0.5s ease",
               }}
             >
               {/* Corner energy lines */}
-              {["tl", "tr", "bl", "br"].map(c => (
-                <div
-                  key={c}
-                  className="absolute w-8 h-8"
-                  style={{
-                    top: c.includes("t") ? 0 : "auto",
-                    bottom: c.includes("b") ? 0 : "auto",
-                    left: c.includes("l") ? 0 : "auto",
-                    right: c.includes("r") ? 0 : "auto",
-                    borderTop: c.includes("t") ? `2px solid ${isRevealing ? activeColor : "rgba(239,68,68,0.4)"}` : "none",
-                    borderBottom: c.includes("b") ? `2px solid ${isRevealing ? activeColor : "rgba(239,68,68,0.4)"}` : "none",
-                    borderLeft: c.includes("l") ? `2px solid ${isRevealing ? activeColor : "rgba(239,68,68,0.4)"}` : "none",
-                    borderRight: c.includes("r") ? `2px solid ${isRevealing ? activeColor : "rgba(239,68,68,0.4)"}` : "none",
-                    borderRadius: c === "tl" ? "8px 0 0 0" : c === "tr" ? "0 8px 0 0" : c === "bl" ? "0 0 0 8px" : "0 0 8px 0",
-                    transition: "border-color 0.3s",
-                  }}
-                />
-              ))}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 rounded-tl-lg" style={{ borderColor: "rgba(239,68,68,0.4)" }} />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 rounded-tr-lg" style={{ borderColor: "rgba(239,68,68,0.4)" }} />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 rounded-bl-lg" style={{ borderColor: "rgba(239,68,68,0.4)" }} />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 rounded-br-lg" style={{ borderColor: "rgba(239,68,68,0.4)" }} />
 
-              {/* Burst particles */}
+              {/* Particles */}
               {particles.map(p => (
                 <div
                   key={p.id}
-                  className="absolute w-2 h-2 rounded-full"
+                  className="absolute w-1.5 h-1.5 rounded-full"
                   style={{
-                    left: "50%",
-                    top: "50%",
+                    left: `${p.x}%`,
+                    top: `${p.y}%`,
                     background: activeColor,
-                    boxShadow: `0 0 10px ${activeColor}`,
-                    transform: `translate(-50%, -50%) rotate(${p.angle}deg) translateX(${p.dist}px)`,
-                    opacity: 0.8,
-                    transition: "transform 0.4s ease-out, opacity 0.4s",
+                    boxShadow: `0 0 8px ${activeColor}`,
+                    animation: "ping 1s cubic-bezier(0,0,0.2,1) forwards",
+                    animationDelay: `${p.id * 0.05}s`,
                   }}
                 />
               ))}
 
-              {/* IDLE */}
+              {/* States */}
               {pullState === "idle" && (
                 <div className="text-center">
-                  <div className="text-7xl mb-3" style={{ filter: "drop-shadow(0 0 20px rgba(239,68,68,0.6))" }}>🐉</div>
+                  <div className="text-7xl mb-3" style={{ filter: "drop-shadow(0 0 20px rgba(239,68,68,0.6))" }}>
+                    🐉
+                  </div>
                   <p className="text-gray-500 text-sm">Connect wallet and pull</p>
                 </div>
               )}
 
-              {/* PAYING */}
               {pullState === "paying" && (
                 <div className="text-center">
-                  <div className="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
-                    style={{ borderColor: "#f97316", borderTopColor: "transparent" }} />
+                  <div
+                    className="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+                    style={{ borderColor: "#f97316", borderTopColor: "transparent" }}
+                  />
                   <p className="text-orange-400 text-sm">Processing $40 USDC...</p>
                 </div>
               )}
 
-              {/* BLACKOUT */}
-              {pullState === "blackout" && (
-                <div className="text-center">
-                  <p className="text-gray-600 text-xs animate-pulse">Preparing...</p>
-                </div>
-              )}
-
-              {/* CHARGE */}
-              {pullState === "charge" && (
+              {pullState === "spinning" && (
                 <div className="text-center">
                   <div
-                    className="text-6xl mb-2"
-                    style={{
-                      filter: `drop-shadow(0 0 ${Math.floor(glowIntensity * 40)}px ${activeColor})`,
-                      transform: `scale(${0.8 + glowIntensity * 0.4})`,
-                      transition: "all 0.08s",
-                    }}
+                    className="text-6xl mb-3"
+                    style={{ animation: "spin 0.4s linear infinite", filter: "drop-shadow(0 0 30px #f97316)" }}
                   >
                     ⚡
                   </div>
-                  <div
-                    className="h-1 rounded-full mx-auto mt-2 transition-all duration-75"
-                    style={{ width: `${glowIntensity * 80}%`, background: `linear-gradient(90deg, ${activeColor}, ${activeColor}80)`, boxShadow: `0 0 10px ${activeColor}` }}
-                  />
+                  <p className="text-orange-400 text-sm font-medium animate-pulse">Selecting your card...</p>
                 </div>
               )}
 
-              {/* REVEAL + DONE */}
-              {isRevealing && revealedCard && revealedTier && (
-                <div
-                  className="text-center px-4"
-                  style={{
-                    transform: `scale(${cardScale})`,
-                    opacity: cardOpacity,
-                    transition: "none",
-                  }}
-                >
+              {(pullState === "revealing" || pullState === "done") && revealedCard && revealedTier && (
+                <div className="text-center px-4">
+                  {/* Card */}
                   <div
-                    className="w-36 h-48 mx-auto rounded-xl mb-3 flex flex-col items-center justify-center relative overflow-hidden"
+                    className="w-32 h-44 mx-auto rounded-xl mb-3 flex flex-col items-center justify-center relative overflow-hidden"
                     style={{
-                      background: `linear-gradient(135deg, ${revealedTier.color}30, #0a0d1c 60%)`,
+                      background: `linear-gradient(135deg, ${revealedTier.color}20, #0a0d1c)`,
                       border: `2px solid ${revealedTier.color}`,
-                      boxShadow: `0 0 60px ${revealedTier.glow}, 0 0 120px ${revealedTier.glow}, inset 0 0 30px ${revealedTier.glow}`,
+                      boxShadow: `0 0 40px ${revealedTier.glow}, inset 0 0 20px ${revealedTier.glow}`,
                     }}
                   >
                     <div className="text-4xl mb-1">🃏</div>
                     <div
-                      className="absolute bottom-0 left-0 right-0 py-1.5 text-xs font-bold text-center"
-                      style={{ background: `${revealedTier.color}40`, color: revealedTier.color }}
+                      className="absolute bottom-0 left-0 right-0 py-1 text-xs font-bold text-center"
+                      style={{ background: `${revealedTier.color}30`, color: revealedTier.color }}
                     >
                       {revealedTier.name.toUpperCase()}
                     </div>
@@ -319,18 +220,25 @@ export default function GachaPage() {
             {/* Dispenser slot */}
             <div
               className="mt-3 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(239,68,68,0.15)", boxShadow: "inset 0 2px 8px rgba(0,0,0,0.8)" }}
+              style={{
+                background: "rgba(0,0,0,0.6)",
+                border: "1px solid rgba(239,68,68,0.15)",
+                boxShadow: "inset 0 2px 8px rgba(0,0,0,0.8)",
+              }}
             >
               <div className="w-20 h-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.3)" }} />
             </div>
           </div>
 
-          {/* Odds */}
+          {/* Odds info */}
           <div className="px-5 pb-3">
             <div className="grid grid-cols-4 gap-1.5">
               {TIERS.map(t => (
-                <div key={t.id} className="rounded-lg py-2 text-center"
-                  style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${t.color}25` }}>
+                <div
+                  key={t.id}
+                  className="rounded-lg py-2 text-center"
+                  style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${t.color}25` }}
+                >
                   <div className="text-xs font-bold" style={{ color: t.color }}>{t.odds}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{t.name}</div>
                   <div className="text-xs text-gray-600">{t.valueRange}</div>
@@ -343,37 +251,55 @@ export default function GachaPage() {
           <div className="px-5 pb-5">
             {pullState === "done" ? (
               <div className="space-y-2">
-                <button onClick={handleReset}
-                  className="w-full py-4 rounded-xl font-bold text-sm"
-                  style={{ background: "linear-gradient(135deg, #ef4444, #f97316)", color: "white", boxShadow: "0 4px 20px rgba(239,68,68,0.4)" }}>
+                <button
+                  onClick={handleReset}
+                  className="w-full py-4 rounded-xl font-bold text-sm transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #ef4444, #f97316)",
+                    color: "white",
+                    boxShadow: "0 4px 20px rgba(239,68,68,0.4)",
+                  }}
+                >
                   Pull Again · $40 USDC
                 </button>
                 <div className="grid grid-cols-2 gap-2">
-                  <button className="py-2.5 rounded-xl text-xs font-medium border transition-all"
-                    style={{ borderColor: "rgba(212,175,55,0.3)", color: "#d4af37", background: "rgba(212,175,55,0.05)" }}>
+                  <button
+                    className="py-2.5 rounded-xl text-xs font-medium border transition-all"
+                    style={{ borderColor: "rgba(212,175,55,0.3)", color: "#d4af37", background: "rgba(212,175,55,0.05)" }}
+                  >
                     Claim Card
                   </button>
-                  <button className="py-2.5 rounded-xl text-xs font-medium border transition-all"
-                    style={{ borderColor: "rgba(255,255,255,0.1)", color: "#94a3b8", background: "rgba(255,255,255,0.03)" }}>
+                  <button
+                    className="py-2.5 rounded-xl text-xs font-medium border transition-all"
+                    style={{ borderColor: "rgba(255,255,255,0.1)", color: "#94a3b8", background: "rgba(255,255,255,0.03)" }}
+                  >
                     Leave in Machine
                   </button>
                 </div>
               </div>
             ) : (
-              <button onClick={handlePull} disabled={pullState !== "idle"}
+              <button
+                onClick={handlePull}
+                disabled={pullState !== "idle"}
                 className="w-full py-4 rounded-xl font-bold text-base transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: pullState === "idle" ? "linear-gradient(135deg, #ef4444 0%, #f97316 100%)" : "rgba(255,255,255,0.05)",
+                  background: pullState === "idle"
+                    ? "linear-gradient(135deg, #ef4444 0%, #f97316 100%)"
+                    : "rgba(255,255,255,0.05)",
                   color: pullState === "idle" ? "white" : "#555",
                   boxShadow: pullState === "idle" ? "0 4px 24px rgba(239,68,68,0.4)" : "none",
-                }}>
+                }}
+              >
                 {pullState === "idle" ? "Pull · $40 USDC" : "Processing..."}
               </button>
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+          <div
+            className="px-5 py-3 border-t flex items-center justify-between"
+            style={{ borderColor: "rgba(255,255,255,0.04)" }}
+          >
             <span className="text-xs text-gray-600">Dragon Ball Z · Fusion World</span>
             <span className="text-xs text-gray-600">5% royalty on resale</span>
           </div>
@@ -381,9 +307,16 @@ export default function GachaPage() {
 
         {/* Stats */}
         <div className="mt-4 grid grid-cols-3 gap-3">
-          {[{ label: "Total Pulls", value: "—" }, { label: "Cards Remaining", value: "100" }, { label: "Biggest Win", value: "—" }].map(s => (
-            <div key={s.label} className="rounded-xl py-3 text-center"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          {[
+            { label: "Total Pulls", value: "—" },
+            { label: "Cards Remaining", value: "100" },
+            { label: "Biggest Win", value: "—" },
+          ].map(s => (
+            <div
+              key={s.label}
+              className="rounded-xl py-3 text-center"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+            >
               <div className="text-sm font-semibold text-white">{s.value}</div>
               <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
             </div>
@@ -400,10 +333,15 @@ export default function GachaPage() {
               { n: "3", t: "Claim it to your wallet, or leave it in the machine" },
               { n: "4", t: "Unclaimed cards can be pulled again by other users" },
             ].map(i => (
-              <div key={i.n} className="flex items-center gap-3 p-3 rounded-xl"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                  style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <div
+                key={i.n}
+                className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
+              >
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                  style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+                >
                   {i.n}
                 </div>
                 <p className="text-gray-300 text-sm">{i.t}</p>
@@ -412,16 +350,6 @@ export default function GachaPage() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes shake {
-          10%, 90% { transform: translateX(-2px); }
-          20%, 80% { transform: translateX(4px); }
-          30%, 50%, 70% { transform: translateX(-6px); }
-          40%, 60% { transform: translateX(6px); }
-          100% { transform: translateX(0); }
-        }
-      `}</style>
     </div>
   );
 }
