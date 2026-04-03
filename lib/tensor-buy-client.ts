@@ -1,10 +1,10 @@
 /**
  * Shared Tensor cNFT buy flow — used by both category grid and card detail pages.
- * 
- * Uses wallet adapter's sendTransaction with skipPreflight: true.
- * - Phantom: skips internal security simulation (no "Failed to simulate" warning)
- * - Solflare: still shows balance preview (uses own backend sim), approve stays active
- * - RPC node: skipPreflight bypasses RPC-level simulation, tx goes straight to chain
+ *
+ * Strategy:
+ * 1. Try sendTransaction with skipPreflight (works for Solflare — native flow, balance preview)
+ * 2. If sendTransaction fails (Phantom throws WalletSendTransactionError), fall back to
+ *    signTransaction + manual RPC send (works for Phantom — user signs, we send directly)
  */
 
 import { VersionedTransaction, Connection } from '@solana/web3.js';
@@ -46,13 +46,22 @@ export async function executeTensorBuy(
 
   let sig: string;
 
+  // Try sendTransaction first (Solflare: works natively with balance preview)
+  // Fall back to signTransaction + manual send (Phantom: sendTransaction blocked by security layer)
+  let usedSendTransaction = false;
   if (sendTransaction) {
-    // Use wallet adapter's sendTransaction with skipPreflight: true
-    // - Phantom: signAndSendTransaction({ skipPreflight: true }) — skips security simulation, no warning
-    // - Solflare: signAndSendTransaction({ skipPreflight: true }) — balance preview still works via Solflare's own backend sim
-    sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
-  } else {
-    // Fallback: signTransaction + manual RPC send (for wallets without sendTransaction)
+    try {
+      sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
+      usedSendTransaction = true;
+    } catch (e: any) {
+      // Phantom throws WalletSendTransactionError — fall through to signTransaction
+      console.log('[tensor-buy] sendTransaction failed, falling back to signTransaction:', e?.message);
+    }
+  }
+
+  if (!usedSendTransaction) {
+    // Fallback: signTransaction + manual RPC send
+    // Phantom: shows "Failed to simulate" warning, user clicks "Confirm unsafe", we sign and send directly
     const signed = await signTransaction(tx);
     const serialized = signed.serialize();
 
@@ -61,7 +70,7 @@ export async function executeTensorBuy(
     if (serialized.length > 1232) {
       const signedTx = VersionedTransaction.deserialize(serialized);
       const patched = new Uint8Array(txBytes);
-      patched.set(signedTx.signatures[0], 2);
+      patched.set(signedTx.signatures[0], 2); // offset: version(1) + sig_count(1)
       txToSend = patched;
     }
 
@@ -80,7 +89,7 @@ export async function executeTensorBuy(
     sig = sendData.result;
   }
 
-  onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
+  onStatus?.(`⏳ Transaction sent: ${sig!.slice(0, 8)}...`);
 
   // Step 3: Poll for confirmation
   for (let i = 0; i < 30; i++) {
@@ -88,15 +97,15 @@ export async function executeTensorBuy(
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig!]] }),
     });
     const statusData = await statusRes.json();
     const status = statusData.result?.value?.[0];
     if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
       if (status.err) throw new Error('Transaction failed on-chain');
-      return { sig, price: tensorData.price, confirmed: true };
+      return { sig: sig!, price: tensorData.price, confirmed: true };
     }
   }
 
-  return { sig, price: tensorData.price, confirmed: false };
+  return { sig: sig!, price: tensorData.price, confirmed: false };
 }
