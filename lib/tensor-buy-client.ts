@@ -74,7 +74,19 @@ export async function executeTensorBuy(
       txToSend = patched;
     }
 
-    sig = await conn.sendRawTransaction(txToSend, { skipPreflight: true, maxRetries: 5 });
+    const b64Tx = btoa(Array.from(new Uint8Array(txToSend)).map((b: number) => String.fromCharCode(b)).join(''));
+    const sendRes = await fetch('/api/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method: 'sendTransaction',
+        params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
+      }),
+    });
+    const sendData = await sendRes.json();
+    if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
+    sig = sendData.result;
   }
 
   onStatus?.(`⏳ Transaction sent: ${sig!.slice(0, 8)}...`);
