@@ -10,16 +10,14 @@ export async function POST(request: Request) {
 
     // Dynamic imports for Tensor SDK (uses @solana/web3.js v2 internally)
     const { getBuySplCompressedInstructionAsync, fetchListState, findListStatePda } = await import('@tensor-foundation/marketplace');
-    const { getMetaHash, getCanopyDepth, retrieveAssetFields, retrieveProofFields, getCNFTArgs } = await import('@tensor-foundation/common-helpers');
+    const { retrieveAssetFields, retrieveProofFields, getCNFTArgs } = await import('@tensor-foundation/common-helpers');
     const { createSolanaRpc, address } = await import('@solana/kit');
 
     const rpc = createSolanaRpc(HELIUS_RPC) as any;
 
-    // Create a fake signer (buyer will sign on frontend)
     const buyerAddress = address(buyer);
     const fakeSigner = { address: buyerAddress, signTransactions: async () => [] };
 
-    // Fetch asset data, proof, list state in parallel
     const [assetFields, proofFields] = await Promise.all([
       retrieveAssetFields(HELIUS_RPC, mint),
       retrieveProofFields(HELIUS_RPC, mint),
@@ -32,15 +30,12 @@ export async function POST(request: Request) {
     const makerBroker = listState.data.makerBroker?.__option === 'Some'
       ? listState.data.makerBroker.value : undefined;
     const rentDest = listState.data.rentPayer || listState.data.owner;
-    const creatorAddresses = (cnftArgs.creators ?? []).map((c: any) => c[0]); // Just Address, not [addr, share]
-    // Use ALL proof nodes — canopy is stale on-chain, need full proof
+    const creatorAddresses = (cnftArgs.creators ?? []).map((c: any) => c[0]);
     const trimmedProof = proofFields.proof.map((p: string) => address(p));
-    const canopyDepth = 0;
 
     const price = Number(listState.data.amount) / 1e6;
     const maxAmount = BigInt(listState.data.amount) * BigInt(105) / BigInt(100);
 
-    // Build instruction using Tensor SDK (cast to any to avoid v1/v2 type conflicts)
     const buyIx = await (getBuySplCompressedInstructionAsync as any)({
       merkleTree: cnftArgs.merkleTree,
       listState: listStatePda,
@@ -50,7 +45,7 @@ export async function POST(request: Request) {
       rentDestination: rentDest,
       currency: address(USDC_MINT),
       makerBroker,
-      takerBroker: address('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P'), // platform fee recipient
+      takerBroker: address('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P'),
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
@@ -61,15 +56,18 @@ export async function POST(request: Request) {
       optionalRoyaltyPct: 100,
       creators: creatorAddresses,
       proof: trimmedProof,
-      canopyDepth: canopyDepth,
+      canopyDepth: 0,
     });
 
-    // Build the full unsigned transaction server-side (server web3.js compiles correctly with ALT)
-    const { PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction, ComputeBudgetProgram, Connection: SolConnection } = await import('@solana/web3.js');
-    
+    const {
+      PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
+      ComputeBudgetProgram, Connection: SolConnection,
+      AddressLookupTableProgram, Transaction, Keypair,
+    } = await import('@solana/web3.js');
+
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
     const buyerPk = new PublicKey(buyer);
-    
+
     const v1Keys = buyIx.accounts.map((acct: any) => {
       const addr = typeof acct.address === 'object' && acct.address.address
         ? acct.address.address : String(acct.address);
@@ -79,29 +77,70 @@ export async function POST(request: Request) {
         isWritable: acct.role === 1 || acct.role === 3,
       };
     });
-    
+
     const v1Ix = new TransactionInstruction({
       programId: new PublicKey(buyIx.programAddress),
       keys: v1Keys,
       data: Buffer.from(buyIx.data),
     });
-    
-    // Program-only ALT: compresses fixed Tensor program addresses (saves ~200 bytes).
-    // Proof nodes stay as static accounts — Solflare can simulate static accounts cleanly.
-    // This fixes simulation failures caused by ALT-indexed proof nodes on unverified domains.
-    const PROGRAM_ALT = new PublicKey('B9zD5xH85HSCU5Lc8WAfPn4S3UWDevhch4efEqjYK2yx');
-    const [altAccount, bh] = await Promise.all([
+
+    // Phygitals' program ALT (59 addresses covering all Tensor/Bubblegum/compression programs)
+    const PROGRAM_ALT = new PublicKey('4NYENhRXdSq1ek7mvJyzMUvdn2aN3JeAr6huzfL7869j');
+
+    // Create a per-tx proof ALT with this card's proof nodes
+    // This is how Phygitals handles tx size — compress proof nodes via a fresh ALT
+    const authoritySecret = JSON.parse(process.env.SOLANA_AUTHORITY_SECRET || '[]');
+    if (authoritySecret.length === 0) {
+      throw new Error('SOLANA_AUTHORITY_SECRET not configured');
+    }
+    const authority = Keypair.fromSecretKey(Uint8Array.from(authoritySecret));
+
+    const slot = await conn.getSlot();
+    const [createIx, proofAltAddress] = AddressLookupTableProgram.createLookupTable({
+      authority: authority.publicKey,
+      payer: authority.publicKey,
+      recentSlot: slot - 1,
+    });
+
+    const proofAddresses = proofFields.proof.map((p: string) => new PublicKey(p));
+    const extendIx = AddressLookupTableProgram.extendLookupTable({
+      payer: authority.publicKey,
+      authority: authority.publicKey,
+      lookupTable: proofAltAddress,
+      addresses: proofAddresses,
+    });
+
+    // Create + extend in one tx
+    const { blockhash: altBh } = await conn.getLatestBlockhash('confirmed');
+    const altTx = new Transaction().add(createIx).add(extendIx);
+    altTx.recentBlockhash = altBh;
+    altTx.feePayer = authority.publicKey;
+    altTx.sign(authority);
+    const altSig = await conn.sendRawTransaction(altTx.serialize(), { skipPreflight: true });
+    await conn.confirmTransaction(altSig, 'confirmed');
+
+    // Wait 2 slots for ALT to activate (~800ms)
+    await new Promise(r => setTimeout(r, 800));
+
+    // Load both ALTs
+    const [programAlt, proofAlt, bh] = await Promise.all([
       conn.getAddressLookupTable(PROGRAM_ALT),
+      conn.getAddressLookupTable(proofAltAddress),
       conn.getLatestBlockhash('confirmed'),
     ]);
+
+    const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
       instructions: [cuIx, v1Ix],
-    }).compileToV0Message(altAccount.value ? [altAccount.value] : []);
-    
+    }).compileToV0Message(alts);
+
     const tx = new VersionedTransaction(msg);
+    const size = tx.serialize().length;
+    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()})`);
+
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
     return NextResponse.json({
@@ -115,7 +154,6 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('[tensor-buy] Error:', err);
     const msg = err.message || '';
-    // Account not found = listing no longer exists (delisted/sold)
     if (msg.includes('Account not found') || msg.includes('3230000')) {
       return NextResponse.json({ error: 'This listing is no longer available. It may have been sold or delisted.' }, { status: 404 });
     }
@@ -123,4 +161,4 @@ export async function POST(request: Request) {
   }
 }
 
-export const maxDuration = 30;
+export const maxDuration = 60;
