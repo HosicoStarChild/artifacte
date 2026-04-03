@@ -51,7 +51,7 @@ export async function executeTensorBuy(
   let usedSendTransaction = false;
   if (sendTransaction) {
     try {
-      sig = await sendTransaction(tx, conn);
+      sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
       usedSendTransaction = true;
     } catch (e: any) {
       // Phantom throws WalletSendTransactionError — fall through to signTransaction
