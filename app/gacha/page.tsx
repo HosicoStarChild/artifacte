@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { soundClick, soundCharge, soundExplosion, soundReveal, soundEpicFanfare } from "@/lib/gacha-sounds";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -32,6 +33,7 @@ export default function GachaPage() {
 
   const handlePull = async () => {
     if (pullState !== "idle") return;
+    soundClick();
 
     // 1. Payment processing
     setPullState("paying");
@@ -50,6 +52,7 @@ export default function GachaPage() {
     // 4. Charge up — energy building
     setPullState("charge");
     setGlowIntensity(0);
+    soundCharge(0.9);
     for (let i = 0; i <= 10; i++) {
       await new Promise(r => setTimeout(r, 80));
       setGlowIntensity(i / 10);
@@ -57,6 +60,7 @@ export default function GachaPage() {
 
     // 5. Flash explosion
     setPullState("flash");
+    soundExplosion();
     setFlashOpacity(1);
     // Screen shake for rare/epic
     if (tier.id === "rare" || tier.id === "epic") {
@@ -74,6 +78,12 @@ export default function GachaPage() {
     setPullState("reveal");
     setCardScale(0);
     setCardOpacity(0);
+    // Sound on reveal
+    if (tier.id === "rare" || tier.id === "epic") {
+      soundEpicFanfare();
+    } else {
+      soundReveal(false);
+    }
 
     // Spawn burst particles
     const burst = Array.from({ length: 32 }, (_, i) => ({
