@@ -61,10 +61,6 @@ export async function executeTensorBuy(
 
   if (!usedSendTransaction) {
     // Fallback: signTransaction + sendRawTransaction via connection
-    // Rebuild tx with fresh blockhash first — sendTransaction attempt may have taken time
-    const freshBh = await conn.getLatestBlockhash('confirmed');
-    tx.message.recentBlockhash = freshBh.blockhash;
-
     // Phantom: shows "Failed to simulate" warning, user clicks "Confirm unsafe", we sign and send directly
     const signed = await signTransaction(tx);
     const serialized = signed.serialize();
