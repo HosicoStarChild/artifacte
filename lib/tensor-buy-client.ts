@@ -103,8 +103,6 @@ export async function executeTensorBuy(
     const status = statusData.result?.value?.[0];
     if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
       if (status.err) throw new Error('Transaction failed on-chain');
-      // Remove from oracle immediately after confirmed buy (fire and forget)
-      fetch('/api/listing-sold', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mint }) }).catch(() => {});
       return { sig: sig!, price: tensorData.price, confirmed: true };
     }
   }
