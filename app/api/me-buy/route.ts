@@ -152,7 +152,6 @@ export async function POST(req: NextRequest) {
         tokenMint: mint,
         price: price.toString(),
         auctionHouseAddress: auctionHouse || CC_AUCTION_HOUSE,
-        takerBroker: TREASURY_WALLET, // Artifacte receives taker broker fee
       });
       if (tokenATA) params.set('tokenATA', tokenATA);
       if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
