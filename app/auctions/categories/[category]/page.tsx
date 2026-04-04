@@ -259,36 +259,61 @@ export default function CategoryAuctionsPage() {
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 
+        const sendViaPoxy = async (rawTxBytes: Uint8Array): Promise<string> => {
+          const b64 = Buffer.from(rawTxBytes).toString('base64');
+          const res = await fetch('/api/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'sendTransaction', params: [b64, { skipPreflight: true, encoding: 'base64', maxRetries: 3 }] }),
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+          return data.result;
+        };
+
         if (v0TxSigned && v0Tx) {
-          // Notary-cosigned flow (M3 phygitals + M2 CC cards)
-          // Send the notary-signed tx to wallet — wallet adds buyer sig
+          // Notary-cosigned flow (M2 CC cards)
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
           const signed = await signTransaction(notaryTx as any);
-          sig = await connection.sendRawTransaction((signed as any).serialize(), {
-            skipPreflight: true,
-            preflightCommitment: 'confirmed',
-          });
+          sig = await sendViaPoxy((signed as any).serialize());
         } else if (v0Tx) {
-          // No notary needed — buyer-only signing
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);
-          sig = await connection.sendRawTransaction((signed as any).serialize(), {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed',
-          });
+          sig = await sendViaPoxy((signed as any).serialize());
         } else if (legacyTx) {
           const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
           const tx = Transaction.from(txBytes);
           const signed = await signTransaction(tx);
-          sig = await connection.sendRawTransaction(signed.serialize());
+          sig = await sendViaPoxy(signed.serialize());
         } else {
           throw new Error("No transaction returned from API");
         }
 
-        await connection.confirmTransaction(sig, "confirmed");
-        showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
+        // Poll via HTTP proxy — WebSocket not supported on /api/rpc
+        let ccConfirmed = false;
+        for (let i = 0; i < 20; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          const statusRes = await fetch('/api/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
+          });
+          if (statusRes.status === 429) continue;
+          const statusData = await statusRes.json();
+          const status = statusData.result?.value?.[0];
+          if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
+            if (status.err) throw new Error('Transaction failed on-chain');
+            ccConfirmed = true;
+            break;
+          }
+        }
+        if (ccConfirmed) {
+          showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
+        } else {
+          showToast.info(`TX sent: ${sig.slice(0, 8)}... — check your wallet`);
+        }
         setBuyingId(null);
         return;
       }
