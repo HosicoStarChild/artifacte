@@ -146,14 +146,12 @@ export async function POST(req: NextRequest) {
       buyData = result.value;
     } else {
       // ── M2 path (CC cards, pNFTs, standard auction house listings) ──
-      const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
       const params = new URLSearchParams({
         buyer,
         seller,
         tokenMint: mint,
         price: price.toString(),
         auctionHouseAddress: auctionHouse || CC_AUCTION_HOUSE,
-        paymentMint: USDC_MINT, // Required for ME to build full USDC pNFT accounts
       });
       if (tokenATA) params.set('tokenATA', tokenATA);
       if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
