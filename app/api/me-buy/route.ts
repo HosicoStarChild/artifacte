@@ -21,6 +21,7 @@ if (!ME_API_KEY) {
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const ME_BATCH_BASE = 'https://api-mainnet.magiceden.us/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
+const TREASURY_WALLET = '6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
         tokenMint: mint,
         price: price.toString(),
         auctionHouseAddress: auctionHouse || CC_AUCTION_HOUSE,
+        takerBroker: TREASURY_WALLET, // Artifacte receives taker broker fee
       });
       if (tokenATA) params.set('tokenATA', tokenATA);
       if (sellerExpiry && sellerExpiry !== -1) params.set('sellerExpiry', sellerExpiry.toString());
