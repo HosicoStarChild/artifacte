@@ -239,13 +239,6 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // USDC listings for non-phygitals: redirect to ME
-        if (listing?.currency === 'USDC') {
-          window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
-          setBuyingId(null);
-          return;
-        }
-
         // CC cards: buy via ME notary-cosigned transaction
         showToast.info("Building transaction...");
         const buildRes = await fetch('/api/me-buy', {
