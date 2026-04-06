@@ -94,9 +94,9 @@ export async function executeTensorBuy(
 
   onStatus?.(`⏳ Transaction sent: ${sig!.slice(0, 8)}...`);
 
-  // Step 3: Poll for confirmation (60s window, 3s interval = 20 requests max)
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000));
+  // Step 3: Poll for confirmation (60s window — Solana can be slow)
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 1000));
     const statusRes = await fetch('/api/rpc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
