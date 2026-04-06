@@ -143,14 +143,21 @@ export default function ListNFTPage() {
   }
 
   function getNftCollection(nft: NFTAsset): { address: string; name: string } | null {
+    // Always allow Artifacte-minted NFTs (authority hardcoded, not from allowlist API)
+    const authorities = (nft as any).authorities;
+    if (authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY)) {
+      return { address: ARTIFACTE_AUTHORITY, name: 'The Artifacte Collection' };
+    }
     // Standard: check collection grouping
     const group = nft.grouping?.find((g: any) => g.group_key === "collection");
     if (group) {
+      // Always allow CC and Phygitals collections
+      if (group.group_value === CC_COLLECTION) return { address: group.group_value, name: 'Collectors Crypt' };
+      if (group.group_value === PHYG_COLLECTION) return { address: group.group_value, name: 'Phygitals' };
       const name = allowedCollections[group.group_value];
       if (name) return { address: group.group_value, name };
     }
     // WNS/Token-2022: check authorities (no collection grouping)
-    const authorities = (nft as any).authorities;
     if (authorities?.length) {
       for (const auth of authorities) {
         const name = allowedCollections[auth.address];

@@ -651,7 +651,7 @@ export default function CategoryAuctionsPage() {
                         <img
                           src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
                           alt={l.name}
-                          className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
+                          className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' || l.source === 'artifacte' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
                           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
                           onLoad={(e) => { const img = e.target as HTMLImageElement; if (img.naturalWidth === 0) img.src = '/placeholder-card.svg'; }}
                         />
@@ -663,6 +663,11 @@ export default function CategoryAuctionsPage() {
                         {l.source === 'collector-crypt' && (
                           <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                             COLLECTOR CRYPT
+                          </span>
+                        )}
+                        {l.source === 'artifacte' && (
+                          <span className="absolute top-2 right-2 bg-gold-500/90 text-dark-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            ARTIFACTE
                           </span>
                         )}
                       </div>
