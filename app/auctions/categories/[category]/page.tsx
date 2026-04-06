@@ -646,7 +646,7 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : l.source === 'baxus' ? (l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`) : '#'} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
+                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : l.source === 'artifacte' && (l as any).nftAddress ? `/auctions/cards/${(l as any).nftAddress}` : l.source === 'baxus' ? (l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`) : '#'} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
@@ -726,6 +726,13 @@ export default function CategoryAuctionsPage() {
                             >
                               Buy on BAXUS
                             </a>
+                          ) : l.source === 'artifacte' && (l as any).nftAddress ? (
+                            <Link
+                              href={`/auctions/cards/${(l as any).nftAddress}`}
+                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
+                            >
+                              View Details
+                            </Link>
                           ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
                             connected ? (
                               <button
