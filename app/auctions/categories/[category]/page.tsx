@@ -27,6 +27,7 @@ const TOKENS: Record<string, { mint: PublicKey; decimals: number; label: string 
 };
 
 const categoryEmojis: Record<string, string> = {
+  "artifacte": "✨",
   "digital-art": "🎨",
   "spirits": "🥃",
   "tcg-cards": "🃏",
@@ -117,7 +118,8 @@ export default function CategoryAuctionsPage() {
   const [meTotal, setMeTotal] = useState(0);
 
   // Fetch from ME API for TCG and Sports cards
-  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS";
+  const isArtifacteCollection = category === "ARTIFACTE";
+  const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS" || isArtifacteCollection;
 
   useEffect(() => {
     if (!useMeApi || !category) return;
@@ -125,8 +127,9 @@ export default function CategoryAuctionsPage() {
     if (meListings.length === 0) setMeLoading(true);
     else setMeFilterLoading(true);
     // Server-side filtering + pagination
+    // Artifacte collection uses source=artifacte (not a category filter)
     const params = new URLSearchParams({
-      category,
+      ...(isArtifacteCollection ? { source: 'artifacte' } : { category }),
       perPage: String(ITEMS_PER_PAGE),
       page: String(page),
       sort: sortBy === 'price-high' ? 'price-desc' : sortBy === 'price-low' ? 'price-asc' : 'price-desc',

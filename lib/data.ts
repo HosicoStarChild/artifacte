@@ -16,7 +16,7 @@ export type Category =
   | "REAL_ESTATE" | "DIGITAL_ART" | "AGRICULTURE" 
   | "AVIATION" | "PRECIOUS_METALS" | "LUXURY" | "SPIRITS"
   | "TCG_CARDS" | "SPORTS_CARDS" | "WATCHES" | "SEALED" | "MERCHANDISE"
-  | "PHYGITALS";
+  | "PHYGITALS" | "ARTIFACTE";
 
 export interface Asset {
   id: string;
@@ -344,6 +344,7 @@ export const categoryLabels: Record<Category, string> = {
   SEALED: "SEALED PRODUCT",
   MERCHANDISE: "MERCHANDISE",
   PHYGITALS: "PHYGITALS",
+  ARTIFACTE: "THE ARTIFACTE COLLECTION",
 };
 
 export const categorySlugMap: Record<string, Category> = {
@@ -355,6 +356,7 @@ export const categorySlugMap: Record<string, Category> = {
   "sealed": "SEALED",
   "merchandise": "MERCHANDISE",
   "phygitals": "PHYGITALS",
+  "artifacte": "ARTIFACTE",
 };
 
 export function formatPrice(n: number): string {

@@ -123,29 +123,47 @@ export default async function Home() {
                 <h2 className="font-serif text-3xl md:text-4xl text-white">Collections</h2>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "/images/digital-collectibles-collage.jpg", count: "" },
-                { name: "Spirits", slug: "spirits", href: "/auctions/categories/spirits", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=600&q=80", count: "2,300+" },
-                { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "110+" },
-                { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
-                { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "/images/sealed-packs.jpg", count: "130+" },
-                { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "/images/merchandise-hero.jpg", count: "500+" },
-              ].map((cat, i) => (
-                <Link key={i} href={cat.href} className="group">
-                  <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
-                    <img src={cat.image} alt={cat.name} className={`absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-110 ${(cat as any).contain ? 'object-contain p-4' : 'object-cover'}`} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
-                    <div className="relative p-6">
-                      <h3 className="font-serif text-xl text-white mb-1">{cat.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <p className="text-gray-300 text-sm">Explore collection →</p>
-                        {cat.count && <span className="text-gold-500 text-xs font-semibold">{cat.count} items</span>}
+            <div className="flex flex-col gap-6">
+              {/* The Artifacte Collection — full width banner */}
+              <Link href="/auctions/categories/artifacte" className="group">
+                <div className="relative rounded-lg overflow-hidden card-hover h-56 flex flex-col justify-end">
+                  <img src="/artifacte-collection-banner.jpg" alt="The Artifacte Collection" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
+                  <div className="relative p-6 flex items-end justify-between">
+                    <div>
+                      <span className="text-gold-400 text-xs font-bold tracking-widest uppercase mb-1 block">Exclusive</span>
+                      <h3 className="font-serif text-2xl md:text-3xl text-white">The Artifacte Collection</h3>
+                      <p className="text-gray-300 text-sm mt-1">Explore collection →</p>
+                    </div>
+                    <span className="text-gold-500 text-xs font-semibold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">Artifacte Originals</span>
+                  </div>
+                </div>
+              </Link>
+              {/* Category grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { name: "Digital Collectibles", slug: "digital-art", href: "/digital-art", image: "/images/digital-collectibles-collage.jpg", count: "" },
+                  { name: "Spirits", slug: "spirits", href: "/auctions/categories/spirits", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=600&q=80", count: "2,300+" },
+                  { name: "Sports Cards", slug: "sports-cards", href: "/auctions/categories/sports-cards", image: "https://images.unsplash.com/photo-1566577739112-5180d4bf9390?w=600&q=80", count: "110+" },
+                  { name: "TCG Cards", slug: "tcg-cards", href: "/auctions/categories/tcg-cards", image: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=600&q=80", count: "16,900+" },
+                  { name: "Sealed Product", slug: "sealed", href: "/auctions/categories/sealed", image: "/images/sealed-packs.jpg", count: "130+" },
+                  { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "/images/merchandise-hero.jpg", count: "500+" },
+                ].map((cat, i) => (
+                  <Link key={i} href={cat.href} className="group">
+                    <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
+                      <img src={cat.image} alt={cat.name} className={`absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-110 ${(cat as any).contain ? 'object-contain p-4' : 'object-cover'}`} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+                      <div className="relative p-6">
+                        <h3 className="font-serif text-xl text-white mb-1">{cat.name}</h3>
+                        <div className="flex items-center justify-between">
+                          <p className="text-gray-300 text-sm">Explore collection →</p>
+                          {cat.count && <span className="text-gold-500 text-xs font-semibold">{cat.count} items</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
