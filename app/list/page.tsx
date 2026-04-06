@@ -180,8 +180,17 @@ export default function ListNFTPage() {
     setError("");
     try {
       const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+      const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
       const nftMint = new PublicKey(selectedNft.id);
-      const priceInLamports = Math.floor(parseFloat(price) * 1e9);
+
+      // RWA categories (TCG, Sports, Sealed, Merch) require USDC — Digital Art uses SOL
+      const itemCategoryForMint = getNftCategory(selectedNft);
+      const isRwaCategory = itemCategoryForMint !== ItemCategory.DigitalArt;
+      const paymentMint = isRwaCategory ? USDC_MINT : SOL_MINT;
+      // Price: SOL uses lamports (1e9), USDC uses micro-USDC (1e6)
+      const priceInUnits = isRwaCategory
+        ? Math.floor(parseFloat(price) * 1e6)
+        : Math.floor(parseFloat(price) * 1e9);
       const durationSeconds = listingType === "auction" ? Math.round(parseFloat(auctionDuration) * 3600) : undefined;
 
       // Get user's NFT token account (detect Token-2022 vs standard SPL)
@@ -213,9 +222,9 @@ export default function ListNFTPage() {
       const tx = await auctionProgram.listItem(
         nftMint,
         sellerNftAccount,
-        SOL_MINT,
+        paymentMint,
         listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
-        priceInLamports,
+        priceInUnits,
         durationSeconds,
         itemCategory
       );
@@ -518,10 +527,10 @@ export default function ListNFTPage() {
               {/* Price */}
               <div className="mb-5">
                 <label className="block text-sm text-gray-400 mb-1.5 font-medium">
-                  {listingType === "fixed" ? "Price" : "Starting Price"} (SOL)
+                  {listingType === "fixed" ? "Price" : "Starting Price"} ({getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? "USDC" : "SOL"})
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-2.5 text-gray-500">◎</span>
+                  <span className="absolute left-4 top-2.5 text-gray-500">{getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? "$" : "◎"}</span>
                   <input
                     type="number"
                     step="0.01"
@@ -568,7 +577,7 @@ export default function ListNFTPage() {
                 <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
                   <span className="text-gray-500">You receive</span>
                   <span className="text-gold-400 font-semibold">
-                    {price ? `◎ ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
+                    {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
                   </span>
                 </div>
                 <p className="text-gray-600 text-[10px] mt-3">Fees are only charged when your item sells. No sale, no fee.</p>
