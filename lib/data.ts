@@ -328,6 +328,7 @@ export const categoryColors: Record<Category, string> = {
   SEALED: "text-emerald-400",
   MERCHANDISE: "text-pink-400",
   PHYGITALS: "text-violet-400",
+  ARTIFACTE: "text-gold-400",
 };
 
 export const categoryLabels: Record<Category, string> = {
