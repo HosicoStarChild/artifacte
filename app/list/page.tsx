@@ -25,6 +25,10 @@ interface WhitelistStatus {
   loading: boolean;
 }
 
+const CC_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
+const PHYG_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
+const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+
 export default function ListNFTPage() {
   const { publicKey, connected, wallet, sendTransaction } = useWallet();
   const { connection } = useConnection();
@@ -87,10 +91,14 @@ export default function ListNFTPage() {
       });
       const data = await res.json();
       const items: NFTAsset[] = (data.result?.items || []).filter((item: any) => {
-        // Filter: not burnt, not compressed, not fungible
+        // Filter: not burnt, not fungible
         if (item.burnt) return false;
-        if (item.compression?.compressed) return false;
         if (item.interface === "FungibleToken" || item.interface === "FungibleAsset") return false;
+        // Allow compressed NFTs only if they're from the Phygitals collection
+        if (item.compression?.compressed) {
+          const g = item.grouping?.find((g: any) => g.group_key === "collection");
+          return g?.group_value === PHYG_COLLECTION;
+        }
         return true;
       });
       setNfts(items);
@@ -114,6 +122,24 @@ export default function ListNFTPage() {
       return `/api/img-proxy?url=${encodeURIComponent(url)}`;
     }
     return url;
+  }
+
+  function getNftCategory(nft: NFTAsset): ItemCategory {
+    const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+    const collectionAddr = g?.group_value;
+    const isRwa = collectionAddr === CC_COLLECTION || collectionAddr === PHYG_COLLECTION ||
+      (nft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
+    if (!isRwa) return ItemCategory.DigitalArt;
+    // Read attributes to determine sub-category
+    const attrs: { trait_type: string; value: string }[] =
+      (nft as any).content?.metadata?.attributes || [];
+    const get = (key: string) => attrs.find(a => a.trait_type?.toLowerCase() === key.toLowerCase())?.value || "";
+    const tcg = get("TCG") || get("Category") || get("Type");
+    const sport = get("Sport");
+    if (sport) return ItemCategory.SportsCards;
+    if (tcg) return ItemCategory.TCGCards;
+    // Default RWA cards to TCGCards
+    return ItemCategory.TCGCards;
   }
 
   function getNftCollection(nft: NFTAsset): { address: string; name: string } | null {
@@ -175,6 +201,8 @@ export default function ListNFTPage() {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
+      const itemCategory = getNftCategory(selectedNft);
+
       const tx = await auctionProgram.listItem(
         nftMint,
         sellerNftAccount,
@@ -182,7 +210,7 @@ export default function ListNFTPage() {
         listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
         priceInLamports,
         durationSeconds,
-        ItemCategory.DigitalArt
+        itemCategory
       );
 
       showToast.success("NFT listed successfully!");
