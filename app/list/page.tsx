@@ -114,11 +114,14 @@ export default function ListNFTPage() {
     const cdnUri = (nft.content?.files?.[0] as any)?.cdn_uri;
     if (cdnUri) return cdnUri;
     let url = nft.content?.links?.image || nft.content?.files?.[0]?.uri || "/placeholder.png";
-    if (url.startsWith("ipfs://")) {
-      url = url.replace("ipfs://", "https://cf-ipfs.com/ipfs/");
+    if (!url || url === '/placeholder.png') return '/placeholder.png';
+    // Normalize ipfs:// protocol
+    if (url.startsWith('ipfs://')) {
+      url = url.replace('ipfs://', 'https://nftstorage.link/ipfs/');
     }
-    // Proxy arweave images through our edge function (arweave.net 302→404 in browsers)
-    if (url.includes("arweave.net/")) {
+    // Proxy all non-https direct URLs through our edge function
+    // (arweave 302→404, IPFS gateways flaky, nftstorage rate-limits)
+    if (url.includes('arweave.net/') || url.includes('nftstorage.link/') || url.includes('/ipfs/')) {
       return `/api/img-proxy?url=${encodeURIComponent(url)}`;
     }
     return url;
