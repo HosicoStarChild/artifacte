@@ -126,16 +126,18 @@ export default async function Home() {
             <div className="flex flex-col gap-6">
               {/* The Artifacte Collection — full width banner */}
               <Link href="/auctions/categories/artifacte" className="group">
-                <div className="relative rounded-lg overflow-hidden card-hover h-56 flex flex-col justify-end">
+                <div className="relative rounded-lg overflow-hidden card-hover h-48 sm:h-56 flex flex-col justify-end">
                   <img src="/artifacte-collection-banner.jpg" alt="The Artifacte Collection" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
-                  <div className="relative p-6 flex items-end justify-between">
-                    <div>
-                      <span className="text-gold-400 text-xs font-bold tracking-widest uppercase mb-1 block">Exclusive</span>
-                      <h3 className="font-serif text-2xl md:text-3xl text-white">The Artifacte Collection</h3>
-                      <p className="text-gray-300 text-sm mt-1">Explore collection →</p>
+                  <div className="relative p-4 sm:p-6">
+                    <span className="text-gold-400 text-xs font-bold tracking-widest uppercase mb-1 block">Exclusive</span>
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-white">The Artifacte Collection</h3>
+                        <p className="text-gray-300 text-sm mt-1">Explore collection →</p>
+                      </div>
+                      <span className="hidden sm:inline text-gold-500 text-xs font-semibold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap flex-shrink-0">Artifacte Originals</span>
                     </div>
-                    <span className="text-gold-500 text-xs font-semibold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">Artifacte Originals</span>
                   </div>
                 </div>
               </Link>
