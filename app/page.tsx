@@ -152,7 +152,7 @@ export default async function Home() {
                   { name: "Merchandise", slug: "merchandise", href: "/auctions/categories/merchandise", image: "/images/merchandise-hero.jpg", count: "500+" },
                 ].map((cat, i) => (
                   <Link key={i} href={cat.href} className="group">
-                    <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end">
+                    <div className="relative rounded-lg overflow-hidden card-hover h-48 flex flex-col justify-end border-2 border-gold-500/70">
                       <img src={cat.image} alt={cat.name} className={`absolute inset-0 w-full h-full transition-transform duration-500 group-hover:scale-110 ${(cat as any).contain ? 'object-contain p-4' : 'object-cover'}`} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
                       <div className="relative p-6">
