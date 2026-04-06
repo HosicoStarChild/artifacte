@@ -126,7 +126,7 @@ export default async function Home() {
             <div className="flex flex-col gap-6">
               {/* The Artifacte Collection — full width banner */}
               <Link href="/auctions/categories/artifacte" className="group">
-                <div className="relative rounded-lg overflow-hidden card-hover h-48 sm:h-56 flex flex-col justify-end">
+<div className="relative rounded-lg overflow-hidden card-hover h-48 sm:h-56 flex flex-col justify-end border-2 border-gold-500/70">
                   <img src="/artifacte-collection-banner.jpg" alt="The Artifacte Collection" className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
                   <div className="relative p-4 sm:p-6">
