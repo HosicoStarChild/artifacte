@@ -168,9 +168,9 @@ function MintFormInner() {
     }
   };
 
-  const generateMetadata = () => {
+  const generateMetadata = (imageUri?: string) => {
     const metadata: Record<string, any> = {
-      name: formData.name, description: `${formData.type} listed on Artifacte`, image: formData.frontImagePreview || "", symbol: "Artifacte",
+      name: formData.name, description: `${formData.type} listed on Artifacte`, image: imageUri || "", symbol: "Artifacte",
       attributes: [], properties: { category: "Trading Card", creators: [{ address: ADMIN_WALLET, share: 100 }] }
     };
     if (formData.type === "Card") {
@@ -277,8 +277,41 @@ function MintFormInner() {
     setMinting(true);
     setMintResult(null);
     try {
-      const metadata = generateMetadata();
-      
+      // Step 1: Set up Umi with Irys uploader
+      const umi = createUmi(connection.rpcEndpoint)
+        .use(walletAdapterIdentity(wallet))
+        .use(irysUploader());
+
+      // Step 2: Upload image to Arweave FIRST — always required
+      let imageUri = "";
+      if (!formData.frontImage) {
+        setMintResult("❌ Front image is required before minting");
+        setMinting(false);
+        return;
+      }
+      setMintResult("⏳ Uploading image to Arweave...");
+      const arrayBuffer = await formData.frontImage.arrayBuffer();
+      const [imgUri] = await umi.uploader.upload([
+        {
+          buffer: Buffer.from(arrayBuffer),
+          fileName: formData.frontImage.name,
+          displayName: formData.frontImage.name,
+          uniqueName: `artifacte-${Date.now()}`,
+          contentType: formData.frontImage.type,
+          extension: formData.frontImage.name.split(".").pop() || "jpg",
+          tags: [],
+        } as any,
+      ]);
+      imageUri = imgUri;
+      if (!imageUri || !imageUri.startsWith('http')) {
+        setMintResult("❌ Image upload failed — got invalid URI: " + imageUri);
+        setMinting(false);
+        return;
+      }
+
+      // Step 3: Build metadata with the real image URL (never embed base64)
+      const metadata = generateMetadata(imageUri);
+
       // Validate metadata size
       const metaSize = JSON.stringify(metadata).length;
       if (metaSize > 50000) {
@@ -286,33 +319,8 @@ function MintFormInner() {
         setMinting(false);
         return;
       }
-      
-      // Step 1: Set up Umi with Irys uploader
-      const umi = createUmi(connection.rpcEndpoint)
-        .use(walletAdapterIdentity(wallet))
-        .use(irysUploader());
 
-      // Step 2: Upload image to Arweave if provided
-      let imageUri = "";
-      if (formData.frontImage) {
-        setMintResult("⏳ Uploading image to Arweave...");
-        const arrayBuffer = await formData.frontImage.arrayBuffer();
-        const [imgUri] = await umi.uploader.upload([
-          {
-            buffer: Buffer.from(arrayBuffer),
-            fileName: formData.frontImage.name,
-            displayName: formData.frontImage.name,
-            uniqueName: `artifacte-${Date.now()}`,
-            contentType: formData.frontImage.type,
-            extension: formData.frontImage.name.split(".").pop() || "jpg",
-            tags: [],
-          } as any,
-        ]);
-        imageUri = imgUri;
-        metadata.image = imageUri;
-      }
-
-      // Step 3: Upload metadata JSON to Arweave
+      // Step 4: Upload metadata JSON to Arweave
       setMintResult("⏳ Uploading metadata to Arweave...");
       const metadataUri = await umi.uploader.uploadJson(metadata);
 
@@ -634,11 +642,11 @@ export function MintContent() {
     }
   };
 
-  const generateMetadata = () => {
+  const generateMetadata = (imageUri?: string) => {
     const metadata: Record<string, any> = {
       name: formData.name,
       description: `${formData.type} listed on Artifacte`,
-      image: formData.frontImagePreview || "",
+      image: imageUri || "",
       attributes: [],
       properties: {
         category: "Trading Card",
