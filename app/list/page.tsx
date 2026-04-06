@@ -366,12 +366,12 @@ export default function ListNFTPage() {
                       }}
                       className="bg-dark-800 border border-white/5 rounded-xl overflow-hidden text-left hover:border-gold-500/50 transition group"
                     >
-                      <div className="aspect-square bg-dark-700 relative overflow-hidden">
+                      <div className="aspect-square bg-dark-900 relative overflow-hidden">
                         <img
                           src={getNftImage(nft)}
                           alt={nft.content?.metadata?.name}
                           loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300"
                           onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.png"; }}
                         />
                       </div>
@@ -466,7 +466,11 @@ export default function ListNFTPage() {
                 <img
                   src={getNftImage(selectedNft)}
                   alt={selectedNft.content?.metadata?.name}
-                  className="w-24 h-24 rounded-lg object-cover"
+                  className={`w-24 h-24 rounded-lg ${
+                    (() => { const g = selectedNft.grouping?.find((g: any) => g.group_key === 'collection'); return g && [CC_COLLECTION, PHYG_COLLECTION].includes(g.group_value) || (selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY); })()
+                      ? 'object-contain p-1 bg-dark-900'
+                      : 'object-cover'
+                  }`}
                 />
                 <div>
                   <h3 className="text-white font-semibold text-lg">
