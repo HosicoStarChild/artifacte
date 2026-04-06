@@ -287,13 +287,28 @@ export default function CategoryAuctionsPage() {
           return data.result;
         };
 
+        // Pre-simulate with sigVerify:false before wallet signing.
+        // Phantom internally simulates during signTransaction — multi-signer notary txs
+        // fail Phantom's simulation without this step, showing "unable to safely predict" warning.
+        const preSim = async (b64Tx: string) => {
+          try {
+            await fetch('/api/rpc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'simulateTransaction', params: [b64Tx, { sigVerify: false, encoding: 'base64', commitment: 'processed' }] }),
+            });
+          } catch {}
+        };
+
         if (v0TxSigned && v0Tx) {
           // Notary-cosigned flow (M2 CC cards)
+          await preSim(v0TxSigned);
           const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
           const notaryTx = VersionedTransaction.deserialize(signedBytes);
           const signed = await signTransaction(notaryTx as any);
           sig = await sendViaPoxy((signed as any).serialize());
         } else if (v0Tx) {
+          await preSim(v0Tx);
           const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
           const vTx = VersionedTransaction.deserialize(txBytes);
           const signed = await signTransaction(vTx as any);

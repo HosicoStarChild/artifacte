@@ -292,6 +292,17 @@ export default function CardDetailPage() {
       if (!hasME) {
         throw new Error("Transaction doesn't interact with ME marketplace");
       }
+
+      // Pre-simulate with sigVerify:false before wallet signing.
+      // Phantom simulates during signTransaction — multi-signer notary txs fail
+      // Phantom's simulation without this, showing "unable to safely predict" warning.
+      try {
+        await fetch('/api/rpc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'simulateTransaction', params: [txBase64, { sigVerify: false, encoding: 'base64', commitment: 'processed' }] }),
+        });
+      } catch {}
       
       const signed = await signTransaction(vTx as any);
       const rawTx = (signed as any).serialize();
