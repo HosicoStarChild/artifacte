@@ -110,13 +110,13 @@ export default function ListNFTPage() {
   }
 
   function getNftImage(nft: NFTAsset): string {
-    // Prefer Helius CDN URI — most reliable, already cached on Cloudflare
+    // Prefer Helius CDN URI — only if it's a real URL (not empty/broken)
     const cdnUri = (nft.content?.files?.[0] as any)?.cdn_uri;
-    if (cdnUri) return cdnUri;
-    // content.links.image is the actual image URL for pNFTs
-    // content.files[0].uri is the arweave metadata JSON — do NOT use it as an image
+    if (cdnUri && cdnUri.length > 40 && !cdnUri.endsWith('//')) return cdnUri;
+    // Use links.image — the actual image URL for pNFTs
+    // Avoid files[0].uri which can be metadata JSON or base64 data
     let url = nft.content?.links?.image || '';
-    if (!url) return `/api/nft-image?mint=${nft.id}`;
+    if (!url || url.startsWith('data:')) return `/api/nft-image?mint=${nft.id}`;
     if (url.startsWith('ipfs://')) url = url.replace('ipfs://', 'https://nftstorage.link/ipfs/');
     if (url.includes('arweave.net/') || url.includes('nftstorage.link/') || url.includes('/ipfs/') || url.includes('irys.xyz/')) {
       return `/api/img-proxy?url=${encodeURIComponent(url)}`;
