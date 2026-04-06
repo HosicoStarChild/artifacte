@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Transaction } from "@solana/web3.js";
 import Link from "next/link";
 import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
@@ -215,6 +216,22 @@ export default function ListNFTPage() {
         await auctionProgram.closeStaleListing(nftMint);
         // Wait for confirmation
         await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // If listing for USDC, ensure seller has a USDC ATA (create if missing)
+      if (isRwaCategory) {
+        const sellerUsdcAta = await getAssociatedTokenAddress(USDC_MINT, publicKey);
+        const ataInfo = await connection.getAccountInfo(sellerUsdcAta);
+        if (!ataInfo) {
+          showToast.info("Creating USDC account...");
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            publicKey, sellerUsdcAta, publicKey, USDC_MINT, TOKEN_PROGRAM_ID
+          );
+          const { blockhash } = await connection.getLatestBlockhash();
+          const ataTx = new Transaction({ feePayer: publicKey, recentBlockhash: blockhash }).add(createAtaIx);
+          const signedAtaTx = await wallet.adapter.sendTransaction(ataTx, connection);
+          await connection.confirmTransaction(signedAtaTx, 'confirmed');
+        }
       }
 
       const itemCategory = getNftCategory(selectedNft);
