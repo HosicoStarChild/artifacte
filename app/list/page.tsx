@@ -113,12 +113,15 @@ export default function ListNFTPage() {
     // Prefer Helius CDN URI — most reliable, already cached on Cloudflare
     const cdnUri = (nft.content?.files?.[0] as any)?.cdn_uri;
     if (cdnUri) return cdnUri;
-    // Fall back to raw image URL — proxy everything through img-proxy
-    // (arweave/IPFS/irys all fail directly in browsers for freshly minted NFTs)
-    let url = nft.content?.links?.image || nft.content?.files?.[0]?.uri || '';
-    if (!url) return '/placeholder.png';
+    // content.links.image is the actual image URL for pNFTs
+    // content.files[0].uri is the arweave metadata JSON — do NOT use it as an image
+    let url = nft.content?.links?.image || '';
+    if (!url) return `/api/nft-image?mint=${nft.id}`;
     if (url.startsWith('ipfs://')) url = url.replace('ipfs://', 'https://nftstorage.link/ipfs/');
-    return `/api/img-proxy?url=${encodeURIComponent(url)}`;
+    if (url.includes('arweave.net/') || url.includes('nftstorage.link/') || url.includes('/ipfs/') || url.includes('irys.xyz/')) {
+      return `/api/img-proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   }
 
   function getNftCategory(nft: NFTAsset): ItemCategory {
