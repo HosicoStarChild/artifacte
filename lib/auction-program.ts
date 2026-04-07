@@ -905,6 +905,22 @@ export class AuctionProgram {
       MPL_TOKEN_METADATA_ID
     )[0];
     console.log('[listItemPnft] escrowTokenRecord:', escrowTokenRecord.toBase58());
+
+    // Create escrow token account if it doesn't exist
+    // pNFT transferV1 requires the destination ATA to exist before CPI
+    const escrowAtaInfo = await this.connection.getAccountInfo(escrowNftToken);
+    const preIxs = [];
+    if (!escrowAtaInfo) {
+      console.log('[listItemPnft] creating escrow ATA...');
+      preIxs.push(createAssociatedTokenAccountInstruction(
+        this.wallet.publicKey, // payer
+        escrowNftToken,        // ata
+        escrowAuthority,       // owner (our PDA)
+        nftMint,               // mint
+        TOKEN_PROGRAM_ID,
+        new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'), // ATA program
+      ));
+    }
     console.log('[listItemPnft] building instruction...');
 
     // Fetch NFT metadata to get auth rules (some pNFTs have programmable configs with rule sets)
@@ -958,6 +974,7 @@ export class AuctionProgram {
     const tx = new Transaction().add(
       ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+      ...preIxs,
       ix
     );
     return await this.sendAndConfirm(tx);
