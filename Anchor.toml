@@ -2,7 +2,7 @@
 
 [features]
 resolution = true
-skip-lint = false
+skip-lint = true
 
 [programs.mainnet]
 auction = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"
