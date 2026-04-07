@@ -933,8 +933,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: MPL_AUTH_RULES_ID, // Metaplex auth rules program
-        authorizationRules: authorizationRules ?? MPL_AUTH_RULES_ID, // ruleSet from metadata, or auth rules program as placeholder
+        authorizationRulesProgram: null, // no auth rules for standard CC pNFTs
+        authorizationRules: null, // no auth rules for standard CC pNFTs
       })
       .instruction();
 
