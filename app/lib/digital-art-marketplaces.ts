@@ -196,7 +196,11 @@ function normalizeTimestamp(value: unknown): number | undefined {
 function parseRawAmount(value: unknown): number | null {
   if (value == null) return null;
   if (typeof value === "number") {
-    return Number.isFinite(value) ? Math.round(value) : null;
+    if (!Number.isFinite(value)) return null;
+    // Float → already in display units (e.g. SOL from Magic Eden), convert to lamports
+    if (value % 1 !== 0) return Math.round(value * 1e9);
+    // Integer → already in lamports
+    return value;
   }
   if (typeof value === "string") {
     if (value.includes(".")) {

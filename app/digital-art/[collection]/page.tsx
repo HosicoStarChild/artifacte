@@ -719,7 +719,7 @@ export default function CollectionPage() {
             </div>
           ) : loadingMarketplace ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-              {Array.from({ length: 10 }).map((_, index) => (
+              {Array.from({ length: 16 }).map((_, index) => (
                 <div
                   key={index}
                   className="bg-dark-800 border border-white/5 rounded-xl h-72 animate-pulse"
