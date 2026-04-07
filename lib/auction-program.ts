@@ -878,6 +878,7 @@ export class AuctionProgram {
     category: ItemCategory,
     royaltyBps: number,
     creatorAddress: PublicKey,
+    ruleSet: PublicKey | null = null,
   ): Promise<string> {
     console.log('[listItemPnft] nftMint:', nftMint.toBase58());
     console.log('[listItemPnft] paymentMint:', paymentMint.toBase58());
@@ -929,18 +930,7 @@ export class AuctionProgram {
     const preIxs: any[] = [];
     console.log('[listItemPnft] building instruction...');
 
-    // Fetch NFT metadata to get auth rules (some pNFTs have programmable configs with rule sets)
-    let authorizationRules: PublicKey | null = null;
-    try {
-      const metadataAccount = await this.connection.getAccountInfo(nftMetadata);
-      if (metadataAccount) {
-        // programmableConfig is at a specific offset in the metadata account
-        // ruleSet option: bytes 679+ for pNFT metadata
-        // Simpler: check if the metadata has a non-default ruleSet via DAS or just default to null
-        // Most CC cards use no auth rules (None variant)
-        authorizationRules = null;
-      }
-    } catch {}
+    console.log('[listItemPnft] ruleSet:', ruleSet?.toBase58() || 'none');
 
     const ix = await this.program.methods
       .listItemPnft(
@@ -972,8 +962,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: null, // no auth rules for standard CC pNFTs
-        authorizationRules: null, // no auth rules for standard CC pNFTs
+        authorizationRulesProgram: ruleSet ? MPL_AUTH_RULES_ID : null,
+        authorizationRules: ruleSet || null,
       })
       .instruction();
 

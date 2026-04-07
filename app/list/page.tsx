@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Transaction } from "@solana/web3.js";
 import Link from "next/link";
@@ -238,19 +238,45 @@ export default function ListNFTPage() {
 
       const itemCategory = getNftCategory(selectedNft);
 
-      // Detect pNFT: CC cards and Phygitals are Metaplex pNFTs (not Token-2022)
-      // pNFTs require the Token Metadata TransferV1 CPI path
-      const isPnft = (selectedNft.grouping?.some((g: any) =>
-        g.group_key === 'collection' &&
-        (g.group_value === CC_COLLECTION || g.group_value === PHYG_COLLECTION)
-      )) || (selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
+      // Detect NFT type from DAS API interface field
+      const isCompressed = (selectedNft as any).compression?.compressed === true;
+      const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
 
       let tx: string;
-      if (isPnft) {
+      if (isCompressed) {
+        // List compressed NFT (cNFT) via Tensor marketplace
+        showToast.info("Listing compressed NFT on Tensor...");
+        const res = await fetch('/api/tensor-list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mint: mintStr,
+            owner: publicKey.toBase58(),
+            amount: priceInUnits,
+            currency: 'USDC',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to build Tensor listing');
+        const txBytes = Buffer.from(data.tx, 'base64');
+        const vtx = VersionedTransaction.deserialize(txBytes);
+        const signed = await wallet.adapter.signTransaction(vtx);
+        const sig = await connection.sendRawTransaction(signed.serialize());
+        // Poll for confirmation (avoids WebSocket issues with HTTP-only RPC proxy)
+        for (let i = 0; i < 60; i++) {
+          const status = await connection.getSignatureStatuses([sig]);
+          const s = status.value[0];
+          if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
+          if (s?.err) throw new Error(`Transaction failed: ${JSON.stringify(s.err)}`);
+          await new Promise(r => setTimeout(r, 500));
+        }
+        tx = sig;
+      } else if (isPnft) {
         showToast.info("Listing pNFT via Metaplex Token Metadata...");
-        // Fetch royalty info for this NFT
+        // Fetch royalty info and auth rules for this NFT
         let royaltyBps = 500; // default 5%
         let creatorAddr = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+        let ruleSet: PublicKey | null = null;
         try {
           const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
           const nftData = await nftRes.json();
@@ -258,6 +284,9 @@ export default function ListNFTPage() {
           royaltyBps = asset.royalty?.basis_points || 500;
           const creators = asset.creators || asset.content?.metadata?.creators || [];
           if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
+          // Extract authorization rules from raw Helius response (pNFTs with rule sets)
+          const ruleSetAddr = nftData.result?.programmable_config?.rule_set;
+          if (ruleSetAddr) ruleSet = new PublicKey(ruleSetAddr);
         } catch {}
         tx = await auctionProgram.listItemPnft(
           nftMint,
@@ -268,6 +297,7 @@ export default function ListNFTPage() {
           itemCategory,
           royaltyBps,
           creatorAddr,
+          ruleSet,
         );
       } else {
         tx = await auctionProgram.listItem(
