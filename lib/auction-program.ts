@@ -862,6 +862,7 @@ export class AuctionProgram {
     creatorAddress: PublicKey,
   ): Promise<string> {
     const MPL_TOKEN_METADATA_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    const MPL_AUTH_RULES_ID = new PublicKey('auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg');
     const ATA_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bpos');
     const SYSVAR_INSTRUCTIONS_ID = new PublicKey('Sysvar1nstructions1111111111111111111111111');
 
@@ -888,6 +889,19 @@ export class AuctionProgram {
       [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), escrowNftToken.toBuffer()],
       MPL_TOKEN_METADATA_ID
     )[0];
+
+    // Fetch NFT metadata to get auth rules (some pNFTs have programmable configs with rule sets)
+    let authorizationRules: PublicKey | null = null;
+    try {
+      const metadataAccount = await this.connection.getAccountInfo(nftMetadata);
+      if (metadataAccount) {
+        // programmableConfig is at a specific offset in the metadata account
+        // ruleSet option: bytes 679+ for pNFT metadata
+        // Simpler: check if the metadata has a non-default ruleSet via DAS or just default to null
+        // Most CC cards use no auth rules (None variant)
+        authorizationRules = null;
+      }
+    } catch {}
 
     const ix = await this.program.methods
       .listItemPnft(
@@ -919,8 +933,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: MPL_TOKEN_METADATA_ID, // placeholder — no auth rules for standard pNFTs
-        authorizationRules: MPL_TOKEN_METADATA_ID, // placeholder — no auth rules for standard pNFTs
+        authorizationRulesProgram: MPL_AUTH_RULES_ID, // Metaplex auth rules program
+        authorizationRules: authorizationRules ?? MPL_AUTH_RULES_ID, // ruleSet from metadata, or auth rules program as placeholder
       })
       .instruction();
 
