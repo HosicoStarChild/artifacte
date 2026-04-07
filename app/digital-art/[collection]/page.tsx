@@ -129,6 +129,7 @@ export default function CollectionPage() {
   const [marketplaceError, setMarketplaceError] = useState("");
   const [showUserNFTs, setShowUserNFTs] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<"all" | "magiceden" | "tensor">("all");
+  const [sourceCounts, setSourceCounts] = useState<{ magiceden: number | null; tensor: number | null } | null>(null);
   const [sortOrder, setSortOrder] = useState<"price_asc" | "price_desc" | "recently_listed" | "common_to_rare" | "rare_to_common">("price_asc");
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -185,7 +186,7 @@ export default function CollectionPage() {
     try {
       const query = new URLSearchParams({
         collection: targetCollectionAddress,
-        limit: "12",
+        limit: "32",
       });
 
       if (cursor) {
@@ -215,6 +216,9 @@ export default function CollectionPage() {
       );
       setMarketplaceCursor(payload.nextCursor || null);
       setHasMoreMarketplace(Boolean(payload.hasMore));
+      if (reset && payload.sourceCounts) {
+        setSourceCounts(payload.sourceCounts);
+      }
     } catch (error: any) {
       if (marketplaceRequestRef.current !== requestId) {
         return;
@@ -655,9 +659,9 @@ export default function CollectionPage() {
                     }`}
                   >
                     {label}
-                    {value !== "all" && (
+                    {value !== "all" && sourceCounts?.[value] != null && (
                       <span className="ml-1.5 opacity-70">
-                        {marketplaceListings.filter((l) => l.source === value).length}
+                        {sourceCounts[value]!.toLocaleString()}
                       </span>
                     )}
                   </button>

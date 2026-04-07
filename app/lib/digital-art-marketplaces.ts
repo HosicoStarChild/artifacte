@@ -263,6 +263,44 @@ async function fetchHeliusAssetsByMint(mints: string[]): Promise<Map<string, Hel
   return assets;
 }
 
+async function fetchMagicEdenListedCount(symbol: string): Promise<number | null> {
+  try {
+    const response = await fetch(
+      `${MAGIC_EDEN_API}/collections/${symbol}/stats`,
+      {
+        headers: ME_API_KEY ? { Authorization: `Bearer ${ME_API_KEY}` } : undefined,
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return typeof data?.listedCount === "number" ? data.listedCount : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTensorListedCount(slug: string): Promise<number | null> {
+  if (!process.env.TENSOR_API_KEY) return null;
+  try {
+    const response = await fetch(
+      `${TENSOR_API}/collections/stats?slugs=${encodeURIComponent(slug)}`,
+      {
+        headers: { "x-tensor-api-key": process.env.TENSOR_API_KEY },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const stats = Array.isArray(data) ? data[0] : data?.collections?.[0] ?? data;
+    return typeof stats?.numListed === "number" ? stats.numListed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchMagicEdenCollectionListings(
   symbol: string,
   offset: number,
@@ -464,6 +502,7 @@ export async function getCuratedMarketplaceListings(input: {
   listings: ExternalMarketplaceListing[];
   nextCursor: string | null;
   hasMore: boolean;
+  sourceCounts?: { magiceden: number | null; tensor: number | null };
 }> {
   const limit = Math.min(Math.max(input.limit || 12, 1), 40);
   const collections = await readCuratedCollections();
@@ -479,13 +518,17 @@ export async function getCuratedMarketplaceListings(input: {
   );
   const cursor = decodeCursor(input.cursor);
 
-  const [magicEdenPage, tensorPage] = await Promise.all([
+  const isFirstPage = !input.cursor;
+
+  const [magicEdenPage, tensorPage, meCount, tensorCount] = await Promise.all([
     magicEdenSymbol && !cursor.meDone
       ? fetchMagicEdenCollectionListings(magicEdenSymbol, cursor.meOffset, limit)
       : Promise.resolve({ listings: [], nextOffset: cursor.meOffset, hasMore: false }),
     tensorSlug && !cursor.tensorDone
       ? fetchTensorCollectionListings(tensorSlug, cursor.tensorCursor || null, limit)
       : Promise.resolve({ listings: [], nextCursor: null, hasMore: false }),
+    isFirstPage && magicEdenSymbol ? fetchMagicEdenListedCount(magicEdenSymbol) : Promise.resolve(null),
+    isFirstPage && tensorSlug ? fetchTensorListedCount(tensorSlug) : Promise.resolve(null),
   ]);
 
   const mintCandidates = [
@@ -553,6 +596,7 @@ export async function getCuratedMarketplaceListings(input: {
     listings: dedupedListings,
     nextCursor: hasMore ? encodeCursor(nextState) : null,
     hasMore,
+    ...(isFirstPage && { sourceCounts: { magiceden: meCount, tensor: tensorCount } }),
   };
 }
 
