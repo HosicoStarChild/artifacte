@@ -113,6 +113,7 @@ export default function CollectionPage() {
   const dataRequestRef = useRef(0);
   const marketplaceRequestRef = useRef(0);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [listings, setListings] = useState<ListedNFT[]>([]);
@@ -333,6 +334,21 @@ export default function CollectionPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreMarketplace && !loadingMoreMarketplace) {
+          void loadMarketplaceListings(collectionAddress);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreMarketplace, loadingMoreMarketplace, collectionAddress]);
 
   if (loading) {
     return (
@@ -698,7 +714,7 @@ export default function CollectionPage() {
               </p>
             </div>
           ) : loadingMarketplace ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
               {Array.from({ length: 10 }).map((_, index) => (
                 <div
                   key={index}
@@ -733,7 +749,7 @@ export default function CollectionPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
                 {filteredListings.map((listing) => {
                   const listedAt = formatListedAt(listing.listedAt);
 
@@ -791,21 +807,11 @@ export default function CollectionPage() {
                 })}
               </div>
 
-              {hasMoreMarketplace && (
-                <div className="mt-8 text-center">
-                  <button
-                    onClick={() => loadMarketplaceListings(collectionAddress)}
-                    disabled={loadingMoreMarketplace}
-                    className={`px-6 py-3 rounded-lg font-semibold text-sm transition ${
-                      loadingMoreMarketplace
-                        ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                        : "bg-gold-500 hover:bg-gold-600 text-dark-900"
-                    }`}
-                  >
-                    {loadingMoreMarketplace ? "Loading..." : "Load More"}
-                  </button>
-                </div>
-              )}
+              <div ref={sentinelRef} className="mt-6 flex justify-center">
+                {loadingMoreMarketplace && (
+                  <div className="w-6 h-6 border-2 border-gray-700 border-t-gold-500 rounded-full animate-spin" />
+                )}
+              </div>
             </>
           )}
         </div>
