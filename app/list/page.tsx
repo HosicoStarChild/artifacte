@@ -182,7 +182,9 @@ export default function ListNFTPage() {
     try {
       const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
       const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-      const nftMint = new PublicKey(selectedNft.id);
+      // CC cards use a listing ID as .id — actual mint is in .nftAddress or .id itself
+      const mintStr = (selectedNft as any).nftAddress || selectedNft.id;
+      const nftMint = new PublicKey(mintStr);
 
       // RWA categories (TCG, Sports, Sealed, Merch) require USDC — Digital Art uses SOL
       const itemCategoryForMint = getNftCategory(selectedNft);
