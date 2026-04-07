@@ -285,8 +285,12 @@ export default function ListNFTPage() {
       setSubmitted(true);
     } catch (err: any) {
       console.error("Listing failed:", err);
+      console.error("Listing failed stack:", err?.stack);
+      console.error("Listing failed logs:", err?.logs);
       const msg = err?.message || err?.toString() || "Unknown error";
-      const shortMsg = msg.length > 200 ? msg.slice(0, 200) + "..." : msg;
+      const logs = err?.logs ? `\nLogs: ${err.logs.slice(-3).join(' | ')}` : '';
+      const fullMsg = msg + logs;
+      const shortMsg = fullMsg.length > 500 ? fullMsg.slice(0, 500) + "..." : fullMsg;
       setError(shortMsg);
       showToast.error(shortMsg);
     } finally {
