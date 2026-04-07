@@ -285,7 +285,7 @@ export default function MyListingsPage() {
                 {filteredListings.map((listing) => (
                   <Link
                     key={listing.id}
-                    href={`/digital-art/auction/${listing.nftMint}`}
+                    href={`/auctions/cards/${listing.nftMint}`}
                     className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all block"
                   >
                     {/* Image */}
