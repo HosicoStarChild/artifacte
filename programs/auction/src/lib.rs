@@ -8,15 +8,12 @@ use anchor_spl::token_interface::{
 };
 use spl_token_2022::extension::BaseStateWithExtensions;
 use spl_transfer_hook_interface::onchain::add_extra_accounts_for_execute_cpi;
-use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use anchor_lang::solana_program::program::invoke_signed as solana_invoke_signed;
+use anchor_spl::metadata::mpl_token_metadata::{
+    instructions::{TransferV1, TransferV1InstructionArgs},
+};
 
-/// Metaplex Token Metadata program ID
-const MPL_TOKEN_METADATA_STR: &str = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
-fn mpl_token_metadata_id() -> Pubkey { MPL_TOKEN_METADATA_STR.parse().unwrap() }
-
-/// Transfer pNFT via Token Metadata TransferV1 raw CPI.
-/// This avoids taking a dependency on mpl-token-metadata which has version conflicts.
+/// Transfer pNFT via Token Metadata TransferV1 CPI using Kinobi-generated builder.
+/// Uses mpl_token_metadata::instructions::TransferV1 for correct serialization.
 fn transfer_pnft<'info>(
     token_metadata_program: &AccountInfo<'info>,
     token: &AccountInfo<'info>,
@@ -39,52 +36,37 @@ fn transfer_pnft<'info>(
     signer_seeds: &[&[&[u8]]],
 ) -> Result<()> {
     // SECURITY: Validate token_metadata_program is actually Metaplex Token Metadata
-    if *token_metadata_program.key != mpl_token_metadata_id() {
-        return Err(error!(AuctionError::Unauthorized));
+    require_keys_eq!(
+        *token_metadata_program.key,
+        anchor_spl::metadata::mpl_token_metadata::ID,
+        AuctionError::Unauthorized
+    );
+
+    // Use Kinobi-generated TransferV1 instruction builder for correct serialization
+    // This ensures discriminator, account order, and args are all correct
+    let transfer_ix = TransferV1 {
+        token: *token.key,
+        token_owner: *token_owner.key,
+        destination_token: *destination_token.key,
+        destination_owner: *destination_owner.key,
+        mint: *mint.key,
+        metadata: *metadata.key,
+        edition: Some(*edition.key),
+        token_record: Some(*token_record.key),
+        destination_token_record: Some(*destination_token_record.key),
+        authority: *authority.key,
+        payer: *payer.key,
+        system_program: *system_program.key,
+        sysvar_instructions: *sysvar_instructions.key,
+        spl_token_program: *spl_token_program.key,
+        spl_ata_program: *spl_ata_program.key,
+        authorization_rules_program: auth_rules_program.map(|a| *a.key),
+        authorization_rules: auth_rules.map(|a| *a.key),
     }
-
-    // Token Metadata TransferV1 instruction data format (from Kinobi-generated client):
-    //   byte 0: 49 = MetadataInstruction enum index for Transfer
-    //   byte 1: 0 = TransferArgs::V1 variant discriminator
-    //   bytes 2-9: amount as u64 little-endian (= 1 for NFT)
-    //   byte 10: 0 = None for Option<AuthorizationData>
-    // Source: clients/js/src/generated/instructions/transferV1.ts
-    let mut data = vec![49u8, 0u8]; // Transfer(49) + V1(0)
-    data.extend_from_slice(&1u64.to_le_bytes()); // amount = 1
-    data.push(0); // None for authorization_data
-
-    let mut accounts = vec![
-        // Exact account order from Kinobi-generated transferV1.ts (indices 0-16):
-        AccountMeta::new(*token.key, false),                    // 0: token (source, writable)
-        AccountMeta::new_readonly(*token_owner.key, false),     // 1: tokenOwner
-        AccountMeta::new(*destination_token.key, false),        // 2: destinationToken (writable)
-        AccountMeta::new_readonly(*destination_owner.key, false), // 3: destinationOwner
-        AccountMeta::new_readonly(*mint.key, false),            // 4: mint
-        AccountMeta::new(*metadata.key, false),                 // 5: metadata (writable)
-        AccountMeta::new_readonly(*edition.key, false),         // 6: edition
-        AccountMeta::new(*token_record.key, false),             // 7: tokenRecord (owner, writable)
-        AccountMeta::new(*destination_token_record.key, false), // 8: destinationTokenRecord (writable)
-        AccountMeta::new(*authority.key, true),                 // 9: authority (signer)
-        AccountMeta::new(*payer.key, true),                     // 10: payer (writable signer)
-        AccountMeta::new_readonly(*system_program.key, false),  // 11: systemProgram
-        AccountMeta::new_readonly(*sysvar_instructions.key, false), // 12: sysvarInstructions
-        AccountMeta::new_readonly(*spl_token_program.key, false),   // 13: splTokenProgram
-        AccountMeta::new_readonly(*spl_ata_program.key, false),     // 14: splAtaProgram
-        AccountMeta::new_readonly(                              // 15: authorizationRulesProgram
-            if let Some(p) = auth_rules_program { *p.key } else { mpl_token_metadata_id() },
-            false
-        ),
-        AccountMeta::new_readonly(                              // 16: authorizationRules
-            if let Some(r) = auth_rules { *r.key } else { mpl_token_metadata_id() },
-            false
-        ),
-    ];
-
-    let ix = Instruction {
-        program_id: mpl_token_metadata_id(),
-        accounts,
-        data,
-    };
+    .instruction(TransferV1InstructionArgs {
+        amount: 1,
+        authorization_data: None,
+    });
 
     let mut account_infos = vec![
         token.clone(), token_owner.clone(), destination_token.clone(),
@@ -98,15 +80,14 @@ fn transfer_pnft<'info>(
     account_infos.push(token_metadata_program.clone());
 
     if signer_seeds.is_empty() {
-        anchor_lang::solana_program::program::invoke(&ix, &account_infos)
+        anchor_lang::solana_program::program::invoke(&transfer_ix, &account_infos)
             .map_err(|_| error!(AuctionError::TransferFailed))?;
     } else {
-        solana_invoke_signed(&ix, &account_infos, signer_seeds)
+        anchor_lang::solana_program::program::invoke_signed(&transfer_ix, &account_infos, signer_seeds)
             .map_err(|_| error!(AuctionError::TransferFailed))?;
     }
     Ok(())
 }
-
 declare_id!("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 
 /// Close a token account using the correct token program (works for both Token and Token-2022)
