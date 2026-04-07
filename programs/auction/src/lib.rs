@@ -38,40 +38,43 @@ fn transfer_pnft<'info>(
     auth_rules: Option<&AccountInfo<'info>>,
     signer_seeds: &[&[&[u8]]],
 ) -> Result<()> {
-    // TransferV1 discriminator = [119, 47, 243, 55, 83, 245, 63, 214]
-    // Instruction layout: discriminator(8) + amount(u64) + auth_data_option(1 + data)
-    // amount = 1, no auth data
     // SECURITY: Validate token_metadata_program is actually Metaplex Token Metadata
     if *token_metadata_program.key != mpl_token_metadata_id() {
         return Err(error!(AuctionError::Unauthorized));
     }
 
-    let mut data = vec![119u8, 47, 243, 55, 83, 245, 63, 214];
+    // Token Metadata TransferV1 instruction data format (from Kinobi-generated client):
+    //   byte 0: 49 = MetadataInstruction enum index for Transfer
+    //   byte 1: 0 = TransferArgs::V1 variant discriminator
+    //   bytes 2-9: amount as u64 little-endian (= 1 for NFT)
+    //   byte 10: 0 = None for Option<AuthorizationData>
+    // Source: clients/js/src/generated/instructions/transferV1.ts
+    let mut data = vec![49u8, 0u8]; // Transfer(49) + V1(0)
     data.extend_from_slice(&1u64.to_le_bytes()); // amount = 1
     data.push(0); // None for authorization_data
 
     let mut accounts = vec![
-        AccountMeta::new(*token.key, false),
-        AccountMeta::new_readonly(*token_owner.key, false),
-        AccountMeta::new(*destination_token.key, false),
-        AccountMeta::new_readonly(*destination_owner.key, false),
-        AccountMeta::new_readonly(*mint.key, false),
-        AccountMeta::new(*metadata.key, false),
-        AccountMeta::new_readonly(*edition.key, false),
-        AccountMeta::new(*token_record.key, false),
-        AccountMeta::new(*destination_token_record.key, false),
-        AccountMeta::new(*authority.key, true),
-        AccountMeta::new_readonly(Pubkey::default(), false), // delegate record (none)
-        AccountMeta::new(*payer.key, true),
-        AccountMeta::new_readonly(*system_program.key, false),
-        AccountMeta::new_readonly(*sysvar_instructions.key, false),
-        AccountMeta::new_readonly(*spl_token_program.key, false),
-        AccountMeta::new_readonly(*spl_ata_program.key, false),
-        AccountMeta::new_readonly(
+        // Exact account order from Kinobi-generated transferV1.ts (indices 0-16):
+        AccountMeta::new(*token.key, false),                    // 0: token (source, writable)
+        AccountMeta::new_readonly(*token_owner.key, false),     // 1: tokenOwner
+        AccountMeta::new(*destination_token.key, false),        // 2: destinationToken (writable)
+        AccountMeta::new_readonly(*destination_owner.key, false), // 3: destinationOwner
+        AccountMeta::new_readonly(*mint.key, false),            // 4: mint
+        AccountMeta::new(*metadata.key, false),                 // 5: metadata (writable)
+        AccountMeta::new_readonly(*edition.key, false),         // 6: edition
+        AccountMeta::new(*token_record.key, false),             // 7: tokenRecord (owner, writable)
+        AccountMeta::new(*destination_token_record.key, false), // 8: destinationTokenRecord (writable)
+        AccountMeta::new(*authority.key, true),                 // 9: authority (signer)
+        AccountMeta::new(*payer.key, true),                     // 10: payer (writable signer)
+        AccountMeta::new_readonly(*system_program.key, false),  // 11: systemProgram
+        AccountMeta::new_readonly(*sysvar_instructions.key, false), // 12: sysvarInstructions
+        AccountMeta::new_readonly(*spl_token_program.key, false),   // 13: splTokenProgram
+        AccountMeta::new_readonly(*spl_ata_program.key, false),     // 14: splAtaProgram
+        AccountMeta::new_readonly(                              // 15: authorizationRulesProgram
             if let Some(p) = auth_rules_program { *p.key } else { mpl_token_metadata_id() },
             false
         ),
-        AccountMeta::new_readonly(
+        AccountMeta::new_readonly(                              // 16: authorizationRules
             if let Some(r) = auth_rules { *r.key } else { mpl_token_metadata_id() },
             false
         ),
