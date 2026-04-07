@@ -214,6 +214,24 @@ export class AuctionProgram {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
+
+    // Pre-simulate to capture detailed program logs on failure
+    try {
+      const sim = await this.connection.simulateTransaction(tx);
+      if (sim.value.err) {
+        console.error('[sendAndConfirm] Simulation failed:', sim.value.err);
+        console.error('[sendAndConfirm] Logs:', sim.value.logs);
+        const logs = sim.value.logs || [];
+        const err = new Error(`Transaction simulation failed: ${JSON.stringify(sim.value.err)}\nLogs:\n${logs.join('\n')}`);
+        (err as any).logs = logs;
+        throw err;
+      }
+    } catch (simErr: any) {
+      if (simErr.logs) throw simErr; // re-throw our formatted error
+      console.error('[sendAndConfirm] Simulation error:', simErr);
+      // Don't block on simulation errors (e.g. unsigned tx sim issues), let wallet handle it
+    }
+
     let sig: string;
     if (this.sendTx) {
       // Use wallet adapter's sendTransaction — goes through Phantom's native flow, no Blowfish warning
