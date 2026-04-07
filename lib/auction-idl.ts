@@ -68,14 +68,14 @@ export const IDL = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller payment account — must be owned by listing.seller"
+            "Seller payment account \u2014 must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account — validated in instruction body against treasury_config or fallback"
+            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -99,7 +99,7 @@ export const IDL = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA — if present, overrides hardcoded treasury address"
+            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -137,6 +137,283 @@ export const IDL = {
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "buy_now_pnft",
+      "docs": [
+        "Buy a fixed-price pNFT listing."
+      ],
+      "discriminator": [
+        26,
+        178,
+        190,
+        138,
+        45,
+        22,
+        144,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nft_mint"
+        },
+        {
+          "name": "nft_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  11,
+                  112,
+                  101,
+                  177,
+                  227,
+                  209,
+                  124,
+                  69,
+                  56,
+                  157,
+                  82,
+                  127,
+                  107,
+                  4,
+                  195,
+                  205,
+                  88,
+                  184,
+                  108,
+                  115,
+                  26,
+                  160,
+                  253,
+                  181,
+                  73,
+                  182,
+                  209,
+                  188,
+                  3,
+                  248,
+                  41,
+                  70
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                11,
+                112,
+                101,
+                177,
+                227,
+                209,
+                124,
+                69,
+                56,
+                157,
+                82,
+                127,
+                107,
+                4,
+                195,
+                205,
+                88,
+                184,
+                108,
+                115,
+                26,
+                160,
+                253,
+                181,
+                73,
+                182,
+                209,
+                188,
+                3,
+                248,
+                41,
+                70
+              ]
+            }
+          }
+        },
+        {
+          "name": "nft_edition"
+        },
+        {
+          "name": "escrow_authority",
+          "docs": [
+            "Escrow authority PDA"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_nft_token",
+          "writable": true
+        },
+        {
+          "name": "escrow_token_record",
+          "writable": true
+        },
+        {
+          "name": "buyer_nft_token",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_record",
+          "writable": true
+        },
+        {
+          "name": "buyer_payment_account",
+          "writable": true
+        },
+        {
+          "name": "seller_payment_account",
+          "writable": true
+        },
+        {
+          "name": "treasury_payment_account",
+          "writable": true
+        },
+        {
+          "name": "creator_payment_account",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "treasury_config",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_metadata_program"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "ata_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions"
+        },
+        {
+          "name": "authorization_rules_program",
+          "optional": true
+        },
+        {
+          "name": "authorization_rules",
+          "optional": true
         }
       ],
       "args": []
@@ -205,6 +482,235 @@ export const IDL = {
         },
         {
           "name": "nft_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_listing_pnft",
+      "docs": [
+        "Cancel a pNFT listing \u2014 return NFT to seller."
+      ],
+      "discriminator": [
+        41,
+        48,
+        179,
+        6,
+        129,
+        16,
+        120,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nft_mint"
+        },
+        {
+          "name": "nft_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  11,
+                  112,
+                  101,
+                  177,
+                  227,
+                  209,
+                  124,
+                  69,
+                  56,
+                  157,
+                  82,
+                  127,
+                  107,
+                  4,
+                  195,
+                  205,
+                  88,
+                  184,
+                  108,
+                  115,
+                  26,
+                  160,
+                  253,
+                  181,
+                  73,
+                  182,
+                  209,
+                  188,
+                  3,
+                  248,
+                  41,
+                  70
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                11,
+                112,
+                101,
+                177,
+                227,
+                209,
+                124,
+                69,
+                56,
+                157,
+                82,
+                127,
+                107,
+                4,
+                195,
+                205,
+                88,
+                184,
+                108,
+                115,
+                26,
+                160,
+                253,
+                181,
+                73,
+                182,
+                209,
+                188,
+                3,
+                248,
+                41,
+                70
+              ]
+            }
+          }
+        },
+        {
+          "name": "nft_edition"
+        },
+        {
+          "name": "escrow_authority",
+          "docs": [
+            "Escrow authority PDA"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_nft_token",
+          "writable": true
+        },
+        {
+          "name": "escrow_token_record",
+          "writable": true
+        },
+        {
+          "name": "seller_nft_token",
+          "writable": true
+        },
+        {
+          "name": "seller_token_record",
+          "writable": true
+        },
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_metadata_program"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "ata_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions"
+        },
+        {
+          "name": "authorization_rules_program",
+          "optional": true
+        },
+        {
+          "name": "authorization_rules",
+          "optional": true
         }
       ],
       "args": []
@@ -471,6 +977,280 @@ export const IDL = {
       ]
     },
     {
+      "name": "list_item_pnft",
+      "docs": [
+        "List a pNFT (Metaplex programmable NFT) for sale.",
+        "Uses Token Metadata TransferV1 CPI with delegate + token_record."
+      ],
+      "discriminator": [
+        236,
+        179,
+        101,
+        29,
+        212,
+        149,
+        190,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nft_mint"
+        },
+        {
+          "name": "nft_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  11,
+                  112,
+                  101,
+                  177,
+                  227,
+                  209,
+                  124,
+                  69,
+                  56,
+                  157,
+                  82,
+                  127,
+                  107,
+                  4,
+                  195,
+                  205,
+                  88,
+                  184,
+                  108,
+                  115,
+                  26,
+                  160,
+                  253,
+                  181,
+                  73,
+                  182,
+                  209,
+                  188,
+                  3,
+                  248,
+                  41,
+                  70
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                11,
+                112,
+                101,
+                177,
+                227,
+                209,
+                124,
+                69,
+                56,
+                157,
+                82,
+                127,
+                107,
+                4,
+                195,
+                205,
+                88,
+                184,
+                108,
+                115,
+                26,
+                160,
+                253,
+                181,
+                73,
+                182,
+                209,
+                188,
+                3,
+                248,
+                41,
+                70
+              ]
+            }
+          }
+        },
+        {
+          "name": "nft_edition"
+        },
+        {
+          "name": "seller_nft_token",
+          "writable": true
+        },
+        {
+          "name": "seller_token_record",
+          "writable": true
+        },
+        {
+          "name": "escrow_authority",
+          "docs": [
+            "Escrow authority PDA \u2014 owns the escrow token account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "nft_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_nft_token",
+          "docs": [
+            "Escrow token account \u2014 created by Token Metadata via ATA"
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow_token_record",
+          "docs": [
+            "Escrow token record (pNFT programmable config)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "payment_mint"
+        },
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_metadata_program"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "ata_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions"
+        },
+        {
+          "name": "authorization_rules_program",
+          "optional": true
+        },
+        {
+          "name": "authorization_rules",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "listing_type",
+          "type": {
+            "defined": {
+              "name": "ListingType"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "duration_seconds",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "category",
+          "type": {
+            "defined": {
+              "name": "ItemCategory"
+            }
+          }
+        },
+        {
+          "name": "royalty_basis_points",
+          "type": "u16"
+        },
+        {
+          "name": "creator_address",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "place_bid",
       "docs": [
         "Place a bid on an active auction (payment tokens only, no NFT transfer)"
@@ -493,7 +1273,7 @@ export const IDL = {
         {
           "name": "payment_mint",
           "docs": [
-            "Payment mint — must match the listing's payment mint"
+            "Payment mint \u2014 must match the listing's payment mint"
           ]
         },
         {
@@ -642,14 +1422,14 @@ export const IDL = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller's payment token account — must be owned by listing.seller"
+            "Seller's payment token account \u2014 must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account — validated in instruction body against treasury_config or fallback"
+            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -660,14 +1440,14 @@ export const IDL = {
         {
           "name": "buyer_nft_account",
           "docs": [
-            "Buyer NFT account — must be owned by highest bidder (or seller if no bids for return)"
+            "Buyer NFT account \u2014 must be owned by highest bidder (or seller if no bids for return)"
           ],
           "writable": true
         },
         {
           "name": "seller_nft_account",
           "docs": [
-            "Seller NFT account — must be owned by listing.seller (for no-bid return)"
+            "Seller NFT account \u2014 must be owned by listing.seller (for no-bid return)"
           ],
           "writable": true
         },
@@ -682,7 +1462,7 @@ export const IDL = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA — if present, overrides hardcoded treasury address"
+            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -981,7 +1761,7 @@ export const IDL = {
     {
       "code": 6015,
       "name": "InvalidRefundAccount",
-      "msg": "Invalid refund account — must be previous bidder's ATA"
+      "msg": "Invalid refund account \u2014 must be previous bidder's ATA"
     },
     {
       "code": 6016,
@@ -991,22 +1771,22 @@ export const IDL = {
     {
       "code": 6017,
       "name": "InvalidBuyerAccount",
-      "msg": "Invalid buyer account — must be owned by highest bidder"
+      "msg": "Invalid buyer account \u2014 must be owned by highest bidder"
     },
     {
       "code": 6018,
       "name": "InvalidCreatorAccount",
-      "msg": "Invalid creator account — must be creator's ATA for payment mint"
+      "msg": "Invalid creator account \u2014 must be creator's ATA for payment mint"
     },
     {
       "code": 6019,
       "name": "InvalidTokenProgram",
-      "msg": "Invalid token program — must be SPL Token or Token-2022"
+      "msg": "Invalid token program \u2014 must be SPL Token or Token-2022"
     },
     {
       "code": 6020,
       "name": "InvalidRoyaltyBps",
-      "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
+      "msg": "Invalid royalty basis points \u2014 must be 0 or >= 100 (1%)"
     }
   ],
   "types": [
@@ -1203,6 +1983,10 @@ export const IDL = {
             "type": "bool"
           },
           {
+            "name": "is_pnft",
+            "type": "bool"
+          },
+          {
             "name": "royalty_basis_points",
             "type": "u16"
           },
@@ -1349,4 +2133,4 @@ export const IDL = {
       }
     }
   ]
-};
+} as const;
