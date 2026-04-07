@@ -406,8 +406,16 @@ function normalizeMagicEdenListing(
   }
 
   const currency = getCurrencyInfo(raw?.currency || SOL_MINT);
-  const priceRaw = parseRawAmount(raw?.price);
-  if (priceRaw == null) return null;
+  // ME sometimes returns price:0 while the real value is in priceInfo.solPrice or takerAmount
+  const rawPriceValue =
+    (raw?.price > 0 ? raw.price : null) ??
+    raw?.priceInfo?.solPrice ??
+    raw?.takerAmount ??
+    raw?.price ??
+    null;
+  const priceRaw = parseRawAmount(rawPriceValue);
+  // Require at least 0.001 SOL (1_000_000 lamports) to discard garbage/near-zero prices
+  if (priceRaw == null || priceRaw < 1_000_000) return null;
 
   const seller = String(raw?.seller || raw?.owner || "");
   const isM3 = !raw?.auctionHouse || raw?.listingSource === "M3";
@@ -467,7 +475,7 @@ function normalizeTensorListing(
       raw?.price ??
       raw?.grossAmount
   );
-  if (priceRaw == null) return null;
+  if (priceRaw == null || priceRaw < 1_000_000) return null;
 
   const compressed =
     Boolean(asset?.compression?.compressed) ||

@@ -141,10 +141,11 @@ export default function CollectionPage() {
   const hasTensor = Boolean(collection?.marketplaces?.tensor?.slug);
 
   const filteredListings = (() => {
-    const base =
+    const base = (
       sourceFilter === "all"
         ? marketplaceListings
-        : marketplaceListings.filter((l) => l.source === sourceFilter);
+        : marketplaceListings.filter((l) => l.source === sourceFilter)
+    ).filter((l) => l.price > 0);
 
     return [...base].sort((a, b) => {
       switch (sortOrder) {
