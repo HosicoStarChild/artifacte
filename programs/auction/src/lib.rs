@@ -1391,13 +1391,8 @@ pub struct ListItemPnft<'info> {
     /// CHECK: Mint — verified by Token Metadata CPI program constraints
     pub nft_mint: UncheckedAccount<'info>,
 
-    /// CHECK: Metaplex metadata PDA — address verified via seeds
-    #[account(
-        mut,
-        seeds = [b"metadata", mpl_token_metadata_id().as_ref(), nft_mint.key().as_ref()],
-        seeds::program = mpl_token_metadata_id(),
-        bump,
-    )]
+    /// CHECK: Metaplex metadata PDA — verified by Token Metadata program during CPI
+    #[account(mut)]
     pub nft_metadata: UncheckedAccount<'info>,
 
     /// CHECK: Metaplex master edition PDA — verified by Token Metadata
@@ -1460,13 +1455,8 @@ pub struct BuyNowPnft<'info> {
     #[account(constraint = nft_mint.key() == listing.nft_mint @ AuctionError::Unauthorized)]
     pub nft_mint: UncheckedAccount<'info>,
 
-    /// CHECK: Metaplex metadata PDA — verified via seeds
-    #[account(
-        mut,
-        seeds = [b"metadata", mpl_token_metadata_id().as_ref(), nft_mint.key().as_ref()],
-        seeds::program = mpl_token_metadata_id(),
-        bump,
-    )]
+    /// CHECK: Metaplex metadata PDA — verified by Token Metadata program during CPI
+    #[account(mut)]
     pub nft_metadata: UncheckedAccount<'info>,
 
     /// CHECK: Metaplex master edition PDA — verified by Token Metadata
@@ -1547,13 +1537,8 @@ pub struct CancelListingPnft<'info> {
     #[account(constraint = nft_mint.key() == listing.nft_mint @ AuctionError::Unauthorized)]
     pub nft_mint: UncheckedAccount<'info>,
 
-    /// CHECK: Metaplex metadata PDA — verified via seeds
-    #[account(
-        mut,
-        seeds = [b"metadata", mpl_token_metadata_id().as_ref(), nft_mint.key().as_ref()],
-        seeds::program = mpl_token_metadata_id(),
-        bump,
-    )]
+    /// CHECK: Metaplex metadata PDA — verified by Token Metadata program during CPI
+    #[account(mut)]
     pub nft_metadata: UncheckedAccount<'info>,
 
     /// CHECK: Metaplex master edition PDA — verified by Token Metadata
