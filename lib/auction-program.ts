@@ -863,7 +863,10 @@ export class AuctionProgram {
   ): Promise<string> {
     console.log('[listItemPnft] nftMint:', nftMint.toBase58());
     console.log('[listItemPnft] paymentMint:', paymentMint.toBase58());
+    console.log('[listItemPnft] royaltyBps:', royaltyBps, 'type:', typeof royaltyBps);
     console.log('[listItemPnft] creatorAddress:', creatorAddress.toBase58());
+    // Ensure royaltyBps is a valid u16
+    const validatedRoyaltyBps = Math.max(0, Math.min(1000, Math.floor(royaltyBps || 0)));
 
     const MPL_TOKEN_METADATA_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
     const MPL_AUTH_RULES_ID = new PublicKey('auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg');
@@ -927,7 +930,7 @@ export class AuctionProgram {
         category === ItemCategory.TCGCards ? { tcgCards: {} } :
         category === ItemCategory.SportsCards ? { sportsCards: {} } :
         { watches: {} },
-        royaltyBps,
+        validatedRoyaltyBps,
         creatorAddress,
       )
       .accounts({
