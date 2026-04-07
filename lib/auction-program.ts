@@ -848,6 +848,91 @@ export class AuctionProgram {
   }
 
   /**
+   * List a pNFT (Metaplex programmable NFT) for sale.
+   * Used for CC cards and Phygitals which are pNFTs.
+   */
+  async listItemPnft(
+    nftMint: PublicKey,
+    paymentMint: PublicKey,
+    listingType: ListingType,
+    price: number,
+    durationSeconds: number | undefined,
+    category: ItemCategory,
+    royaltyBps: number,
+    creatorAddress: PublicKey,
+  ): Promise<string> {
+    const MPL_TOKEN_METADATA_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    const ATA_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bpos');
+    const SYSVAR_INSTRUCTIONS_ID = new PublicKey('Sysvar1nstructions1111111111111111111111111');
+
+    const listing = PublicKey.findProgramAddressSync([Buffer.from('listing'), nftMint.toBuffer()], AUCTION_PROGRAM_ID)[0];
+    const escrowAuthority = PublicKey.findProgramAddressSync([Buffer.from('escrow_authority'), nftMint.toBuffer()], AUCTION_PROGRAM_ID)[0];
+
+    const nftMetadata = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+    const nftEdition = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('edition')],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    const sellerNftToken = await getAssociatedTokenAddress(nftMint, this.wallet.publicKey);
+    const escrowNftToken = await getAssociatedTokenAddress(nftMint, escrowAuthority, true);
+
+    const sellerTokenRecord = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), sellerNftToken.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+    const escrowTokenRecord = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), escrowNftToken.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    const ix = await this.program.methods
+      .listItemPnft(
+        listingType === ListingType.FixedPrice ? { fixedPrice: {} } : { auction: {} },
+        new anchor.BN(price),
+        durationSeconds ? new anchor.BN(durationSeconds) : null,
+        category === ItemCategory.DigitalArt ? { digitalArt: {} } :
+        category === ItemCategory.Spirits ? { spirits: {} } :
+        category === ItemCategory.TCGCards ? { tcgCards: {} } :
+        category === ItemCategory.SportsCards ? { sportsCards: {} } :
+        { watches: {} },
+        royaltyBps,
+        creatorAddress,
+      )
+      .accounts({
+        listing,
+        nftMint,
+        nftMetadata,
+        nftEdition,
+        sellerNftToken,
+        sellerTokenRecord,
+        escrowAuthority,
+        escrowNftToken,
+        escrowTokenRecord,
+        paymentMint,
+        seller: this.wallet.publicKey,
+        tokenMetadataProgram: MPL_TOKEN_METADATA_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        ataProgram: ATA_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
+        authorizationRulesProgram: null,
+        authorizationRules: null,
+      })
+      .instruction();
+
+    const tx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+      ix
+    );
+    return await this.sendAndConfirm(tx);
+  }
+
+  /**
    * Fetch all listings
    */
   async fetchAllListings(): Promise<any[]> {

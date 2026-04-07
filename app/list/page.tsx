@@ -236,15 +236,48 @@ export default function ListNFTPage() {
 
       const itemCategory = getNftCategory(selectedNft);
 
-      const tx = await auctionProgram.listItem(
-        nftMint,
-        sellerNftAccount,
-        paymentMint,
-        listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
-        priceInUnits,
-        durationSeconds,
-        itemCategory
-      );
+      // Detect pNFT: CC cards and Phygitals are Metaplex pNFTs (not Token-2022)
+      // pNFTs require the Token Metadata TransferV1 CPI path
+      const isPnft = (selectedNft.grouping?.some((g: any) =>
+        g.group_key === 'collection' &&
+        (g.group_value === CC_COLLECTION || g.group_value === PHYG_COLLECTION)
+      )) || (selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
+
+      let tx: string;
+      if (isPnft) {
+        showToast.info("Listing pNFT via Metaplex Token Metadata...");
+        // Fetch royalty info for this NFT
+        let royaltyBps = 500; // default 5%
+        let creatorAddr = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+        try {
+          const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
+          const nftData = await nftRes.json();
+          const asset = nftData.nft || nftData;
+          royaltyBps = asset.royalty?.basis_points || 500;
+          const creators = asset.creators || asset.content?.metadata?.creators || [];
+          if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
+        } catch {}
+        tx = await auctionProgram.listItemPnft(
+          nftMint,
+          paymentMint,
+          listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
+          priceInUnits,
+          durationSeconds,
+          itemCategory,
+          royaltyBps,
+          creatorAddr,
+        );
+      } else {
+        tx = await auctionProgram.listItem(
+          nftMint,
+          sellerNftAccount,
+          paymentMint,
+          listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
+          priceInUnits,
+          durationSeconds,
+          itemCategory
+        );
+      }
 
       showToast.success("NFT listed successfully!");
       setSubmitted(true);
