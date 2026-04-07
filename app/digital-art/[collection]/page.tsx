@@ -112,6 +112,7 @@ export default function CollectionPage() {
 
   const dataRequestRef = useRef(0);
   const marketplaceRequestRef = useRef(0);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
 
   const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [listings, setListings] = useState<ListedNFT[]>([]);
@@ -126,11 +127,42 @@ export default function CollectionPage() {
   const [loadingMoreMarketplace, setLoadingMoreMarketplace] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [showUserNFTs, setShowUserNFTs] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "magiceden" | "tensor">("all");
+  const [sortOrder, setSortOrder] = useState<"price_asc" | "price_desc" | "recently_listed" | "common_to_rare" | "rare_to_common">("price_asc");
+  const [sortOpen, setSortOpen] = useState(false);
 
   const walletAddress = publicKey?.toBase58();
   const hasMarketplaceConfig = Boolean(
     collection?.marketplaces?.magicEden?.symbol || collection?.marketplaces?.tensor?.slug
   );
+  const hasMagicEden = Boolean(collection?.marketplaces?.magicEden?.symbol);
+  const hasTensor = Boolean(collection?.marketplaces?.tensor?.slug);
+
+  const filteredListings = (() => {
+    const base =
+      sourceFilter === "all"
+        ? marketplaceListings
+        : marketplaceListings.filter((l) => l.source === sourceFilter);
+
+    return [...base].sort((a, b) => {
+      switch (sortOrder) {
+        case "price_asc":   return a.price - b.price;
+        case "price_desc":  return b.price - a.price;
+        case "recently_listed": return (b.listedAt ?? 0) - (a.listedAt ?? 0);
+        case "common_to_rare": return a.price - b.price;
+        case "rare_to_common": return b.price - a.price;
+        default: return 0;
+      }
+    });
+  })();
+
+  const SORT_LABELS: Record<typeof sortOrder, string> = {
+    price_asc: "Price: Low to High",
+    price_desc: "Price: High to Low",
+    recently_listed: "Recently Listed",
+    common_to_rare: "Common to Rare",
+    rare_to_common: "Rare to Common",
+  };
 
   async function loadMarketplaceListings(
     targetCollectionAddress: string,
@@ -291,6 +323,16 @@ export default function CollectionPage() {
 
     void loadData();
   }, [collectionAddress, walletAddress]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
+        setSortOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (loading) {
     return (
@@ -578,6 +620,70 @@ export default function CollectionPage() {
                 collection.
               </p>
             </div>
+            {hasMarketplaceConfig && !loadingMarketplace && !marketplaceError && (
+              <div className="flex items-center gap-3 flex-wrap">
+                {(
+                  [
+                    { value: "all", label: "All" },
+                    ...(hasMagicEden ? [{ value: "magiceden", label: "Magic Eden" }] : []),
+                    ...(hasTensor ? [{ value: "tensor", label: "Tensor" }] : []),
+                  ] as { value: "all" | "magiceden" | "tensor"; label: string }[]
+                ).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setSourceFilter(value)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition ${
+                      sourceFilter === value
+                        ? "bg-gold-500 border-gold-500 text-dark-900"
+                        : "bg-transparent border-white/15 text-gray-400 hover:border-gold-500/50 hover:text-white"
+                    }`}
+                  >
+                    {label}
+                    {value !== "all" && (
+                      <span className="ml-1.5 opacity-70">
+                        {marketplaceListings.filter((l) => l.source === value).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+
+                {/* Sort dropdown */}
+                <div className="relative ml-auto" ref={sortDropdownRef}>
+                  <button
+                    onClick={() => setSortOpen((o) => !o)}
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold border border-white/15 bg-dark-800 text-gray-300 hover:border-gold-500/50 hover:text-white transition"
+                  >
+                    {SORT_LABELS[sortOrder]}
+                    <svg
+                      className={`w-3 h-3 transition-transform ${sortOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {sortOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-dark-800 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+                      {(Object.keys(SORT_LABELS) as (typeof sortOrder)[]).map((key) => (
+                        <button
+                          key={key}
+                          onClick={() => { setSortOrder(key); setSortOpen(false); }}
+                          className={`w-full text-left px-4 py-2.5 text-xs transition ${
+                            sortOrder === key
+                              ? "text-gold-400 bg-gold-500/10"
+                              : "text-gray-300 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          {SORT_LABELS[key]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {!hasMarketplaceConfig ? (
@@ -613,21 +719,22 @@ export default function CollectionPage() {
                 Retry
               </button>
             </div>
-          ) : marketplaceListings.length === 0 ? (
+          ) : filteredListings.length === 0 ? (
             <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
               <div className="text-5xl mb-4">🪄</div>
               <h3 className="font-serif text-xl text-white mb-2">
                 No External Listings Right Now
               </h3>
               <p className="text-gray-400 text-sm">
-                We could not find any active buy-now listings for this collection
-                on the curated marketplace sources.
+                {sourceFilter === "all"
+                  ? "We could not find any active buy-now listings for this collection on the curated marketplace sources."
+                  : `No listings found on ${sourceFilter === "magiceden" ? "Magic Eden" : "Tensor"} for this collection.`}
               </p>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {marketplaceListings.map((listing) => {
+                {filteredListings.map((listing) => {
                   const listedAt = formatListedAt(listing.listedAt);
 
                   return (
