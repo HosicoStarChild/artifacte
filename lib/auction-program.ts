@@ -861,34 +861,48 @@ export class AuctionProgram {
     royaltyBps: number,
     creatorAddress: PublicKey,
   ): Promise<string> {
+    console.log('[listItemPnft] nftMint:', nftMint.toBase58());
+    console.log('[listItemPnft] paymentMint:', paymentMint.toBase58());
+    console.log('[listItemPnft] creatorAddress:', creatorAddress.toBase58());
+
     const MPL_TOKEN_METADATA_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
     const MPL_AUTH_RULES_ID = new PublicKey('auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg');
     const ATA_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bpos');
     const SYSVAR_INSTRUCTIONS_ID = new PublicKey('Sysvar1nstructions1111111111111111111111111');
 
+    console.log('[listItemPnft] deriving PDAs...');
     const listing = PublicKey.findProgramAddressSync([Buffer.from('listing'), nftMint.toBuffer()], AUCTION_PROGRAM_ID)[0];
+    console.log('[listItemPnft] listing:', listing.toBase58());
     const escrowAuthority = PublicKey.findProgramAddressSync([Buffer.from('escrow_authority'), nftMint.toBuffer()], AUCTION_PROGRAM_ID)[0];
+    console.log('[listItemPnft] escrowAuthority:', escrowAuthority.toBase58());
 
     const nftMetadata = PublicKey.findProgramAddressSync(
       [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer()],
       MPL_TOKEN_METADATA_ID
     )[0];
+    console.log('[listItemPnft] nftMetadata:', nftMetadata.toBase58());
     const nftEdition = PublicKey.findProgramAddressSync(
       [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('edition')],
       MPL_TOKEN_METADATA_ID
     )[0];
+    console.log('[listItemPnft] nftEdition:', nftEdition.toBase58());
 
     const sellerNftToken = await getAssociatedTokenAddress(nftMint, this.wallet.publicKey);
+    console.log('[listItemPnft] sellerNftToken:', sellerNftToken.toBase58());
     const escrowNftToken = await getAssociatedTokenAddress(nftMint, escrowAuthority, true);
+    console.log('[listItemPnft] escrowNftToken:', escrowNftToken.toBase58());
 
     const sellerTokenRecord = PublicKey.findProgramAddressSync(
       [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), sellerNftToken.toBuffer()],
       MPL_TOKEN_METADATA_ID
     )[0];
+    console.log('[listItemPnft] sellerTokenRecord:', sellerTokenRecord.toBase58());
     const escrowTokenRecord = PublicKey.findProgramAddressSync(
       [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), escrowNftToken.toBuffer()],
       MPL_TOKEN_METADATA_ID
     )[0];
+    console.log('[listItemPnft] escrowTokenRecord:', escrowTokenRecord.toBase58());
+    console.log('[listItemPnft] building instruction...');
 
     // Fetch NFT metadata to get auth rules (some pNFTs have programmable configs with rule sets)
     let authorizationRules: PublicKey | null = null;
