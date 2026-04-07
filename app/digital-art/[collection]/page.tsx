@@ -7,6 +7,9 @@ import { useWallet } from "@solana/wallet-adapter-react";
 
 type MarketplaceSource = "magiceden" | "tensor";
 
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%23444'%3E%3F%3C/text%3E%3C/svg%3E";
+
 interface CollectionInfo {
   collectionAddress: string;
   name: string;
@@ -333,7 +336,7 @@ export default function CollectionPage() {
             alt={collection.name}
             className="w-20 h-20 rounded-xl object-cover border border-white/10"
             onError={(event) => {
-              (event.target as HTMLImageElement).src = "/placeholder.png";
+              (event.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
           />
           <div>
@@ -441,7 +444,7 @@ export default function CollectionPage() {
                         loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         onError={(event) => {
-                          (event.target as HTMLImageElement).src = "/placeholder.png";
+                          (event.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                         }}
                       />
                     </div>
@@ -510,7 +513,7 @@ export default function CollectionPage() {
                         loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         onError={(event) => {
-                          (event.target as HTMLImageElement).src = "/placeholder.png";
+                          (event.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                         }}
                       />
                       {isAuctionEnded && (
@@ -640,7 +643,7 @@ export default function CollectionPage() {
                           loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           onError={(event) => {
-                            (event.target as HTMLImageElement).src = "/placeholder.png";
+                            (event.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
                           }}
                         />
                         <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-dark-900/90 text-[10px] font-semibold text-white border border-white/10">
