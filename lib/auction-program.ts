@@ -919,8 +919,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: null,
-        authorizationRules: null,
+        authorizationRulesProgram: MPL_TOKEN_METADATA_ID, // placeholder — no auth rules for standard pNFTs
+        authorizationRules: MPL_TOKEN_METADATA_ID, // placeholder — no auth rules for standard pNFTs
       })
       .instruction();
 
