@@ -234,8 +234,18 @@ export class AuctionProgram {
 
     let sig: string;
     if (this.sendTx) {
-      // Use wallet adapter's sendTransaction — goes through Phantom's native flow, no Blowfish warning
-      sig = await this.sendTx(tx, this.connection);
+      try {
+        // Use wallet adapter's sendTransaction — goes through Phantom's native flow
+        sig = await this.sendTx(tx, this.connection);
+      } catch (walletErr: any) {
+        // Try to extract simulation logs from wallet error
+        console.error('[sendAndConfirm] Wallet sendTransaction failed:', walletErr?.message || walletErr);
+        if (walletErr?.logs) console.error('[sendAndConfirm] Wallet error logs:', walletErr.logs);
+        // Fallback: sign separately and send raw (bypasses wallet simulation)
+        console.log('[sendAndConfirm] Retrying with signTransaction + sendRawTransaction...');
+        const signed = await this.wallet.signTransaction(tx);
+        sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+      }
     } else {
       const signed = await this.wallet.signTransaction(tx);
       sig = await this.connection.sendRawTransaction(signed.serialize());
