@@ -31,7 +31,7 @@ const PHYG_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 
 export default function ListNFTPage() {
-  const { publicKey, connected, wallet, sendTransaction } = useWallet();
+  const { publicKey, connected, wallet, sendTransaction, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
   const [nfts, setNfts] = useState<NFTAsset[]>([]);
@@ -260,7 +260,8 @@ export default function ListNFTPage() {
         if (!res.ok) throw new Error(data.error || 'Failed to build Tensor listing');
         const txBytes = Buffer.from(data.tx, 'base64');
         const vtx = VersionedTransaction.deserialize(txBytes);
-        const signed = await wallet.adapter.signTransaction(vtx);
+        if (!signTransaction) throw new Error("Wallet does not support signing");
+        const signed = await signTransaction(vtx);
         const sig = await connection.sendRawTransaction(signed.serialize());
         // Poll for confirmation (avoids WebSocket issues with HTTP-only RPC proxy)
         for (let i = 0; i < 60; i++) {
