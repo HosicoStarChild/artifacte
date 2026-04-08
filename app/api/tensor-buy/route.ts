@@ -117,9 +117,15 @@ export async function POST(request: Request) {
     altTx.feePayer = authority.publicKey;
     altTx.sign(authority);
     const altSig = await conn.sendRawTransaction(altTx.serialize(), { skipPreflight: true });
-    await conn.confirmTransaction(altSig, 'confirmed');
 
-    // Wait 2 slots for ALT to activate (~800ms)
+    // Poll for ALT tx confirmation (avoids WebSocket issues in Next.js server)
+    for (let i = 0; i < 30; i++) {
+      const status = await conn.getSignatureStatuses([altSig]);
+      if (status.value[0]?.confirmationStatus === 'confirmed' || status.value[0]?.confirmationStatus === 'finalized') break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Wait for ALT to activate (~800ms)
     await new Promise(r => setTimeout(r, 800));
 
     // Load both ALTs
