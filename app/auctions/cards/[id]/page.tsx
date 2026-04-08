@@ -280,8 +280,9 @@ export default function CardDetailPage() {
     try {
       showToast.info("Building transaction...");
 
-      // Route phygitals directly to Tensor — check URL prefix, not card.source
-      if (cardId.startsWith('phyg-')) {
+      // Route Tensor listings to Tensor buy flow (phyg- prefix or source/buyKind)
+      const isTensorBuy = cardId.startsWith('phyg-') || card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard';
+      if (isTensorBuy) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
         const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info, sendTransaction ?? undefined, wallet?.adapter?.name);
