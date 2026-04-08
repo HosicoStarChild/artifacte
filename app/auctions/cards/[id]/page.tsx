@@ -48,6 +48,7 @@ export default function CardDetailPage() {
   const [card, setCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
+  const [unlisting, setUnlisting] = useState(false);
   const { publicKey, signTransaction, signAllTransactions, sendTransaction, connected, wallet } = useWallet();
   const { connection } = useConnection();
 
@@ -414,6 +415,46 @@ export default function CardDetailPage() {
     }
   };
 
+  const handleUnlist = async () => {
+    if (!connected || !publicKey || !card?.nftAddress || !signTransaction) return;
+    setUnlisting(true);
+    try {
+      showToast.info("Building delist transaction...");
+      const res = await fetch('/api/tensor-delist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mint: card.nftAddress,
+          owner: publicKey.toBase58(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to build delist transaction');
+
+      const txBytes = Buffer.from(data.tx, 'base64');
+      const vtx = VersionedTransaction.deserialize(txBytes);
+      const signed = await signTransaction(vtx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+
+      // Poll for confirmation
+      for (let i = 0; i < 60; i++) {
+        const status = await connection.getSignatureStatuses([sig]);
+        const s = status.value[0];
+        if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
+        if (s?.err) throw new Error(`Transaction failed: ${JSON.stringify(s.err)}`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      showToast.success("NFT unlisted successfully!");
+      setCard((prev: any) => prev ? { ...prev, price: 0, usdcPrice: null, solPrice: 0 } : prev);
+    } catch (err: any) {
+      console.error("Unlist failed:", err);
+      showToast.error(err.message || "Failed to unlist");
+    } finally {
+      setUnlisting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="pt-24 pb-20 min-h-screen">
@@ -513,11 +554,21 @@ export default function CardDetailPage() {
 
                 {card.price ? (
                   connected && publicKey && card.seller && publicKey.toBase58() === card.seller ? (
-                    <div className="text-center">
-                      <div className="w-full px-6 py-3.5 rounded-lg text-base font-semibold bg-dark-700 border border-gold-500/30 text-gold-500">
+                    <div className="space-y-3">
+                      <div className="w-full px-6 py-3 rounded-lg text-sm font-semibold bg-dark-700 border border-gold-500/30 text-gold-500 text-center">
                         Your Listing
                       </div>
-                      <p className="text-gray-500 text-xs mt-2">This NFT is listed by you</p>
+                      <button
+                        onClick={handleUnlist}
+                        disabled={unlisting}
+                        className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
+                          unlisting
+                            ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
+                      >
+                        {unlisting ? "Unlisting..." : "Unlist Item"}
+                      </button>
                     </div>
                   ) : connected ? (
                     <button
