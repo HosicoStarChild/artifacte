@@ -426,17 +426,20 @@ export default function CardDetailPage() {
       try {
         const nftRes = await fetch(`/api/nft?mint=${card.nftAddress}`);
         const nftData = await nftRes.json();
-        const asset = nftData.nft || nftData;
-        const isCompressed = asset.compression?.compressed === true;
-        const mintInfo = await connection.getAccountInfo(new PublicKey(card.nftAddress));
-        const isToken2022 = mintInfo?.owner.toBase58() === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+        const rawAsset = nftData.result || {};
+        const isCompressed = rawAsset.compression?.compressed === true;
         if (isCompressed) {
           delistRoute = '/api/tensor-delist';
-        } else if (isToken2022) {
-          delistRoute = '/api/tensor-delist-t22';
         } else {
-          delistRoute = '/api/tensor-delist-legacy';
+          const mintInfo = await connection.getAccountInfo(new PublicKey(card.nftAddress));
+          const isToken2022 = mintInfo?.owner.toBase58() === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+          if (isToken2022) {
+            delistRoute = '/api/tensor-delist-t22';
+          } else {
+            delistRoute = '/api/tensor-delist-legacy';
+          }
         }
+        console.log('[delist] route:', delistRoute, 'compressed:', isCompressed);
       } catch {
         // If detection fails, try compressed (original behavior)
       }

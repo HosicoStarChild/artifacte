@@ -4,7 +4,7 @@ import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapte
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { PublicKey, Connection, Transaction } from "@solana/web3.js";
+import { PublicKey, Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
@@ -45,7 +45,7 @@ interface MyListing {
 }
 
 export default function MyListingsPage() {
-  const { publicKey, connected, wallet, sendTransaction } = useWallet();
+  const { publicKey, connected, wallet, sendTransaction, signTransaction } = useWallet();
   const { connection } = useConnection();
   const anchorWallet = useAnchorWallet();
   const [activeTab, setActiveTab] = useState<TabType>("active");
@@ -281,6 +281,63 @@ export default function MyListingsPage() {
     }
   }
 
+  async function handleTensorDelist(nftMintStr: string) {
+    if (!publicKey || !signTransaction) return;
+    setCancellingMint(nftMintStr);
+    try {
+      // Detect NFT type to choose the correct Tensor delist route
+      let delistRoute = '/api/tensor-delist';
+      try {
+        const nftRes = await fetch(`/api/nft?mint=${nftMintStr}`);
+        const nftData = await nftRes.json();
+        const rawAsset = nftData.result || {};
+        const isCompressed = rawAsset.compression?.compressed === true;
+        if (isCompressed) {
+          delistRoute = '/api/tensor-delist';
+        } else {
+          const mintInfo = await connection.getAccountInfo(new PublicKey(nftMintStr));
+          const isToken2022 = mintInfo?.owner.toBase58() === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+          if (isToken2022) {
+            delistRoute = '/api/tensor-delist-t22';
+          } else {
+            delistRoute = '/api/tensor-delist-legacy';
+          }
+        }
+        console.log('[my-listings] delist route:', delistRoute, 'compressed:', isCompressed);
+      } catch {}
+
+      const res = await fetch(delistRoute, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mint: nftMintStr, owner: publicKey.toBase58() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to build delist transaction');
+
+      const txBytes = Buffer.from(data.tx, 'base64');
+      const vtx = VersionedTransaction.deserialize(txBytes);
+      const signed = await signTransaction(vtx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+
+      for (let i = 0; i < 60; i++) {
+        const status = await connection.getSignatureStatuses([sig]);
+        const s = status.value[0];
+        if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
+        if (s?.err) throw new Error(`Transaction failed: ${JSON.stringify(s.err)}`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      setMyListings((prev) =>
+        prev.map((l) => l.nftMint === nftMintStr ? { ...l, status: "cancelled" as const } : l)
+      );
+    } catch (err: any) {
+      console.error("Tensor delist failed:", err);
+      setError(err.message || "Failed to delist from Tensor");
+    } finally {
+      setCancellingMint(null);
+    }
+  }
+
   function getFilteredListings(): MyListing[] {
     return myListings.filter((listing) => listing.status === activeTab);
   }
@@ -448,16 +505,26 @@ export default function MyListingsPage() {
                     </div>
                   </Link>
 
-                  {/* Cancel button for active non-Tensor listings */}
-                  {listing.status === "active" && !listing.listingType.includes("Tensor") && (
+                  {/* Cancel / Delist button for active listings */}
+                  {listing.status === "active" && (
                     <div className="px-4 pb-4">
-                      <button
-                        onClick={() => handleCancelListing(listing.nftMint, listing.isPnft)}
-                        disabled={cancellingMint === listing.nftMint}
-                        className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {cancellingMint === listing.nftMint ? "Cancelling..." : "Cancel Listing & Return NFT"}
-                      </button>
+                      {listing.listingType.includes("Tensor") ? (
+                        <button
+                          onClick={() => handleTensorDelist(listing.nftMint)}
+                          disabled={cancellingMint === listing.nftMint}
+                          className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancellingMint === listing.nftMint ? "Delisting..." : "Delist from Tensor"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleCancelListing(listing.nftMint, listing.isPnft)}
+                          disabled={cancellingMint === listing.nftMint}
+                          className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancellingMint === listing.nftMint ? "Cancelling..." : "Cancel Listing & Return NFT"}
+                        </button>
+                      )}
                     </div>
                   )}
                   </div>
