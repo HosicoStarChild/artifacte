@@ -133,10 +133,18 @@ export default function MyListingsPage() {
         fetchTensorListings(publicKey, connection),
       ]);
 
+      console.log('[my-listings] auction program listings:', allListings.length, 'tensor listings:', tensorListings.length);
+      console.log('[my-listings] connected wallet:', publicKey.toBase58());
+      if (allListings.length > 0) {
+        console.log('[my-listings] listing sellers:', allListings.map((l: any) => l.account.seller.toBase58()));
+        console.log('[my-listings] listing mints:', allListings.map((l: any) => l.account.nftMint.toBase58()));
+      }
+
       // Filter auction program listings where seller is the connected wallet
       const mine = allListings.filter(
         (l: any) => l.account.seller.toBase58() === publicKey.toBase58()
       );
+      console.log('[my-listings] matched listings for wallet:', mine.length);
 
       // Enrich auction program listings with NFT metadata
       const auctionEnriched: MyListing[] = await Promise.all(
