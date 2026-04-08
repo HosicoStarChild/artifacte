@@ -52,38 +52,33 @@ export default function CategoryAuctionsPage() {
   const urlCcCategoryParam = urlSearchParams.get('ccCategory');
   // Restore filters from sessionStorage on mount, with URL param override
   const storageKey = `artifacte-filters-${categorySlug}`;
-  const [filters, setFilters] = useState<Record<string, string>>(() => {
-    if (typeof window === 'undefined') return {};
-    // URL param takes priority (e.g. ?ccCategory=Pokemon from homepage)
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">("All");
+  const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">("default");
+  const [searchInput, setSearchInput] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore state from sessionStorage/URL after hydration
+  useEffect(() => {
+    const reverseMap: Record<string, string> = {
+      'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
+      'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
+      'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
+    };
     const urlCcCategory = new URLSearchParams(window.location.search).get('ccCategory');
     if (urlCcCategory) {
-      // Map URL param to dropdown option values (must match exactly)
-      const reverseMap: Record<string, string> = {
-        'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
-        'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
-        'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
-      };
       const tcgVal = reverseMap[urlCcCategory] || urlCcCategory;
-      return { tcg: tcgVal };
+      setFilters({ tcg: tcgVal });
+    } else {
+      try { setFilters(JSON.parse(sessionStorage.getItem(storageKey) || '{}')); } catch {}
     }
-    try { return JSON.parse(sessionStorage.getItem(storageKey) || '{}'); } catch { return {}; }
-  });
-  const [page, setPage] = useState(() => {
-    if (typeof window === 'undefined') return 1;
-    try { return parseInt(sessionStorage.getItem(`${storageKey}-page`) || '1'); } catch { return 1; }
-  });
-  const [currencyFilter, setCurrencyFilter] = useState<"All" | "USDC" | "SOL">(() => {
-    if (typeof window === 'undefined') return "All";
-    try { return (sessionStorage.getItem(`${storageKey}-currency`) as any) || "All"; } catch { return "All"; }
-  });
-  const [sortBy, setSortBy] = useState<"default" | "price-high" | "price-low" | "newest">(() => {
-    if (typeof window === 'undefined') return "default";
-    try { return (sessionStorage.getItem(`${storageKey}-sort`) as any) || "default"; } catch { return "default"; }
-  });
-  const [searchInput, setSearchInput] = useState(() => {
-    if (typeof window === 'undefined') return "";
-    try { return sessionStorage.getItem(`${storageKey}-search`) || ""; } catch { return ""; }
-  });
+    try { setPage(parseInt(sessionStorage.getItem(`${storageKey}-page`) || '1')); } catch {}
+    try { setCurrencyFilter((sessionStorage.getItem(`${storageKey}-currency`) as any) || "All"); } catch {}
+    try { setSortBy((sessionStorage.getItem(`${storageKey}-sort`) as any) || "default"); } catch {}
+    try { setSearchInput(sessionStorage.getItem(`${storageKey}-search`) || ""); } catch {}
+    setHydrated(true);
+  }, [storageKey]);
 
   // Sync URL ccCategory param → filter state (handles navigation between carousels)
   useEffect(() => {
@@ -685,15 +680,18 @@ export default function CategoryAuctionsPage() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            {l.source === 'phygitals' ? (
+                            {l.source === 'phygitals' && (l as any).currency === 'USDC' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">
-                                  {(l as any).usdcPrice ? `$${(l as any).usdcPrice.toLocaleString()}` : (l as any).currency === 'USDC' ? `$${l.price.toLocaleString()}` : `$${((l as any).solPrice || l.price).toLocaleString()}`}
-                                </p>
+                                <p className="text-white font-serif text-2xl">${l.price.toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">USDC</p>
                                 {(l as any).solPrice > 0 && (
                                   <p className="text-gray-500 text-xs mt-0.5">◎ {(l as any).solPrice.toFixed(4)} SOL</p>
                                 )}
+                              </>
+                            ) : l.source === 'phygitals' ? (
+                              <>
+                                <p className="text-white font-serif text-2xl">◎ {(l as any).solPrice?.toFixed(4) || l.price.toLocaleString()}</p>
+                                <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
                             ) : l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
                               <>
