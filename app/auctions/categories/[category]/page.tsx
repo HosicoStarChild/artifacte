@@ -687,8 +687,7 @@ export default function CategoryAuctionsPage() {
                               </>
                             ) : (l as any).usdcPrice || (l as any).currency === 'USDC' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">${((l as any).usdcPrice || l.price).toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">USDC</p>
+                                <p className="text-white font-serif text-2xl">${((l as any).usdcPrice || l.price).toLocaleString()} <span className="text-gold-500 text-sm">USDC</span></p>
                                 {(l as any).solPrice > 0 && (
                                   <p className="text-gray-500 text-xs mt-0.5">◎ {Number((l as any).solPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</p>
                                 )}
