@@ -173,7 +173,7 @@ export default function CardDetailPage() {
               const phygGradingId = getPhygAttr('Cert Number') || getPhygAttr('Grading ID') || null;
               // Check Tensor for listing price
               const tp = await fetchTensorPrice(connection, asset.id || cardId);
-              console.log(tp)
+
               setCard({
                 id: asset.id || cardId,
                 name: asset.content?.metadata?.name || "Unknown",
