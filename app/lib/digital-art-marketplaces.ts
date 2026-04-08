@@ -121,12 +121,14 @@ export function getSiblingCollectionAddresses(
 
 export function getMarketplaceIds(entry: AllowlistEntry): {
   magicEdenSymbol?: string;
-  tensorSlug?: string;
+  tensorCollId?: string;
 } {
   const magicEdenSymbol = entry.marketplaces?.magicEden?.symbol;
-  const tensorSlug =
-    entry.marketplaces?.tensor?.slug || entry.marketplaces?.magicEden?.symbol;
-  return { magicEdenSymbol, tensorSlug };
+  const tensorCollId =
+    entry.marketplaces?.tensor?.slug ||
+    entry.collectionAddress ||
+    entry.mintAuthority;
+  return { magicEdenSymbol, tensorCollId };
 }
 
 function decodeCursor(cursor?: string | null): MarketplaceCursor {
@@ -285,11 +287,46 @@ async function fetchMagicEdenListedCount(symbol: string): Promise<number | null>
   }
 }
 
-async function fetchTensorListedCount(slug: string): Promise<number | null> {
+// Cache resolved Tensor collIds so we only call find_collection once per address
+const tensorCollIdCache = new Map<string, string | null>();
+
+async function resolveTensorCollId(identifier: string): Promise<string | null> {
+  if (!process.env.TENSOR_API_KEY) return null;
+
+  const cached = tensorCollIdCache.get(identifier);
+  if (cached !== undefined) return cached;
+
+  try {
+    const response = await fetch(
+      `${TENSOR_API}/collections/find_collection?filter=${encodeURIComponent(identifier)}`,
+      {
+        headers: { "x-tensor-api-key": process.env.TENSOR_API_KEY },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!response.ok) {
+      console.log(`[tensor] find_collection failed for ${identifier}: ${response.status}`);
+      tensorCollIdCache.set(identifier, null);
+      return null;
+    }
+    const data = await response.json();
+    const collId = data?.collId || null;
+    console.log(`[tensor] resolved ${identifier} → collId: ${collId}`);
+    tensorCollIdCache.set(identifier, collId);
+    return collId;
+  } catch (err) {
+    console.log(`[tensor] find_collection error for ${identifier}:`, err);
+    tensorCollIdCache.set(identifier, null);
+    return null;
+  }
+}
+
+async function fetchTensorListedCount(collId: string): Promise<number | null> {
   if (!process.env.TENSOR_API_KEY) return null;
   try {
     const response = await fetch(
-      `${TENSOR_API}/collections/stats?slugs=${encodeURIComponent(slug)}`,
+      `${TENSOR_API}/collections/stats?slugs=${encodeURIComponent(collId)}`,
       {
         headers: { "x-tensor-api-key": process.env.TENSOR_API_KEY },
         cache: "no-store",
@@ -337,7 +374,7 @@ async function fetchMagicEdenCollectionListings(
 }
 
 async function fetchTensorCollectionListings(
-  slug: string,
+  collId: string,
   cursor: string | null,
   limit: number
 ): Promise<TensorPage> {
@@ -346,7 +383,7 @@ async function fetchTensorCollectionListings(
   }
 
   const params = new URLSearchParams({
-    slug,
+    collId,
     sortBy: "ListingPriceAsc",
     onlyListings: "true",
     limit: String(limit),
@@ -523,7 +560,10 @@ export async function getCuratedMarketplaceListings(input: {
     return { listings: [], nextCursor: null, hasMore: false };
   }
 
-  const { magicEdenSymbol, tensorSlug } = getMarketplaceIds(collection);
+  const { magicEdenSymbol, tensorCollId: tensorIdentifier } = getMarketplaceIds(collection);
+  const resolvedTensorCollId = tensorIdentifier
+    ? await resolveTensorCollId(tensorIdentifier)
+    : null;
   const curatedAddresses = new Set(
     getSiblingCollectionAddresses(collections, input.collectionAddress)
   );
@@ -535,11 +575,11 @@ export async function getCuratedMarketplaceListings(input: {
     magicEdenSymbol && !cursor.meDone
       ? fetchMagicEdenCollectionListings(magicEdenSymbol, cursor.meOffset, limit)
       : Promise.resolve({ listings: [], nextOffset: cursor.meOffset, hasMore: false }),
-    tensorSlug && !cursor.tensorDone
-      ? fetchTensorCollectionListings(tensorSlug, cursor.tensorCursor || null, limit)
+    resolvedTensorCollId && !cursor.tensorDone
+      ? fetchTensorCollectionListings(resolvedTensorCollId, cursor.tensorCursor || null, limit)
       : Promise.resolve({ listings: [], nextCursor: null, hasMore: false }),
     isFirstPage && magicEdenSymbol ? fetchMagicEdenListedCount(magicEdenSymbol) : Promise.resolve(null),
-    isFirstPage && tensorSlug ? fetchTensorListedCount(tensorSlug) : Promise.resolve(null),
+    isFirstPage && resolvedTensorCollId ? fetchTensorListedCount(resolvedTensorCollId) : Promise.resolve(null),
   ]);
 
   const mintCandidates = [
@@ -687,10 +727,13 @@ export async function getCuratedMarketplaceListing(input: {
     if (listing) return listing;
   }
 
-  const { tensorSlug } = getMarketplaceIds(collection);
-  if (!tensorSlug) return null;
+  const { tensorCollId: fallbackIdentifier } = getMarketplaceIds(collection);
+  if (!fallbackIdentifier) return null;
 
-  const fallback = await fetchTensorCollectionListings(tensorSlug, null, 60);
+  const resolvedFallbackCollId = await resolveTensorCollId(fallbackIdentifier);
+  if (!resolvedFallbackCollId) return null;
+
+  const fallback = await fetchTensorCollectionListings(resolvedFallbackCollId, null, 60);
   return (
     fallback.listings
       .filter((item: any) => {
