@@ -128,24 +128,22 @@ export default function CollectionPage() {
   const [loadingMoreMarketplace, setLoadingMoreMarketplace] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [showUserNFTs, setShowUserNFTs] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<"all" | "magiceden" | "tensor">("all");
+  const [sourceFilter, setSourceFilter] = useState<"magiceden" | "tensor">("tensor");
   const [sourceCounts, setSourceCounts] = useState<{ magiceden: number | null; tensor: number | null } | null>(null);
   const [sortOrder, setSortOrder] = useState<"price_asc" | "price_desc" | "recently_listed" | "common_to_rare" | "rare_to_common">("price_asc");
   const [sortOpen, setSortOpen] = useState(false);
 
   const walletAddress = publicKey?.toBase58();
   const hasMarketplaceConfig = Boolean(
-    collection?.marketplaces?.magicEden?.symbol || collection?.marketplaces?.tensor?.slug
+    collection?.marketplaces?.magicEden?.symbol || collection?.marketplaces?.tensor?.slug || collection?.collectionAddress
   );
   const hasMagicEden = Boolean(collection?.marketplaces?.magicEden?.symbol);
-  const hasTensor = Boolean(collection?.marketplaces?.tensor?.slug);
+  const hasTensor = Boolean(collection?.marketplaces?.tensor?.slug || collection?.collectionAddress);
 
   const filteredListings = (() => {
-    const base = (
-      sourceFilter === "all"
-        ? marketplaceListings
-        : marketplaceListings.filter((l) => l.source === sourceFilter)
-    ).filter((l) => l.price > 0);
+    const base = marketplaceListings
+      .filter((l) => l.source === sourceFilter)
+      .filter((l) => l.price > 0);
 
     return [...base].sort((a, b) => {
       switch (sortOrder) {
@@ -627,10 +625,9 @@ export default function CollectionPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 {(
                   [
-                    { value: "all", label: "All" },
-                    ...(hasMagicEden ? [{ value: "magiceden", label: "Magic Eden" }] : []),
                     ...(hasTensor ? [{ value: "tensor", label: "Tensor" }] : []),
-                  ] as { value: "all" | "magiceden" | "tensor"; label: string }[]
+                    ...(hasMagicEden ? [{ value: "magiceden", label: "Magic Eden" }] : []),
+                  ] as { value: "magiceden" | "tensor"; label: string }[]
                 ).map(({ value, label }) => (
                   <button
                     key={value}
@@ -724,9 +721,7 @@ export default function CollectionPage() {
                 No External Listings Right Now
               </h3>
               <p className="text-gray-400 text-sm">
-                {sourceFilter === "all"
-                  ? "We could not find any active buy-now listings for this collection on the curated marketplace sources."
-                  : `No listings found on ${sourceFilter === "magiceden" ? "Magic Eden" : "Tensor"} for this collection.`}
+                {`No listings found on ${sourceFilter === "magiceden" ? "Magic Eden" : "Tensor"} for this collection.`}
               </p>
             </div>
           ) : (
