@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { AuctionProgram } from "@/lib/auction-program";
-import bs58 from "bs58";
 
 const TENSOR_MARKETPLACE_PROGRAM = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const LIST_STATE_DISCRIMINATOR = new Uint8Array([78, 242, 89, 138, 161, 221, 176, 75]);
@@ -73,7 +72,7 @@ export default function MyListingsPage() {
       // Fetch ListState accounts where owner matches (owner at offset 10)
       const accounts = await conn.getProgramAccounts(TENSOR_MARKETPLACE_PROGRAM, {
         filters: [
-          { memcmp: { offset: 0, bytes: bs58.encode(LIST_STATE_DISCRIMINATOR) } },
+          { memcmp: { offset: 0, bytes: "ECt8xkbczt2" } },
           { memcmp: { offset: 10, bytes: owner.toBase58() } },
         ],
       });
