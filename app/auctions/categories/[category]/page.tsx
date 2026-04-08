@@ -680,32 +680,22 @@ export default function CategoryAuctionsPage() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            {l.source === 'phygitals' && (l as any).currency === 'USDC' ? (
+                            {isDigitalArt ? (
                               <>
-                                <p className="text-white font-serif text-2xl">${l.price.toLocaleString()}</p>
+                                <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
+                                <p className="text-gold-500 text-xs mt-1">SOL</p>
+                              </>
+                            ) : (l as any).usdcPrice || (l as any).currency === 'USDC' ? (
+                              <>
+                                <p className="text-white font-serif text-2xl">${((l as any).usdcPrice || l.price).toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">USDC</p>
                                 {(l as any).solPrice > 0 && (
-                                  <p className="text-gray-500 text-xs mt-0.5">◎ {(l as any).solPrice.toFixed(4)} SOL</p>
+                                  <p className="text-gray-500 text-xs mt-0.5">◎ {Number((l as any).solPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</p>
                                 )}
                               </>
-                            ) : l.source === 'phygitals' ? (
+                            ) : (l as any).solPrice > 0 || (l as any).currency === 'SOL' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">◎ {(l as any).solPrice?.toFixed(4) || l.price.toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">SOL</p>
-                              </>
-                            ) : l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">SOL</p>
-                              </>
-                            ) : l.source === 'collector-crypt' && (l as any).currency === 'USDC' ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">${l.price.toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">USDC</p>
-                              </>
-                            ) : isDigitalArt ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
+                                <p className="text-white font-serif text-2xl">◎ {((l as any).solPrice || l.price).toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
                             ) : (
