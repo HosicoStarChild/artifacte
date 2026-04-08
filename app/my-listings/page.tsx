@@ -196,18 +196,20 @@ export default function MyListingsPage() {
         })
       );
 
-      // Filter to only allowed collections
-      const filteredAuction = auctionEnriched.filter(
-        (l) => l.collectionAddress && allowedAddresses.has(l.collectionAddress)
-      );
+      // Log resolved collections for debugging
+      console.log('[my-listings] auction enriched:', auctionEnriched.map(l => ({ mint: l.nftMint, collection: l.collectionAddress })));
+
+      // Auction program listings: always show the user's own listings (no allowlist gate)
+      // Tensor listings: filter to allowed collections only
       const filteredTensor = tensorListings.filter(
         (l) => l.collectionAddress && allowedAddresses.has(l.collectionAddress)
       );
+      console.log('[my-listings] tensor after allowlist filter:', filteredTensor.length, '/', tensorListings.length);
 
       // Merge both sources, dedup by nftMint
       const seen = new Set<string>();
       const all: MyListing[] = [];
-      for (const listing of [...filteredAuction, ...filteredTensor]) {
+      for (const listing of [...auctionEnriched, ...filteredTensor]) {
         if (!seen.has(listing.nftMint)) {
           seen.add(listing.nftMint);
           all.push(listing);
