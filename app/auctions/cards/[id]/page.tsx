@@ -21,7 +21,7 @@ const WalletMultiButton = dynamic(
 const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcPrice: number | null; solPrice: number | null } | null> {
+async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcPrice: number | null; solPrice: number | null; seller: string | null } | null> {
   try {
     const [listStatePda] = PublicKey.findProgramAddressSync(
       [Buffer.from("list_state"), new PublicKey(mint).toBuffer()],
@@ -29,13 +29,14 @@ async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcP
     );
     const info = await conn.getAccountInfo(listStatePda);
     if (!info || info.data.length < 82) return null;
+    const owner = new PublicKey(info.data.subarray(10, 42)).toBase58();
     const amount = Number(info.data.readBigUInt64LE(74));
     const hasCurrency = info.data[82] === 1;
     const currencyAddr = hasCurrency ? new PublicKey(info.data.subarray(83, 115)).toBase58() : null;
     if (currencyAddr === USDC_MINT) {
-      return { usdcPrice: amount / 1e6, solPrice: null };
+      return { usdcPrice: amount / 1e6, solPrice: null, seller: owner };
     }
-    return { usdcPrice: null, solPrice: amount / 1e9 };
+    return { usdcPrice: null, solPrice: amount / 1e9, seller: owner };
   } catch {
     return null;
   }
@@ -137,9 +138,11 @@ export default function CardDetailPage() {
             found.solPrice = found.solPrice || found.price || tp.solPrice || 0;
             found.currency = 'USDC';
             found.price = tp.usdcPrice;
+            if (tp.seller) found.seller = tp.seller;
           } else if (tp?.solPrice && !found.solPrice) {
             found.solPrice = tp.solPrice;
           }
+          if (tp?.seller && !found.seller) found.seller = tp.seller;
           setCard(found);
           setLoading(false);
           return;
@@ -509,13 +512,20 @@ export default function CardDetailPage() {
                 )}
 
                 {card.price ? (
-                  connected ? (
+                  connected && publicKey && card.seller && publicKey.toBase58() === card.seller ? (
+                    <div className="text-center">
+                      <div className="w-full px-6 py-3.5 rounded-lg text-base font-semibold bg-dark-700 border border-gold-500/30 text-gold-500">
+                        Your Listing
+                      </div>
+                      <p className="text-gray-500 text-xs mt-2">This NFT is listed by you</p>
+                    </div>
+                  ) : connected ? (
                     <button
                       onClick={handleBuy}
                       disabled={buying || card.sold}
                       className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
                         buying || card.sold
-                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400" 
+                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
                           : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                       }`}
                     >
