@@ -1007,15 +1007,34 @@ export class AuctionProgram {
   }
 
   /**
-   * Fetch all listings
+   * Fetch all listings (skips accounts that fail to decode)
    */
   async fetchAllListings(): Promise<any[]> {
     try {
       const accounts = await this.program.account.listing.all();
       return accounts;
     } catch (e) {
-      console.error("Error fetching listings:", e);
-      return [];
+      // If bulk decode fails (e.g. corrupted/closed accounts), fetch raw and decode individually
+      console.warn("Bulk listing fetch failed, trying individual decode:", (e as any)?.message);
+      try {
+        const rawAccounts = await this.connection.getProgramAccounts(
+          new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"),
+          { filters: [{ dataSize: this.program.account.listing.size }] }
+        );
+        const decoded: any[] = [];
+        for (const raw of rawAccounts) {
+          try {
+            const account = this.program.account.listing.coder.accounts.decode("listing", raw.account.data);
+            decoded.push({ publicKey: raw.pubkey, account });
+          } catch {
+            // Skip accounts that can't be decoded (closed/corrupted)
+          }
+        }
+        return decoded;
+      } catch (e2) {
+        console.error("Error fetching listings:", e2);
+        return [];
+      }
     }
   }
 }
