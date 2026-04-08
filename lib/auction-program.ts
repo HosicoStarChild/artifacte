@@ -928,9 +928,29 @@ export class AuctionProgram {
     // Token Metadata's transferV1 CPI handles ATA creation for pNFTs via init_if_needed
     // Do NOT pre-create the escrow ATA with standard ATA program — pNFTs need token records
     const preIxs: any[] = [];
-    console.log('[listItemPnft] building instruction...');
 
-    console.log('[listItemPnft] ruleSet:', ruleSet?.toBase58() || 'none');
+    // Read rule set from on-chain metadata using Metaplex deserializer
+    let authRuleSet: PublicKey | null = ruleSet;
+    if (!authRuleSet) {
+      try {
+        const { Metadata } = await import('@metaplex-foundation/mpl-token-metadata');
+        const metaAccount = await this.connection.getAccountInfo(nftMetadata);
+        if (metaAccount) {
+          const [metadata] = Metadata.fromAccountInfo(metaAccount);
+          const progConfig = metadata.programmableConfig;
+          if (progConfig && (progConfig as any).__kind === 'V1') {
+            const rs = (progConfig as any).ruleSet;
+            if (rs) {
+              authRuleSet = new PublicKey(rs);
+              console.log('[listItemPnft] found ruleSet from metadata:', authRuleSet.toBase58());
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[listItemPnft] failed to parse metadata for rule set:', err);
+      }
+    }
+    console.log('[listItemPnft] ruleSet:', authRuleSet?.toBase58() || 'none');
 
     const ix = await this.program.methods
       .listItemPnft(
@@ -962,8 +982,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: ruleSet ? MPL_AUTH_RULES_ID : null,
-        authorizationRules: ruleSet || null,
+        authorizationRulesProgram: authRuleSet ? MPL_AUTH_RULES_ID : null,
+        authorizationRules: authRuleSet || null,
       })
       .instruction();
 
