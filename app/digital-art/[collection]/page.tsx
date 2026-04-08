@@ -529,29 +529,11 @@ export default function CollectionPage() {
           </div>
         )}
 
-        <div>
-          <h2 className="font-serif text-2xl text-white mb-6">
-            Artifacte Listings
-          </h2>
-          {listings.length === 0 ? (
-            <div className="bg-dark-800 border border-white/10 rounded-xl p-12 text-center">
-              <div className="text-5xl mb-4">📭</div>
-              <h3 className="font-serif text-xl text-white mb-2">
-                No Listings Yet
-              </h3>
-              <p className="text-gray-400 mb-6 text-sm">
-                No NFTs from this collection are currently listed on Artifacte.
-              </p>
-              {userNFTs.length > 0 && (
-                <Link
-                  href={`/list?collection=${collectionAddress}`}
-                  className="inline-block px-6 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold rounded-lg transition text-sm"
-                >
-                  List Your {collection.name} NFT
-                </Link>
-              )}
-            </div>
-          ) : (
+        {listings.length > 0 && (
+          <div>
+            <h2 className="font-serif text-2xl text-white mb-6">
+              Artifacte Listings
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {listings.map((nft: any) => {
                 const isAuctionEnded =
@@ -627,8 +609,8 @@ export default function CollectionPage() {
                 );
               })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="mt-16">
           <div className="flex items-center justify-between gap-4 mb-6">
