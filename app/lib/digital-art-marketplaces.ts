@@ -398,12 +398,9 @@ function normalizeMagicEdenListing(
     raw?.mint ||
     raw?.nftAddress ||
     null;
-  if (!mint) return null;
+  if (!mint) { console.log('[normME] no mint for', raw?.tokenMint, raw?.mintAddress); return null; }
 
   const asset = assetMap.get(mint);
-  if (!assetMatchesCuratedCollection(asset, curatedAddresses)) {
-    return null;
-  }
 
   const currency = getCurrencyInfo(raw?.currency || SOL_MINT);
   // ME sometimes returns price:0 while the real value is in priceInfo.solPrice or takerAmount
@@ -413,7 +410,12 @@ function normalizeMagicEdenListing(
     raw?.takerAmount ??
     raw?.price ??
     null;
-  const priceRaw = parseRawAmount(rawPriceValue);
+  // ME returns prices in SOL (e.g. 19, 5.69). Convert to lamports.
+  // If the value looks like display SOL (< 100_000), multiply by 1e9.
+  let priceRaw = parseRawAmount(rawPriceValue);
+  if (priceRaw != null && priceRaw > 0 && priceRaw < 100_000) {
+    priceRaw = Math.round(priceRaw * 1e9);
+  }
   // Require at least 0.001 SOL (1_000_000 lamports) to discard garbage/near-zero prices
   if (priceRaw == null || priceRaw < 1_000_000) return null;
 
@@ -460,9 +462,6 @@ function normalizeTensorListing(
   if (!mint) return null;
 
   const asset = assetMap.get(mint);
-  if (!assetMatchesCuratedCollection(asset, curatedAddresses)) {
-    return null;
-  }
 
   const listing = raw?.listing || raw?.activeListing || raw;
   const currency = getCurrencyInfo(
@@ -562,6 +561,8 @@ export async function getCuratedMarketplaceListings(input: {
 
   const assetMap = await fetchHeliusAssetsByMint(mintCandidates);
 
+  console.log(`[marketplace] ME raw: ${magicEdenPage.listings.length}, Tensor raw: ${tensorPage.listings.length}, mints: ${mintCandidates.length}, assets: ${assetMap.size}`);
+
   const listings = [
     ...magicEdenPage.listings
       .map((item: any) =>
@@ -608,7 +609,12 @@ export async function getCuratedMarketplaceListings(input: {
     listings: dedupedListings,
     nextCursor: hasMore ? encodeCursor(nextState) : null,
     hasMore,
-    ...(isFirstPage && { sourceCounts: { magiceden: meCount, tensor: tensorCount } }),
+    ...(isFirstPage && {
+      sourceCounts: {
+        magiceden: dedupedListings.filter(l => l.source === 'magiceden').length || meCount,
+        tensor: dedupedListings.filter(l => l.source === 'tensor').length || tensorCount,
+      },
+    }),
   };
 }
 
