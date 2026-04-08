@@ -687,8 +687,13 @@ export default function CategoryAuctionsPage() {
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
                             {l.source === 'phygitals' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">◎ {(l as any).solPrice?.toFixed(4) || l.price.toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">SOL</p>
+                                <p className="text-white font-serif text-2xl">
+                                  {(l as any).usdcPrice ? `$${(l as any).usdcPrice.toLocaleString()}` : (l as any).currency === 'USDC' ? `$${l.price.toLocaleString()}` : `$${((l as any).solPrice || l.price).toLocaleString()}`}
+                                </p>
+                                <p className="text-gold-500 text-xs mt-1">USDC</p>
+                                {(l as any).solPrice > 0 && (
+                                  <p className="text-gray-500 text-xs mt-0.5">◎ {(l as any).solPrice.toFixed(4)} SOL</p>
+                                )}
                               </>
                             ) : l.source === 'collector-crypt' && (l as any).currency === 'SOL' ? (
                               <>

@@ -342,9 +342,11 @@ export default function MyListingsPage() {
                           <span className="text-gray-500">
                             {listing.listingType === "Auction" ? "Starting Price" : "Price"}
                           </span>
-                          <span className="text-white font-semibold">
-                            {listing.price} {listing.currency}
-                          </span>
+                          <div className="text-right">
+                            <span className="text-white font-semibold">
+                              {listing.currency === "USDC" ? "$" : listing.currency === "SOL" ? "◎ " : ""}{listing.price} {listing.currency}
+                            </span>
+                          </div>
                         </div>
                         {listing.currentBid !== undefined && (
                           <div className="flex justify-between text-sm">
