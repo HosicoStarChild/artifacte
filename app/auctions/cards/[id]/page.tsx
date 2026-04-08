@@ -420,7 +420,28 @@ export default function CardDetailPage() {
     setUnlisting(true);
     try {
       showToast.info("Building delist transaction...");
-      const res = await fetch('/api/tensor-delist', {
+
+      // Detect NFT type to choose the correct Tensor delist route
+      let delistRoute = '/api/tensor-delist'; // default: compressed
+      try {
+        const nftRes = await fetch(`/api/nft?mint=${card.nftAddress}`);
+        const nftData = await nftRes.json();
+        const asset = nftData.nft || nftData;
+        const isCompressed = asset.compression?.compressed === true;
+        const mintInfo = await connection.getAccountInfo(new PublicKey(card.nftAddress));
+        const isToken2022 = mintInfo?.owner.toBase58() === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+        if (isCompressed) {
+          delistRoute = '/api/tensor-delist';
+        } else if (isToken2022) {
+          delistRoute = '/api/tensor-delist-t22';
+        } else {
+          delistRoute = '/api/tensor-delist-legacy';
+        }
+      } catch {
+        // If detection fails, try compressed (original behavior)
+      }
+
+      const res = await fetch(delistRoute, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

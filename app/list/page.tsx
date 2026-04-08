@@ -243,17 +243,33 @@ export default function ListNFTPage() {
       const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
 
       let tx: string;
-      if (isCompressed) {
-        // List compressed NFT (cNFT) via Tensor marketplace
-        showToast.info("Listing compressed NFT on Tensor...");
-        const res = await fetch('/api/tensor-list', {
+
+      if (listingType === "fixed") {
+        // ── Fixed-price listings: always use Tensor marketplace ──
+        let tensorRoute: string;
+        let tensorCurrency = isRwaCategory ? 'USDC' : undefined; // SOL for Digital Art
+
+        if (isCompressed) {
+          tensorRoute = '/api/tensor-list';
+          tensorCurrency = 'USDC';
+          showToast.info("Listing compressed NFT on Tensor...");
+        } else if (isToken2022) {
+          tensorRoute = '/api/tensor-list-t22';
+          showToast.info("Listing Token-2022 NFT on Tensor...");
+        } else {
+          // Standard SPL + pNFTs — both handled by Tensor's legacy instruction
+          tensorRoute = '/api/tensor-list-legacy';
+          showToast.info("Listing NFT on Tensor...");
+        }
+
+        const res = await fetch(tensorRoute, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             mint: mintStr,
             owner: publicKey.toBase58(),
             amount: priceInUnits,
-            currency: 'USDC',
+            currency: tensorCurrency,
           }),
         });
         const data = await res.json();
@@ -263,7 +279,7 @@ export default function ListNFTPage() {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const signed = await signTransaction(vtx);
         const sig = await connection.sendRawTransaction(signed.serialize());
-        // Poll for confirmation (avoids WebSocket issues with HTTP-only RPC proxy)
+        // Poll for confirmation
         for (let i = 0; i < 60; i++) {
           const status = await connection.getSignatureStatuses([sig]);
           const s = status.value[0];
@@ -272,44 +288,48 @@ export default function ListNFTPage() {
           await new Promise(r => setTimeout(r, 500));
         }
         tx = sig;
-      } else if (isPnft) {
-        showToast.info("Listing pNFT via Metaplex Token Metadata...");
-        // Fetch royalty info and auth rules for this NFT
-        let royaltyBps = 500; // default 5%
-        let creatorAddr = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
-        let ruleSet: PublicKey | null = null;
-        try {
-          const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
-          const nftData = await nftRes.json();
-          const asset = nftData.nft || nftData;
-          royaltyBps = asset.royalty?.basis_points || 500;
-          const creators = asset.creators || asset.content?.metadata?.creators || [];
-          if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
-          // Extract authorization rules from raw Helius response (pNFTs with rule sets)
-          const ruleSetAddr = nftData.result?.programmable_config?.rule_set;
-          if (ruleSetAddr) ruleSet = new PublicKey(ruleSetAddr);
-        } catch {}
-        tx = await auctionProgram.listItemPnft(
-          nftMint,
-          paymentMint,
-          listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
-          priceInUnits,
-          durationSeconds,
-          itemCategory,
-          royaltyBps,
-          creatorAddr,
-          ruleSet,
-        );
       } else {
-        tx = await auctionProgram.listItem(
-          nftMint,
-          sellerNftAccount,
-          paymentMint,
-          listingType === "auction" ? ListingType.Auction : ListingType.FixedPrice,
-          priceInUnits,
-          durationSeconds,
-          itemCategory
-        );
+        // ── Auction listings: keep using Artifacte auction program ──
+        if (isCompressed) {
+          throw new Error("Auctions are not supported for compressed NFTs. Please use Fixed Price.");
+        } else if (isPnft) {
+          showToast.info("Listing pNFT auction via Metaplex Token Metadata...");
+          let royaltyBpsVal = 500;
+          let creatorAddr = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+          let ruleSet: PublicKey | null = null;
+          try {
+            const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
+            const nftData = await nftRes.json();
+            const asset = nftData.nft || nftData;
+            royaltyBpsVal = asset.royalty?.basis_points || 500;
+            const creators = asset.creators || asset.content?.metadata?.creators || [];
+            if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
+            const ruleSetAddr = nftData.result?.programmable_config?.rule_set;
+            if (ruleSetAddr) ruleSet = new PublicKey(ruleSetAddr);
+          } catch {}
+          tx = await auctionProgram.listItemPnft(
+            nftMint,
+            paymentMint,
+            ListingType.Auction,
+            priceInUnits,
+            durationSeconds,
+            itemCategory,
+            royaltyBpsVal,
+            creatorAddr,
+            ruleSet,
+          );
+        } else {
+          showToast.info("Listing auction on Artifacte...");
+          tx = await auctionProgram.listItem(
+            nftMint,
+            sellerNftAccount,
+            paymentMint,
+            ListingType.Auction,
+            priceInUnits,
+            durationSeconds,
+            itemCategory
+          );
+        }
       }
 
       showToast.success("NFT listed successfully!");
@@ -653,21 +673,39 @@ export default function ListNFTPage() {
               {/* Fee info */}
               <div className="bg-dark-700 rounded-lg p-4 mb-6 border border-white/5">
                 <p className="text-gray-400 text-xs font-medium mb-2">Fee Summary</p>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Platform fee</span>
-                  <span className="text-white">2%</span>
-                </div>
-                <div className="flex justify-between text-sm mt-1">
-                  <span className="text-gray-500">Creator royalty</span>
-                  <span className="text-white">{loadingRoyalty ? "..." : `${(royaltyBps / 100).toFixed(1)}%`}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
-                  <span className="text-gray-500">You receive</span>
-                  <span className="text-gold-400 font-semibold">
-                    {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
-                  </span>
-                </div>
-                <p className="text-gray-600 text-[10px] mt-3">Fees are only charged when your item sells. No sale, no fee.</p>
+                {listingType === "fixed" ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Platform fee (paid by buyer)</span>
+                      <span className="text-white">2%</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
+                      <span className="text-gray-500">You receive</span>
+                      <span className="text-gold-400 font-semibold">
+                        {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${parseFloat(price).toFixed(2)}` : "—"}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 text-[10px] mt-3">Listed on Tensor. 2% platform fee is charged to the buyer at purchase time.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Platform fee</span>
+                      <span className="text-white">2%</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-gray-500">Creator royalty</span>
+                      <span className="text-white">{loadingRoyalty ? "..." : `${(royaltyBps / 100).toFixed(1)}%`}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
+                      <span className="text-gray-500">You receive</span>
+                      <span className="text-gold-400 font-semibold">
+                        {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 text-[10px] mt-3">Listed on Artifacte. Fees are deducted when the auction settles.</p>
+                  </>
+                )}
               </div>
 
               {/* Submit */}
