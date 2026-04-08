@@ -635,6 +635,9 @@ export default function ListNFTPage() {
                     Auction
                   </button>
                 </div>
+                {(selectedNft as any)?.compression?.compressed && (
+                  <p className="text-yellow-500/80 text-xs mt-2">Auctions are not available for compressed NFTs. Only fixed-price listings are supported.</p>
+                )}
               </div>
 
               {/* Price */}
