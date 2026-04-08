@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { AuctionProgram } from "@/lib/auction-program";
+import { fetchAllowlist } from "@/lib/allowlist";
 
 const TENSOR_MARKETPLACE_PROGRAM = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const LIST_STATE_DISCRIMINATOR = new Uint8Array([78, 242, 89, 138, 161, 221, 176, 75]);
@@ -31,6 +32,7 @@ interface MyListing {
   currentBid?: number;
   highestBidder?: string;
   royaltyBps: number;
+  collectionAddress?: string;
 }
 
 export default function MyListingsPage() {
@@ -49,14 +51,16 @@ export default function MyListingsPage() {
     }
   }, [connected, publicKey]);
 
-  async function fetchNftMeta(mintAddr: string): Promise<{ name: string; image: string }> {
+  async function fetchNftMeta(mintAddr: string): Promise<{ name: string; image: string; collection: string }> {
     let name = mintAddr.slice(0, 8) + "...";
     let image = "/placeholder-card.svg";
+    let collection = "";
     try {
       const resp = await fetch(`/api/nft?mint=${mintAddr}`);
       const data = await resp.json();
       const nft = data.nft || data;
       name = nft.name || nft.content?.metadata?.name || name;
+      collection = nft.collection || "";
       const rawImage = nft.image || nft.content?.links?.image || nft.content?.files?.[0]?.uri || "";
       if (rawImage.includes("arweave.net") || rawImage.includes("irys.xyz")) {
         image = `/api/img-proxy?url=${encodeURIComponent(rawImage)}`;
@@ -64,7 +68,7 @@ export default function MyListingsPage() {
         image = rawImage;
       }
     } catch {}
-    return { name, image };
+    return { name, image, collection };
   }
 
   async function fetchTensorListings(owner: PublicKey, conn: Connection): Promise<MyListing[]> {
@@ -92,7 +96,7 @@ export default function MyListingsPage() {
           const price = amount / Math.pow(10, decimals);
 
           const mintAddr = assetId.toBase58();
-          const { name, image } = await fetchNftMeta(mintAddr);
+          const { name, image, collection } = await fetchNftMeta(mintAddr);
 
           return {
             id: acc.pubkey.toBase58(),
@@ -104,6 +108,7 @@ export default function MyListingsPage() {
             status: "active" as const,
             listingType: "Fixed Price (Tensor)",
             royaltyBps: 0,
+            collectionAddress: collection,
           };
         })
       );
@@ -128,10 +133,15 @@ export default function MyListingsPage() {
       };
       const program = new AuctionProgram(connection, dummyWallet);
 
-      const [allListings, tensorListings] = await Promise.all([
+      const [allListings, tensorListings, allowlist] = await Promise.all([
         program.fetchAllListings(),
         fetchTensorListings(publicKey, connection),
+        fetchAllowlist(),
       ]);
+
+      const allowedAddresses = new Set(
+        allowlist.map((e) => e.collectionAddress).filter(Boolean)
+      );
 
       console.log('[my-listings] auction program listings:', allListings.length, 'tensor listings:', tensorListings.length);
       console.log('[my-listings] connected wallet:', publicKey.toBase58());
@@ -151,7 +161,7 @@ export default function MyListingsPage() {
         mine.map(async (l: any) => {
           const acc = l.account;
           const mintAddr = acc.nftMint.toBase58();
-          const { name, image } = await fetchNftMeta(mintAddr);
+          const { name, image, collection } = await fetchNftMeta(mintAddr);
 
           let status: "active" | "completed" | "cancelled" = "active";
           const statusObj = acc.status;
@@ -181,14 +191,23 @@ export default function MyListingsPage() {
             currentBid: currentBid > 0 ? currentBid : undefined,
             highestBidder: acc.highestBidder?.toBase58() !== PublicKey.default.toBase58() ? acc.highestBidder?.toBase58() : undefined,
             royaltyBps: acc.royaltyBasisPoints || 0,
+            collectionAddress: collection,
           };
         })
+      );
+
+      // Filter to only allowed collections
+      const filteredAuction = auctionEnriched.filter(
+        (l) => l.collectionAddress && allowedAddresses.has(l.collectionAddress)
+      );
+      const filteredTensor = tensorListings.filter(
+        (l) => l.collectionAddress && allowedAddresses.has(l.collectionAddress)
       );
 
       // Merge both sources, dedup by nftMint
       const seen = new Set<string>();
       const all: MyListing[] = [];
-      for (const listing of [...auctionEnriched, ...tensorListings]) {
+      for (const listing of [...filteredAuction, ...filteredTensor]) {
         if (!seen.has(listing.nftMint)) {
           seen.add(listing.nftMint);
           all.push(listing);
