@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     }
 
     const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+    const TOKEN_METADATA_PROGRAM_ID = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
 
     const { getDelistLegacyInstructionAsync, findListStatePda } = await import('@tensor-foundation/marketplace');
     const { address } = await import('@solana/kit');
@@ -15,11 +16,57 @@ export async function POST(request: Request) {
     const ownerAddress = address(owner);
     const fakeSigner = { address: ownerAddress, signTransactions: async () => [] };
 
-    const delistIx = await (getDelistLegacyInstructionAsync as any)({
+    // Read on-chain metadata account to detect pNFT + extract authorization rules
+    const { PublicKey: PK, Connection: SolConn } = await import('@solana/web3.js');
+    const tmpConn = new SolConn(HELIUS_RPC, 'confirmed');
+    const mintPk = new PK(mint);
+    const metaProgramPk = new PK(TOKEN_METADATA_PROGRAM_ID);
+    const [metaPda] = PK.findProgramAddressSync(
+      [Buffer.from('metadata'), metaProgramPk.toBuffer(), mintPk.toBuffer()],
+      metaProgramPk,
+    );
+    const metaAccount = await tmpConn.getAccountInfo(metaPda);
+    let isPnft = false;
+    let ruleSet: string | null = null;
+
+    if (metaAccount?.data) {
+      const d = metaAccount.data;
+      let o = 1 + 32 + 32;
+      o += 4 + 32; o += 4 + 10; o += 4 + 200; o += 2;
+      const hasCreators = d[o]; o += 1;
+      if (hasCreators === 1) { const n = d.readUInt32LE(o); o += 4; o += n * 34; }
+      o += 1; o += 1;
+      const hasEdNonce = d[o]; o += 1; if (hasEdNonce === 1) o += 1;
+      const hasTokenStd = d[o]; o += 1;
+      let tokenStandard = -1;
+      if (hasTokenStd === 1) { tokenStandard = d[o]; o += 1; }
+      isPnft = tokenStandard === 4;
+      const hasColl = d[o]; o += 1; if (hasColl === 1) o += 33;
+      const hasUses = d[o]; o += 1; if (hasUses === 1) o += 17;
+      const hasCollDetails = d[o]; o += 1;
+      if (hasCollDetails === 1) { const v = d[o]; o += 1; if (v === 0) o += 8; else if (v === 1) o += 16; }
+      if (o < d.length && d[o] === 1) {
+        o += 1; o += 1;
+        if (d[o] === 1) { o += 1; ruleSet = new PK(d.slice(o, o + 32)).toBase58(); }
+      }
+      console.log(`[tensor-delist-legacy] tokenStandard=${tokenStandard} isPnft=${isPnft} ruleSet=${ruleSet}`);
+    }
+
+    const delistInput: any = {
       owner: fakeSigner,
       mint: address(mint),
       rentDestination: ownerAddress,
-    });
+    };
+
+    if (isPnft && ruleSet) {
+      delistInput.authorizationRules = address(ruleSet);
+      console.log(`[tensor-delist-legacy] pNFT with rule set: ${ruleSet}`);
+    }
+    if (!isPnft) {
+      delistInput.tokenStandard = 0;
+    }
+
+    const delistIx = await (getDelistLegacyInstructionAsync as any)(delistInput);
 
     const {
       PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
