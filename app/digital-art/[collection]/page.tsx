@@ -642,11 +642,6 @@ export default function CollectionPage() {
                     }`}
                   >
                     {label}
-                    {value !== "all" && sourceCounts?.[value] != null && (
-                      <span className="ml-1.5 opacity-70">
-                        {sourceCounts[value]!.toLocaleString()}
-                      </span>
-                    )}
                   </button>
                 ))}
 
