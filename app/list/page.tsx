@@ -291,58 +291,7 @@ export default function ListNFTPage() {
       } else {
         // ── Auction listings: keep using Artifacte auction program ──
         if (isCompressed) {
-          // Compressed NFTs must be decompressed first before auction listing
-          showToast.info("Decompressing NFT for auction listing (2 transactions)...");
-          if (!signTransaction) throw new Error("Wallet does not support signing");
-
-          const decompRes = await fetch('/api/decompress-cnft', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mint: mintStr, owner: publicKey.toBase58() }),
-          });
-          const decompData = await decompRes.json();
-          if (!decompRes.ok) throw new Error(decompData.error || 'Failed to build decompress tx');
-
-          // Step 1: Redeem (remove leaf from tree)
-          showToast.info("Step 1/3: Redeeming compressed NFT...");
-          const redeemTx = VersionedTransaction.deserialize(Buffer.from(decompData.redeemTx, 'base64'));
-          const signedRedeem = await signTransaction(redeemTx);
-          const redeemSig = await connection.sendRawTransaction(signedRedeem.serialize());
-          for (let i = 0; i < 60; i++) {
-            const status = await connection.getSignatureStatuses([redeemSig]);
-            const s = status.value[0];
-            if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
-            if (s?.err) throw new Error(`Redeem failed: ${JSON.stringify(s.err)}`);
-            await new Promise(r => setTimeout(r, 500));
-          }
-
-          // Step 2: Decompress (voucher → regular NFT)
-          showToast.info("Step 2/3: Decompressing into regular NFT...");
-          const decompTx = VersionedTransaction.deserialize(Buffer.from(decompData.decompressTx, 'base64'));
-          const signedDecomp = await signTransaction(decompTx);
-          const decompSig = await connection.sendRawTransaction(signedDecomp.serialize());
-          for (let i = 0; i < 60; i++) {
-            const status = await connection.getSignatureStatuses([decompSig]);
-            const s = status.value[0];
-            if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
-            if (s?.err) throw new Error(`Decompress failed: ${JSON.stringify(s.err)}`);
-            await new Promise(r => setTimeout(r, 500));
-          }
-
-          // Step 3: Now list as standard auction (NFT is decompressed)
-          showToast.info("Step 3/3: Listing auction on Artifacte...");
-          // After decompression, the mint stays the same (asset ID = mint)
-          // Need to get the new token account
-          const decompressedAta = await getAssociatedTokenAddress(nftMint, publicKey);
-          tx = await auctionProgram.listItem(
-            nftMint,
-            decompressedAta,
-            paymentMint,
-            ListingType.Auction,
-            priceInUnits,
-            durationSeconds,
-            itemCategory
-          );
+          throw new Error("Auctions are not available for compressed NFTs. Please use Fixed Price instead.");
         } else if (isPnft) {
           showToast.info("Listing pNFT auction via Metaplex Token Metadata...");
           let royaltyBpsVal = 500;
@@ -520,6 +469,7 @@ export default function ListNFTPage() {
                       key={nft.id}
                       onClick={() => {
                         setSelectedNft(nft);
+                        if ((nft as any).compression?.compressed) setListingType("fixed");
                         setLoadingRoyalty(true);
                         fetch(`/api/nft?mint=${nft.id}`)
                           .then(r => r.json())
@@ -585,6 +535,7 @@ export default function ListNFTPage() {
                         return (
                           <button key={nft.id} onClick={() => {
                             setSelectedNft(nft);
+                            if ((nft as any).compression?.compressed) setListingType("fixed");
                             setLoadingRoyalty(true);
                             fetch(`/api/nft?mint=${nft.id}`)
                               .then(r => r.json())
@@ -670,9 +621,13 @@ export default function ListNFTPage() {
                     Fixed Price
                   </button>
                   <button
-                    onClick={() => setListingType("auction")}
+                    onClick={() => { if (!((selectedNft as any)?.compression?.compressed)) setListingType("auction"); }}
+                    disabled={(selectedNft as any)?.compression?.compressed === true}
+                    title={(selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : undefined}
                     className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
-                      listingType === "auction"
+                      (selectedNft as any)?.compression?.compressed
+                        ? "border-white/5 text-gray-600 cursor-not-allowed opacity-50"
+                        : listingType === "auction"
                         ? "border-gold-500 bg-gold-500/10 text-gold-400"
                         : "border-white/10 text-gray-400 hover:border-white/20"
                     }`}
