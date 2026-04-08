@@ -693,6 +693,13 @@ export default function CardDetailPage() {
                         {unlisting ? "Unlisting..." : "Unlist Item"}
                       </button>
                     </div>
+                  ) : card.auctionListing ? (
+                    <Link
+                      href={`/digital-art/auction/${card.nftAddress}`}
+                      className="w-full block px-6 py-3.5 rounded-lg text-base font-semibold text-center bg-gold-500 hover:bg-gold-600 text-dark-900 transition"
+                    >
+                      {card.auctionListing.listingType === 'auction' ? 'View Auction & Place Bid' : `Buy Now — $${card.price.toLocaleString()} ${card.currency}`}
+                    </Link>
                   ) : connected ? (
                     <button
                       onClick={handleBuy}
@@ -711,7 +718,7 @@ export default function CardDetailPage() {
                 ) : (
                   <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
                 )}
-                {card.price && <p className="text-gray-600 text-xs mt-2">Powered by Magic Eden</p>}
+                {card.price && <p className="text-gray-600 text-xs mt-2">{card.auctionListing ? 'Listed on Artifacte' : 'Powered by Magic Eden'}</p>}
               </div>
             )}
 
