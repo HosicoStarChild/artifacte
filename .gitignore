@@ -3,3 +3,10 @@ node_modules
 .env*
 target/
 sync-engine/node_modules
+.vercel
+
+# Skills
+
+.agents
+.claude
+skills-lock.json

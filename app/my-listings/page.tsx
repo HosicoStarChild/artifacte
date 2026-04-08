@@ -4,8 +4,12 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
 import { AuctionProgram } from "@/lib/auction-program";
+
+const TENSOR_MARKETPLACE_PROGRAM = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
+const LIST_STATE_DISCRIMINATOR = new Uint8Array([78, 242, 89, 138, 161, 221, 176, 75]);
+const USDC_MINT_ADDR = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -45,62 +49,113 @@ export default function MyListingsPage() {
     }
   }, [connected, publicKey]);
 
+  async function fetchNftMeta(mintAddr: string): Promise<{ name: string; image: string }> {
+    let name = mintAddr.slice(0, 8) + "...";
+    let image = "/placeholder-card.svg";
+    try {
+      const resp = await fetch(`/api/nft?mint=${mintAddr}`);
+      const data = await resp.json();
+      const nft = data.nft || data;
+      name = nft.name || nft.content?.metadata?.name || name;
+      const rawImage = nft.image || nft.content?.links?.image || nft.content?.files?.[0]?.uri || "";
+      if (rawImage.includes("arweave.net") || rawImage.includes("irys.xyz")) {
+        image = `/api/img-proxy?url=${encodeURIComponent(rawImage)}`;
+      } else if (rawImage) {
+        image = rawImage;
+      }
+    } catch {}
+    return { name, image };
+  }
+
+  async function fetchTensorListings(owner: PublicKey, conn: Connection): Promise<MyListing[]> {
+    try {
+      // Fetch ListState accounts where owner matches (owner at offset 10)
+      const accounts = await conn.getProgramAccounts(TENSOR_MARKETPLACE_PROGRAM, {
+        filters: [
+          { memcmp: { offset: 0, bytes: "ECt8xkbczt2" } },
+          { memcmp: { offset: 10, bytes: owner.toBase58() } },
+        ],
+      });
+
+      const listings: MyListing[] = await Promise.all(
+        accounts.map(async (acc) => {
+          const data = acc.account.data;
+          // Parse assetId (mint) at offset 42 (10 + 32 owner)
+          const assetId = new PublicKey(data.subarray(42, 74));
+          // Parse amount at offset 74
+          const amount = Number(data.readBigUInt64LE(74));
+          // Parse currency option at offset 82 (1 byte option flag + 32 bytes address)
+          const hasCurrency = data[82] === 1;
+          const currencyAddr = hasCurrency ? new PublicKey(data.subarray(83, 115)).toBase58() : null;
+          const currency = currencyAddr === USDC_MINT_ADDR ? "USDC" : "SOL";
+          const decimals = currency === "SOL" ? 9 : 6;
+          const price = amount / Math.pow(10, decimals);
+
+          const mintAddr = assetId.toBase58();
+          const { name, image } = await fetchNftMeta(mintAddr);
+
+          return {
+            id: acc.pubkey.toBase58(),
+            name,
+            image,
+            nftMint: mintAddr,
+            price,
+            currency,
+            status: "active" as const,
+            listingType: "Fixed Price (Tensor)",
+            royaltyBps: 0,
+          };
+        })
+      );
+
+      return listings;
+    } catch (err) {
+      console.error("Failed to fetch Tensor listings:", err);
+      return [];
+    }
+  }
+
   async function fetchMyListings() {
     if (!publicKey || !wallet) return;
     setLoading(true);
     setError("");
     try {
+      // Fetch auction program listings and Tensor listings in parallel
       const dummyWallet = {
         publicKey,
         signTransaction: async (tx: any) => tx,
         signAllTransactions: async (txs: any) => txs,
       };
       const program = new AuctionProgram(connection, dummyWallet);
-      const allListings = await program.fetchAllListings();
 
-      // Filter listings where seller is the connected wallet
+      const [allListings, tensorListings] = await Promise.all([
+        program.fetchAllListings(),
+        fetchTensorListings(publicKey, connection),
+      ]);
+
+      // Filter auction program listings where seller is the connected wallet
       const mine = allListings.filter(
         (l: any) => l.account.seller.toBase58() === publicKey.toBase58()
       );
 
-      // Fetch NFT metadata for each listing
-      const enriched: MyListing[] = await Promise.all(
+      // Enrich auction program listings with NFT metadata
+      const auctionEnriched: MyListing[] = await Promise.all(
         mine.map(async (l: any) => {
           const acc = l.account;
           const mintAddr = acc.nftMint.toBase58();
-          let name = mintAddr.slice(0, 8) + "...";
-          let image = "/placeholder-card.svg";
+          const { name, image } = await fetchNftMeta(mintAddr);
 
-          try {
-            const resp = await fetch(`/api/nft?mint=${mintAddr}`);
-            const data = await resp.json();
-            const nft = data.nft || data;
-            name = nft.name || nft.content?.metadata?.name || name;
-            const rawImage = nft.image || nft.content?.links?.image || nft.content?.files?.[0]?.uri || "";
-            // Proxy arweave/IPFS images
-            if (rawImage.includes("arweave.net") || rawImage.includes("irys.xyz")) {
-              image = `/api/img-proxy?url=${encodeURIComponent(rawImage)}`;
-            } else if (rawImage) {
-              image = rawImage;
-            }
-          } catch {}
-
-          // Determine status
           let status: "active" | "completed" | "cancelled" = "active";
           const statusObj = acc.status;
           if (statusObj.settled !== undefined) status = "completed";
           else if (statusObj.cancelled !== undefined) status = "cancelled";
 
-          // Determine listing type
           const isAuction = acc.listingType?.auction !== undefined;
-
-          // Currency
           const paymentMint = acc.paymentMint.toBase58();
           const currency = paymentMint === "So11111111111111111111111111111111111111112" ? "SOL"
             : paymentMint === "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB" ? "USD1"
             : "USDC";
 
-          // Price in human-readable
           const decimals = currency === "SOL" ? 9 : 6;
           const price = Number(acc.price) / Math.pow(10, decimals);
           const currentBid = Number(acc.currentBid) / Math.pow(10, decimals);
@@ -122,7 +177,17 @@ export default function MyListingsPage() {
         })
       );
 
-      setMyListings(enriched);
+      // Merge both sources, dedup by nftMint
+      const seen = new Set<string>();
+      const all: MyListing[] = [];
+      for (const listing of [...auctionEnriched, ...tensorListings]) {
+        if (!seen.has(listing.nftMint)) {
+          seen.add(listing.nftMint);
+          all.push(listing);
+        }
+      }
+
+      setMyListings(all);
     } catch (err: any) {
       console.error("Failed to fetch listings:", err);
       setError(err.message || "Failed to fetch listings");
@@ -219,7 +284,7 @@ export default function MyListingsPage() {
                 {filteredListings.map((listing) => (
                   <Link
                     key={listing.id}
-                    href={`/digital-art/auction/${listing.nftMint}`}
+                    href={`/auctions/cards/${listing.nftMint}`}
                     className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all block"
                   >
                     {/* Image */}
@@ -276,9 +341,11 @@ export default function MyListingsPage() {
                           <span className="text-gray-500">
                             {listing.listingType === "Auction" ? "Starting Price" : "Price"}
                           </span>
-                          <span className="text-white font-semibold">
-                            {listing.price} {listing.currency}
-                          </span>
+                          <div className="text-right">
+                            <span className="text-white font-semibold">
+                              {listing.currency === "USDC" ? "$" : listing.currency === "SOL" ? "◎ " : ""}{listing.price} {listing.currency}
+                            </span>
+                          </div>
                         </div>
                         {listing.currentBid !== undefined && (
                           <div className="flex justify-between text-sm">

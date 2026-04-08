@@ -1,10 +1,33 @@
+export interface CollectionLinks {
+  website?: string;
+  twitter?: string;
+  discord?: string;
+}
+
+export interface CollectionMarketplaces {
+  magicEden?: {
+    symbol: string;
+  };
+  tensor?: {
+    slug: string;
+  };
+  order?: Array<"artifacte" | "magiceden" | "tensor">;
+}
+
 export interface AllowlistEntry {
-  mintAuthority: string;
+  mintAuthority?: string;
+  collectionAddress?: string;
   name: string;
-  category: string;
-  addedAt: number;
-  addedBy: string;
-  verified: boolean;
+  category?: string;
+  matchBy?: string;
+  image?: string;
+  supply?: number;
+  description?: string;
+  links?: CollectionLinks;
+  marketplaces?: CollectionMarketplaces;
+  addedAt?: number;
+  addedBy?: string;
+  verified?: boolean;
 }
 
 export async function fetchAllowlist(): Promise<AllowlistEntry[]> {
@@ -20,12 +43,22 @@ export async function fetchAllowlist(): Promise<AllowlistEntry[]> {
 
 export async function isCollectionAllowlisted(mintAuthority: string): Promise<boolean> {
   const allowlist = await fetchAllowlist();
-  return allowlist.some((entry) => entry.mintAuthority === mintAuthority);
+  return allowlist.some(
+    (entry) =>
+      entry.mintAuthority === mintAuthority ||
+      entry.collectionAddress === mintAuthority
+  );
 }
 
 export async function getCollectionInfo(
   mintAuthority: string
 ): Promise<AllowlistEntry | null> {
   const allowlist = await fetchAllowlist();
-  return allowlist.find((entry) => entry.mintAuthority === mintAuthority) || null;
+  return (
+    allowlist.find(
+      (entry) =>
+        entry.mintAuthority === mintAuthority ||
+        entry.collectionAddress === mintAuthority
+    ) || null
+  );
 }

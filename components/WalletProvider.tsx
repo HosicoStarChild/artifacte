@@ -10,7 +10,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 
 export const WalletProviderWrapper: FC<{ children: ReactNode }> = ({ children }) => {
   // RPC proxy — keeps API key server-side  
-  const endpoint = useMemo(() => 'https://artifacte.io/api/rpc', []);
+  const endpoint = useMemo(() => `${typeof window !== 'undefined' ? window.location.origin : 'https://artifacte.io'}/api/rpc`, []);
   const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
 
   return (

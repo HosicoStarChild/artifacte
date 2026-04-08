@@ -214,10 +214,38 @@ export class AuctionProgram {
     const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.wallet.publicKey;
+
+    // Pre-simulate to capture detailed program logs on failure
+    try {
+      const sim = await this.connection.simulateTransaction(tx);
+      if (sim.value.err) {
+        console.error('[sendAndConfirm] Simulation failed:', sim.value.err);
+        console.error('[sendAndConfirm] Logs:', sim.value.logs);
+        const logs = sim.value.logs || [];
+        const err = new Error(`Transaction simulation failed: ${JSON.stringify(sim.value.err)}\nLogs:\n${logs.join('\n')}`);
+        (err as any).logs = logs;
+        throw err;
+      }
+    } catch (simErr: any) {
+      if (simErr.logs) throw simErr; // re-throw our formatted error
+      console.error('[sendAndConfirm] Simulation error:', simErr);
+      // Don't block on simulation errors (e.g. unsigned tx sim issues), let wallet handle it
+    }
+
     let sig: string;
     if (this.sendTx) {
-      // Use wallet adapter's sendTransaction — goes through Phantom's native flow, no Blowfish warning
-      sig = await this.sendTx(tx, this.connection);
+      try {
+        // Use wallet adapter's sendTransaction — goes through Phantom's native flow
+        sig = await this.sendTx(tx, this.connection);
+      } catch (walletErr: any) {
+        // Try to extract simulation logs from wallet error
+        console.error('[sendAndConfirm] Wallet sendTransaction failed:', walletErr?.message || walletErr);
+        if (walletErr?.logs) console.error('[sendAndConfirm] Wallet error logs:', walletErr.logs);
+        // Fallback: sign separately and send raw (bypasses wallet simulation)
+        console.log('[sendAndConfirm] Retrying with signTransaction + sendRawTransaction...');
+        const signed = await this.wallet.signTransaction(tx);
+        sig = await this.connection.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+      }
     } else {
       const signed = await this.wallet.signTransaction(tx);
       sig = await this.connection.sendRawTransaction(signed.serialize());
@@ -860,6 +888,7 @@ export class AuctionProgram {
     category: ItemCategory,
     royaltyBps: number,
     creatorAddress: PublicKey,
+    ruleSet: PublicKey | null = null,
   ): Promise<string> {
     console.log('[listItemPnft] nftMint:', nftMint.toBase58());
     console.log('[listItemPnft] paymentMint:', paymentMint.toBase58());
@@ -909,20 +938,29 @@ export class AuctionProgram {
     // Token Metadata's transferV1 CPI handles ATA creation for pNFTs via init_if_needed
     // Do NOT pre-create the escrow ATA with standard ATA program — pNFTs need token records
     const preIxs: any[] = [];
-    console.log('[listItemPnft] building instruction...');
 
-    // Fetch NFT metadata to get auth rules (some pNFTs have programmable configs with rule sets)
-    let authorizationRules: PublicKey | null = null;
-    try {
-      const metadataAccount = await this.connection.getAccountInfo(nftMetadata);
-      if (metadataAccount) {
-        // programmableConfig is at a specific offset in the metadata account
-        // ruleSet option: bytes 679+ for pNFT metadata
-        // Simpler: check if the metadata has a non-default ruleSet via DAS or just default to null
-        // Most CC cards use no auth rules (None variant)
-        authorizationRules = null;
+    // Read rule set from on-chain metadata using Metaplex deserializer
+    let authRuleSet: PublicKey | null = ruleSet;
+    if (!authRuleSet) {
+      try {
+        const { Metadata } = await import('@metaplex-foundation/mpl-token-metadata');
+        const metaAccount = await this.connection.getAccountInfo(nftMetadata);
+        if (metaAccount) {
+          const [metadata] = Metadata.fromAccountInfo(metaAccount);
+          const progConfig = metadata.programmableConfig;
+          if (progConfig && (progConfig as any).__kind === 'V1') {
+            const rs = (progConfig as any).ruleSet;
+            if (rs) {
+              authRuleSet = new PublicKey(rs);
+              console.log('[listItemPnft] found ruleSet from metadata:', authRuleSet.toBase58());
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[listItemPnft] failed to parse metadata for rule set:', err);
       }
-    } catch {}
+    }
+    console.log('[listItemPnft] ruleSet:', authRuleSet?.toBase58() || 'none');
 
     const ix = await this.program.methods
       .listItemPnft(
@@ -954,8 +992,8 @@ export class AuctionProgram {
         ataProgram: ATA_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
-        authorizationRulesProgram: null, // no auth rules for standard CC pNFTs
-        authorizationRules: null, // no auth rules for standard CC pNFTs
+        authorizationRulesProgram: authRuleSet ? MPL_AUTH_RULES_ID : null,
+        authorizationRules: authRuleSet || null,
       })
       .instruction();
 

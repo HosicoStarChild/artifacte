@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
@@ -18,12 +18,37 @@ const WalletMultiButton = dynamic(
 // Fee collection happens on our auction program listings only (2% on-chain)
 // CC card buys pass through to ME with no separate fee
 
+const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcPrice: number | null; solPrice: number | null; seller: string | null } | null> {
+  try {
+    const [listStatePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("list_state"), new PublicKey(mint).toBuffer()],
+      TENSOR_MARKETPLACE
+    );
+    const info = await conn.getAccountInfo(listStatePda);
+    if (!info || info.data.length < 82) return null;
+    const owner = new PublicKey(info.data.subarray(10, 42)).toBase58();
+    const amount = Number(info.data.readBigUInt64LE(74));
+    const hasCurrency = info.data[82] === 1;
+    const currencyAddr = hasCurrency ? new PublicKey(info.data.subarray(83, 115)).toBase58() : null;
+    if (currencyAddr === USDC_MINT) {
+      return { usdcPrice: amount / 1e6, solPrice: null, seller: owner };
+    }
+    return { usdcPrice: null, solPrice: amount / 1e9, seller: owner };
+  } catch {
+    return null;
+  }
+}
+
 export default function CardDetailPage() {
   const params = useParams();
   const cardId = params.id as string;
   const [card, setCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
+  const [unlisting, setUnlisting] = useState(false);
   const { publicKey, signTransaction, signAllTransactions, sendTransaction, connected, wallet } = useWallet();
   const { connection } = useConnection();
 
@@ -40,15 +65,22 @@ export default function CardDetailPage() {
           const searchData = searchRes.ok ? await searchRes.json() : null;
           const oracleListing = searchData?.listings?.find((l: any) => l.id === cardId || l.nftAddress === mint);
           
-          // Also fetch Helius metadata for TCGPlayer ID
-          const assetRes = await fetch(`/api/nft?mint=${mint}`);
+          // Fetch Helius metadata and Tensor listing price in parallel
+          const [assetRes, tensorPrice] = await Promise.all([
+            fetch(`/api/nft?mint=${mint}`),
+            fetchTensorPrice(connection, mint),
+          ]);
           const assetData = assetRes.ok ? await assetRes.json() : null;
           const nft = assetData?.nft || assetData || {};
           const attrs = nft?.content?.metadata?.attributes || nft?.attributes || [];
           const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
 
           const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
-          
+
+          // Merge prices: oracle has SOL price from ME, Tensor may have USDC price
+          const solPrice = oracleListing?.solPrice || oracleListing?.price || tensorPrice?.solPrice || 0;
+          const usdcPrice = tensorPrice?.usdcPrice || (oracleListing?.currency === 'USDC' ? oracleListing?.price : null) || oracleListing?.usdcPrice || null;
+
           setCard({
             id: cardId,
             name: oracleListing?.name || nft.name || mint.slice(0, 12),
@@ -59,10 +91,11 @@ export default function CardDetailPage() {
             image: oracleListing?.image || nft.image || '',
             nftAddress: mint,
             source: 'phygitals',
-            currency: 'SOL',
+            currency: usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'),
             category: 'TCG_CARDS',
-            price: oracleListing?.solPrice || oracleListing?.price || 0,
-            solPrice: oracleListing?.solPrice || oracleListing?.price || 0,
+            price: usdcPrice || solPrice,
+            solPrice,
+            usdcPrice,
             seller: oracleListing?.seller || '',
             grade: oracleListing?.grade || getAttr('Grade') || 'Ungraded',
             gradingCompany: oracleListing?.gradingCompany || (() => {
@@ -98,6 +131,19 @@ export default function CardDetailPage() {
         const data = await listRes.json();
         const found = (data.listings || []).find((l: any) => l.id === cardId || l.nftAddress === cardId || l.ccId === ccId);
         if (found) {
+          // Also check Tensor for a USDC listing price
+          const mint = found.nftAddress || cardId;
+          const tp = await fetchTensorPrice(connection, mint);
+          if (tp?.usdcPrice) {
+            found.usdcPrice = tp.usdcPrice;
+            found.solPrice = found.solPrice || found.price || tp.solPrice || 0;
+            found.currency = 'USDC';
+            found.price = tp.usdcPrice;
+            if (tp.seller) found.seller = tp.seller;
+          } else if (tp?.solPrice && !found.solPrice) {
+            found.solPrice = tp.solPrice;
+          }
+          if (tp?.seller && !found.seller) found.seller = tp.seller;
           setCard(found);
           setLoading(false);
           return;
@@ -129,6 +175,9 @@ export default function CardDetailPage() {
               const phygGradingCompany = gradeMatch ? gradeMatch[1].toUpperCase() : (getPhygAttr('Grader') || null);
               const phygGradeNum = gradeMatch ? gradeMatch[2] : null;
               const phygGradingId = getPhygAttr('Cert Number') || getPhygAttr('Grading ID') || null;
+              // Check Tensor for listing price
+              const tp = await fetchTensorPrice(connection, asset.id || cardId);
+
               setCard({
                 id: asset.id || cardId,
                 name: asset.content?.metadata?.name || "Unknown",
@@ -136,9 +185,11 @@ export default function CardDetailPage() {
                 image: asset.content?.links?.image || asset.content?.links?.animation_url || "",
                 nftAddress: asset.id || cardId,
                 source: 'phygitals',
-                currency: 'USDC',
+                currency: tp?.usdcPrice ? 'USDC' : 'SOL',
                 category: 'TCG_CARDS',
-                price: 0,
+                price: tp?.usdcPrice || tp?.solPrice || 0,
+                solPrice: tp?.solPrice || 0,
+                usdcPrice: tp?.usdcPrice || null,
                 grade: gradeRaw,
                 gradeNum: phygGradeNum,
                 gradingCompany: phygGradingCompany,
@@ -233,8 +284,9 @@ export default function CardDetailPage() {
     try {
       showToast.info("Building transaction...");
 
-      // Route phygitals directly to Tensor — check URL prefix, not card.source
-      if (cardId.startsWith('phyg-')) {
+      // Route Tensor listings to Tensor buy flow (phyg- prefix or source/buyKind)
+      const isTensorBuy = cardId.startsWith('phyg-') || card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard';
+      if (isTensorBuy) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
         const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info, sendTransaction ?? undefined, wallet?.adapter?.name);
@@ -363,6 +415,46 @@ export default function CardDetailPage() {
     }
   };
 
+  const handleUnlist = async () => {
+    if (!connected || !publicKey || !card?.nftAddress || !signTransaction) return;
+    setUnlisting(true);
+    try {
+      showToast.info("Building delist transaction...");
+      const res = await fetch('/api/tensor-delist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mint: card.nftAddress,
+          owner: publicKey.toBase58(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to build delist transaction');
+
+      const txBytes = Buffer.from(data.tx, 'base64');
+      const vtx = VersionedTransaction.deserialize(txBytes);
+      const signed = await signTransaction(vtx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+
+      // Poll for confirmation
+      for (let i = 0; i < 60; i++) {
+        const status = await connection.getSignatureStatuses([sig]);
+        const s = status.value[0];
+        if (s?.confirmationStatus === 'confirmed' || s?.confirmationStatus === 'finalized') break;
+        if (s?.err) throw new Error(`Transaction failed: ${JSON.stringify(s.err)}`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      showToast.success("NFT unlisted successfully!");
+      setCard((prev: any) => prev ? { ...prev, price: 0, usdcPrice: null, solPrice: 0 } : prev);
+    } catch (err: any) {
+      console.error("Unlist failed:", err);
+      showToast.error(err.message || "Failed to unlist");
+    } finally {
+      setUnlisting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="pt-24 pb-20 min-h-screen">
@@ -444,24 +536,47 @@ export default function CardDetailPage() {
             ) : (
               <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                 <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">{card.price ? "Price" : "Status"}</p>
-                <div className="flex items-baseline gap-3 mb-4">
-                  <p className="text-white font-serif text-4xl">
-                    {card.price 
-                      ? (card.currency === 'SOL' ? `◎ ${card.price.toLocaleString()}` : `$${card.price.toLocaleString()}`)
-                      : "Unlisted"
-                    }
-                  </p>
-                  {card.price && <span className="text-gold-500 text-sm font-medium">{card.currency}</span>}
-                </div>
+                {card.price ? (
+                  <>
+                    <div className="flex items-baseline gap-3">
+                      <p className="text-white font-serif text-4xl">
+                        {card.usdcPrice ? `$${card.usdcPrice.toLocaleString()}` : card.currency === 'USDC' ? `$${card.price.toLocaleString()}` : `◎ ${card.price.toLocaleString()}`}
+                      </p>
+                      <span className="text-gold-500 text-sm font-medium">{card.usdcPrice || card.currency === 'USDC' ? 'USDC' : 'SOL'}</span>
+                    </div>
+                    {card.solPrice > 0 && (
+                      <p className="text-gray-400 text-sm mt-1 mb-4">◎ {card.solPrice.toLocaleString()} SOL</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-white font-serif text-4xl mb-4">Unlisted</p>
+                )}
 
                 {card.price ? (
-                  connected ? (
+                  connected && publicKey && card.seller && publicKey.toBase58() === card.seller ? (
+                    <div className="space-y-3">
+                      <div className="w-full px-6 py-3 rounded-lg text-sm font-semibold bg-dark-700 border border-gold-500/30 text-gold-500 text-center">
+                        Your Listing
+                      </div>
+                      <button
+                        onClick={handleUnlist}
+                        disabled={unlisting}
+                        className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
+                          unlisting
+                            ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
+                      >
+                        {unlisting ? "Unlisting..." : "Unlist Item"}
+                      </button>
+                    </div>
+                  ) : connected ? (
                     <button
                       onClick={handleBuy}
                       disabled={buying || card.sold}
                       className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
                         buying || card.sold
-                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400" 
+                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
                           : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                       }`}
                     >

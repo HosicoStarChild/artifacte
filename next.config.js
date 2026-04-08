@@ -29,9 +29,13 @@ const nextConfig = {
         'node:os': false,
         path: false,
         os: false,
-        'pino-pretty': false,
       };
     }
+    // Stub pino-pretty for both client and server to suppress the warning
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'pino-pretty': false,
+    };
     return config;
   },
 };
