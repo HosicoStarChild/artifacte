@@ -1,12 +1,20 @@
 "use client";
 
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey, Connection, Transaction } from "@solana/web3.js";
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+  TOKEN_2022_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { AuctionProgram } from "@/lib/auction-program";
 import { fetchAllowlist } from "@/lib/allowlist";
+
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 const TENSOR_MARKETPLACE_PROGRAM = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const LIST_STATE_DISCRIMINATOR = new Uint8Array([78, 242, 89, 138, 161, 221, 176, 75]);
@@ -33,15 +41,18 @@ interface MyListing {
   highestBidder?: string;
   royaltyBps: number;
   collectionAddress?: string;
+  isPnft?: boolean;
 }
 
 export default function MyListingsPage() {
-  const { publicKey, connected, wallet } = useWallet();
+  const { publicKey, connected, wallet, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const anchorWallet = useAnchorWallet();
   const [activeTab, setActiveTab] = useState<TabType>("active");
   const [myListings, setMyListings] = useState<MyListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [cancellingMint, setCancellingMint] = useState<string | null>(null);
 
   useEffect(() => {
     if (connected && publicKey) {
@@ -192,6 +203,7 @@ export default function MyListingsPage() {
             highestBidder: acc.highestBidder?.toBase58() !== PublicKey.default.toBase58() ? acc.highestBidder?.toBase58() : undefined,
             royaltyBps: acc.royaltyBasisPoints || 0,
             collectionAddress: collection,
+            isPnft: acc.isPnft || false,
           };
         })
       );
@@ -222,6 +234,50 @@ export default function MyListingsPage() {
       setError(err.message || "Failed to fetch listings");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCancelListing(nftMintStr: string, isPnft?: boolean) {
+    if (!publicKey || !anchorWallet) return;
+    setCancellingMint(nftMintStr);
+    try {
+      const nftMint = new PublicKey(nftMintStr);
+      const auctionProgram = new AuctionProgram(connection, anchorWallet, sendTransaction);
+
+      if (isPnft) {
+        // pNFT: use cancel_listing_pnft which handles escrow_authority + Metaplex TransferV1
+        await auctionProgram.cancelListingPnft(nftMint);
+      } else {
+        // Standard SPL / Token-2022: use cancel_listing with escrow_nft PDA
+        const mintInfo = await connection.getAccountInfo(nftMint);
+        const isToken2022 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
+        const tokenProgramId = isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+
+        const sellerNftAccount = await getAssociatedTokenAddress(
+          nftMint, publicKey, false, tokenProgramId
+        );
+
+        const ataInfo = await connection.getAccountInfo(sellerNftAccount);
+        if (!ataInfo) {
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            publicKey, sellerNftAccount, publicKey, nftMint, tokenProgramId, ASSOCIATED_TOKEN_PROGRAM_ID
+          );
+          const ataTx = new Transaction().add(createAtaIx);
+          const ataSig = await sendTransaction(ataTx, connection);
+          await connection.confirmTransaction(ataSig, "confirmed");
+        }
+
+        await auctionProgram.cancelListing(nftMint, sellerNftAccount);
+      }
+
+      setMyListings((prev) =>
+        prev.map((l) => l.nftMint === nftMintStr ? { ...l, status: "cancelled" as const } : l)
+      );
+    } catch (err: any) {
+      console.error("Cancel listing failed:", err);
+      setError(err.message || "Failed to cancel listing");
+    } finally {
+      setCancellingMint(null);
     }
   }
 
@@ -311,10 +367,13 @@ export default function MyListingsPage() {
             {!loading && filteredListings.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredListings.map((listing) => (
-                  <Link
+                  <div
                     key={listing.id}
+                    className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all"
+                  >
+                  <Link
                     href={`/auctions/cards/${listing.nftMint}`}
-                    className="bg-dark-800 border border-white/10 rounded-xl overflow-hidden hover:border-gold-500/50 transition-all block"
+                    className="block"
                   >
                     {/* Image */}
                     <div className="aspect-square bg-dark-700 overflow-hidden relative">
@@ -388,6 +447,20 @@ export default function MyListingsPage() {
                       </div>
                     </div>
                   </Link>
+
+                  {/* Cancel button for active non-Tensor listings */}
+                  {listing.status === "active" && !listing.listingType.includes("Tensor") && (
+                    <div className="px-4 pb-4">
+                      <button
+                        onClick={() => handleCancelListing(listing.nftMint, listing.isPnft)}
+                        disabled={cancellingMint === listing.nftMint}
+                        className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {cancellingMint === listing.nftMint ? "Cancelling..." : "Cancel Listing & Return NFT"}
+                      </button>
+                    </div>
+                  )}
+                  </div>
                 ))}
               </div>
             )}

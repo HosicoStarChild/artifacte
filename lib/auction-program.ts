@@ -728,6 +728,96 @@ export class AuctionProgram {
   }
 
   /**
+   * Cancel a pNFT listing — return NFT to seller via Metaplex TransferV1
+   */
+  async cancelListingPnft(nftMint: PublicKey): Promise<string> {
+    const MPL_TOKEN_METADATA_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+    const MPL_AUTH_RULES_ID = new PublicKey('auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg');
+    const ATA_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+    const SYSVAR_INSTRUCTIONS_ID = new PublicKey('Sysvar1nstructions1111111111111111111111111');
+
+    const listing = PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+
+    const escrowAuthority = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow_authority"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+
+    const nftMetadata = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    const nftEdition = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('edition')],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    const sellerNftToken = await getAssociatedTokenAddress(nftMint, this.wallet.publicKey);
+    const escrowNftToken = await getAssociatedTokenAddress(nftMint, escrowAuthority, true);
+
+    const sellerTokenRecord = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), sellerNftToken.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    const escrowTokenRecord = PublicKey.findProgramAddressSync(
+      [Buffer.from('metadata'), MPL_TOKEN_METADATA_ID.toBuffer(), nftMint.toBuffer(), Buffer.from('token_record'), escrowNftToken.toBuffer()],
+      MPL_TOKEN_METADATA_ID
+    )[0];
+
+    // Read rule set from on-chain metadata
+    let authRuleSet: PublicKey | null = null;
+    try {
+      const { Metadata } = await import('@metaplex-foundation/mpl-token-metadata');
+      const metaAccount = await this.connection.getAccountInfo(nftMetadata);
+      if (metaAccount) {
+        const [metadata] = Metadata.fromAccountInfo(metaAccount);
+        const progConfig = metadata.programmableConfig;
+        if (progConfig && (progConfig as any).__kind === 'V1') {
+          const rs = (progConfig as any).ruleSet;
+          if (rs) authRuleSet = new PublicKey(rs);
+        }
+      }
+    } catch (err) {
+      console.warn('[cancelListingPnft] failed to parse metadata for rule set:', err);
+    }
+
+    const ix = await this.program.methods
+      .cancelListingPnft()
+      .accounts({
+        listing,
+        nftMint,
+        nftMetadata,
+        nftEdition,
+        escrowAuthority,
+        escrowNftToken,
+        escrowTokenRecord,
+        sellerNftToken,
+        sellerTokenRecord,
+        seller: this.wallet.publicKey,
+        tokenMetadataProgram: MPL_TOKEN_METADATA_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        ataProgram: ATA_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        sysvarInstructions: SYSVAR_INSTRUCTIONS_ID,
+        authorizationRulesProgram: authRuleSet ? MPL_AUTH_RULES_ID : null,
+        authorizationRules: authRuleSet || null,
+      })
+      .instruction();
+
+    const tx = new Transaction().add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+      ix
+    );
+    return await this.sendAndConfirm(tx);
+  }
+
+  /**
    * Settle an auction after the end time
    * Supports both standard SPL Token and Token-2022/WNS NFTs
    */
