@@ -10,6 +10,8 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
     "@irys/sdk": "^0.2.11",
+    "@metaplex-foundation/digital-asset-standard-api": "^2.0.0",
+    "@metaplex-foundation/mpl-bubblegum": "^4.4.0",
     "@metaplex-foundation/mpl-core": "^1.7.0",
     "@metaplex-foundation/umi": "^1.5.1",
     "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
