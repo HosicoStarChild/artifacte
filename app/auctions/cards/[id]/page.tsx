@@ -20,6 +20,9 @@ const WalletMultiButton = dynamic(
 
 const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 
 async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcPrice: number | null; solPrice: number | null; seller: string | null } | null> {
   try {
@@ -37,6 +40,66 @@ async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcP
       return { usdcPrice: amount / 1e6, solPrice: null, seller: owner };
     }
     return { usdcPrice: null, solPrice: amount / 1e9, seller: owner };
+  } catch {
+    return null;
+  }
+}
+
+interface AuctionListing {
+  price: number;
+  currency: string;
+  seller: string;
+  listingType: 'fixedPrice' | 'auction';
+  startTime: number;
+  endTime: number;
+  currentBid: number;
+  highestBidder: string | null;
+  status: 'active' | 'settled' | 'cancelled';
+}
+
+async function fetchAuctionListing(conn: Connection, mint: string): Promise<AuctionListing | null> {
+  try {
+    const nftMint = new PublicKey(mint);
+    const [listingPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    );
+    const info = await conn.getAccountInfo(listingPda);
+    if (!info || info.data.length < 140) return null;
+    // Verify it belongs to our program
+    if (!info.owner.equals(AUCTION_PROGRAM_ID)) return null;
+
+    const data = info.data;
+    const seller = new PublicKey(data.subarray(8, 40)).toBase58();
+    const paymentMint = new PublicKey(data.subarray(72, 104)).toBase58();
+    const price = Number(data.readBigUInt64LE(104));
+    const listingType = data[112]; // 0=FixedPrice, 1=Auction
+    const startTime = Number(data.readBigInt64LE(114));
+    const endTime = Number(data.readBigInt64LE(122));
+    const status = data[130]; // 0=Active, 1=Settled, 2=Cancelled
+
+    if (status !== 0) return null; // Only return active listings
+
+    const currentBid = Number(data.readBigUInt64LE(174));
+    const highestBidder = new PublicKey(data.subarray(182, 214)).toBase58();
+    const defaultKey = PublicKey.default.toBase58();
+
+    const currency = paymentMint === SOL_MINT ? 'SOL'
+      : paymentMint === USD1_MINT ? 'USD1'
+      : 'USDC';
+    const decimals = currency === 'SOL' ? 9 : 6;
+
+    return {
+      price: price / Math.pow(10, decimals),
+      currency,
+      seller,
+      listingType: listingType === 0 ? 'fixedPrice' : 'auction',
+      startTime: startTime * 1000,
+      endTime: endTime * 1000,
+      currentBid: currentBid / Math.pow(10, decimals),
+      highestBidder: highestBidder !== defaultKey ? highestBidder : null,
+      status: 'active',
+    };
   } catch {
     return null;
   }
@@ -210,14 +273,26 @@ export default function CardDetailPage() {
             }
 
             if (isArtifacte) {
+              const mintAddr = asset.id || asset.mint || cardId;
+              const [tp, auctionListing] = await Promise.all([
+                fetchTensorPrice(connection, mintAddr),
+                fetchAuctionListing(connection, mintAddr),
+              ]);
+              const listingPrice = auctionListing?.price || tp?.usdcPrice || tp?.solPrice || 0;
+              const listingCurrency = auctionListing?.currency || (tp?.usdcPrice ? 'USDC' : (tp?.solPrice ? 'SOL' : 'SOL'));
               setCard({
-                id: asset.id || asset.mint || cardId,
+                id: mintAddr,
                 name: asset.content?.metadata?.name || asset.name || "Unknown",
                 image: asset.content?.links?.image || asset.image || "",
-                nftAddress: asset.id || asset.mint || cardId,
+                nftAddress: mintAddr,
                 category: "TCG_CARDS",
                 source: "artifacte",
                 collection: "Artifacte",
+                currency: listingCurrency,
+                price: listingPrice,
+                solPrice: tp?.solPrice || 0,
+                usdcPrice: tp?.usdcPrice || null,
+                auctionListing,
                 grade: getAttr("Condition") === "Graded" ? `${getAttr("Grading Company")} ${getAttr("Grade")}` : getAttr("Condition"),
                 gradeNum: getAttr("Grade") || null,
                 gradingCompany: getAttr("Grading Company") || null,
@@ -231,7 +306,7 @@ export default function CardDetailPage() {
                 cardNumber: getAttr("Card Number"),
                 priceSource: getAttr("Price Source"),
                 priceSourceId: getAttr("Price Source ID"),
-                seller: asset.ownership?.owner,
+                seller: auctionListing?.seller || tp?.seller || asset.ownership?.owner,
                 insuredValue: null,
                 vault: null,
               });
@@ -241,14 +316,26 @@ export default function CardDetailPage() {
 
             if (isCC) {
               const ccName = asset.content?.metadata?.name || asset.name || "Unknown";
+              const mintAddr = asset.id || asset.mint || cardId;
+              const [tp, auctionListing] = await Promise.all([
+                fetchTensorPrice(connection, mintAddr),
+                fetchAuctionListing(connection, mintAddr),
+              ]);
+              const listingPrice = auctionListing?.price || tp?.usdcPrice || tp?.solPrice || 0;
+              const listingCurrency = auctionListing?.currency || (tp?.usdcPrice ? 'USDC' : (tp?.solPrice ? 'SOL' : 'SOL'));
               setCard({
-                id: asset.id || asset.mint || cardId,
+                id: mintAddr,
                 name: ccName,
                 image: asset.content?.links?.image || asset.image || "",
-                nftAddress: asset.id || asset.mint || cardId,
+                nftAddress: mintAddr,
                 category: "TCG_CARDS",
                 source: "collector-crypt",
                 collection: "Collectors Crypt",
+                currency: listingCurrency,
+                price: listingPrice,
+                solPrice: tp?.solPrice || 0,
+                usdcPrice: tp?.usdcPrice || null,
+                auctionListing,
                 grade: `${getAttr("Grading Company")} ${getAttr("The Grade") || getAttr("GradeNum")}`.trim(),
                 gradeNum: getAttr("GradeNum") || null,
                 gradingCompany: getAttr("Grading Company") || null,
@@ -257,7 +344,7 @@ export default function CardDetailPage() {
                 ccCategory: getAttr("Category"),
                 insuredValue: getAttr("Insured Value") ? parseInt(getAttr("Insured Value")) : null,
                 vault: getAttr("Vault"),
-                seller: asset.ownership?.owner || (asset as any).owner,
+                seller: auctionListing?.seller || tp?.seller || asset.ownership?.owner || (asset as any).owner,
                 subtitle: `${getAttr("Category")} • ${getAttr("Grading Company")} ${getAttr("GradeNum")} • ${getAttr("Vault") || "Vault"}`,
               });
               setLoading(false);
@@ -559,7 +646,9 @@ export default function CardDetailPage() {
               <ArtifactePriceSection card={card} />
             ) : (
               <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-                <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">{card.price ? "Price" : "Status"}</p>
+                <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">
+                  {card.auctionListing?.listingType === 'auction' ? 'Auction' : card.price ? "Price" : "Status"}
+                </p>
                 {card.price ? (
                   <>
                     <div className="flex items-baseline gap-3">
@@ -568,7 +657,17 @@ export default function CardDetailPage() {
                       </p>
                       <span className="text-gold-500 text-sm font-medium">{card.usdcPrice || card.currency === 'USDC' ? 'USDC' : 'SOL'}</span>
                     </div>
-                    {card.solPrice > 0 && (
+                    {card.auctionListing?.listingType === 'auction' && card.auctionListing.currentBid > 0 && (
+                      <p className="text-gold-400 text-sm mt-1">
+                        Current bid: {card.auctionListing.currency === 'SOL' ? '◎ ' : '$'}{card.auctionListing.currentBid.toLocaleString()} {card.auctionListing.currency}
+                      </p>
+                    )}
+                    {card.auctionListing?.listingType === 'auction' && card.auctionListing.endTime > 0 && (
+                      <p className="text-gray-400 text-sm mt-1 mb-4">
+                        Ends: {new Date(card.auctionListing.endTime).toLocaleDateString()} {new Date(card.auctionListing.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                    {!card.auctionListing && card.solPrice > 0 && (
                       <p className="text-gray-400 text-sm mt-1 mb-4">◎ {card.solPrice.toLocaleString()} SOL</p>
                     )}
                   </>
@@ -827,18 +926,61 @@ function ArtifactePriceSection({ card }: { card: any }) {
     }
   }, [card.priceSource, card.priceSourceId]);
 
+  const al = card.auctionListing as AuctionListing | null | undefined;
+  const hasListing = !!(al || card.price);
+
   return (
-    <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-      <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Market Price</p>
-      <div className="flex items-baseline gap-3 mb-2">
-        <p className="text-white font-serif text-4xl">
-          {marketPrice ? `$${marketPrice.toFixed(2)}` : "—"}
-        </p>
-        {card.priceSource && (
-          <span className="text-gold-500 text-xs font-medium">via {card.priceSource}</span>
-        )}
+    <div className="bg-dark-800 rounded-xl border border-white/5 p-6 space-y-4">
+      {/* Auction / Fixed Price listing info */}
+      {hasListing && (
+        <div>
+          <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">
+            {al?.listingType === 'auction' ? 'Auction' : 'Price'}
+          </p>
+          <div className="flex items-baseline gap-3">
+            <p className="text-white font-serif text-4xl">
+              {al ? (
+                al.currency === 'SOL' ? `◎ ${al.price.toLocaleString()}` : `$${al.price.toLocaleString()}`
+              ) : (
+                card.usdcPrice ? `$${card.usdcPrice.toLocaleString()}` : `◎ ${card.price?.toLocaleString()}`
+              )}
+            </p>
+            <span className="text-gold-500 text-sm font-medium">{al?.currency || card.currency}</span>
+          </div>
+          {al?.listingType === 'auction' && al.currentBid > 0 && (
+            <p className="text-gold-400 text-sm mt-1">
+              Current bid: {al.currency === 'SOL' ? '◎ ' : '$'}{al.currentBid.toLocaleString()} {al.currency}
+            </p>
+          )}
+          {al?.listingType === 'auction' && al.endTime > 0 && (
+            <p className="text-gray-400 text-sm mt-1">
+              Ends: {new Date(al.endTime).toLocaleDateString()} {new Date(al.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!hasListing && (
+        <div>
+          <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Status</p>
+          <p className="text-white font-serif text-4xl">Unlisted</p>
+        </div>
+      )}
+
+      {/* Market Price from TCGplayer */}
+      <div>
+        <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Market Price</p>
+        <div className="flex items-baseline gap-3 mb-2">
+          <p className="text-white font-serif text-2xl">
+            {marketPrice ? `$${marketPrice.toFixed(2)}` : "—"}
+          </p>
+          {card.priceSource && (
+            <span className="text-gold-500 text-xs font-medium">via {card.priceSource}</span>
+          )}
+        </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
+
+      <div className="flex flex-wrap gap-3 text-xs text-gray-400">
         {card.variant && <span className="bg-dark-700 px-2 py-1 rounded">{card.variant}</span>}
         {card.language && <span className="bg-dark-700 px-2 py-1 rounded">{card.language}</span>}
         {card.grade && <span className="bg-dark-700 px-2 py-1 rounded">{card.grade}</span>}
