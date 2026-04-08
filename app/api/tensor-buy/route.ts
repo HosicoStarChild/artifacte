@@ -137,21 +137,35 @@ export async function POST(request: Request) {
 
     const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
+
+    // 2% platform fee (charged to buyer, sent to treasury)
+    const TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
+    const { SystemProgram } = await import('@solana/web3.js');
+    // Price is in USDC (6 decimals) — calculate 2% in lamports for SOL transfer
+    const priceInLamports = Number(listState.data.amount);
+    const platformFeeLamports = Math.ceil(priceInLamports * 0.02);
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: buyerPk,
+      toPubkey: TREASURY,
+      lamports: platformFeeLamports,
+    });
+
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix],
+      instructions: [cuIx, v1Ix, feeIx],
     }).compileToV0Message(alts);
 
     const tx = new VersionedTransaction(msg);
     const size = tx.serialize().length;
-    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()})`);
+    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: ${platformFeeLamports} lamports)`);
 
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
     return NextResponse.json({
       tx: txBase64,
       price,
+      platformFee: platformFeeLamports / 1e9,
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,

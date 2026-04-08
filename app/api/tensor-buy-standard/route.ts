@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Connection } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, Transaction } from "@solana/web3.js";
 import { getCuratedMarketplaceListing } from "@/app/lib/digital-art-marketplaces";
 
 const TENSOR_API_KEY = process.env.TENSOR_API_KEY;
@@ -7,6 +7,8 @@ const TENSOR_API_BASE = "https://api.mainnet.tensordev.io/api/v1";
 const HELIUS_RPC = process.env.HELIUS_API_KEY
   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   : "https://api.mainnet-beta.solana.com";
+const TREASURY_WALLET = '6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P';
+const PLATFORM_FEE_BPS = 200; // 2%
 
 const rateMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 10;
@@ -129,19 +131,97 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Inject 2% platform fee into the first transaction ──
+    const platformFeeLamports = Math.ceil(listing.priceRaw * PLATFORM_FEE_BPS / 10000);
+    const platformFee = platformFeeLamports / 1e9;
+    const buyerPk = new PublicKey(buyer);
+    const treasuryPk = new PublicKey(TREASURY_WALLET);
+
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: buyerPk,
+      toPubkey: treasuryPk,
+      lamports: platformFeeLamports,
+    });
+
+    const modifiedTxs: { txV0: string | null; tx: string | null }[] = [];
+
+    for (let i = 0; i < txs.length; i++) {
+      const rawTx = txs[i];
+      const txV0Data = rawTx?.txV0?.data || rawTx?.txV0;
+      const txData = rawTx?.tx?.data || rawTx?.tx;
+
+      // Only inject fee into the first transaction
+      if (i === 0) {
+        const isVersioned = Boolean(txV0Data);
+        const raw = txV0Data || txData;
+        if (!raw) {
+          modifiedTxs.push({ txV0: null, tx: null });
+          continue;
+        }
+
+        try {
+          const txBytes = typeof raw === 'string'
+            ? Uint8Array.from(atob(raw), (c: string) => c.charCodeAt(0))
+            : Uint8Array.from(Array.isArray(raw) ? raw : raw);
+
+          if (isVersioned) {
+            const vTx = VersionedTransaction.deserialize(txBytes);
+            // Fetch ALTs referenced in the transaction
+            const altAccounts = await Promise.all(
+              vTx.message.addressTableLookups.map(async (lookup: any) => {
+                const res = await connection.getAddressLookupTable(lookup.accountKey);
+                return res.value;
+              })
+            );
+            const validAlts = altAccounts.filter((a): a is NonNullable<typeof a> => a != null);
+
+            const decompiled = TransactionMessage.decompile(vTx.message, {
+              addressLookupTableAccounts: validAlts,
+            });
+            decompiled.instructions.push(feeIx);
+
+            const recompiled = decompiled.compileToV0Message(validAlts);
+            const newTx = new VersionedTransaction(recompiled);
+            modifiedTxs.push({
+              txV0: Buffer.from(newTx.serialize()).toString('base64'),
+              tx: null,
+            });
+          } else {
+            const legacyTx = Transaction.from(txBytes);
+            legacyTx.add(feeIx);
+            modifiedTxs.push({
+              txV0: null,
+              tx: Buffer.from(legacyTx.serialize({ requireAllSignatures: false })).toString('base64'),
+            });
+          }
+          console.log(`[tensor-buy-standard] Injected 2% platform fee: ${platformFee} SOL (${platformFeeLamports} lamports)`);
+        } catch (feeErr: any) {
+          console.error('[tensor-buy-standard] Failed to inject fee, using original tx:', feeErr.message);
+          modifiedTxs.push({
+            txV0: toBase64(txV0Data),
+            tx: toBase64(txData),
+          });
+        }
+      } else {
+        // Pass through subsequent transactions unmodified
+        modifiedTxs.push({
+          txV0: toBase64(txV0Data),
+          tx: toBase64(txData),
+        });
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       mint: listing.mint,
       seller: listing.seller,
       price: listing.price,
+      platformFee,
       priceRaw: listing.priceRaw,
       currencySymbol: listing.currencySymbol,
       blockhash: latestBlockhash.blockhash,
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      txs: txs.map((tx: any) => ({
-        txV0: toBase64(tx?.txV0?.data || tx?.txV0),
-        tx: toBase64(tx?.tx?.data || tx?.tx),
-      })),
+      txs: modifiedTxs,
     });
   } catch (error: any) {
     return NextResponse.json(

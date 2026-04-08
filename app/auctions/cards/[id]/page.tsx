@@ -324,7 +324,7 @@ export default function CardDetailPage() {
         throw new Error("Wallet does not support signing");
       }
 
-      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} fee` : '';
+      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} SOL fee` : '';
       showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
       
       const txBase64 = v0TxSigned || v0Tx;

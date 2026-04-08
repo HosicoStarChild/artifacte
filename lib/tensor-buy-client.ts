@@ -35,7 +35,8 @@ export async function executeTensorBuy(
   }
 
   const tensorData = await tensorRes.json();
-  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC`);
+  const feeDisplay = tensorData.platformFee ? ` + ${tensorData.platformFee.toFixed(4)} SOL fee` : '';
+  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC${feeDisplay}`);
 
   // Step 2: Deserialize tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));

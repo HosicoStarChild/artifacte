@@ -332,13 +332,16 @@ export default function AuctionDetailPage() {
         throw new Error(payload.error || `Buy failed: ${buildRes.status}`);
       }
 
-      const { v0Tx, v0TxSigned, legacyTx, price, blockhash } = payload;
+      const { v0Tx, v0TxSigned, legacyTx, price, platformFee, blockhash } = payload;
       const versionedTxBase64 = v0TxSigned || v0Tx;
       const txBase64 = versionedTxBase64 || legacyTx;
 
       if (!txBase64) {
         throw new Error("No transaction returned from API");
       }
+
+      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} SOL fee` : '';
+      showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
 
       let rawTx: Uint8Array;
       if (versionedTxBase64) {
@@ -471,6 +474,9 @@ export default function AuctionDetailPage() {
       if (!txs.length) {
         throw new Error("Tensor did not return any transactions");
       }
+
+      const feeDisplay = payload.platformFee ? ` + ${payload.platformFee.toFixed(4)} SOL fee` : '';
+      showToast.info(`💳 Confirm purchase — ${payload.price} ${payload.currencySymbol}${feeDisplay}`);
 
       let lastSignature = "";
       let allConfirmed = true;

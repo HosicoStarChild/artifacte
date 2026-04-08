@@ -107,9 +107,9 @@ export async function POST(req: NextRequest) {
     }
 
     let buyData: any;
+    const platformFeeBps = 200; // 2%
 
     if (isM3) {
-      // ── M3 path (Phygitals, cNFTs, MMM pool listings) ──
       // Uses the batch endpoint on api-mainnet.magiceden.us
       console.log('[me-buy] M3 listing detected, using batch endpoint');
       
@@ -169,15 +169,69 @@ export async function POST(req: NextRequest) {
       buyData = await buyRes.json();
     }
 
-    // 3. Return cosigned tx (same format for both M2 and M3)
+    // ── Inject 2% platform fee (SOL transfer from buyer to treasury) ──
+    const { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } = await import('@solana/web3.js');
+    const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+    const connection = new Connection(HELIUS_RPC, 'confirmed');
+
+    // Calculate 2% fee in lamports (price is in SOL)
+    const platformFeeLamports = Math.ceil(price * 1e9 * platformFeeBps / 10000);
+    const platformFee = platformFeeLamports / 1e9;
+    const buyerPk = new PublicKey(buyer);
+    const treasuryPk = new PublicKey(TREASURY_WALLET);
+
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: buyerPk,
+      toPubkey: treasuryPk,
+      lamports: platformFeeLamports,
+    });
+
+    // Decompile the unsigned v0 transaction, append fee instruction, recompile
+    const rawV0 = buyData.v0?.tx?.data;
+    let modifiedV0Base64: string | null = null;
+
+    if (rawV0) {
+      try {
+        const txBytes = Uint8Array.from(rawV0);
+        const originalTx = VersionedTransaction.deserialize(txBytes);
+        const message = originalTx.message;
+
+        // Fetch any address lookup tables referenced in the transaction
+        const altAccounts = await Promise.all(
+          message.addressTableLookups.map(async (lookup: any) => {
+            const res = await connection.getAddressLookupTable(lookup.accountKey);
+            return res.value;
+          })
+        );
+        const validAlts = altAccounts.filter((a): a is NonNullable<typeof a> => a != null);
+
+        // Decompile → add fee instruction → recompile
+        const decompiled = TransactionMessage.decompile(message, {
+          addressLookupTableAccounts: validAlts,
+        });
+        decompiled.instructions.push(feeIx);
+
+        const recompiled = decompiled.compileToV0Message(validAlts);
+        const newTx = new VersionedTransaction(recompiled);
+        modifiedV0Base64 = Buffer.from(newTx.serialize()).toString('base64');
+
+        console.log(`[me-buy] Injected 2% platform fee: ${platformFee} SOL (${platformFeeLamports} lamports)`);
+      } catch (feeErr: any) {
+        console.error('[me-buy] Failed to inject platform fee, falling back to unmodified tx:', feeErr.message);
+        // Fall back to original transaction without fee
+        modifiedV0Base64 = Buffer.from(rawV0).toString('base64');
+      }
+    }
+
+    // 3. Return modified tx (v0TxSigned is invalidated by modification, so we use the unsigned modified tx)
     return NextResponse.json({
-      v0Tx: buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null,
-      v0TxSigned: buyData.v0?.txSigned?.data ? Buffer.from(buyData.v0.txSigned.data).toString('base64') : 
-                  buyData.txSigned?.data ? Buffer.from(buyData.txSigned.data).toString('base64') : null,
+      v0Tx: modifiedV0Base64 || (buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null),
+      v0TxSigned: null, // Notary cosign is invalidated by fee injection
       legacyTx: buyData.tx?.data ? Buffer.from(buyData.tx.data).toString('base64') : null,
       blockhash: buyData.blockhashData?.blockhash,
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
       price,
+      platformFee,
       seller,
       mint,
       listingSource: isM3 ? 'M3' : 'M2',
