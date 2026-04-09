@@ -64,10 +64,34 @@ async function fetchAuctionListing(conn: Connection, mint: string): Promise<Auct
       [Buffer.from("listing"), nftMint.toBuffer()],
       AUCTION_PROGRAM_ID
     );
-    const info = await conn.getAccountInfo(listingPda);
+    const [escrowNftPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow_nft"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID
+    );
+    // Fetch listing PDA and escrow account in parallel
+    const [info, escrowInfo] = await Promise.all([
+      conn.getAccountInfo(listingPda),
+      conn.getAccountInfo(escrowNftPda),
+    ]);
     if (!info || info.data.length < 140) return null;
     // Verify it belongs to our program
     if (!info.owner.equals(AUCTION_PROGRAM_ID)) return null;
+    // Verify the escrow actually holds the NFT — if not, listing is stale
+    if (!escrowInfo || escrowInfo.data.length === 0) {
+      // Return a special stale marker so the owner can clean it up
+      const data = info.data;
+      const seller = new PublicKey(data.subarray(8, 40)).toBase58();
+      const status = data[130];
+      if (status === 0) {
+        return {
+          price: 0, currency: 'USDC', seller,
+          listingType: 'fixedPrice', startTime: 0, endTime: 0,
+          currentBid: 0, highestBidder: null, status: 'active',
+          stale: true,
+        } as AuctionListing & { stale: boolean };
+      }
+      return null;
+    }
 
     const data = info.data;
     const seller = new PublicKey(data.subarray(8, 40)).toBase58();
@@ -721,6 +745,33 @@ export default function CardDetailPage() {
                   </>
                 ) : (
                   <p className="text-white font-serif text-4xl mb-4">Unlisted</p>
+                )}
+
+                {!card.price && (card.auctionListing as any)?.stale && connected && publicKey && card.auctionListing?.seller === publicKey.toBase58() && (
+                  <button
+                    onClick={async () => {
+                      if (!signTransaction || !card.nftAddress) return;
+                      setUnlisting(true);
+                      try {
+                        showToast.info("Closing stale listing...");
+                        const { AuctionProgram } = await import('@/lib/auction-program');
+                        const ap = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
+                        const sig = await ap.closeStaleListing(new PublicKey(card.nftAddress));
+                        showToast.success(`Stale listing closed! TX: ${sig.slice(0, 12)}...`);
+                        setCard((prev: any) => prev ? { ...prev, auctionListing: null } : prev);
+                      } catch (err: any) {
+                        showToast.error(err.message?.slice(0, 80) || "Failed to close listing");
+                      } finally {
+                        setUnlisting(false);
+                      }
+                    }}
+                    disabled={unlisting}
+                    className={`w-full px-6 py-3 rounded-lg text-sm font-semibold transition ${
+                      unlisting ? "bg-gray-600/50 cursor-not-allowed text-gray-400" : "bg-dark-700 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+                    }`}
+                  >
+                    {unlisting ? "Closing..." : "Close Stale Listing (reclaim rent)"}
+                  </button>
                 )}
 
                 {card.price ? (
