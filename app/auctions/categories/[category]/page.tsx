@@ -145,7 +145,7 @@ export default function CategoryAuctionsPage() {
     }
     const gradeFilter = filters['grade'];
     if (gradeFilter && gradeFilter !== 'All') params.set('grade', gradeFilter);
-    if (currencyFilter !== 'All') params.set('currency', currencyFilter);
+    // Currency filter applied client-side after Tensor USDC enrichment — not sent to Oracle
     const searchFilter = filters['search'];
     if (searchFilter) params.set('q', searchFilter);
     // Additional filters
@@ -411,6 +411,7 @@ export default function CategoryAuctionsPage() {
     : [];
 
   // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
+  // Currency filter + sort always applied client-side (Tensor USDC enrichment happens after Oracle returns)
   const categoryListings = (useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
     for (const [key, value] of Object.entries(filters)) {
       if (!value || value === "All") continue;
@@ -427,11 +428,12 @@ export default function CategoryAuctionsPage() {
       }
     }
     return true;
-  }).filter((l: any) => {
+  })).filter((l: any) => {
     if (currencyFilter === "All") return true;
-    const lCurrency = l.currency || (l.category === "DIGITAL_ART" ? "SOL" : "USDC");
-    return lCurrency === currencyFilter;
-  })).sort((a: any, b: any) => {
+    if (currencyFilter === "USDC") return !!(l.usdcPrice || l.currency === "USDC");
+    if (currencyFilter === "SOL") return !l.usdcPrice && l.currency !== "USDC";
+    return true;
+  }).sort((a: any, b: any) => {
     if (sortBy === "price-high") return b.price - a.price;
     if (sortBy === "price-low") return a.price - b.price;
     if (sortBy === "newest") {
