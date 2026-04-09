@@ -293,7 +293,7 @@ export default function CardDetailPage() {
                 priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
                 priceSourceId: tcgPlayerId || undefined,
                 verifiedBy: 'TCGplayer',
-                seller: asset.ownership?.owner || '',
+                seller: tp?.seller || asset.ownership?.owner || '',
               });
               setLoading(false);
               return;

@@ -689,44 +689,6 @@ export default function ListNFTPage() {
                 </div>
               )}
 
-              {/* Fee info */}
-              <div className="bg-dark-700 rounded-lg p-4 mb-6 border border-white/5">
-                <p className="text-gray-400 text-xs font-medium mb-2">Fee Summary</p>
-                {listingType === "fixed" ? (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Platform fee (paid by buyer)</span>
-                      <span className="text-white">2%</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
-                      <span className="text-gray-500">You receive</span>
-                      <span className="text-gold-400 font-semibold">
-                        {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${parseFloat(price).toFixed(2)}` : "—"}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 text-[10px] mt-3">Listed on Tensor. 2% platform fee is charged to the buyer at purchase time.</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Platform fee</span>
-                      <span className="text-white">2%</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-500">Creator royalty</span>
-                      <span className="text-white">{loadingRoyalty ? "..." : `${(royaltyBps / 100).toFixed(1)}%`}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1 pt-1 border-t border-white/5">
-                      <span className="text-gray-500">You receive</span>
-                      <span className="text-gold-400 font-semibold">
-                        {price ? `${getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? '$' : '◎'} ${(parseFloat(price) * (1 - 0.02 - royaltyBps / 10000)).toFixed(2)}` : "—"}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 text-[10px] mt-3">Listed on Artifacte. Fees are deducted when the auction settles.</p>
-                  </>
-                )}
-              </div>
-
               {/* Submit */}
               <button
                 onClick={handleSubmit}
