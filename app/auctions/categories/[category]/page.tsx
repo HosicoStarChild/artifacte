@@ -246,9 +246,13 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // USDC listings for non-phygitals: redirect to ME
+        // USDC listings: redirect to appropriate marketplace
         if (listing?.currency === 'USDC') {
-          window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
+          if (listing?.marketplace === 'tensor') {
+            window.open(`https://www.tensor.trade/item/${mintAddr}`, '_blank');
+          } else {
+            window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
+          }
           setBuyingId(null);
           return;
         }
