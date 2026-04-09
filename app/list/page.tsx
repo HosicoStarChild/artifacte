@@ -341,6 +341,18 @@ export default function ListNFTPage() {
 
       showToast.success("NFT listed successfully!");
       setSubmitted(true);
+
+      // Notify Oracle so the listing appears immediately (fire-and-forget)
+      // Small delay to let Tensor index the listing after TX confirmation
+      if (listingType === "fixed") {
+        setTimeout(() => {
+          fetch('/api/listing-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mint: mintStr }),
+          }).catch(() => {});
+        }, 3000);
+      }
     } catch (err: any) {
       console.error("Listing failed:", err);
       console.error("Listing failed stack:", err?.stack);
