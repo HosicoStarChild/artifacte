@@ -128,10 +128,11 @@ export default function CardDetailPage() {
           const searchData = searchRes.ok ? await searchRes.json() : null;
           const oracleListing = searchData?.listings?.find((l: any) => l.id === cardId || l.nftAddress === mint);
           
-          // Fetch Helius metadata and Tensor listing price in parallel
-          const [assetRes, tensorPrice] = await Promise.all([
+          // Fetch Helius metadata and Tensor listing price and Anchor auction listing in parallel
+          const [assetRes, tensorPrice, auctionListing] = await Promise.all([
             fetch(`/api/nft?mint=${mint}`),
             fetchTensorPrice(connection, mint),
+            fetchAuctionListing(connection, mint),
           ]);
           const assetData = assetRes.ok ? await assetRes.json() : null;
           const nft = assetData?.nft || assetData || {};
@@ -140,9 +141,10 @@ export default function CardDetailPage() {
 
           const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
 
-          // Merge prices: oracle has SOL price from ME, Tensor may have USDC price
+          // Merge prices: oracle has SOL price from ME, Tensor may have USDC price, Anchor may have auction listing
           const solPrice = oracleListing?.solPrice || oracleListing?.price || tensorPrice?.solPrice || 0;
-          const usdcPrice = tensorPrice?.usdcPrice || (oracleListing?.currency === 'USDC' ? oracleListing?.price : null) || oracleListing?.usdcPrice || null;
+          const usdcPrice = auctionListing?.currency === 'USDC' ? auctionListing.price
+            : tensorPrice?.usdcPrice || (oracleListing?.currency === 'USDC' ? oracleListing?.price : null) || oracleListing?.usdcPrice || null;
 
           setCard({
             id: cardId,
@@ -154,12 +156,13 @@ export default function CardDetailPage() {
             image: oracleListing?.image || nft.image || '',
             nftAddress: mint,
             source: 'phygitals',
-            currency: usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'),
+            currency: auctionListing ? auctionListing.currency : usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'),
             category: 'TCG_CARDS',
-            price: usdcPrice || solPrice,
+            price: auctionListing ? auctionListing.price : (usdcPrice || solPrice),
             solPrice,
             usdcPrice,
-            seller: oracleListing?.seller || '',
+            auctionListing,
+            seller: auctionListing?.seller || oracleListing?.seller || tensorPrice?.seller || '',
             grade: oracleListing?.grade || getAttr('Grade') || 'Ungraded',
             gradingCompany: oracleListing?.gradingCompany || (() => {
               const g = (getAttr('Grade') || '').match(/^(PSA|BGS|CGC|SGC)\s/i);
@@ -507,6 +510,22 @@ export default function CardDetailPage() {
     setUnlisting(true);
     try {
       showToast.info("Building delist transaction...");
+
+      // Check if listed on Anchor auction program first
+      const nftMintPk = new PublicKey(card.nftAddress);
+      const auctionListing = await fetchAuctionListing(connection, card.nftAddress);
+      if (auctionListing) {
+        // Cancel via Anchor auction program
+        const { AuctionProgram } = await import('@/lib/auction-program');
+        const auctionProgram = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
+        const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+        const sellerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
+        const sig = await auctionProgram.cancelListing(nftMintPk, sellerNftAccount);
+        showToast.success(`NFT unlisted successfully! TX: ${sig.slice(0, 12)}...`);
+        setCard((prev: any) => prev ? { ...prev, price: 0, usdcPrice: null, solPrice: 0, auctionListing: null } : prev);
+        setUnlisting(false);
+        return;
+      }
 
       // Detect NFT type to choose the correct Tensor delist route
       let delistRoute = '/api/tensor-delist'; // default: compressed
