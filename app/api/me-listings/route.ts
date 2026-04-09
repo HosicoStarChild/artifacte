@@ -33,8 +33,7 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
     if (cached) {
       if (cached.usdcPrice) {
         l.usdcPrice = cached.usdcPrice;
-        l.currency = 'USDC';
-        l.solPrice = l.solPrice || l.price || 0;
+        if (!l.solPrice) l.solPrice = l.price || 0;
       } else if (cached.solPrice && !l.solPrice) {
         l.solPrice = cached.solPrice;
       }
@@ -79,8 +78,7 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
         if (currencyAddr === USDC_MINT) {
           const usdcPrice = amount / 1e6;
           listing.usdcPrice = usdcPrice;
-          listing.currency = 'USDC';
-          listing.solPrice = listing.solPrice || listing.price || 0;
+          if (!listing.solPrice) listing.solPrice = listing.price || 0;
           tensorPriceCache.set(mint, { usdcPrice, ts: now });
         } else if (amount > 0) {
           const solPrice = amount / 1e9;

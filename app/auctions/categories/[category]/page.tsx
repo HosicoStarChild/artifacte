@@ -435,7 +435,7 @@ export default function CategoryAuctionsPage() {
   })).filter((l: any) => {
     if (currencyFilter === "All") return true;
     if (currencyFilter === "USDC") return !!(l.usdcPrice || l.currency === "USDC");
-    if (currencyFilter === "SOL") return !l.usdcPrice && l.currency !== "USDC";
+    if (currencyFilter === "SOL") return l.currency === "SOL" || !!(l.solPrice && l.solPrice > 0);
     return true;
   }).sort((a: any, b: any) => {
     if (sortBy === "price-high") return b.price - a.price;
