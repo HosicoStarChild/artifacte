@@ -374,6 +374,35 @@ export default function CardDetailPage() {
     try {
       showToast.info("Building transaction...");
 
+      // Anchor auction program listings: buy directly via on-chain program
+      if (card.auctionListing) {
+        if (!signTransaction) throw new Error("Wallet does not support signing");
+        const { AuctionProgram } = await import('@/lib/auction-program');
+        const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+        const auctionProgram = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
+        const nftMintPk = new PublicKey(card.nftAddress);
+        const paymentMintPk = new PublicKey(
+          card.auctionListing.currency === 'SOL' ? 'So11111111111111111111111111111111111111112'
+          : card.auctionListing.currency === 'USD1' ? 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB'
+          : 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+        );
+        const decimals = card.auctionListing.currency === 'SOL' ? 9 : 6;
+        const priceInUnits = Math.round(card.auctionListing.price * Math.pow(10, decimals));
+        const buyerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
+        const buyerPaymentAccount = await getAssociatedTokenAddress(paymentMintPk, publicKey);
+        const sellerPk = new PublicKey(card.auctionListing.seller);
+        const sellerPaymentAccount = await getAssociatedTokenAddress(paymentMintPk, sellerPk);
+        showToast.info(`💳 Confirm purchase — ${card.auctionListing.currency === 'SOL' ? '◎' : '$'}${card.auctionListing.price.toLocaleString()} ${card.auctionListing.currency}`);
+        const sig = await auctionProgram.buyNow(
+          nftMintPk, sellerPaymentAccount, buyerPaymentAccount,
+          buyerNftAccount, priceInUnits, paymentMintPk
+        );
+        showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
+        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
+        setBuying(false);
+        return;
+      }
+
       // Route Tensor listings to Tensor buy flow (phyg- prefix or source/buyKind)
       const isTensorBuy = cardId.startsWith('phyg-') || card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard';
       if (isTensorBuy) {
@@ -713,12 +742,21 @@ export default function CardDetailPage() {
                       </button>
                     </div>
                   ) : card.auctionListing ? (
-                    <Link
-                      href={`/digital-art/auction/${card.nftAddress}`}
-                      className="w-full block px-6 py-3.5 rounded-lg text-base font-semibold text-center bg-gold-500 hover:bg-gold-600 text-dark-900 transition"
-                    >
-                      {card.auctionListing.listingType === 'auction' ? 'View Auction & Place Bid' : `Buy Now — $${card.price.toLocaleString()} ${card.currency}`}
-                    </Link>
+                    connected ? (
+                      <button
+                        onClick={handleBuy}
+                        disabled={buying || card.sold}
+                        className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
+                          buying || card.sold
+                            ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
+                            : "bg-gold-500 hover:bg-gold-600 text-dark-900"
+                        }`}
+                      >
+                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
+                      </button>
+                    ) : (
+                      <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
+                    )
                   ) : connected ? (
                     <button
                       onClick={handleBuy}
