@@ -630,7 +630,7 @@ export default function ListNFTPage() {
                   <button
                     onClick={() => { if (!((selectedNft as any)?.compression?.compressed) && !(selectedNft && isRwaNft(selectedNft))) setListingType("auction"); }}
                     disabled={(selectedNft as any)?.compression?.compressed === true || !!(selectedNft && isRwaNft(selectedNft))}
-                    title={(selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : (selectedNft && isRwaNft(selectedNft)) ? "Auctions are only available for Digital Collectibles" : undefined}
+                    title={(selectedNft && isRwaNft(selectedNft)) ? "Auctions are only available for Digital Collectibles" : (selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : undefined}
                     className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
                       (selectedNft as any)?.compression?.compressed || (selectedNft && isRwaNft(selectedNft))
                         ? "border-white/5 text-gray-600 cursor-not-allowed opacity-50"
@@ -642,11 +642,11 @@ export default function ListNFTPage() {
                     Auction
                   </button>
                 </div>
-                {(selectedNft as any)?.compression?.compressed && (
-                  <p className="text-yellow-500/80 text-xs mt-2">Auctions are not available for compressed NFTs. Only fixed-price listings are supported.</p>
-                )}
-                {selectedNft && !((selectedNft as any)?.compression?.compressed) && isRwaNft(selectedNft) && (
+                {selectedNft && isRwaNft(selectedNft) && (
                   <p className="text-yellow-500/80 text-xs mt-2">Auctions are only available for Digital Collectibles. RWA cards support fixed-price listings only.</p>
+                )}
+                {(selectedNft as any)?.compression?.compressed && !(selectedNft && isRwaNft(selectedNft)) && (
+                  <p className="text-yellow-500/80 text-xs mt-2">Auctions are not available for compressed NFTs. Only fixed-price listings are supported.</p>
                 )}
               </div>
 
