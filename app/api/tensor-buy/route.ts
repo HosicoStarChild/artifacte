@@ -138,34 +138,41 @@ export async function POST(request: Request) {
     const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
 
-    // 2% platform fee (charged to buyer, sent to treasury)
+    // 2% platform fee in USDC (charged to buyer, sent to treasury)
     const TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
-    const { SystemProgram } = await import('@solana/web3.js');
-    // Price is in USDC (6 decimals) — calculate 2% in lamports for SOL transfer
-    const priceInLamports = Number(listState.data.amount);
-    const platformFeeLamports = Math.ceil(priceInLamports * 0.02);
-    const feeIx = SystemProgram.transfer({
-      fromPubkey: buyerPk,
-      toPubkey: TREASURY,
-      lamports: platformFeeLamports,
-    });
+    const usdcMintPk = new PublicKey(USDC_MINT);
+    const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    const platformFeeUsdc = Math.ceil(Number(listState.data.amount) * 0.02); // 2% in USDC micro-units
+    const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
+    const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, TREASURY);
+
+    // Create treasury USDC ATA if it doesn't exist
+    const preIxs: InstanceType<typeof TransactionInstruction>[] = [];
+    const treasuryAtaInfo = await conn.getAccountInfo(treasuryUsdcAta);
+    if (!treasuryAtaInfo) {
+      preIxs.push(createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, TREASURY, usdcMintPk));
+    }
+
+    const feeIx = createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeUsdc);
 
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix, feeIx],
+      instructions: [...preIxs, cuIx, v1Ix, feeIx],
     }).compileToV0Message(alts);
 
     const tx = new VersionedTransaction(msg);
     const size = tx.serialize().length;
-    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: ${platformFeeLamports} lamports)`);
+    const platformFeeUsdc$ = platformFeeUsdc / 1e6;
+    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: $${platformFeeUsdc$.toFixed(4)} USDC)`);
 
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
     return NextResponse.json({
       tx: txBase64,
       price,
-      platformFee: platformFeeLamports / 1e9,
+      platformFee: platformFeeUsdc$,
+      platformFeeCurrency: 'USDC',
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,

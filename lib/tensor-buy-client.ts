@@ -35,7 +35,8 @@ export async function executeTensorBuy(
   }
 
   const tensorData = await tensorRes.json();
-  const feeDisplay = tensorData.platformFee ? ` + ${tensorData.platformFee.toFixed(4)} SOL fee` : '';
+  const feeCurrency = tensorData.platformFeeCurrency || 'USDC';
+  const feeDisplay = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} ${feeCurrency} fee` : '';
   onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC${feeDisplay}`);
 
   // Step 2: Deserialize tx
