@@ -125,6 +125,13 @@ export default function ListNFTPage() {
     return url;
   }
 
+  function isRwaNft(nft: NFTAsset): boolean {
+    const g = nft.grouping?.find((g: any) => g.group_key === "collection");
+    const collectionAddr = g?.group_value;
+    return collectionAddr === CC_COLLECTION || collectionAddr === PHYG_COLLECTION ||
+      !!(nft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
+  }
+
   function getNftCategory(nft: NFTAsset): ItemCategory {
     const g = nft.grouping?.find((g: any) => g.group_key === "collection");
     const collectionAddr = g?.group_value;
@@ -469,7 +476,7 @@ export default function ListNFTPage() {
                       key={nft.id}
                       onClick={() => {
                         setSelectedNft(nft);
-                        if ((nft as any).compression?.compressed) setListingType("fixed");
+                        if ((nft as any).compression?.compressed || isRwaNft(nft)) setListingType("fixed");
                         setLoadingRoyalty(true);
                         fetch(`/api/nft?mint=${nft.id}`)
                           .then(r => r.json())
@@ -535,7 +542,7 @@ export default function ListNFTPage() {
                         return (
                           <button key={nft.id} onClick={() => {
                             setSelectedNft(nft);
-                            if ((nft as any).compression?.compressed) setListingType("fixed");
+                            if ((nft as any).compression?.compressed || isRwaNft(nft)) setListingType("fixed");
                             setLoadingRoyalty(true);
                             fetch(`/api/nft?mint=${nft.id}`)
                               .then(r => r.json())
@@ -621,11 +628,11 @@ export default function ListNFTPage() {
                     Fixed Price
                   </button>
                   <button
-                    onClick={() => { if (!((selectedNft as any)?.compression?.compressed)) setListingType("auction"); }}
-                    disabled={(selectedNft as any)?.compression?.compressed === true}
-                    title={(selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : undefined}
+                    onClick={() => { if (!((selectedNft as any)?.compression?.compressed) && !(selectedNft && isRwaNft(selectedNft))) setListingType("auction"); }}
+                    disabled={(selectedNft as any)?.compression?.compressed === true || !!(selectedNft && isRwaNft(selectedNft))}
+                    title={(selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : (selectedNft && isRwaNft(selectedNft)) ? "Auctions are only available for Digital Collectibles" : undefined}
                     className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
-                      (selectedNft as any)?.compression?.compressed
+                      (selectedNft as any)?.compression?.compressed || (selectedNft && isRwaNft(selectedNft))
                         ? "border-white/5 text-gray-600 cursor-not-allowed opacity-50"
                         : listingType === "auction"
                         ? "border-gold-500 bg-gold-500/10 text-gold-400"
@@ -637,6 +644,9 @@ export default function ListNFTPage() {
                 </div>
                 {(selectedNft as any)?.compression?.compressed && (
                   <p className="text-yellow-500/80 text-xs mt-2">Auctions are not available for compressed NFTs. Only fixed-price listings are supported.</p>
+                )}
+                {selectedNft && !((selectedNft as any)?.compression?.compressed) && isRwaNft(selectedNft) && (
+                  <p className="text-yellow-500/80 text-xs mt-2">Auctions are only available for Digital Collectibles. RWA cards support fixed-price listings only.</p>
                 )}
               </div>
 
