@@ -332,7 +332,7 @@ export default function MyListingsPage() {
       );
     } catch (err: any) {
       console.error("Tensor delist failed:", err);
-      setError(err.message || "Failed to delist from Tensor");
+      setError(err.message || "Failed to delist");
     } finally {
       setCancellingMint(null);
     }
@@ -514,7 +514,7 @@ export default function MyListingsPage() {
                           disabled={cancellingMint === listing.nftMint}
                           className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {cancellingMint === listing.nftMint ? "Delisting..." : "Delist from Tensor"}
+                          {cancellingMint === listing.nftMint ? "Delisting..." : "Delist"}
                         </button>
                       ) : (
                         <button
