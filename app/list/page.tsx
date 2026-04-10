@@ -248,11 +248,52 @@ export default function ListNFTPage() {
       // Detect NFT type from DAS API interface field
       const isCompressed = (selectedNft as any).compression?.compressed === true;
       const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
+      // Artifacte-minted NFTs are identified by their update authority
+      const isArtifacteNFT = !!(selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
 
       let tx: string;
 
-      if (listingType === "fixed") {
-        // ── Fixed-price listings: always use Tensor marketplace ──
+      if (listingType === "fixed" && isArtifacteNFT) {
+        // ── Artifacte collection: fixed-price listing on Artifacte's own on-chain program ──
+        showToast.info("Listing on Artifacte...");
+        if (isPnft) {
+          let royaltyBpsVal = royaltyBps || 500;
+          let creatorAddr = new PublicKey(ARTIFACTE_AUTHORITY);
+          let ruleSet: PublicKey | null = null;
+          try {
+            const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
+            const nftData = await nftRes.json();
+            const asset = nftData.nft || nftData;
+            royaltyBpsVal = asset.royalty?.basis_points || royaltyBps || 500;
+            const creators = asset.creators || asset.content?.metadata?.creators || [];
+            if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
+            const ruleSetAddr = nftData.result?.programmable_config?.rule_set;
+            if (ruleSetAddr) ruleSet = new PublicKey(ruleSetAddr);
+          } catch {}
+          tx = await auctionProgram.listItemPnft(
+            nftMint,
+            paymentMint,
+            ListingType.FixedPrice,
+            priceInUnits,
+            undefined,
+            itemCategory,
+            royaltyBpsVal,
+            creatorAddr,
+            ruleSet,
+          );
+        } else {
+          tx = await auctionProgram.listItem(
+            nftMint,
+            sellerNftAccount,
+            paymentMint,
+            ListingType.FixedPrice,
+            priceInUnits,
+            undefined,
+            itemCategory
+          );
+        }
+      } else if (listingType === "fixed") {
+        // ── Fixed-price listings: use Tensor marketplace ──
         let tensorRoute: string;
         let tensorCurrency = isRwaCategory ? 'USDC' : undefined; // SOL for Digital Art
 
@@ -344,7 +385,8 @@ export default function ListNFTPage() {
 
       // Notify Oracle so the listing appears immediately (fire-and-forget)
       // Small delay to let Tensor index the listing after TX confirmation
-      if (listingType === "fixed") {
+      // Skip for Artifacte NFTs — they list on the Artifacte program, not Tensor
+      if (listingType === "fixed" && !isArtifacteNFT) {
         setTimeout(() => {
           fetch('/api/listing-notify', {
             method: 'POST',
@@ -655,7 +697,11 @@ export default function ListNFTPage() {
                   </button>
                 </div>
                 {selectedNft && isRwaNft(selectedNft) && (
-                  <p className="text-yellow-500/80 text-xs mt-2">Auctions are only available for Digital Collectibles. RWA cards support fixed-price listings only.</p>
+                  <p className="text-yellow-500/80 text-xs mt-2">
+                    {(selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY)
+                      ? "Artifacte collection NFTs are listed exclusively on the Artifacte platform."
+                      : "Auctions are only available for Digital Collectibles. RWA cards support fixed-price listings only."}
+                  </p>
                 )}
                 {(selectedNft as any)?.compression?.compressed && !(selectedNft && isRwaNft(selectedNft)) && (
                   <p className="text-yellow-500/80 text-xs mt-2">Auctions are not available for compressed NFTs. Only fixed-price listings are supported.</p>

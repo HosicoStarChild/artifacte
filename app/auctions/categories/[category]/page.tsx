@@ -121,10 +121,9 @@ export default function CategoryAuctionsPage() {
     // Only show full spinner on initial load; filter changes keep old results visible
     if (meListings.length === 0) setMeLoading(true);
     else setMeFilterLoading(true);
-    // Server-side filtering + pagination
-    // Artifacte collection uses source=artifacte (not a category filter)
+    // Artifacte collection queries the Artifacte on-chain program directly (not Oracle)
     const params = new URLSearchParams({
-      ...(isArtifacteCollection ? { source: 'artifacte' } : { category }),
+      ...(isArtifacteCollection ? {} : { category }),
       perPage: String(ITEMS_PER_PAGE),
       page: String(page),
       sort: sortBy === 'price-high' ? 'price-desc' : sortBy === 'price-low' ? 'price-asc' : 'price-desc',
@@ -146,6 +145,7 @@ export default function CategoryAuctionsPage() {
     const gradeFilter = filters['grade'];
     if (gradeFilter && gradeFilter !== 'All') params.set('grade', gradeFilter);
     // Currency filter applied client-side after Tensor USDC enrichment — not sent to Oracle
+    // Pass search query
     const searchFilter = filters['search'];
     if (searchFilter) params.set('q', searchFilter);
     // Additional filters
@@ -168,7 +168,11 @@ export default function CategoryAuctionsPage() {
       params.set('source', sourceMap[sourceFilter] || sourceFilter);
     }
 
-    fetch(`/api/me-listings?${params}`)
+    const apiUrl = isArtifacteCollection
+      ? `/api/artifacte-program-listings?${params}`
+      : `/api/me-listings?${params}`;
+
+    fetch(apiUrl)
       .then(r => r.json())
       .then(data => {
         setMeListings(data.listings || []);
