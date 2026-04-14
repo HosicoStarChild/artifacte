@@ -1,11 +1,31 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { getActiveArtifacteMintSet } from '@/lib/artifacte-listings';
 
 // Proxy to Railway oracle listings index — fast, pre-indexed, real-time via webhooks
 const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const TENSOR_MARKETPLACE = new PublicKey('TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp');
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const ORACLE_BATCH_SIZE = 250;
+
+type OracleListing = {
+  id?: string;
+  nftAddress?: string;
+  source?: string;
+  marketplace?: string;
+  verifiedBy?: string;
+  usdcPrice?: number;
+  solPrice?: number;
+  price?: number;
+  [key: string]: unknown;
+};
+
+type OracleListingsResponse = {
+  listings?: OracleListing[];
+  total?: number;
+  [key: string]: unknown;
+};
 
 // In-memory cache for Tensor prices — keyed by mint address
 const TENSOR_CACHE_TTL = 60_000; // 60 seconds
@@ -94,34 +114,120 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
   }
 }
 
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const parsed = Number.parseInt(value || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function shouldFilterArtifacteRows(category: string | null): boolean {
+  return category === 'TCG_CARDS' && Boolean(process.env.HELIUS_API_KEY);
+}
+
+function isArtifacteOracleListing(listing: OracleListing): boolean {
+  return listing.source === 'artifacte' || listing.marketplace === 'artifacte' || listing.verifiedBy === 'Artifacte';
+}
+
+function getOracleListingMint(listing: OracleListing): string | null {
+  if (typeof listing.nftAddress === 'string' && listing.nftAddress) return listing.nftAddress;
+  if (typeof listing.id === 'string' && listing.id) return listing.id;
+  return null;
+}
+
+async function fetchOraclePage(params: URLSearchParams): Promise<OracleListingsResponse> {
+  const res = await fetch(`${ORACLE_API}/api/listings?${params}`, {
+    signal: AbortSignal.timeout(15000),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Oracle returned ${res.status}`);
+  }
+
+  return res.json() as Promise<OracleListingsResponse>;
+}
+
+async function fetchAllOracleListings(params: URLSearchParams): Promise<OracleListingsResponse> {
+  const batchParams = new URLSearchParams(params.toString());
+  batchParams.set('page', '1');
+  batchParams.set('perPage', String(ORACLE_BATCH_SIZE));
+
+  const firstPage = await fetchOraclePage(batchParams);
+  const allListings = Array.isArray(firstPage.listings) ? [...firstPage.listings] : [];
+  const total = typeof firstPage.total === 'number' ? firstPage.total : allListings.length;
+  const totalPages = Math.max(1, Math.ceil(total / ORACLE_BATCH_SIZE));
+
+  for (let page = 2; page <= totalPages; page++) {
+    batchParams.set('page', String(page));
+    const nextPage = await fetchOraclePage(batchParams);
+    if (!Array.isArray(nextPage.listings) || nextPage.listings.length === 0) break;
+    allListings.push(...nextPage.listings);
+  }
+
+  return {
+    ...firstPage,
+    listings: allListings,
+    total: allListings.length,
+  };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const category = searchParams.get('category');
+  const requestedPage = parsePositiveInt(searchParams.get('page'), 1);
+  const requestedPerPage = Math.min(100, Math.max(1, parsePositiveInt(searchParams.get('perPage'), 24)));
+  const filterArtifacteRows = shouldFilterArtifacteRows(category);
 
   // Forward all query params to Railway
   const params = new URLSearchParams(searchParams.toString());
 
   try {
-    const res = await fetch(`${ORACLE_API}/api/listings?${params}`, {
-      signal: AbortSignal.timeout(15000),
-      cache: 'no-store',
-    });
+    const data = filterArtifacteRows
+      ? await fetchAllOracleListings(params)
+      : await fetchOraclePage(params);
 
-    if (!res.ok) {
-      throw new Error(`Oracle returned ${res.status}`);
+    let listings = Array.isArray(data.listings) ? data.listings : [];
+    let total = typeof data.total === 'number' ? data.total : listings.length;
+
+    if (filterArtifacteRows && listings.length > 0) {
+      try {
+        const activeArtifacteMints = await getActiveArtifacteMintSet();
+        listings = listings.filter((listing) => {
+          if (!isArtifacteOracleListing(listing)) return true;
+
+          const mint = getOracleListingMint(listing);
+          return mint !== null && activeArtifacteMints.has(mint);
+        });
+      } catch (e: any) {
+        console.warn('[me-listings] Artifacte listing filter failed:', e?.message);
+      }
+
+      total = listings.length;
+      const start = (requestedPage - 1) * requestedPerPage;
+      listings = listings.slice(start, start + requestedPerPage);
     }
 
-    const data = await res.json();
-
     // Enrich listings with Tensor USDC prices
-    if (data.listings?.length && process.env.HELIUS_API_KEY) {
+    if (listings.length && process.env.HELIUS_API_KEY) {
       try {
-        await enrichWithTensorPrices(data.listings);
+        await enrichWithTensorPrices(listings);
       } catch (e: any) {
         console.warn('[me-listings] Tensor enrichment failed:', e?.message);
       }
     }
 
-    const response = NextResponse.json(data);
+    const responsePayload: OracleListingsResponse = {
+      ...data,
+      listings,
+      total,
+    };
+
+    if (filterArtifacteRows) {
+      responsePayload.page = requestedPage;
+      responsePayload.perPage = requestedPerPage;
+      responsePayload.totalPages = Math.max(1, Math.ceil(total / requestedPerPage));
+    }
+
+    const response = NextResponse.json(responsePayload);
     response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
     return response;
   } catch (err: any) {
