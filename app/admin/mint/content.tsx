@@ -3,10 +3,11 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
+import { SendTransactionError } from "@solana/web3.js";
 import { ADMIN_WALLET, ARTIFACTE_COLLECTION, hasAdminAccess } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { createV1, createCollectionV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
+import { createV1, createCollectionV1, fetchCollection, hasCollectionUpdateAuthority, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 import {
@@ -62,6 +63,65 @@ interface MintFormData {
 
   // Recipient
   recipientWallet: string;
+}
+
+interface CollectionAccessState {
+  checking: boolean;
+  canUse: boolean | null;
+  message: string | null;
+  updateAuthority: string | null;
+}
+
+interface CollectionValidationResult {
+  canUse: boolean;
+  normalizedAddress: string;
+  updateAuthority?: string;
+  message: string;
+}
+
+async function validateCollectionAccess(
+  rpcEndpoint: string,
+  collectionAddress: string,
+  walletAddress: string
+): Promise<CollectionValidationResult> {
+  const normalizedAddress = collectionAddress.trim();
+
+  if (!normalizedAddress) {
+    return {
+      canUse: true,
+      normalizedAddress: "",
+      message: "",
+    };
+  }
+
+  try {
+    const umi = createUmi(rpcEndpoint);
+    const collection = await fetchCollection(umi, normalizedAddress);
+    const updateAuthority = String(collection.updateAuthority);
+    const canUse = hasCollectionUpdateAuthority(walletAddress, collection);
+
+    if (canUse) {
+      return {
+        canUse: true,
+        normalizedAddress,
+        updateAuthority,
+        message: `Collection ready. This wallet is authorized for ${normalizedAddress}.`,
+      };
+    }
+
+    return {
+      canUse: false,
+      normalizedAddress,
+      updateAuthority,
+      message: `Selected collection is controlled by ${updateAuthority}. Wallet ${walletAddress} cannot mint into it. Clear the collection field, create a new collection with this wallet, or switch wallets.`,
+    };
+  } catch {
+    return {
+      canUse: false,
+      normalizedAddress,
+      message: `Could not load Metaplex Core collection ${normalizedAddress}. Check the address or leave the field empty to mint without a collection.`,
+    };
+  }
 }
 
 /** Embeddable form content (no auth check, no page wrapper) — used by admin tab */
@@ -219,10 +279,81 @@ function MintFormInner() {
 
   const wallet = useWallet();
   const { connection } = useConnection();
+  const walletAddress = wallet.publicKey?.toBase58() || "";
   const [minting, setMinting] = useState(false);
   const [mintResult, setMintResult] = useState<string | null>(null);
   const [collectionAddress, setCollectionAddress] = useState(ARTIFACTE_COLLECTION || "");
   const [creatingCollection, setCreatingCollection] = useState(false);
+  const [collectionAccess, setCollectionAccess] = useState<CollectionAccessState>({
+    checking: false,
+    canUse: null,
+    message: null,
+    updateAuthority: null,
+  });
+  const normalizedCollectionAddress = collectionAddress.trim();
+  const collectionAuthorityLabel = normalizedCollectionAddress
+    ? collectionAccess.checking
+      ? "Resolving authority..."
+      : collectionAccess.updateAuthority || "Authority unavailable"
+    : "No collection selected";
+  const collectionAccessLabel = !normalizedCollectionAddress
+    ? "Standalone Mint"
+    : collectionAccess.checking
+      ? "Checking"
+      : collectionAccess.canUse
+        ? "Authorized"
+        : "Blocked";
+  const collectionAccessTone = !normalizedCollectionAddress
+    ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+    : collectionAccess.checking
+      ? "border-gray-500/30 bg-gray-500/10 text-gray-300"
+      : collectionAccess.canUse
+        ? "border-green-500/30 bg-green-500/10 text-green-300"
+        : "border-red-500/30 bg-red-500/10 text-red-300";
+  const collectionAccessSummary = !normalizedCollectionAddress
+    ? "No collection selected. This mint will be created as a standalone Metaplex Core asset."
+    : collectionAccess.message || "Checking collection authority...";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkCollectionAccess() {
+      if (!walletAddress || !collectionAddress.trim()) {
+        setCollectionAccess({
+          checking: false,
+          canUse: null,
+          message: null,
+          updateAuthority: null,
+        });
+        return;
+      }
+
+      setCollectionAccess({
+        checking: true,
+        canUse: null,
+        message: "Checking collection authority...",
+        updateAuthority: null,
+      });
+
+      const result = await validateCollectionAccess(connection.rpcEndpoint, collectionAddress, walletAddress);
+      if (cancelled) {
+        return;
+      }
+
+      setCollectionAccess({
+        checking: false,
+        canUse: result.canUse,
+        message: result.message,
+        updateAuthority: result.updateAuthority || null,
+      });
+    }
+
+    void checkCollectionAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [walletAddress, collectionAddress, connection.rpcEndpoint]);
 
   const handleCreateCollection = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
@@ -311,6 +442,18 @@ function MintFormInner() {
         .use(walletAdapterIdentity(wallet))
         .use(irysUploader());
 
+      let validatedCollectionAddress = "";
+      if (collectionAddress.trim()) {
+        const collectionValidation = await validateCollectionAccess(connection.rpcEndpoint, collectionAddress, walletAddress);
+        if (!collectionValidation.canUse) {
+          setMintResult(`❌ ${collectionValidation.message}`);
+          setMinting(false);
+          return;
+        }
+
+        validatedCollectionAddress = collectionValidation.normalizedAddress;
+      }
+
       // Step 2: Upload image to Arweave FIRST — always required
       let imageUri = "";
       if (!formData.frontImage) {
@@ -381,8 +524,8 @@ function MintFormInner() {
       };
 
       // Assign to collection if set
-      if (collectionAddress) {
-        createArgs.collection = umiPublicKey(collectionAddress);
+      if (validatedCollectionAddress) {
+        createArgs.collection = umiPublicKey(validatedCollectionAddress);
       }
 
       const tx = await createV1(umi, createArgs).sendAndConfirm(umi);
@@ -390,7 +533,28 @@ function MintFormInner() {
       const sig = Buffer.from(tx.signature).toString("base64");
       setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${sig}`);
     } catch (err: any) {
-      setMintResult(`❌ Error: ${err.message}`);
+      let logs: string[] | undefined;
+      if (err instanceof SendTransactionError) {
+        try {
+          logs = await err.getLogs(connection);
+        } catch {
+          logs = err.logs;
+        }
+      } else if (Array.isArray(err?.logs)) {
+        logs = err.logs;
+      }
+
+      const hasCollectionApprovalError = /Neither the asset or any plugins have approved this operation|0x1a/.test(String(err?.message || ""));
+      const logSuffix = logs && logs.length > 0 ? `\n\nLogs:\n${logs.slice(-10).join("\n")}` : "";
+
+      if (hasCollectionApprovalError && collectionAddress.trim()) {
+        const authorityHint = collectionAccess.updateAuthority
+          ? ` Selected collection authority: ${collectionAccess.updateAuthority}.`
+          : "";
+        setMintResult(`❌ The selected collection rejected this mint.${authorityHint} Clear the collection field to mint standalone, create a new collection with this wallet, or switch to the collection authority wallet.${logSuffix}`);
+      } else {
+        setMintResult(`❌ Error: ${err.message}${logSuffix}`);
+      }
       console.error("Mint error:", err);
     }
     setMinting(false);
@@ -409,12 +573,45 @@ function MintFormInner() {
           <div className="flex gap-2 mb-2">
             <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-gold-500" placeholder="Collection address (create one first)" />
           </div>
+          <div className="mb-3 rounded-lg border border-white/10 bg-dark-800/70 p-3">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Collection Authority</p>
+                <p className="mt-1 text-xs font-mono text-white break-all">{collectionAuthorityLabel}</p>
+              </div>
+              <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${collectionAccessTone}`}>
+                {collectionAccessLabel}
+              </span>
+            </div>
+            <div className="space-y-1 text-xs">
+              <p className="text-gray-500 break-all">
+                Connected wallet: <span className="font-mono text-gray-300">{walletAddress || "Connect wallet"}</span>
+              </p>
+              {normalizedCollectionAddress && (
+                <p className="text-gray-500 break-all">
+                  Collection: <span className="font-mono text-gray-300">{normalizedCollectionAddress}</span>
+                </p>
+              )}
+              <p className={`${collectionAccess.checking ? "text-gray-400" : collectionAccess.canUse === false ? "text-amber-400" : "text-gray-400"}`}>
+                {collectionAccessSummary}
+              </p>
+            </div>
+            {collectionAccess.canUse === false && (
+              <button
+                type="button"
+                onClick={() => setCollectionAddress("")}
+                className="mt-2 text-xs text-gold-400 hover:text-gold-300 transition"
+              >
+                Clear collection and mint standalone
+              </button>
+            )}
+          </div>
           {!collectionAddress && (
             <button onClick={handleCreateCollection} disabled={creatingCollection} className={`w-full py-2 rounded-lg text-xs font-medium transition ${creatingCollection ? "bg-gray-700 text-gray-500" : "bg-gold-500/20 border border-gold-500/50 text-gold-400 hover:bg-gold-500/30"}`}>
               {creatingCollection ? "Creating..." : "Create Artifacte Collection (one-time)"}
             </button>
           )}
-          {collectionAddress && <p className="text-green-400 text-xs">✅ Collection set</p>}
+          {collectionAddress && collectionAccess.canUse === true && <p className="text-green-400 text-xs">✅ Collection set and authorized</p>}
         </div>
 
         {/* Basic Info */}
