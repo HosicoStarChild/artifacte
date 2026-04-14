@@ -3,7 +3,7 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { ADMIN_WALLET, ARTIFACTE_COLLECTION } from "@/lib/data";
+import { ADMIN_WALLET, ARTIFACTE_COLLECTION, hasAdminAccess } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
 import { createV1, createCollectionV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
@@ -560,9 +560,13 @@ export function MintContent() {
   useEffect(() => {
     if (connected && publicKey) {
       const walletAddress = publicKey.toBase58();
-      if (walletAddress === ADMIN_WALLET) {
+      if (hasAdminAccess(walletAddress)) {
         setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
       }
+    } else {
+      setIsAdmin(false);
     }
     setLoading(false);
   }, [connected, publicKey]);
@@ -736,7 +740,7 @@ export function MintContent() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-red-900/20 border border-red-700 rounded-xl p-12 text-center">
             <h2 className="font-serif text-2xl font-bold text-white mb-4">Unauthorized</h2>
-            <p className="text-gray-400">You do not have permission to access this page. Only the admin wallet can access the mint dashboard.</p>
+            <p className="text-gray-400">You do not have permission to access this page. Only authorized admin wallets can access the mint dashboard.</p>
           </div>
         </div>
       </main>

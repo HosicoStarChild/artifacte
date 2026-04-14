@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { BAXUS_SELLER_FEE_ENABLED, TREASURY_WALLET, ADMIN_WALLET } from "@/lib/data";
+import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess } from "@/lib/data";
 import { MintFormContent } from "./mint/content";
 
 interface AdminListing {
@@ -86,14 +86,19 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    if (connected && publicKey) {
-      const walletAddress = publicKey.toBase58();
-      if (walletAddress === TREASURY_WALLET || walletAddress === ADMIN_WALLET) {
-        setIsAdmin(true);
-        loadAdminData();
-      } else {
-        setError("Unauthorized: You are not the treasury wallet");
-      }
+    if (!connected || !publicKey) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const walletAddress = publicKey.toBase58();
+    if (hasAdminAccess(walletAddress)) {
+      setError("");
+      setIsAdmin(true);
+      loadAdminData();
+    } else {
+      setIsAdmin(false);
+      setError("Unauthorized: This wallet is not allowed to access the admin dashboard");
     }
   }, [connected, publicKey]);
 
@@ -311,7 +316,7 @@ export default function AdminPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-red-900/20 border border-red-700 rounded-xl p-12 text-center">
             <h2 className="font-serif text-2xl font-bold text-white mb-4">Access Denied</h2>
-            <p className="text-gray-400">You do not have permission to access this page. Only the treasury wallet can access the admin dashboard.</p>
+            <p className="text-gray-400">You do not have permission to access this page. Only authorized admin wallets can access the admin dashboard.</p>
           </div>
         </div>
       </main>

@@ -3,8 +3,8 @@ import bundledAllowlist from "@/data/allowlist.json";
 import type { AllowlistEntry } from "@/lib/allowlist";
 import fs from "fs/promises";
 import path from "path";
+import { isAdminWallet } from "@/lib/admin";
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
@@ -34,7 +34,7 @@ async function writeAllowlist(data: AllowlistData): Promise<void> {
 
 function validateAdmin(adminWallet: string, secret?: string): boolean {
   if (!ADMIN_SECRET) return false; // Fail closed if secret not configured
-  return adminWallet === ADMIN_WALLET && secret === ADMIN_SECRET;
+  return isAdminWallet(adminWallet) && secret === ADMIN_SECRET;
 }
 
 export async function GET() {

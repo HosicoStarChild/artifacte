@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
-
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+import { hasAdminAccess } from "@/lib/data";
 
 interface Application {
   id: string;
@@ -36,7 +35,7 @@ export default function AdminApplicationsPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    if (connected && publicKey?.toBase58() === ADMIN_WALLET) {
+    if (connected && hasAdminAccess(publicKey?.toBase58())) {
       fetchApplications();
     } else {
       setLoading(false);
@@ -134,7 +133,7 @@ export default function AdminApplicationsPage() {
     );
   }
 
-  if (publicKey.toBase58() !== ADMIN_WALLET) {
+  if (!hasAdminAccess(publicKey.toBase58())) {
     return (
       <div className="pt-24 pb-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

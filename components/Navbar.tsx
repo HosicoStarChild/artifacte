@@ -4,19 +4,18 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { hasAdminAccess } from "@/lib/data";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
   { ssr: false }
 );
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
-
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { publicKey, connected } = useWallet();
-  const isAdmin = connected && publicKey?.toBase58() === ADMIN_WALLET;
+  const isAdmin = connected && hasAdminAccess(publicKey?.toBase58());
 
   useEffect(() => {
     const handleScroll = () => {

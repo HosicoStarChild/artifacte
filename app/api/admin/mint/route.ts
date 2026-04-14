@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { isAdminWallet } from "@/lib/admin";
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 // Store metadata temporarily for minting (in production, upload to Arweave)
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const { action, adminWallet, adminSecret } = body;
 
     // Auth required for all mint actions
-    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

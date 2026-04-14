@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import { isAdminWallet } from "@/lib/admin";
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const APPLICATIONS_FILE = path.join(process.cwd(), "data", "applications.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
@@ -71,7 +71,7 @@ async function writeAllowlist(data: AllowlistData): Promise<void> {
 
 function validateAdmin(adminWallet: string, secret?: string): boolean {
   if (!ADMIN_SECRET) return false;
-  return adminWallet === ADMIN_WALLET && secret === ADMIN_SECRET;
+  return isAdminWallet(adminWallet) && secret === ADMIN_SECRET;
 }
 
 /**

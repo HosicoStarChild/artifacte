@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { hasAdminAccess, isAdminWallet } from "@/lib/admin";
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
 const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     const data = await readListings();
     
     let filtered = data.listings;
-    if (wallet && wallet !== ADMIN_WALLET) {
+    if (wallet && !hasAdminAccess(wallet)) {
       filtered = filtered.filter(l => l.seller === wallet);
     }
     if (status) {
@@ -152,7 +152,7 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, action, adminWallet, adminSecret } = body;
 
-    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     if (!id || !action || !["approve", "reject"].includes(action)) {

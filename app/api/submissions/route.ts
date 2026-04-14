@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { hasAdminAccess } from "@/lib/admin";
 
-const TREASURY_WALLET = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const SUBMISSIONS_FILE = path.join(process.cwd(), "data", "submissions.json");
 
 export interface Submission {
@@ -46,7 +45,7 @@ async function writeSubmissions(data: SubmissionsData): Promise<void> {
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 function isAdminWallet(wallet?: string, secret?: string): boolean {
-  if (wallet === TREASURY_WALLET || wallet === ADMIN_WALLET) return true;
+  if (hasAdminAccess(wallet)) return true;
   // Also allow secret-based access if ADMIN_SECRET is configured
   if (ADMIN_SECRET && secret === ADMIN_SECRET) return true;
   return false;

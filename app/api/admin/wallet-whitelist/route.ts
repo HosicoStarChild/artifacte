@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { isAdminWallet } from "@/lib/admin";
 
-const ADMIN_WALLET = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { address, name, role, adminWallet, adminSecret } = body;
 
-    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     if (!address || !name) {
@@ -78,7 +78,7 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json();
     const { address, adminWallet, adminSecret } = body;
 
-    if (!ADMIN_SECRET || adminWallet !== ADMIN_WALLET || adminSecret !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

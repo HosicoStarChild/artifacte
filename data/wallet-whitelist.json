@@ -8,6 +8,20 @@
       "enabled": true
     },
     {
+      "address": "7fignaSBU6FDWtz2HphpTaNG1dQqrmTtWcNAN4hWG8b1",
+      "name": "Artifacte Admin 2",
+      "role": "admin",
+      "addedAt": 1776124800000,
+      "enabled": true
+    },
+    {
+      "address": "3EFvrQ9rqSr6TjeaNKQucyUNTp3Cm6GsqTPKa7HC2SAH",
+      "name": "Artifacte Admin 3",
+      "role": "admin",
+      "addedAt": 1776124800000,
+      "enabled": true
+    },
+    {
       "address": "Csxbu2BWrYKaN728HZv2NgGpDgDeFqDYgvofWufUVjJi",
       "name": "Sin",
       "role": "seller",
