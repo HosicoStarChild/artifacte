@@ -9,6 +9,17 @@ import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-ad
 import { createV1, createCollectionV1, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
+import {
+  ADMIN_CORE_ROYALTY_BASIS_POINTS,
+  buildCanonicalMintName,
+  buildMetaplexCompatibleMetadata,
+  DEFAULT_COLLECTION_SYMBOL,
+  DEFAULT_NFT_SYMBOL,
+  getMetadataFieldStatus,
+  getUtf8ByteLength,
+  METADATA_BYTE_LIMITS,
+  usesMultibyteUtf8,
+} from "@/lib/nft-metadata";
 
 interface MintFormData {
   // Basic Info
@@ -91,6 +102,10 @@ function MintFormInner() {
 
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const mintName = buildCanonicalMintName(formData);
+  const nameStatus = getMetadataFieldStatus(mintName.canonicalName, METADATA_BYTE_LIMITS.name);
+  const symbolStatus = getMetadataFieldStatus(DEFAULT_NFT_SYMBOL, METADATA_BYTE_LIMITS.symbol);
+  const nameUsesMultibyte = usesMultibyteUtf8(mintName.sourceName);
 
   // Search Alt.xyz / TCGplayer for matching cards
   const handlePriceSourceSearch = async () => {
@@ -143,17 +158,8 @@ function MintFormInner() {
 
   // Auto-generate name when relevant fields change
   useEffect(() => {
-    let generatedName = "";
-    if (formData.type === "Card") {
-      if (formData.condition === "Graded") {
-        generatedName = [formData.year, formData.cardName, formData.variant, formData.cardNumber ? `#${formData.cardNumber}` : "", formData.gradingCompany, formData.grade, formData.language, formData.set, formData.tcg].filter(Boolean).join(" ");
-      } else {
-        generatedName = [formData.year, formData.cardName, formData.variant, formData.cardNumber ? `#${formData.cardNumber}` : "", formData.condition, formData.language, formData.set, formData.tcg].filter(Boolean).join(" ");
-      }
-    } else {
-      generatedName = [formData.sealedYear, formData.sealedTcg, formData.sealedSet, formData.productName, formData.sealedLanguage].filter(Boolean).join(" ");
-    }
-    setFormData(prev => ({ ...prev, name: generatedName }));
+    const nextName = buildCanonicalMintName(formData).canonicalName;
+    setFormData((prev) => (prev.name === nextName ? prev : { ...prev, name: nextName }));
   }, [formData.type, formData.year, formData.cardName, formData.variant, formData.cardNumber, formData.condition, formData.gradingCompany, formData.grade, formData.language, formData.set, formData.tcg, formData.productName, formData.sealedSet, formData.sealedYear, formData.sealedLanguage, formData.sealedTcg]);
 
   const handleImageUpload = (field: 'frontImage' | 'backImage') => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,26 +174,23 @@ function MintFormInner() {
     }
   };
 
-  const generateMetadata = (imageUri?: string) => {
-    const metadata: Record<string, any> = {
-      name: formData.name, description: `${formData.type} listed on Artifacte`, image: imageUri || "", symbol: "Artifacte",
-      attributes: [], properties: { category: "Trading Card", creators: [{ address: ADMIN_WALLET, share: 100 }] }
-    };
+  const generateMetadata = (imageUri?: string, imageMimeType?: string) => {
+    const attributes: Array<{ trait_type: string; value: string }> = [];
     if (formData.type === "Card") {
-      metadata.attributes.push(
+      attributes.push(
         { trait_type: "Type", value: "Card" }, { trait_type: "TCG", value: formData.tcg }, { trait_type: "Card Name", value: formData.cardName },
         { trait_type: "Set", value: formData.set }, { trait_type: "Card Number", value: formData.cardNumber },
         { trait_type: "Year", value: formData.year?.toString() || "" }, { trait_type: "Language", value: formData.language },
         { trait_type: "Variant", value: formData.variant }, { trait_type: "Condition", value: formData.condition }
       );
       if (formData.condition === "Graded") {
-        metadata.attributes.push(
+        attributes.push(
           { trait_type: "Grading Company", value: formData.gradingCompany }, { trait_type: "Grade", value: formData.grade },
           { trait_type: "Grade Label", value: formData.gradeLabel }, { trait_type: "Cert Number", value: formData.certNumber }
         );
       }
     } else {
-      metadata.attributes.push(
+      attributes.push(
         { trait_type: "Type", value: "Sealed" }, { trait_type: "Product Name", value: formData.productName },
         { trait_type: "Set", value: formData.sealedSet }, { trait_type: "Year", value: formData.sealedYear?.toString() || "" },
         { trait_type: "Language", value: formData.sealedLanguage }, { trait_type: "TCG", value: formData.sealedTcg }
@@ -195,12 +198,23 @@ function MintFormInner() {
     }
     // Price source mapping
     if (formData.priceSource !== "None" && formData.priceSourceId) {
-      metadata.attributes.push(
+      attributes.push(
         { trait_type: "Price Source", value: formData.priceSource },
         { trait_type: "Price Source ID", value: formData.priceSourceId }
       );
     }
-    return metadata;
+
+    return buildMetaplexCompatibleMetadata({
+      name: mintName.canonicalName,
+      symbol: DEFAULT_NFT_SYMBOL,
+      description: `${formData.type} listed on Artifacte`,
+      image: imageUri || "",
+      imageMimeType,
+      attributes,
+      creatorAddress: wallet.publicKey?.toBase58() || ADMIN_WALLET,
+      externalUrl: "https://artifacte.io",
+      sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
+    });
   };
 
   const wallet = useWallet();
@@ -220,15 +234,25 @@ function MintFormInner() {
         .use(irysUploader());
 
       const collectionMeta = {
-        name: "Artifacte",
-        symbol: "ARTF",
-        description: "Artifacte — RWA tokenized collectibles on Solana. Trading cards, sealed products, and more.",
-        image: "",
-        external_url: "https://artifacte.io",
+        ...buildMetaplexCompatibleMetadata({
+          name: "Artifacte",
+          symbol: DEFAULT_COLLECTION_SYMBOL,
+          description: "Artifacte — RWA tokenized collectibles on Solana. Trading cards, sealed products, and more.",
+          image: "",
+          creatorAddress: wallet.publicKey.toBase58(),
+          externalUrl: "https://artifacte.io",
+          sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
+        }),
       };
 
       setMintResult("⏳ Uploading collection metadata...");
       const metadataUri = await umi.uploader.uploadJson(collectionMeta);
+      const collectionUriStatus = getMetadataFieldStatus(metadataUri, METADATA_BYTE_LIMITS.uri, "uri");
+      if (!collectionUriStatus.fits) {
+        setMintResult(`❌ Collection metadata URI too long (${collectionUriStatus.bytes} bytes, max ${METADATA_BYTE_LIMITS.uri})`);
+        setCreatingCollection(false);
+        return;
+      }
 
       setMintResult("⏳ Creating collection on-chain...");
       const collection = generateSigner(umi);
@@ -241,7 +265,7 @@ function MintFormInner() {
           pluginAuthorityPair({
             type: "Royalties",
             data: {
-              basisPoints: 500,
+              basisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
               creators: [{ address: umi.identity.publicKey, percentage: 100 }],
               ruleSet: ruleSet("None"),
             },
@@ -259,6 +283,7 @@ function MintFormInner() {
 
   const handleMint = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
+    const canonicalName = buildCanonicalMintName(formData);
     
     // Input validation
     if (formData.recipientWallet) {
@@ -269,8 +294,12 @@ function MintFormInner() {
         return;
       }
     }
-    if (formData.name.length > 32) {
-      setMintResult("❌ Name too long (max 32 characters on-chain)");
+    if (!canonicalName.canonicalName || !canonicalName.fits) {
+      setMintResult(`❌ Name must fit within ${METADATA_BYTE_LIMITS.name} UTF-8 bytes on-chain`);
+      return;
+    }
+    if (!symbolStatus.fits) {
+      setMintResult(`❌ Symbol must fit within ${METADATA_BYTE_LIMITS.symbol} UTF-8 bytes`);
       return;
     }
 
@@ -310,10 +339,10 @@ function MintFormInner() {
       }
 
       // Step 3: Build metadata with the real image URL (never embed base64)
-      const metadata = generateMetadata(imageUri);
+      const metadata = generateMetadata(imageUri, formData.frontImage.type);
 
       // Validate metadata size
-      const metaSize = JSON.stringify(metadata).length;
+      const metaSize = getUtf8ByteLength(JSON.stringify(metadata));
       if (metaSize > 50000) {
         setMintResult("❌ Metadata too large (" + metaSize + " bytes, max 50KB)");
         setMinting(false);
@@ -323,6 +352,12 @@ function MintFormInner() {
       // Step 4: Upload metadata JSON to Arweave
       setMintResult("⏳ Uploading metadata to Arweave...");
       const metadataUri = await umi.uploader.uploadJson(metadata);
+      const metadataUriStatus = getMetadataFieldStatus(metadataUri, METADATA_BYTE_LIMITS.uri, "uri");
+      if (!metadataUriStatus.fits) {
+        setMintResult(`❌ Metadata URI too long (${metadataUriStatus.bytes} bytes, max ${METADATA_BYTE_LIMITS.uri})`);
+        setMinting(false);
+        return;
+      }
 
       // Step 4: Create Metaplex Core asset with royalties
       setMintResult("⏳ Simulating transaction...");
@@ -330,14 +365,14 @@ function MintFormInner() {
 
       const createArgs: any = {
         asset,
-        name: formData.name.slice(0, 32),
+        name: canonicalName.canonicalName,
         uri: metadataUri,
         owner: formData.recipientWallet ? umiPublicKey(formData.recipientWallet) : umi.identity.publicKey,
         plugins: [
           pluginAuthorityPair({
             type: "Royalties",
             data: {
-              basisPoints: 500,
+              basisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
               creators: [{ address: umi.identity.publicKey, percentage: 100 }],
               ruleSet: ruleSet("None"),
             },
@@ -400,8 +435,23 @@ function MintFormInner() {
             </div>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Auto-Generated Name</label>
+            <label className="block text-sm text-gray-400 mb-1">On-Chain Name</label>
             <input type="text" value={formData.name} readOnly className="w-full bg-dark-700 border border-white/10 rounded-lg px-3 py-2 text-gray-300 text-sm cursor-not-allowed" />
+            <div className="mt-2 space-y-1 text-xs">
+              <p className={nameStatus.fits ? "text-gray-400" : "text-red-400"}>
+                {nameStatus.bytes}/{METADATA_BYTE_LIMITS.name} bytes on-chain
+                {mintName.wasShortened ? " • auto-shortened to fit" : ""}
+              </p>
+              {mintName.wasShortened && mintName.sourceName && (
+                <p className="text-amber-400 break-words">Source name: {mintName.sourceName}</p>
+              )}
+              {nameUsesMultibyte && (
+                <p className="text-gray-500">UTF-8 aware: emoji and accented characters consume multiple bytes.</p>
+              )}
+              <p className={symbolStatus.fits ? "text-gray-500" : "text-red-400"}>
+                Symbol {DEFAULT_NFT_SYMBOL}: {symbolStatus.bytes}/{METADATA_BYTE_LIMITS.symbol} bytes
+              </p>
+            </div>
           </div>
         </div>
         {/* Card Details */}

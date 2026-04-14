@@ -3,6 +3,13 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess } from "@/lib/data";
+import {
+  buildMetaplexCompatibleMetadata,
+  DEFAULT_NFT_SYMBOL,
+  getMetadataFieldStatus,
+  METADATA_BYTE_LIMITS,
+  sanitizeMetadataSymbol,
+} from "@/lib/nft-metadata";
 import { MintFormContent } from "./mint/content";
 
 interface AdminListing {
@@ -50,6 +57,30 @@ interface MintingForm {
   attributes: Array<{ key: string; value: string }>;
 }
 
+function extractMintAttributes(metadata?: Record<string, any>): Array<{ key: string; value: string }> {
+  if (!metadata) {
+    return [{ key: "", value: "" }];
+  }
+
+  if (Array.isArray(metadata.attributes)) {
+    const attributes = metadata.attributes
+      .map((attribute: any) => ({
+        key: String(attribute?.trait_type || ""),
+        value: String(attribute?.value || ""),
+      }))
+      .filter((attribute) => attribute.key && attribute.value);
+
+    return attributes.length > 0 ? attributes : [{ key: "", value: "" }];
+  }
+
+  const attributes = Object.entries(metadata)
+    .filter(([key]) => !["name", "symbol", "description", "image", "external_url", "seller_fee_basis_points", "properties", "attributes"].includes(key))
+    .map(([key, value]) => ({ key, value: String(value) }))
+    .filter((attribute) => attribute.key && attribute.value);
+
+  return attributes.length > 0 ? attributes : [{ key: "", value: "" }];
+}
+
 export default function AdminPage() {
   const { publicKey, connected } = useWallet();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -80,10 +111,12 @@ export default function AdminPage() {
   const [mintForm, setMintForm] = useState<MintingForm>({
     submissionId: "",
     nftName: "",
-    nftSymbol: "Artifacte",
+    nftSymbol: DEFAULT_NFT_SYMBOL,
     nftImageUri: "",
     attributes: [{ key: "", value: "" }],
   });
+  const mintNameStatus = getMetadataFieldStatus(mintForm.nftName, METADATA_BYTE_LIMITS.name);
+  const mintSymbolStatus = getMetadataFieldStatus(sanitizeMetadataSymbol(mintForm.nftSymbol), METADATA_BYTE_LIMITS.symbol);
 
   useEffect(() => {
     if (!connected || !publicKey) {
@@ -239,11 +272,23 @@ export default function AdminPage() {
         return;
       }
 
-      const metadata = Object.fromEntries(
-        mintForm.attributes
+      if (!mintNameStatus.fits) {
+        setError(`NFT name must fit within ${METADATA_BYTE_LIMITS.name} UTF-8 bytes`);
+        return;
+      }
+
+      const symbol = sanitizeMetadataSymbol(mintForm.nftSymbol || DEFAULT_NFT_SYMBOL);
+      const metadata = buildMetaplexCompatibleMetadata({
+        name: mintNameStatus.value,
+        symbol,
+        description: "Submission minted on Artifacte",
+        image: mintForm.nftImageUri,
+        attributes: mintForm.attributes
           .filter((attr) => attr.key && attr.value)
-          .map((attr) => [attr.key, attr.value])
-      );
+          .map((attr) => ({ trait_type: attr.key, value: attr.value })),
+        creatorAddress: publicKey?.toBase58(),
+        externalUrl: "https://artifacte.io",
+      });
 
       const res = await fetch("/api/submissions", {
         method: "PATCH",
@@ -254,8 +299,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           id: mintingSubmissionId,
           status: "minted",
-          nftName: mintForm.nftName,
-          nftSymbol: mintForm.nftSymbol,
+          nftName: mintNameStatus.value,
+          nftSymbol: symbol,
           nftImageUri: mintForm.nftImageUri,
           nftMetadata: metadata,
         }),
@@ -278,7 +323,7 @@ export default function AdminPage() {
       setMintForm({
         submissionId: "",
         nftName: "",
-        nftSymbol: "Artifacte",
+        nftSymbol: DEFAULT_NFT_SYMBOL,
         nftImageUri: "",
         attributes: [{ key: "", value: "" }],
       });
@@ -656,7 +701,7 @@ export default function AdminPage() {
                                   setMintForm({
                                     submissionId: submission.id,
                                     nftName: submission.name,
-                                    nftSymbol: "Artifacte",
+                                    nftSymbol: DEFAULT_NFT_SYMBOL,
                                     nftImageUri: submission.photos[0] || "",
                                     attributes: [{ key: "", value: "" }],
                                   });
@@ -681,14 +726,9 @@ export default function AdminPage() {
                                 setMintForm({
                                   submissionId: submission.id,
                                   nftName: submission.nftName || submission.name,
-                                  nftSymbol: submission.nftSymbol || "Artifacte",
+                                  nftSymbol: submission.nftSymbol || DEFAULT_NFT_SYMBOL,
                                   nftImageUri: submission.nftImageUri || submission.photos[0] || "",
-                                  attributes: submission.nftMetadata
-                                    ? Object.entries(submission.nftMetadata).map(([k, v]) => ({
-                                        key: k,
-                                        value: String(v),
-                                      }))
-                                    : [{ key: "", value: "" }],
+                                  attributes: extractMintAttributes(submission.nftMetadata),
                                 });
                                 setShowMintForm(true);
                               }}
@@ -755,6 +795,9 @@ export default function AdminPage() {
                     className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
                     placeholder="NFT name..."
                   />
+                  <p className={`mt-2 text-xs ${mintNameStatus.fits ? "text-gray-500" : "text-red-400"}`}>
+                    {mintNameStatus.bytes}/{METADATA_BYTE_LIMITS.name} UTF-8 bytes
+                  </p>
                 </div>
 
                 {/* NFT Symbol */}
@@ -767,6 +810,9 @@ export default function AdminPage() {
                     className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
                     placeholder="Symbol (default: Artifacte)"
                   />
+                  <p className={`mt-2 text-xs ${mintSymbolStatus.fits ? "text-gray-500" : "text-red-400"}`}>
+                    {mintSymbolStatus.bytes}/{METADATA_BYTE_LIMITS.symbol} UTF-8 bytes
+                  </p>
                 </div>
 
                 {/* Image URI */}

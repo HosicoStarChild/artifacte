@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { hasAdminAccess } from "@/lib/admin";
+import {
+  buildMetaplexCompatibleMetadata,
+  DEFAULT_NFT_SYMBOL,
+  getMetadataFieldStatus,
+  METADATA_BYTE_LIMITS,
+  normalizeMetadataText,
+  normalizeMetadataUri,
+  sanitizeMetadataSymbol,
+} from "@/lib/nft-metadata";
 
 const SUBMISSIONS_FILE = path.join(process.cwd(), "data", "submissions.json");
 
@@ -27,6 +36,29 @@ export interface Submission {
 
 interface SubmissionsData {
   submissions: Submission[];
+}
+
+function extractMetadataAttributes(metadata?: Record<string, any>) {
+  if (!metadata) {
+    return [];
+  }
+
+  if (Array.isArray(metadata.attributes)) {
+    return metadata.attributes
+      .map((attribute: any) => ({
+        trait_type: normalizeMetadataText(attribute?.trait_type),
+        value: normalizeMetadataText(String(attribute?.value ?? "")),
+      }))
+      .filter((attribute) => attribute.trait_type && attribute.value);
+  }
+
+  return Object.entries(metadata)
+    .filter(([key]) => !["name", "symbol", "description", "image", "external_url", "seller_fee_basis_points", "properties", "attributes"].includes(key))
+    .map(([trait_type, value]) => ({
+      trait_type: normalizeMetadataText(trait_type),
+      value: normalizeMetadataText(String(value ?? "")),
+    }))
+    .filter((attribute) => attribute.trait_type && attribute.value);
 }
 
 async function readSubmissions(): Promise<SubmissionsData> {
@@ -162,10 +194,41 @@ export async function PATCH(req: NextRequest) {
 
     // If updating to minted, store mint metadata
     if (status === "minted") {
-      submission.nftName = nftName || submission.name;
-      submission.nftSymbol = nftSymbol || "Artifacte";
-      submission.nftImageUri = nftImageUri;
-      submission.nftMetadata = nftMetadata;
+      const nextName = getMetadataFieldStatus(nftName || submission.name, METADATA_BYTE_LIMITS.name);
+      if (!nextName.value || !nextName.fits) {
+        return NextResponse.json({ error: `NFT name must fit within ${METADATA_BYTE_LIMITS.name} UTF-8 bytes` }, { status: 400 });
+      }
+
+      const nextSymbolInput = normalizeMetadataText(nftSymbol || DEFAULT_NFT_SYMBOL) || DEFAULT_NFT_SYMBOL;
+      const nextSymbolStatus = getMetadataFieldStatus(nextSymbolInput, METADATA_BYTE_LIMITS.symbol);
+      if (!nextSymbolStatus.fits) {
+        return NextResponse.json({ error: `NFT symbol must fit within ${METADATA_BYTE_LIMITS.symbol} UTF-8 bytes` }, { status: 400 });
+      }
+
+      const nextImageUri = normalizeMetadataUri(nftImageUri || nftMetadata?.image || "");
+      const metadataDescription = normalizeMetadataText(
+        String(nftMetadata?.description || `${submission.category} minted on Artifacte`)
+      );
+      const creatorAddress = Array.isArray(nftMetadata?.properties?.creators)
+        ? normalizeMetadataText(String(nftMetadata.properties.creators[0]?.address || ""))
+        : "";
+
+      submission.nftName = nextName.value;
+      submission.nftSymbol = sanitizeMetadataSymbol(nextSymbolInput);
+      submission.nftImageUri = nextImageUri;
+      submission.nftMetadata = buildMetaplexCompatibleMetadata({
+        name: submission.nftName,
+        symbol: submission.nftSymbol,
+        description: metadataDescription,
+        image: nextImageUri,
+        attributes: extractMetadataAttributes(nftMetadata),
+        creatorAddress,
+        externalUrl: typeof nftMetadata?.external_url === "string" ? nftMetadata.external_url : undefined,
+        sellerFeeBasisPoints:
+          typeof nftMetadata?.seller_fee_basis_points === "number"
+            ? nftMetadata.seller_fee_basis_points
+            : undefined,
+      });
       submission.mintedAt = Date.now();
     }
 

@@ -1,21 +1,29 @@
 # Artifacte NFT Metadata Standard v1.0
 
-All NFTs minted on Artifacte follow this metadata schema. Built on Metaplex Token Metadata with category-specific extensions.
+Artifacte currently has two metadata paths in this repo:
 
-## Royalty & Creator Config
+- The admin dashboard at `/admin` mints Metaplex Core assets and uploads Metaplex-compatible off-chain JSON.
+- Legacy auction and pNFT code paths still reference Metaplex Token Metadata / ProgrammableNonFungible flows.
 
-All Artifacte-minted pNFTs use:
-- **Seller fee basis points**: `200` (2%)
-- **Creator**: `DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX` (treasury, 100% share, verified)
-- **Token standard**: `ProgrammableNonFungible` (pNFT — royalties enforced on-chain)
+This document now describes the admin mint dashboard as the canonical current behavior and calls out the legacy pNFT path where relevant.
 
-This ensures Artifacte receives 2% royalty on ALL resales across any pNFT-compatible marketplace (Magic Eden, Tensor, etc.).
+## Admin Mint Path
+
+The admin mint dashboard currently uses:
+- **Mint standard**: `Metaplex Core`
+- **On-chain name limit**: `32 UTF-8 bytes`
+- **On-chain URI limit**: `200 UTF-8 bytes`
+- **Off-chain symbol compatibility target**: `10 UTF-8 bytes`
+- **Seller fee basis points**: `500` (5%) via the Core royalties plugin
+- **Creator source**: the connected admin wallet used for the mint transaction
+
+The repo still contains Token Metadata / pNFT-specific auction flows. Those should be treated as a separate path with their own runtime constraints rather than assumed to match the admin dashboard exactly.
 
 ## Universal Fields (Required)
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string (64) | Item name |
+| `name` | string (32 UTF-8 bytes on admin Core mint) | Item name |
 | `symbol` | string | `Artifacte` |
 | `description` | string | Item description |
 | `image` | string (URI) | Primary photo |
@@ -101,7 +109,9 @@ This ensures Artifacte receives 2% royalty on ALL resales across any pNFT-compat
 
 ## On-Chain Storage
 
-Category-specific fields are stored as JSON in the NFT's `uri` (off-chain metadata on Arweave/IPFS). Universal fields that need on-chain access (name, category, appraisedValue, condition) are stored in the `RwaMetadata` PDA.
+Category-specific fields are stored as JSON in the NFT's `uri` (off-chain metadata on Arweave/IPFS). The admin dashboard enforces the Core-facing limits of `name <= 32 UTF-8 bytes` and `uri <= 200 UTF-8 bytes` before minting.
+
+The separate `RwaMetadata` Anchor program in this repo still has its own PDA storage limits (`name <= 64`, `uri <= 200`). Do not assume those larger PDA limits apply to the Metaplex Core admin mint flow.
 
 ```
 URI JSON structure:
@@ -110,6 +120,7 @@ URI JSON structure:
   "symbol": "Artifacte",
   "description": "...",
   "image": "https://arweave.net/...",
+  "seller_fee_basis_points": 500,
   "attributes": [
     { "trait_type": "category", "value": "TCGCards" },
     { "trait_type": "tcg", "value": "One Piece" },
@@ -124,7 +135,8 @@ URI JSON structure:
   ],
   "properties": {
     "category": "image",
-    "files": [{ "uri": "https://arweave.net/...", "type": "image/png" }]
+    "files": [{ "uri": "https://arweave.net/...", "type": "image/png" }],
+    "creators": [{ "address": "<admin-wallet>", "share": 100 }]
   }
 }
 ```
@@ -138,7 +150,9 @@ URI JSON structure:
 5. **`image` must be on permanent storage** — Arweave or IPFS, not HTTP URLs
 6. **Language is critical for TCG** — EN and JPN are different assets, never mixed
 7. **Grade must include grading company** — "PSA 10" not just "10"
+8. **Admin mint names are byte-limited, not character-limited** — emoji and accented characters can exceed 32 bytes before they exceed 32 visible characters
+9. **Admin mint symbols should remain within 10 UTF-8 bytes** — `Artifacte` is 9 bytes and the current default
 
 ## Symbol
 
-All Artifacte NFTs use the symbol `Artifacte` for marketplace identification.
+Admin dashboard metadata uses the symbol `Artifacte` for marketplace identification. It fits within the 10-byte compatibility target used by wallets and indexers.
