@@ -35,14 +35,17 @@ interface ListingData {
   seller: string;
   nftMint: string;
   price: number;
+  paymentMint: string;
+  currency: string;
   listingType: { fixedPrice?: {}; auction?: {} };
   status: { active?: {}; settled?: {}; cancelled?: {} };
   endTime: number;
   currentBid: number;
-  highestBidder: string;
+  highestBidder: string | null;
   escrowNftAccount: string;
   royaltyBasisPoints: number;
   creatorAddress: string;
+  isCore?: boolean;
 }
 
 interface NFTData {
@@ -104,6 +107,18 @@ function formatListedAt(listedAt?: number): string | null {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
   return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+function nativeCurrencyDivisor(currency: string): number {
+  return currency === "SOL" ? 1e9 : 1e6;
+}
+
+function formatNativePrice(amount: number, currency: string): string {
+  const value = amount / nativeCurrencyDivisor(currency);
+  if (currency === "SOL") {
+    return `◎ ${value.toFixed(4)}`;
+  }
+  return `${value.toFixed(2)} ${currency}`;
 }
 
 export default function AuctionDetailPage() {
@@ -185,6 +200,20 @@ export default function AuctionDetailPage() {
         ...listingData,
         seller: listingData.seller?.toBase58?.() || listingData.seller,
         nftMint: listingData.nftMint?.toBase58?.() || listingData.nftMint,
+        paymentMint:
+          listingData.paymentMint?.toBase58?.() ||
+          listingData.paymentMint ||
+          SOL_MINT.toBase58(),
+        currency:
+          (() => {
+            const paymentMint =
+              listingData.paymentMint?.toBase58?.() ||
+              listingData.paymentMint ||
+              SOL_MINT.toBase58();
+            if (paymentMint === SOL_MINT.toBase58()) return "SOL";
+            if (paymentMint === "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB") return "USD1";
+            return "USDC";
+          })(),
         price: listingData.price?.toNumber?.() || Number(listingData.price),
         endTime:
           listingData.endTime?.toNumber?.() || Number(listingData.endTime),
@@ -198,6 +227,7 @@ export default function AuctionDetailPage() {
         creatorAddress:
           listingData.creatorAddress?.toBase58?.() || listingData.creatorAddress,
         royaltyBasisPoints: listingData.royaltyBasisPoints || 0,
+        isCore: Boolean(listingData.isCore),
       });
 
       try {
@@ -562,38 +592,43 @@ export default function AuctionDetailPage() {
     setLoadingAction(true);
     try {
       const nftMint = new PublicKey(mint);
-      const mintInfo = await connection.getAccountInfo(nftMint);
-      const isToken2022 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
-      const nftProgram = isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
-
-      const buyerPaymentAccount = await getAssociatedTokenAddress(
-        SOL_MINT,
-        publicKey
-      );
-      const sellerPaymentAccount = await getAssociatedTokenAddress(
-        SOL_MINT,
-        new PublicKey(listing.seller)
-      );
-      const buyerNftAccount = await getAssociatedTokenAddress(
-        nftMint,
-        publicKey,
-        false,
-        nftProgram
-      );
-
       const auctionProgram = new AuctionProgram(
         connection,
         anchorWallet,
         sendTransaction
       );
-      await auctionProgram.buyNow(
-        nftMint,
-        sellerPaymentAccount,
-        buyerPaymentAccount,
-        buyerNftAccount,
-        listing.price,
-        SOL_MINT
-      );
+
+      if (listing.isCore) {
+        await auctionProgram.buyNowCore(nftMint);
+      } else {
+        const mintInfo = await connection.getAccountInfo(nftMint);
+        const isToken2022 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
+        const nftProgram = isToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+        const paymentMint = new PublicKey(listing.paymentMint);
+        const buyerPaymentAccount = await getAssociatedTokenAddress(
+          paymentMint,
+          publicKey
+        );
+        const sellerPaymentAccount = await getAssociatedTokenAddress(
+          paymentMint,
+          new PublicKey(listing.seller)
+        );
+        const buyerNftAccount = await getAssociatedTokenAddress(
+          nftMint,
+          publicKey,
+          false,
+          nftProgram
+        );
+
+        await auctionProgram.buyNow(
+          nftMint,
+          sellerPaymentAccount,
+          buyerPaymentAccount,
+          buyerNftAccount,
+          listing.price,
+          paymentMint
+        );
+      }
 
       showToast.success("Purchase successful!");
       setListing((previous: any) =>
@@ -639,7 +674,7 @@ export default function AuctionDetailPage() {
         listing.currentBid > 0
           ? await getAssociatedTokenAddress(
               SOL_MINT,
-              new PublicKey(listing.highestBidder)
+              new PublicKey(listing.highestBidder!)
             )
           : publicKey;
 
@@ -688,7 +723,7 @@ export default function AuctionDetailPage() {
       );
       const buyerNftAccount = await getAssociatedTokenAddress(
         nftMint,
-        new PublicKey(listing.highestBidder),
+        new PublicKey(listing.highestBidder!),
         false,
         nftProgram
       );
@@ -733,40 +768,45 @@ export default function AuctionDetailPage() {
     setLoadingAction(true);
     try {
       const nftMint = new PublicKey(mint);
-      const mintInfo = await connection.getAccountInfo(nftMint);
-      const isToken2022 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
-      const tokenProgramId = isToken2022
-        ? TOKEN_2022_PROGRAM_ID
-        : TOKEN_PROGRAM_ID;
-
-      const sellerNftAccount = await getAssociatedTokenAddress(
-        nftMint,
-        publicKey,
-        false,
-        tokenProgramId
-      );
-
-      const ataInfo = await connection.getAccountInfo(sellerNftAccount);
-      if (!ataInfo) {
-        const createAtaIx = createAssociatedTokenAccountInstruction(
-          publicKey,
-          sellerNftAccount,
-          publicKey,
-          nftMint,
-          tokenProgramId,
-          ASSOCIATED_TOKEN_PROGRAM_ID
-        );
-        const ataTx = new Transaction().add(createAtaIx);
-        const ataSig = await sendTransaction(ataTx, connection);
-        await connection.confirmTransaction(ataSig, "confirmed");
-      }
-
       const auctionProgram = new AuctionProgram(
         connection,
         anchorWallet,
         sendTransaction
       );
-      await auctionProgram.cancelListing(nftMint, sellerNftAccount);
+
+      if (listing.isCore) {
+        await auctionProgram.cancelListingCore(nftMint);
+      } else {
+        const mintInfo = await connection.getAccountInfo(nftMint);
+        const isToken2022 = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID) || false;
+        const tokenProgramId = isToken2022
+          ? TOKEN_2022_PROGRAM_ID
+          : TOKEN_PROGRAM_ID;
+
+        const sellerNftAccount = await getAssociatedTokenAddress(
+          nftMint,
+          publicKey,
+          false,
+          tokenProgramId
+        );
+
+        const ataInfo = await connection.getAccountInfo(sellerNftAccount);
+        if (!ataInfo) {
+          const createAtaIx = createAssociatedTokenAccountInstruction(
+            publicKey,
+            sellerNftAccount,
+            publicKey,
+            nftMint,
+            tokenProgramId,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          );
+          const ataTx = new Transaction().add(createAtaIx);
+          const ataSig = await sendTransaction(ataTx, connection);
+          await connection.confirmTransaction(ataSig, "confirmed");
+        }
+
+        await auctionProgram.cancelListing(nftMint, sellerNftAccount);
+      }
 
       showToast.success("Listing cancelled successfully!");
       setListing((previous: any) =>
@@ -1035,7 +1075,7 @@ export default function AuctionDetailPage() {
                   <div>
                     <p className="text-gray-400 text-sm mb-2">Listed Price</p>
                     <p className="text-4xl font-serif text-gold-400">
-                      ◎ {(listing.price / 1e9).toFixed(4)}
+                      {formatNativePrice(listing.price, listing.currency)}
                     </p>
                   </div>
                 ) : (
@@ -1044,11 +1084,11 @@ export default function AuctionDetailPage() {
                       {listing.currentBid > 0 ? "Current Highest Bid" : "Starting Bid"}
                     </p>
                     <p className="text-4xl font-serif text-gold-400">
-                      ◎ {(Math.max(listing.price, listing.currentBid) / 1e9).toFixed(4)}
+                      {formatNativePrice(Math.max(listing.price, listing.currentBid), listing.currency)}
                     </p>
                     {listing.currentBid > 0 && (
                       <p className="text-gray-500 text-xs mt-2">
-                        Leading bidder: {shortAddress(listing.highestBidder)}
+                        Leading bidder: {shortAddress(listing.highestBidder || "")}
                       </p>
                     )}
                   </div>
@@ -1220,7 +1260,7 @@ export default function AuctionDetailPage() {
                   nftMint={mint}
                   connection={connection}
                   currentBid={listing.currentBid}
-                  highestBidder={listing.highestBidder}
+                  highestBidder={listing.highestBidder ?? undefined}
                 />
               </div>
             )}

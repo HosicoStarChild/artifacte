@@ -1,6 +1,10 @@
 import { Connection, PublicKey, Transaction, SystemProgram, TransactionInstruction, ComputeBudgetProgram } from "@solana/web3.js";
 import { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
+import { approvePluginAuthority } from "@metaplex-foundation/mpl-core";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+import { fromWeb3JsPublicKey, toWeb3JsInstruction } from "@metaplex-foundation/umi-web3js-adapters";
 import { IDL } from "./auction-idl";
 
 // Program IDs and constants
@@ -14,6 +18,13 @@ const [TREASURY_CONFIG_PDA] = PublicKey.findProgramAddressSync(
 );
 const USD1_MINT = new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB");
 const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const ARTIFACTE_CORE_COLLECTION = new PublicKey("jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS");
+const MPL_CORE_PROGRAM_ID = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
+const CORE_LISTING_ACCOUNT_SIZE = 189;
+const CORE_LISTING_ACCOUNT_DISCRIMINATOR = Buffer.from([205, 178, 162, 169, 199, 166, 133, 157]);
+const LIST_CORE_ITEM_DISCRIMINATOR = Buffer.from([249, 213, 18, 100, 230, 110, 232, 59]);
+const BUY_NOW_CORE_DISCRIMINATOR = Buffer.from([107, 235, 190, 104, 232, 171, 241, 145]);
+const CANCEL_LISTING_CORE_DISCRIMINATOR = Buffer.from([121, 19, 72, 243, 73, 39, 91, 219]);
 
 // WNS Program IDs
 const WNS_PROGRAM_ID = new PublicKey("wns1gDLt8fgLcGhWi5MqAqgXpwEP1JftKE9eZnXS1HM");
@@ -163,6 +174,62 @@ function getWNSRemainingAccounts(nftMint: PublicKey): { pubkey: PublicKey; isSig
   ];
 }
 
+function decodeItemCategory(category: number) {
+  if (category === 0) return { digitalArt: {} };
+  if (category === 1) return { spirits: {} };
+  if (category === 2) return { tcgCards: {} };
+  if (category === 3) return { sportsCards: {} };
+  return { watches: {} };
+}
+
+function decodeListingStatus(status: number) {
+  if (status === 0) return { active: {} };
+  if (status === 1) return { settled: {} };
+  return { cancelled: {} };
+}
+
+function decodeCoreListingAccount(data: Buffer | Uint8Array) {
+  const buffer = Buffer.from(data);
+  if (buffer.length !== CORE_LISTING_ACCOUNT_SIZE) return null;
+  if (!buffer.subarray(0, 8).equals(CORE_LISTING_ACCOUNT_DISCRIMINATOR)) return null;
+
+  const seller = new PublicKey(buffer.subarray(8, 40));
+  const assetId = new PublicKey(buffer.subarray(40, 72));
+  const collection = new PublicKey(buffer.subarray(72, 104));
+  const paymentMint = new PublicKey(buffer.subarray(104, 136));
+  const price = new anchor.BN(buffer.readBigUInt64LE(136).toString());
+  const category = buffer[144];
+  const status = buffer[145];
+  const royaltyBasisPoints = buffer.readUInt16LE(146);
+  const creatorAddress = new PublicKey(buffer.subarray(148, 180));
+  const createdAt = new anchor.BN(buffer.readBigInt64LE(180).toString());
+  const bump = buffer[188];
+
+  return {
+    seller,
+    nftMint: assetId,
+    assetId,
+    collection,
+    paymentMint,
+    price,
+    listingType: { fixedPrice: {} },
+    category: decodeItemCategory(category),
+    status: decodeListingStatus(status),
+    startTime: createdAt,
+    endTime: new anchor.BN(0),
+    escrowNftAccount: PublicKey.default,
+    currentBid: new anchor.BN(0),
+    highestBidder: PublicKey.default,
+    baxusFee: false,
+    isToken2022: false,
+    isPnft: false,
+    isCore: true,
+    royaltyBasisPoints,
+    creatorAddress,
+    bump,
+  };
+}
+
 // WNS authority → group mint mapping for distribution PDA derivation
 // Distribution PDA seeds: [group_mint, payment_mint] under distribution program
 // The group_mint is the Token-2022 collection NFT mint, NOT the authority address
@@ -208,6 +275,126 @@ export class AuctionProgram {
     const provider = new anchor.AnchorProvider(connection, wallet, {});
     const idl = { ...IDL, address: AUCTION_PROGRAM_ID.toBase58() } as any;
     this.program = new (anchor.Program as any)(idl, provider);
+  }
+
+  private createUmi() {
+    return createUmi(this.connection).use(walletAdapterIdentity(this.wallet));
+  }
+
+  private getCoreListingPda(assetId: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("core_listing"), assetId.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+  }
+
+  private async buildCoreDelegateApprovalInstructions(
+    assetId: PublicKey,
+    collection: PublicKey,
+    delegate: PublicKey
+  ): Promise<TransactionInstruction[]> {
+    const umi = this.createUmi();
+    const builder = approvePluginAuthority(umi, {
+      asset: fromWeb3JsPublicKey(assetId),
+      collection: fromWeb3JsPublicKey(collection),
+      authority: umi.payer,
+      plugin: { type: "TransferDelegate" },
+      newAuthority: { type: "Address", address: fromWeb3JsPublicKey(delegate) } as any,
+    });
+
+    return builder.getInstructions().map((instruction) => toWeb3JsInstruction(instruction));
+  }
+
+  private buildCoreListInstruction(
+    assetId: PublicKey,
+    collection: PublicKey,
+    paymentMint: PublicKey,
+    price: number,
+    category: ItemCategory,
+    royaltyBps: number,
+    creatorAddress: PublicKey
+  ): TransactionInstruction {
+    const listing = this.getCoreListingPda(assetId);
+    const data = Buffer.alloc(51);
+    LIST_CORE_ITEM_DISCRIMINATOR.copy(data, 0);
+    data.writeBigUInt64LE(BigInt(price), 8);
+    data.writeUInt8(category, 16);
+    data.writeUInt16LE(royaltyBps, 17);
+    Buffer.from(creatorAddress.toBytes()).copy(data, 19);
+
+    return new TransactionInstruction({
+      programId: AUCTION_PROGRAM_ID,
+      keys: [
+        { pubkey: listing, isSigner: false, isWritable: true },
+        { pubkey: assetId, isSigner: false, isWritable: false },
+        { pubkey: collection, isSigner: false, isWritable: false },
+        { pubkey: paymentMint, isSigner: false, isWritable: false },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data,
+    });
+  }
+
+  private buildCoreBuyInstruction(
+    assetId: PublicKey,
+    collection: PublicKey,
+    buyerPaymentAccount: PublicKey,
+    sellerPaymentAccount: PublicKey,
+    treasuryPaymentAccount: PublicKey,
+    creatorPaymentAccount: PublicKey
+  ): TransactionInstruction {
+    const listing = this.getCoreListingPda(assetId);
+
+    return new TransactionInstruction({
+      programId: AUCTION_PROGRAM_ID,
+      keys: [
+        { pubkey: listing, isSigner: false, isWritable: true },
+        { pubkey: assetId, isSigner: false, isWritable: true },
+        { pubkey: collection, isSigner: false, isWritable: true },
+        { pubkey: buyerPaymentAccount, isSigner: false, isWritable: true },
+        { pubkey: sellerPaymentAccount, isSigner: false, isWritable: true },
+        { pubkey: treasuryPaymentAccount, isSigner: false, isWritable: true },
+        { pubkey: creatorPaymentAccount, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: TREASURY_WALLET, isSigner: false, isWritable: true },
+        { pubkey: TREASURY_CONFIG_PDA, isSigner: false, isWritable: false },
+        { pubkey: MPL_CORE_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: BUY_NOW_CORE_DISCRIMINATOR,
+    });
+  }
+
+  private buildCoreCancelInstruction(
+    assetId: PublicKey,
+    collection: PublicKey
+  ): TransactionInstruction {
+    const listing = this.getCoreListingPda(assetId);
+
+    return new TransactionInstruction({
+      programId: AUCTION_PROGRAM_ID,
+      keys: [
+        { pubkey: listing, isSigner: false, isWritable: true },
+        { pubkey: assetId, isSigner: false, isWritable: true },
+        { pubkey: collection, isSigner: false, isWritable: true },
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: MPL_CORE_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: CANCEL_LISTING_CORE_DISCRIMINATOR,
+    });
+  }
+
+  private async fetchCoreListingAccount(assetId: PublicKey): Promise<any | null> {
+    const listing = this.getCoreListingPda(assetId);
+    const info = await this.connection.getAccountInfo(listing);
+    if (!info || !info.owner.equals(AUCTION_PROGRAM_ID)) return null;
+
+    const decoded = decodeCoreListingAccount(info.data);
+    if (!decoded) return null;
+    return decoded;
   }
 
   private async sendAndConfirm(tx: Transaction): Promise<string> {
@@ -431,6 +618,39 @@ export class AuctionProgram {
   }
 
   /**
+   * List a Metaplex Core asset for fixed-price sale.
+   * The seller approves the program's listing PDA as TransferDelegate first.
+   */
+  async listCoreItem(
+    assetId: PublicKey,
+    collection: PublicKey,
+    paymentMint: PublicKey,
+    price: number,
+    category: ItemCategory,
+    royaltyBps: number,
+    creatorAddress: PublicKey
+  ): Promise<string> {
+    const listing = this.getCoreListingPda(assetId);
+    const approveInstructions = await this.buildCoreDelegateApprovalInstructions(assetId, collection, listing);
+    const listIx = this.buildCoreListInstruction(
+      assetId,
+      collection,
+      paymentMint,
+      price,
+      category,
+      royaltyBps,
+      creatorAddress
+    );
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
+      .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }))
+      .add(...approveInstructions, listIx);
+
+    return await this.sendAndConfirm(tx);
+  }
+
+  /**
    * Buy a fixed-price listing
    * Supports both standard SPL Token and Token-2022/WNS NFTs
    */
@@ -601,6 +821,108 @@ export class AuctionProgram {
   }
 
   /**
+   * Buy a fixed-price Metaplex Core listing.
+   */
+  async buyNowCore(
+    assetId: PublicKey,
+    collection: PublicKey = ARTIFACTE_CORE_COLLECTION
+  ): Promise<string> {
+    const listingData = await this.fetchCoreListingAccount(assetId);
+    if (!listingData) throw new Error("Core listing not found");
+
+    const paymentMint = listingData.paymentMint as PublicKey;
+    const seller = listingData.seller as PublicKey;
+    const creatorAddress = listingData.creatorAddress as PublicKey;
+    const price = listingData.price.toNumber();
+    const buyerPaymentAccount = await getAssociatedTokenAddress(paymentMint, this.wallet.publicKey);
+    const sellerPaymentAccount = await getAssociatedTokenAddress(paymentMint, seller);
+    const treasuryPaymentAccount = await getAssociatedTokenAddress(paymentMint, TREASURY_WALLET);
+    const creatorPaymentAccount = listingData.royaltyBasisPoints > 0
+      ? await getAssociatedTokenAddress(paymentMint, creatorAddress, true)
+      : SystemProgram.programId;
+
+    const preInstructions: TransactionInstruction[] = [];
+    const SOL_MINT_ADDR = new PublicKey("So11111111111111111111111111111111111111112");
+
+    if (paymentMint.equals(SOL_MINT_ADDR)) {
+      const buyerAtaInfo = await this.connection.getAccountInfo(buyerPaymentAccount);
+      if (!buyerAtaInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            buyerPaymentAccount,
+            this.wallet.publicKey,
+            SOL_MINT_ADDR
+          )
+        );
+      }
+      preInstructions.push(
+        SystemProgram.transfer({
+          fromPubkey: this.wallet.publicKey,
+          toPubkey: buyerPaymentAccount,
+          lamports: price,
+        })
+      );
+      const { createSyncNativeInstruction } = await import("@solana/spl-token");
+      preInstructions.push(createSyncNativeInstruction(buyerPaymentAccount));
+    }
+
+    const sellerAtaInfo = await this.connection.getAccountInfo(sellerPaymentAccount);
+    if (!sellerAtaInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          sellerPaymentAccount,
+          seller,
+          paymentMint
+        )
+      );
+    }
+
+    const treasuryAtaInfo = await this.connection.getAccountInfo(treasuryPaymentAccount);
+    if (!treasuryAtaInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey,
+          treasuryPaymentAccount,
+          TREASURY_WALLET,
+          paymentMint
+        )
+      );
+    }
+
+    if (listingData.royaltyBasisPoints > 0) {
+      const creatorAtaInfo = await this.connection.getAccountInfo(creatorPaymentAccount);
+      if (!creatorAtaInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            this.wallet.publicKey,
+            creatorPaymentAccount,
+            creatorAddress,
+            paymentMint
+          )
+        );
+      }
+    }
+
+    const buyIx = this.buildCoreBuyInstruction(
+      assetId,
+      collection,
+      buyerPaymentAccount,
+      sellerPaymentAccount,
+      treasuryPaymentAccount,
+      creatorPaymentAccount
+    );
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
+      .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }))
+      .add(...preInstructions, buyIx);
+
+    return await this.sendAndConfirm(tx);
+  }
+
+  /**
    * Place a bid on an active auction (payment only, no NFT transfer)
    */
   async placeBid(
@@ -725,6 +1047,22 @@ export class AuctionProgram {
       const cancelSig = await this.sendAndConfirm(cancelTx);
       return cancelSig;
     }
+  }
+
+  /**
+   * Cancel a Metaplex Core listing.
+   */
+  async cancelListingCore(
+    assetId: PublicKey,
+    collection: PublicKey = ARTIFACTE_CORE_COLLECTION
+  ): Promise<string> {
+    const cancelIx = this.buildCoreCancelInstruction(assetId, collection);
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }))
+      .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }))
+      .add(cancelIx);
+
+    return await this.sendAndConfirm(tx);
   }
 
   /**
@@ -961,7 +1299,7 @@ export class AuctionProgram {
       const account = await this.program.account.listing.fetch(listing);
       return account;
     } catch (e) {
-      return null;
+      return await this.fetchCoreListingAccount(nftMint);
     }
   }
 
@@ -1100,9 +1438,9 @@ export class AuctionProgram {
    * Fetch all listings (skips accounts that fail to decode)
    */
   async fetchAllListings(): Promise<any[]> {
+    let legacyListings: any[] = [];
     try {
-      const accounts = await this.program.account.listing.all();
-      return accounts;
+      legacyListings = await this.program.account.listing.all();
     } catch (e) {
       // If bulk decode fails (e.g. corrupted/closed accounts), fetch raw and decode individually
       console.warn("Bulk listing fetch failed, trying individual decode:", (e as any)?.message);
@@ -1120,11 +1458,33 @@ export class AuctionProgram {
             // Skip accounts that can't be decoded (closed/corrupted)
           }
         }
-        return decoded;
+        legacyListings = decoded;
       } catch (e2) {
         console.error("Error fetching listings:", e2);
-        return [];
+        legacyListings = [];
       }
+    }
+
+    try {
+      const coreAccounts = await this.connection.getProgramAccounts(AUCTION_PROGRAM_ID, {
+        filters: [
+          { dataSize: CORE_LISTING_ACCOUNT_SIZE },
+          { memcmp: { offset: 0, bytes: anchor.utils.bytes.bs58.encode(CORE_LISTING_ACCOUNT_DISCRIMINATOR) } },
+        ],
+      });
+
+      const decodedCore = coreAccounts
+        .map((raw) => {
+          const account = decodeCoreListingAccount(raw.account.data);
+          if (!account) return null;
+          return { publicKey: raw.pubkey, account };
+        })
+        .filter(Boolean);
+
+      return [...legacyListings, ...decodedCore];
+    } catch (coreError) {
+      console.error("Error fetching core listings:", coreError);
+      return legacyListings;
     }
   }
 }

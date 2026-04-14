@@ -6,6 +6,12 @@ use anchor_spl::token_interface::{
     TokenAccount as IfaceTokenAccount,
     TokenInterface,
 };
+use mpl_core::{
+    accounts::BaseAssetV1,
+    instructions::{RevokePluginAuthorityV1CpiBuilder, TransferV1CpiBuilder},
+    programs::MPL_CORE_ID,
+    types::{PluginType, UpdateAuthority},
+};
 use spl_token_2022::extension::BaseStateWithExtensions;
 use spl_transfer_hook_interface::onchain::add_extra_accounts_for_execute_cpi;
 use anchor_spl::metadata::mpl_token_metadata::{
@@ -121,6 +127,9 @@ const DEPLOY_AUTHORITY: &str = "H3s3zhbcDNrLgPbUQFZYvRd9xy58nVNRC3vdg1hK1KPt";
 
 // Fallback treasury (used only if config not yet initialized)
 const TREASURY_FALLBACK: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
+
+// Artifacte Metaplex Core collection
+const CORE_ARTIFACTE_COLLECTION: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 
 // Standard token mints
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
@@ -333,6 +342,52 @@ pub mod auction {
             price,
             category: category.clone(),
             end_time: listing.end_time,
+            payment_mint: listing.payment_mint,
+        });
+
+        Ok(())
+    }
+
+    /// List a Metaplex Core asset for fixed-price sale on Artifacte.
+    ///
+    /// Seller ownership is validated on-chain. Transfer authority must be
+    /// approved to the listing PDA by the client before this instruction runs.
+    pub fn list_core_item(
+        ctx: Context<ListCoreItem>,
+        price: u64,
+        category: ItemCategory,
+        royalty_basis_points: u16,
+        creator_address: Pubkey,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+        let asset = load_core_asset(&ctx.accounts.core_asset.to_account_info())?;
+
+        require!(price > 0, AuctionError::InvalidPrice);
+        require!(royalty_basis_points <= 1000, AuctionError::RoyaltyTooHigh);
+        validate_category_and_payment(&category, ctx.accounts.payment_mint.key())?;
+        require_keys_eq!(asset.owner, ctx.accounts.seller.key(), AuctionError::Unauthorized);
+        ensure_artifacte_core_asset(&asset, ctx.accounts.core_collection.key())?;
+
+        let listing = &mut ctx.accounts.listing;
+        listing.seller = ctx.accounts.seller.key();
+        listing.asset_id = ctx.accounts.core_asset.key();
+        listing.collection = ctx.accounts.core_collection.key();
+        listing.payment_mint = ctx.accounts.payment_mint.key();
+        listing.price = price;
+        listing.category = category;
+        listing.status = ListingStatus::Active;
+        listing.royalty_basis_points = royalty_basis_points;
+        listing.creator_address = creator_address;
+        listing.created_at = clock.unix_timestamp;
+        listing.bump = ctx.bumps.listing;
+
+        emit!(ListingCreated {
+            nft_mint: listing.asset_id,
+            seller: listing.seller,
+            listing_type: ListingType::FixedPrice,
+            price,
+            category,
+            end_time: 0,
             payment_mint: listing.payment_mint,
         });
 
@@ -629,6 +684,143 @@ pub mod auction {
         Ok(())
     }
 
+    /// Buy a fixed-price Metaplex Core listing.
+    pub fn buy_now_core(ctx: Context<BuyNowCore>) -> Result<()> {
+        let asset = load_core_asset(&ctx.accounts.core_asset.to_account_info())?;
+        let asset_id = ctx.accounts.listing.asset_id;
+        let seller = ctx.accounts.listing.seller;
+        let payment_mint = ctx.accounts.listing.payment_mint;
+        let price = ctx.accounts.listing.price;
+        let royalty_basis_points = ctx.accounts.listing.royalty_basis_points;
+        let creator_address = ctx.accounts.listing.creator_address;
+        let listing_bump = ctx.accounts.listing.bump;
+        let listing_info = ctx.accounts.listing.to_account_info();
+
+        require!(ctx.accounts.listing.status == ListingStatus::Active, AuctionError::ListingNotActive);
+        require_keys_eq!(ctx.accounts.mpl_core_program.key(), MPL_CORE_ID, AuctionError::InvalidCoreProgram);
+        require_keys_eq!(ctx.accounts.core_collection.key(), ctx.accounts.listing.collection, AuctionError::InvalidCoreCollection);
+        ensure_artifacte_core_asset(&asset, ctx.accounts.listing.collection)?;
+        require_keys_eq!(asset.owner, seller, AuctionError::CoreAssetOwnerChanged);
+
+        let treasury_config_info = ctx.accounts.treasury_config.to_account_info();
+        let treasury_address = resolve_treasury_from_account_info(treasury_config_info)?;
+        require!(ctx.accounts.treasury_payment_account.owner == treasury_address, AuctionError::Unauthorized);
+        require!(ctx.accounts.treasury.key() == treasury_address, AuctionError::Unauthorized);
+
+        let platform_fee = price
+            .checked_mul(200)
+            .and_then(|value| value.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?;
+        let creator_royalty = price
+            .checked_mul(royalty_basis_points as u64)
+            .and_then(|value| value.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?;
+
+        require!(
+            royalty_basis_points == 0 || royalty_basis_points >= 100,
+            AuctionError::InvalidRoyaltyBps
+        );
+
+        if creator_royalty > 0 {
+            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(
+                &creator_address,
+                &payment_mint,
+            );
+            require!(
+                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                AuctionError::InvalidCreatorAccount
+            );
+        }
+
+        ctx.accounts.listing.status = ListingStatus::Settled;
+
+        let seller_amount = price
+            .checked_sub(platform_fee)
+            .ok_or(AuctionError::CalculationError)?
+            .checked_sub(creator_royalty)
+            .ok_or(AuctionError::CalculationError)?;
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.buyer_payment_account.to_account_info(),
+                    to: ctx.accounts.seller_payment_account.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            seller_amount,
+        )?;
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.buyer_payment_account.to_account_info(),
+                    to: ctx.accounts.treasury_payment_account.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            platform_fee,
+        )?;
+
+        if creator_royalty > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.buyer_payment_account.to_account_info(),
+                        to: ctx.accounts.creator_payment_account.to_account_info(),
+                        authority: ctx.accounts.buyer.to_account_info(),
+                    },
+                ),
+                creator_royalty,
+            )?;
+        }
+
+        let listing_seeds: &[&[u8]] = &[
+            b"core_listing",
+            asset_id.as_ref(),
+            &[listing_bump],
+        ];
+
+        TransferV1CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())
+            .asset(&ctx.accounts.core_asset.to_account_info())
+            .collection(Some(&ctx.accounts.core_collection.to_account_info()))
+            .payer(&ctx.accounts.buyer.to_account_info())
+            .authority(Some(&listing_info))
+            .new_owner(&ctx.accounts.buyer.to_account_info())
+            .system_program(Some(&ctx.accounts.system_program.to_account_info()))
+            .invoke_signed(&[listing_seeds])
+            .map_err(|_| error!(AuctionError::CoreTransferFailed))?;
+
+        RevokePluginAuthorityV1CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())
+            .asset(&ctx.accounts.core_asset.to_account_info())
+            .collection(Some(&ctx.accounts.core_collection.to_account_info()))
+            .payer(&ctx.accounts.buyer.to_account_info())
+            .authority(Some(&listing_info))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .plugin_type(PluginType::TransferDelegate)
+            .invoke_signed(&[listing_seeds])
+            .map_err(|_| error!(AuctionError::CoreDelegateRevokeFailed))?;
+
+        emit!(ItemPurchased {
+            nft_mint: asset_id,
+            seller,
+            buyer: ctx.accounts.buyer.key(),
+            price,
+            platform_fee,
+            creator_royalty,
+        });
+
+        close_owned_account(
+            &listing_info,
+            &ctx.accounts.treasury.to_account_info(),
+        )?;
+
+        Ok(())
+    }
+
     /// Cancel a listing (seller only, auctions only if no bids)
     ///
     /// For WNS/Token-2022: client MUST include WNS `approve_transfer` (amount=0)
@@ -709,6 +901,49 @@ pub mod auction {
         **listing_info.lamports.borrow_mut() = 0;
         listing_info.assign(&anchor_lang::solana_program::system_program::ID);
         listing_info.realloc(0, false)?;
+
+        Ok(())
+    }
+
+    /// Cancel a Metaplex Core listing and revoke the program's transfer delegate.
+    pub fn cancel_listing_core(ctx: Context<CancelListingCore>) -> Result<()> {
+        let asset = load_core_asset(&ctx.accounts.core_asset.to_account_info())?;
+        let asset_id = ctx.accounts.listing.asset_id;
+        let seller = ctx.accounts.listing.seller;
+        let listing_bump = ctx.accounts.listing.bump;
+        let listing_info = ctx.accounts.listing.to_account_info();
+
+        require!(ctx.accounts.listing.status == ListingStatus::Active, AuctionError::ListingNotActive);
+        require_keys_eq!(ctx.accounts.seller.key(), seller, AuctionError::Unauthorized);
+        require_keys_eq!(ctx.accounts.mpl_core_program.key(), MPL_CORE_ID, AuctionError::InvalidCoreProgram);
+        require_keys_eq!(ctx.accounts.core_collection.key(), ctx.accounts.listing.collection, AuctionError::InvalidCoreCollection);
+        ensure_artifacte_core_asset(&asset, ctx.accounts.listing.collection)?;
+
+        let listing_seeds: &[&[u8]] = &[
+            b"core_listing",
+            asset_id.as_ref(),
+            &[listing_bump],
+        ];
+
+        RevokePluginAuthorityV1CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())
+            .asset(&ctx.accounts.core_asset.to_account_info())
+            .collection(Some(&ctx.accounts.core_collection.to_account_info()))
+            .payer(&ctx.accounts.seller.to_account_info())
+            .authority(Some(&listing_info))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .plugin_type(PluginType::TransferDelegate)
+            .invoke_signed(&[listing_seeds])
+            .map_err(|_| error!(AuctionError::CoreDelegateRevokeFailed))?;
+
+        emit!(ListingCancelled {
+            nft_mint: asset_id,
+            seller,
+        });
+
+        close_owned_account(
+            &listing_info,
+            &ctx.accounts.seller.to_account_info(),
+        )?;
 
         Ok(())
     }
@@ -1356,6 +1591,27 @@ pub struct ListItem<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+#[derive(Accounts)]
+#[instruction(price: u64, category: ItemCategory, royalty_basis_points: u16, creator_address: Pubkey)]
+pub struct ListCoreItem<'info> {
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + CoreListing::INIT_SPACE,
+        seeds = [b"core_listing", core_asset.key().as_ref()],
+        bump,
+    )]
+    pub listing: Account<'info, CoreListing>,
+    /// CHECK: Validated as a Metaplex Core asset in the instruction body.
+    pub core_asset: UncheckedAccount<'info>,
+    /// CHECK: Validated against the Artifacte Core collection in the instruction body.
+    pub core_collection: UncheckedAccount<'info>,
+    pub payment_mint: Account<'info, anchor_spl::token::Mint>,
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 // ============================================================================
 // pNFT Account Structs
 // ============================================================================
@@ -1649,6 +1905,46 @@ pub struct BuyNow<'info> {
 }
 
 #[derive(Accounts)]
+pub struct BuyNowCore<'info> {
+    #[account(
+        mut,
+        seeds = [b"core_listing", core_asset.key().as_ref()],
+        bump = listing.bump,
+    )]
+    pub listing: Box<Account<'info, CoreListing>>,
+    /// CHECK: Validated in the instruction body and by Metaplex Core CPI.
+    #[account(mut, constraint = core_asset.key() == listing.asset_id @ AuctionError::Unauthorized)]
+    pub core_asset: UncheckedAccount<'info>,
+    /// CHECK: Validated in the instruction body and by Metaplex Core CPI.
+    #[account(mut, constraint = core_collection.key() == listing.collection @ AuctionError::InvalidCoreCollection)]
+    pub core_collection: UncheckedAccount<'info>,
+    #[account(mut, constraint = buyer_payment_account.mint == listing.payment_mint @ AuctionError::InvalidPaymentMint)]
+    pub buyer_payment_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized,
+        constraint = seller_payment_account.mint == listing.payment_mint @ AuctionError::InvalidPaymentMint,
+    )]
+    pub seller_payment_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = treasury_payment_account.mint == listing.payment_mint @ AuctionError::InvalidPaymentMint)]
+    pub treasury_payment_account: Account<'info, TokenAccount>,
+    /// CHECK: Validated in the instruction body.
+    #[account(mut)]
+    pub creator_payment_account: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    /// CHECK: Treasury wallet validated in the instruction body.
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
+    /// CHECK: Parsed when present, otherwise falls back to the hardcoded treasury.
+    pub treasury_config: UncheckedAccount<'info>,
+    /// CHECK: Must be the Metaplex Core program.
+    pub mpl_core_program: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct CancelListing<'info> {
     #[account(mut)]
     pub listing: Account<'info, Listing>,
@@ -1665,6 +1961,27 @@ pub struct CancelListing<'info> {
     pub seller_nft_account: InterfaceAccount<'info, IfaceTokenAccount>,
     pub seller: Signer<'info>,
     pub nft_token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
+pub struct CancelListingCore<'info> {
+    #[account(
+        mut,
+        seeds = [b"core_listing", core_asset.key().as_ref()],
+        bump = listing.bump,
+    )]
+    pub listing: Account<'info, CoreListing>,
+    /// CHECK: Validated in the instruction body and by Metaplex Core CPI.
+    #[account(mut, constraint = core_asset.key() == listing.asset_id @ AuctionError::Unauthorized)]
+    pub core_asset: UncheckedAccount<'info>,
+    /// CHECK: Validated in the instruction body and by Metaplex Core CPI.
+    #[account(mut, constraint = core_collection.key() == listing.collection @ AuctionError::InvalidCoreCollection)]
+    pub core_collection: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    /// CHECK: Must be the Metaplex Core program.
+    pub mpl_core_program: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -1783,6 +2100,22 @@ pub struct Listing {
     pub is_pnft: bool,
     pub royalty_basis_points: u16,
     pub creator_address: Pubkey,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CoreListing {
+    pub seller: Pubkey,
+    pub asset_id: Pubkey,
+    pub collection: Pubkey,
+    pub payment_mint: Pubkey,
+    pub price: u64,
+    pub category: ItemCategory,
+    pub status: ListingStatus,
+    pub royalty_basis_points: u16,
+    pub creator_address: Pubkey,
+    pub created_at: i64,
     pub bump: u8,
 }
 
@@ -1932,4 +2265,59 @@ pub enum AuctionError {
     InvalidTokenProgram,
     #[msg("Invalid royalty basis points — must be 0 or >= 100 (1%)")]
     InvalidRoyaltyBps,
+    #[msg("Invalid Metaplex Core asset account")]
+    InvalidCoreAsset,
+    #[msg("Asset is not part of the Artifacte Core collection")]
+    InvalidCoreCollection,
+    #[msg("Invalid Metaplex Core program account")]
+    InvalidCoreProgram,
+    #[msg("Metaplex Core transfer failed")]
+    CoreTransferFailed,
+    #[msg("Failed to revoke the Metaplex Core transfer delegate")]
+    CoreDelegateRevokeFailed,
+    #[msg("Metaplex Core asset owner changed after listing")]
+    CoreAssetOwnerChanged,
+}
+
+fn artifacte_core_collection() -> Pubkey {
+    CORE_ARTIFACTE_COLLECTION.parse::<Pubkey>().unwrap()
+}
+
+fn load_core_asset<'info>(core_asset: &AccountInfo<'info>) -> Result<BaseAssetV1> {
+    require_keys_eq!(*core_asset.owner, MPL_CORE_ID, AuctionError::InvalidCoreAsset);
+    BaseAssetV1::try_from(core_asset).map_err(|_| error!(AuctionError::InvalidCoreAsset))
+}
+
+fn ensure_artifacte_core_asset(asset: &BaseAssetV1, collection: Pubkey) -> Result<()> {
+    require_keys_eq!(collection, artifacte_core_collection(), AuctionError::InvalidCoreCollection);
+
+    match &asset.update_authority {
+        UpdateAuthority::Collection(asset_collection) => {
+            require_keys_eq!(*asset_collection, collection, AuctionError::InvalidCoreCollection);
+            Ok(())
+        }
+        _ => err!(AuctionError::InvalidCoreCollection),
+    }
+}
+
+fn resolve_treasury_from_account_info(treasury_config: AccountInfo<'_>) -> Result<Pubkey> {
+    if treasury_config.owner == &crate::ID && !treasury_config.data_is_empty() {
+        let data = treasury_config.try_borrow_data()?;
+        let mut data_slice: &[u8] = &data;
+        let config = TreasuryConfig::try_deserialize(&mut data_slice)?;
+        Ok(config.treasury)
+    } else {
+        Ok(TREASURY_FALLBACK.parse::<Pubkey>().unwrap())
+    }
+}
+
+fn close_owned_account<'info>(account: &AccountInfo<'info>, destination: &AccountInfo<'info>) -> Result<()> {
+    let destination_lamports = destination.lamports();
+    **destination.lamports.borrow_mut() = destination_lamports
+        .checked_add(account.lamports())
+        .ok_or(AuctionError::CalculationError)?;
+    **account.lamports.borrow_mut() = 0;
+    account.assign(&anchor_lang::solana_program::system_program::ID);
+    account.realloc(0, false)?;
+    Ok(())
 }

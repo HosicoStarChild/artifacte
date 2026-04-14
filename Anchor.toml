@@ -6,7 +6,7 @@ skip-lint = true
 
 [programs.mainnet]
 auction = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"
-rwa_nft = "dK6HkxoT5BHYdPJFomXNSSB1fBUoRjxGT7XxbQudFLH"
+rwa_nft = "AFS1uuPwGfbuCVL7eEkm47GCa6vv7yz59yZqhJmv2KXp"
 
 [registry]
 url = "https://api.apr.dev"

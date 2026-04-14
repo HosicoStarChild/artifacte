@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("dK6HkxoT5BHYdPJFomXNSSB1fBUoRjxGT7XxbQudFLH");
+declare_id!("AFS1uuPwGfbuCVL7eEkm47GCa6vv7yz59yZqhJmv2KXp");
 
 #[program]
 pub mod rwa_nft {

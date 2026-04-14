@@ -29,6 +29,8 @@ interface WhitelistStatus {
 const CC_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
 const PHYG_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ARTIFACTE_CORE_COLLECTION = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
+const MPL_CORE_PROGRAM = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d";
 
 export default function ListNFTPage() {
   const { publicKey, connected, wallet, sendTransaction, signTransaction } = useWallet();
@@ -203,28 +205,44 @@ export default function ListNFTPage() {
         : Math.floor(parseFloat(price) * 1e9);
       const durationSeconds = listingType === "auction" ? Math.round(parseFloat(auctionDuration) * 3600) : undefined;
 
-      // Get user's NFT token account (detect Token-2022 vs standard SPL)
-      const mintAccountInfo = await connection.getAccountInfo(nftMint);
-      const isToken2022 = mintAccountInfo?.owner.equals(TOKEN_2022_PROGRAM_ID);
-      const sellerNftAccount = await getAssociatedTokenAddress(
-        nftMint, publicKey, false,
-        isToken2022 ? TOKEN_2022_PROGRAM_ID : undefined
-      );
+      const assetAccountInfo = await connection.getAccountInfo(nftMint);
+      const isCoreAsset = assetAccountInfo?.owner.toBase58() === MPL_CORE_PROGRAM;
+      const isToken2022 = !isCoreAsset && assetAccountInfo?.owner.equals(TOKEN_2022_PROGRAM_ID);
+      const sellerNftAccount = !isCoreAsset
+        ? await getAssociatedTokenAddress(
+            nftMint,
+            publicKey,
+            false,
+            isToken2022 ? TOKEN_2022_PROGRAM_ID : undefined
+          )
+        : null;
+      const isCompressed = (selectedNft as any).compression?.compressed === true;
+      const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
+      const isArtifacteNFT = !!(selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
+
+      if (isCoreAsset && listingType !== "fixed") {
+        throw new Error("Artifacte Core NFTs currently support fixed-price listings only.");
+      }
+
+      if (isCoreAsset && !isArtifacteNFT) {
+        throw new Error("Metaplex Core assets are only supported through Artifacte's native listing flow right now.");
+      }
 
       const auctionProgram = new AuctionProgram(connection, wallet.adapter, sendTransaction);
 
-      // Check for stale listing PDA and close it first
-      const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-      const [listingPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("listing"), nftMint.toBuffer()],
-        AUCTION_PROGRAM_ID
-      );
-      const existingListing = await connection.getAccountInfo(listingPda);
-      if (existingListing) {
-        console.log("Stale listing found, closing...");
-        await auctionProgram.closeStaleListing(nftMint);
-        // Wait for confirmation
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check for stale listing PDA and close it first for escrow-based NFTs.
+      if (!isCoreAsset) {
+        const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
+        const [listingPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("listing"), nftMint.toBuffer()],
+          AUCTION_PROGRAM_ID
+        );
+        const existingListing = await connection.getAccountInfo(listingPda);
+        if (existingListing) {
+          console.log("Stale listing found, closing...");
+          await auctionProgram.closeStaleListing(nftMint);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
 
       // If listing for USDC, ensure seller has a USDC ATA (create if missing)
@@ -245,18 +263,32 @@ export default function ListNFTPage() {
 
       const itemCategory = getNftCategory(selectedNft);
 
-      // Detect NFT type from DAS API interface field
-      const isCompressed = (selectedNft as any).compression?.compressed === true;
-      const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
-      // Artifacte-minted NFTs are identified by their update authority
-      const isArtifacteNFT = !!(selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
-
       let tx: string;
 
       if (listingType === "fixed" && isArtifacteNFT) {
         // ── Artifacte collection: fixed-price listing on Artifacte's own on-chain program ──
         showToast.info("Listing on Artifacte...");
-        if (isPnft) {
+        if (isCoreAsset) {
+          let royaltyBpsVal = royaltyBps || 500;
+          let creatorAddr = new PublicKey(ARTIFACTE_AUTHORITY);
+          try {
+            const nftRes = await fetch(`/api/nft?mint=${nftMint.toBase58()}`);
+            const nftData = await nftRes.json();
+            const asset = nftData.nft || nftData;
+            royaltyBpsVal = asset.royalty?.basis_points || royaltyBps || 500;
+            const creators = asset.creators || asset.content?.metadata?.creators || [];
+            if (creators.length > 0) creatorAddr = new PublicKey(creators[0].address);
+          } catch {}
+          tx = await auctionProgram.listCoreItem(
+            nftMint,
+            new PublicKey(ARTIFACTE_CORE_COLLECTION),
+            paymentMint,
+            priceInUnits,
+            itemCategory,
+            royaltyBpsVal,
+            creatorAddr,
+          );
+        } else if (isPnft) {
           let royaltyBpsVal = royaltyBps || 500;
           let creatorAddr = new PublicKey(ARTIFACTE_AUTHORITY);
           let ruleSet: PublicKey | null = null;
@@ -284,7 +316,7 @@ export default function ListNFTPage() {
         } else {
           tx = await auctionProgram.listItem(
             nftMint,
-            sellerNftAccount,
+            sellerNftAccount!,
             paymentMint,
             ListingType.FixedPrice,
             priceInUnits,
@@ -370,7 +402,7 @@ export default function ListNFTPage() {
           showToast.info("Listing auction on Artifacte...");
           tx = await auctionProgram.listItem(
             nftMint,
-            sellerNftAccount,
+            sellerNftAccount!,
             paymentMint,
             ListingType.Auction,
             priceInUnits,

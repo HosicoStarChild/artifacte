@@ -42,6 +42,7 @@ interface MyListing {
   royaltyBps: number;
   collectionAddress?: string;
   isPnft?: boolean;
+  isCore?: boolean;
 }
 
 export default function MyListingsPage() {
@@ -204,6 +205,7 @@ export default function MyListingsPage() {
             royaltyBps: acc.royaltyBasisPoints || 0,
             collectionAddress: collection,
             isPnft: acc.isPnft || false,
+            isCore: acc.isCore || false,
           };
         })
       );
@@ -237,14 +239,16 @@ export default function MyListingsPage() {
     }
   }
 
-  async function handleCancelListing(nftMintStr: string, isPnft?: boolean) {
+  async function handleCancelListing(nftMintStr: string, isPnft?: boolean, isCore?: boolean) {
     if (!publicKey || !anchorWallet) return;
     setCancellingMint(nftMintStr);
     try {
       const nftMint = new PublicKey(nftMintStr);
       const auctionProgram = new AuctionProgram(connection, anchorWallet, sendTransaction);
 
-      if (isPnft) {
+      if (isCore) {
+        await auctionProgram.cancelListingCore(nftMint);
+      } else if (isPnft) {
         // pNFT: use cancel_listing_pnft which handles escrow_authority + Metaplex TransferV1
         await auctionProgram.cancelListingPnft(nftMint);
       } else {
@@ -518,7 +522,7 @@ export default function MyListingsPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleCancelListing(listing.nftMint, listing.isPnft)}
+                          onClick={() => handleCancelListing(listing.nftMint, listing.isPnft, listing.isCore)}
                           disabled={cancellingMint === listing.nftMint}
                           className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >

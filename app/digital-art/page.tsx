@@ -20,6 +20,7 @@ interface ActiveListing {
   image: string;
   collection: string;
   price: number;
+  currency: string;
   listingType: "fixed" | "auction";
   endTime?: number;
   currentBid?: number;
@@ -77,10 +78,32 @@ export default function DigitalArtPage() {
               name: nftData.nft?.name || "Untitled",
               image: nftData.nft?.image || "/placeholder.png",
               collection: nftData.nft?.collection || "Unknown",
-              price: listing.price.toNumber ? listing.price.toNumber() : listing.price,
+              price: (() => {
+                const paymentMint = listing.paymentMint?.toBase58?.() || listing.paymentMint;
+                const currency = paymentMint === "So11111111111111111111111111111111111111112" ? "SOL"
+                  : paymentMint === "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB" ? "USD1"
+                  : "USDC";
+                const divisor = currency === "SOL" ? 1e9 : 1e6;
+                const rawPrice = listing.price.toNumber ? listing.price.toNumber() : listing.price;
+                return rawPrice / divisor;
+              })(),
+              currency: (() => {
+                const paymentMint = listing.paymentMint?.toBase58?.() || listing.paymentMint;
+                if (paymentMint === "So11111111111111111111111111111111111111112") return "SOL";
+                if (paymentMint === "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB") return "USD1";
+                return "USDC";
+              })(),
               listingType: listing.listing_type.auction ? "auction" : "fixed",
               endTime: listing.end_time,
-              currentBid: listing.current_bid.toNumber ? listing.current_bid.toNumber() : listing.current_bid,
+              currentBid: (() => {
+                const paymentMint = listing.paymentMint?.toBase58?.() || listing.paymentMint;
+                const currency = paymentMint === "So11111111111111111111111111111111111111112" ? "SOL"
+                  : paymentMint === "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB" ? "USD1"
+                  : "USDC";
+                const divisor = currency === "SOL" ? 1e9 : 1e6;
+                const rawBid = listing.current_bid.toNumber ? listing.current_bid.toNumber() : listing.current_bid;
+                return rawBid / divisor;
+              })(),
             });
           } catch (err) {
             console.error("Failed to enrich listing:", err);
@@ -234,9 +257,13 @@ export default function DigitalArtPage() {
                             : "Price"}
                         </p>
                         <p className="text-white font-semibold text-sm">
-                          ◎ {listing.listingType === "auction" && listing.currentBid
-                            ? (listing.currentBid / 1e9).toFixed(2)
-                            : (listing.price / 1e9).toFixed(2)}
+                          {listing.currency === "SOL"
+                            ? `◎ ${((listing.listingType === "auction" && listing.currentBid)
+                                ? listing.currentBid
+                                : listing.price).toFixed(2)}`
+                            : `${((listing.listingType === "auction" && listing.currentBid)
+                                ? listing.currentBid
+                                : listing.price).toFixed(2)} ${listing.currency}`}
                         </p>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
