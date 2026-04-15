@@ -665,6 +665,12 @@ export default function CardDetailPage() {
     );
   }
 
+  const showSolTransactionPrice = card.source === 'collector-crypt' && !card.auctionListing && card.solPrice > 0;
+  const primaryPrice = showSolTransactionPrice ? card.solPrice : (card.usdcPrice || card.price);
+  const primaryCurrency = showSolTransactionPrice ? 'SOL' : (card.usdcPrice || card.currency === 'USDC' ? 'USDC' : card.currency);
+  const buyPrice = showSolTransactionPrice ? card.solPrice : card.price;
+  const buyCurrency = showSolTransactionPrice ? 'SOL' : card.currency;
+
   return (
     <div className="pt-24 pb-20 min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -725,9 +731,9 @@ export default function CardDetailPage() {
                   <>
                     <div className="flex items-baseline gap-3">
                       <p className="text-white font-serif text-4xl">
-                        {card.usdcPrice ? `$${card.usdcPrice.toLocaleString()}` : card.currency === 'USDC' ? `$${card.price.toLocaleString()}` : `◎ ${card.price.toLocaleString()}`}
+                        {primaryCurrency === 'SOL' ? `◎ ${primaryPrice.toLocaleString()}` : `$${primaryPrice.toLocaleString()}`}
                       </p>
-                      <span className="text-gold-500 text-sm font-medium">{card.usdcPrice || card.currency === 'USDC' ? 'USDC' : 'SOL'}</span>
+                      <span className="text-gold-500 text-sm font-medium">{primaryCurrency}</span>
                     </div>
                     {card.auctionListing?.listingType === 'auction' && card.auctionListing.currentBid > 0 && (
                       <p className="text-gold-400 text-sm mt-1">
@@ -739,7 +745,7 @@ export default function CardDetailPage() {
                         Ends: {new Date(card.auctionListing.endTime).toLocaleDateString()} {new Date(card.auctionListing.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     )}
-                    {!card.auctionListing && card.solPrice > 0 && (
+                    {!card.auctionListing && primaryCurrency !== 'SOL' && card.solPrice > 0 && (
                       <p className="text-gray-400 text-sm mt-1 mb-4">◎ {card.solPrice.toLocaleString()} SOL</p>
                     )}
                   </>
@@ -803,7 +809,7 @@ export default function CardDetailPage() {
                             : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                         }`}
                       >
-                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
+                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${buyCurrency === 'SOL' ? '◎' : '$'}${buyPrice.toLocaleString()} ${buyCurrency}`}
                       </button>
                     ) : (
                       <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
@@ -818,7 +824,7 @@ export default function CardDetailPage() {
                           : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                       }`}
                     >
-                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${card.currency === 'SOL' ? '◎' : '$'}${card.price.toLocaleString()} ${card.currency}`}
+                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${buyCurrency === 'SOL' ? '◎' : '$'}${buyPrice.toLocaleString()} ${buyCurrency}`}
                     </button>
                   ) : (
                     <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
