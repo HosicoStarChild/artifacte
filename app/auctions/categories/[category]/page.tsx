@@ -250,18 +250,8 @@ export default function CategoryAuctionsPage() {
           return;
         }
 
-        // USDC listings: redirect to appropriate marketplace
-        if (listing?.currency === 'USDC') {
-          if (listing?.marketplace === 'tensor') {
-            window.open(`https://www.tensor.trade/item/${mintAddr}`, '_blank');
-          } else {
-            window.open(`https://magiceden.io/item-details/${mintAddr}`, '_blank');
-          }
-          setBuyingId(null);
-          return;
-        }
-
-        // CC cards: buy via ME notary-cosigned transaction
+        // Card-category purchases stay in-app once they reach this flow.
+        // Phygitals use Tensor above; the remaining card listings use ME below.
         showToast.info("Building transaction...");
         const buildRes = await fetch('/api/me-buy', {
           method: 'POST',
