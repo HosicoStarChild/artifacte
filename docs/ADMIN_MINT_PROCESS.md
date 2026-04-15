@@ -227,7 +227,7 @@ Current collection settings:
 
 - name: `Artifacte`
 - symbol: `ARTF`
-- royalties basis points: `500`
+- royalties basis points: `200`
 
 ## Off-Chain Metadata Generation
 
@@ -323,7 +323,7 @@ The code builds a `createArgs` object containing:
 
 The asset currently uses a royalties plugin configured with:
 
-- `basisPoints: 500`
+- `basisPoints: 200`
 - one creator at 100%
 - `ruleSet("None")`
 

@@ -566,6 +566,9 @@ function MintFormInner() {
       {/* Form */}
       <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
         <h3 className="font-serif text-xl font-bold text-white mb-6">Mint New NFT</h3>
+        <p className="mb-6 rounded-lg border border-gold-500/20 bg-gold-500/10 px-4 py-3 text-sm text-gold-300">
+          Admin mints use a fixed {ADMIN_CORE_ROYALTY_BASIS_POINTS / 100}% secondary royalty.
+        </p>
         
         {/* Collection */}
         <div className="mb-6 p-4 bg-dark-700 rounded-lg border border-white/5">

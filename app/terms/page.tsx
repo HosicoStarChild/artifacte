@@ -4,7 +4,7 @@ export default function TermsPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="font-serif text-4xl text-white mb-8">Terms of Service</h1>
         <div className="prose prose-invert prose-gold max-w-none space-y-6 text-gray-300 text-sm leading-relaxed">
-          <p className="text-gray-400 text-xs">Last updated: March 27, 2026</p>
+          <p className="text-gray-400 text-xs">Last updated: April 14, 2026</p>
 
           <h2 className="font-serif text-xl text-white mt-8">1. Acceptance of Terms</h2>
           <p>By accessing or using Artifacte (&quot;the Platform&quot;), you agree to be bound by these Terms of Service. If you do not agree, do not use the Platform.</p>
@@ -35,7 +35,7 @@ export default function TermsPage() {
           </ul>
 
           <h2 className="font-serif text-xl text-white mt-8">6. Fees</h2>
-          <p>Artifacte charges a <strong className="text-white">2% platform fee</strong> on completed sales. NFTs minted by Artifacte carry a <strong className="text-white">5% royalty</strong> on secondary sales, enforced at the protocol level. Additional blockchain transaction fees (gas) apply to all on-chain operations.</p>
+          <p>Artifacte charges a <strong className="text-white">2% platform fee</strong> on completed sales. NFTs minted by Artifacte carry a <strong className="text-white">2% royalty</strong> on secondary sales, enforced at the protocol level. Additional blockchain transaction fees (gas) apply to all on-chain operations.</p>
 
           <h2 className="font-serif text-xl text-white mt-8">7. Prohibited Activities</h2>
           <p>You agree not to:</p>

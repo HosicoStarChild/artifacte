@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import { hasAdminAccess } from "@/lib/admin";
 import {
+  ADMIN_CORE_ROYALTY_BASIS_POINTS,
   buildMetaplexCompatibleMetadata,
   DEFAULT_NFT_SYMBOL,
   getMetadataFieldStatus,
@@ -224,10 +225,7 @@ export async function PATCH(req: NextRequest) {
         attributes: extractMetadataAttributes(nftMetadata),
         creatorAddress,
         externalUrl: typeof nftMetadata?.external_url === "string" ? nftMetadata.external_url : undefined,
-        sellerFeeBasisPoints:
-          typeof nftMetadata?.seller_fee_basis_points === "number"
-            ? nftMetadata.seller_fee_basis_points
-            : undefined,
+        sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
       });
       submission.mintedAt = Date.now();
     }

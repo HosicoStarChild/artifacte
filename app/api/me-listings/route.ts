@@ -7,6 +7,8 @@ const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const TENSOR_MARKETPLACE = new PublicKey('TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp');
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const MAGIC_EDEN_API = 'https://api-mainnet.magiceden.dev/v2';
+const ME_API_KEY = process.env.ME_API_KEY;
 const ORACLE_BATCH_SIZE = 250;
 
 type OracleListing = {
@@ -30,12 +32,24 @@ type OracleListingsResponse = {
 // In-memory cache for Tensor prices — keyed by mint address
 const TENSOR_CACHE_TTL = 60_000; // 60 seconds
 const tensorPriceCache = new Map<string, { usdcPrice?: number; solPrice?: number; ts: number }>();
+const ME_CACHE_TTL = 60_000; // 60 seconds
+const magicEdenPriceCache = new Map<string, { solPrice?: number; usdcPrice?: number; ts: number }>();
 
 function getCachedPrice(mint: string) {
   const entry = tensorPriceCache.get(mint);
   if (!entry) return null;
   if (Date.now() - entry.ts > TENSOR_CACHE_TTL) {
     tensorPriceCache.delete(mint);
+    return null;
+  }
+  return entry;
+}
+
+function getCachedMagicEdenPrice(mint: string) {
+  const entry = magicEdenPriceCache.get(mint);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > ME_CACHE_TTL) {
+    magicEdenPriceCache.delete(mint);
     return null;
   }
   return entry;
@@ -111,6 +125,88 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
     } catch (e: any) {
       console.warn(`[me-listings] Tensor batch enrichment error:`, e?.message);
     }
+  }
+}
+
+async function enrichCollectorCryptSolPrices(listings: OracleListing[]): Promise<void> {
+  if (!ME_API_KEY) return;
+
+  const uncached: { mint: string; idx: number }[] = [];
+
+  for (let i = 0; i < listings.length; i++) {
+    const listing = listings[i];
+    if (
+      listing.source !== 'collector-crypt' ||
+      listing.currency !== 'USDC' ||
+      listing.solPrice ||
+      !listing.nftAddress
+    ) {
+      continue;
+    }
+
+    const cached = getCachedMagicEdenPrice(listing.nftAddress);
+    if (cached) {
+      if (cached.solPrice) listing.solPrice = cached.solPrice;
+      if (cached.usdcPrice && !listing.usdcPrice) listing.usdcPrice = cached.usdcPrice;
+      continue;
+    }
+
+    uncached.push({ mint: listing.nftAddress, idx: i });
+  }
+
+  if (uncached.length === 0) return;
+
+  const BATCH = 8;
+
+  for (let i = 0; i < uncached.length; i += BATCH) {
+    const batch = uncached.slice(i, i + BATCH);
+    await Promise.all(batch.map(async ({ mint, idx }) => {
+      const now = Date.now();
+      try {
+        const res = await fetch(`${MAGIC_EDEN_API}/tokens/${mint}/listings`, {
+          headers: { Authorization: `Bearer ${ME_API_KEY}` },
+          signal: AbortSignal.timeout(8000),
+          cache: 'no-store',
+        });
+
+        if (!res.ok) {
+          magicEdenPriceCache.set(mint, { ts: now });
+          return;
+        }
+
+        const meListings = await res.json();
+        const meListing = Array.isArray(meListings) ? meListings[0] : null;
+        if (!meListing) {
+          magicEdenPriceCache.set(mint, { ts: now });
+          return;
+        }
+
+        const rawSolAmount = meListing?.priceInfo?.solPrice?.rawAmount;
+        const rawUsdcAmount = meListing?.priceInfo?.splPrice?.rawAmount;
+        const solPrice = typeof rawSolAmount === 'string'
+          ? Number(rawSolAmount) / 1e9
+          : typeof meListing.price === 'number'
+            ? meListing.price
+            : undefined;
+        const usdcPrice = typeof rawUsdcAmount === 'string'
+          ? Number(rawUsdcAmount) / 1e6
+          : undefined;
+
+        const cacheValue = {
+          solPrice,
+          usdcPrice,
+          ts: now,
+        };
+        magicEdenPriceCache.set(mint, cacheValue);
+
+        const listing = listings[idx];
+        if (solPrice) listing.solPrice = solPrice;
+        if (usdcPrice && !listing.usdcPrice) listing.usdcPrice = usdcPrice;
+      } catch (e: any) {
+        console.warn(`[me-listings] ME price enrichment error for ${mint}:`, e?.message);
+        magicEdenPriceCache.set(mint, { ts: now });
+      }
+    }));
   }
 }
 
@@ -212,6 +308,14 @@ export async function GET(request: Request) {
         await enrichWithTensorPrices(listings);
       } catch (e: any) {
         console.warn('[me-listings] Tensor enrichment failed:', e?.message);
+      }
+    }
+
+    if (listings.length) {
+      try {
+        await enrichCollectorCryptSolPrices(listings);
+      } catch (e: any) {
+        console.warn('[me-listings] Collector Crypt SOL enrichment failed:', e?.message);
       }
     }
 

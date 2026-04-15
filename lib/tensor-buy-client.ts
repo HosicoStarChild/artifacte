@@ -14,6 +14,40 @@ interface TensorBuyResult {
   confirmed: boolean;
 }
 
+function isUserRejectedError(error: unknown): boolean {
+  const queue: any[] = [error];
+  const seen = new Set<any>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || seen.has(current)) continue;
+    seen.add(current);
+
+    const message = [current.message, current.name, current.error?.message, current.cause?.message]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    const code = current.code ?? current.error?.code ?? current.cause?.code;
+
+    if (
+      code === 4001 ||
+      message.includes('user rejected') ||
+      message.includes('rejected the request') ||
+      message.includes('user declined') ||
+      message.includes('declined') ||
+      message.includes('cancelled') ||
+      message.includes('canceled')
+    ) {
+      return true;
+    }
+
+    if (current.error) queue.push(current.error);
+    if (current.cause) queue.push(current.cause);
+  }
+
+  return false;
+}
+
 export async function executeTensorBuy(
   mint: string,
   buyer: string,
@@ -59,6 +93,9 @@ export async function executeTensorBuy(
       usedSendTransaction = true;
       console.log('[tensor-buy] Solflare: sendTransaction used');
     } catch (e: any) {
+      if (isUserRejectedError(e)) {
+        throw e;
+      }
       console.log('[tensor-buy] Solflare sendTransaction failed, falling back:', e?.message);
     }
   }

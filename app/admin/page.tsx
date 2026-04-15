@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess } from "@/lib/data";
 import {
+  ADMIN_CORE_ROYALTY_BASIS_POINTS,
   buildMetaplexCompatibleMetadata,
   DEFAULT_NFT_SYMBOL,
   getMetadataFieldStatus,
@@ -288,6 +289,7 @@ export default function AdminPage() {
           .map((attr) => ({ trait_type: attr.key, value: attr.value })),
         creatorAddress: publicKey?.toBase58(),
         externalUrl: "https://artifacte.io",
+        sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
       });
 
       const res = await fetch("/api/submissions", {
@@ -783,6 +785,9 @@ export default function AdminPage() {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div className="bg-dark-800 border border-white/10 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
               <h2 className="font-serif text-2xl text-white mb-6">Mint NFT</h2>
+              <p className="mb-6 rounded-lg border border-gold-500/20 bg-gold-500/10 px-4 py-3 text-sm text-gold-300">
+                Admin mints use a fixed {ADMIN_CORE_ROYALTY_BASIS_POINTS / 100}% secondary royalty.
+              </p>
 
               <div className="space-y-6">
                 {/* NFT Name */}

@@ -6,7 +6,7 @@ export const METADATA_BYTE_LIMITS = {
 
 export const DEFAULT_NFT_SYMBOL = "Artifacte";
 export const DEFAULT_COLLECTION_SYMBOL = "ARTF";
-export const ADMIN_CORE_ROYALTY_BASIS_POINTS = 500;
+export const ADMIN_CORE_ROYALTY_BASIS_POINTS = 200;
 
 const textEncoder = new TextEncoder();
 

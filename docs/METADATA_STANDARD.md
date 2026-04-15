@@ -120,7 +120,7 @@ URI JSON structure:
   "symbol": "Artifacte",
   "description": "...",
   "image": "https://arweave.net/...",
-  "seller_fee_basis_points": 500,
+  "seller_fee_basis_points": 200,
   "attributes": [
     { "trait_type": "category", "value": "TCGCards" },
     { "trait_type": "tcg", "value": "One Piece" },
