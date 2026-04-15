@@ -389,10 +389,17 @@ export default function CategoryAuctionsPage() {
       showToast.success(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`);
     } catch (err: any) {
       const message = err.message || "Transaction failed";
+      const lowerMessage = message.toLowerCase();
       
-      if (message.includes("User rejected")) {
+      if (
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("rejected the request") ||
+        lowerMessage.includes("declined") ||
+        lowerMessage.includes("cancelled") ||
+        lowerMessage.includes("canceled")
+      ) {
         showToast.error("Transaction rejected by user");
-      } else if (message.includes("insufficient")) {
+      } else if (lowerMessage.includes("insufficient")) {
         showToast.error(`Insufficient balance. Required: ${price} ${isDigitalArt ? "SOL" : currency}`);
       } else {
         showToast.error(`Error: ${message.slice(0, 80)}`);

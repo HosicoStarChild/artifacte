@@ -540,18 +540,27 @@ export default function CardDetailPage() {
       }
       setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
     } catch (err: any) {
-      if (err.message?.includes("User rejected") || err.message?.includes("user rejected")) {
+      const message = err.message || "";
+      const lowerMessage = message.toLowerCase();
+
+      if (
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("rejected the request") ||
+        lowerMessage.includes("declined") ||
+        lowerMessage.includes("cancelled") ||
+        lowerMessage.includes("canceled")
+      ) {
         showToast.error("Transaction cancelled");
-      } else if (err.message?.includes("insufficient")) {
+      } else if (lowerMessage.includes("insufficient")) {
         showToast.error("Insufficient SOL balance");
-      } else if (err.message?.includes("no longer available") || err.message?.includes("already been sold")) {
+      } else if (lowerMessage.includes("no longer available") || lowerMessage.includes("already been sold")) {
         showToast.error("This item has already been sold");
-      } else if (err.message?.includes("No active listing")) {
+      } else if (message.includes("No active listing")) {
         showToast.error("This item is no longer listed");
-      } else if (err.message?.includes("Simulation failed") || err.message?.includes("simulation failed")) {
+      } else if (lowerMessage.includes("simulation failed")) {
         showToast.error("Transaction simulation failed. This listing may be stale — try refreshing the page.");
       } else {
-        showToast.error(`Error: ${(err.message || "").slice(0, 120)}`);
+        showToast.error(`Error: ${message.slice(0, 120)}`);
       }
     } finally {
       setBuying(false);
