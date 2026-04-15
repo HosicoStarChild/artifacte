@@ -408,6 +408,19 @@ export default function CategoryAuctionsPage() {
     ? (useMeApi ? meListings : listings.filter((l: any) => l.category === category))
     : [];
 
+  const getListingPurchaseCurrency = (listing: any): 'SOL' | 'USDC' | 'USD1' => {
+    if (listing?.source === 'collector-crypt' && Number(listing?.solPrice) > 0) {
+      return 'SOL';
+    }
+    if (listing?.usdcPrice || listing?.currency === 'USDC') {
+      return 'USDC';
+    }
+    if (listing?.currency === 'SOL' || Number(listing?.solPrice) > 0) {
+      return 'SOL';
+    }
+    return 'USD1';
+  };
+
   // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
   // Currency filter + sort always applied client-side (Tensor USDC enrichment happens after Oracle returns)
   const categoryListings = (useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
@@ -428,8 +441,9 @@ export default function CategoryAuctionsPage() {
     return true;
   })).filter((l: any) => {
     if (currencyFilter === "All") return true;
-    if (currencyFilter === "USDC") return !!(l.usdcPrice || l.currency === "USDC");
-    if (currencyFilter === "SOL") return l.currency === "SOL" || !!(l.solPrice && l.solPrice > 0);
+    const purchaseCurrency = getListingPurchaseCurrency(l);
+    if (currencyFilter === "USDC") return purchaseCurrency === "USDC";
+    if (currencyFilter === "SOL") return purchaseCurrency === "SOL";
     return true;
   }).sort((a: any, b: any) => {
     if (sortBy === "price-high") return b.price - a.price;
@@ -645,6 +659,8 @@ export default function CategoryAuctionsPage() {
               <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 transition-opacity duration-200 ${meFilterLoading ? 'opacity-40' : ''}`}>
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const usd1Amount = l.price.toLocaleString();
+                  const purchaseCurrency = getListingPurchaseCurrency(l);
+                  const showUsdcPrice = purchaseCurrency === 'USDC';
                   return (
                     <div
                       key={l.id}
@@ -695,7 +711,7 @@ export default function CategoryAuctionsPage() {
                                 <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
-                            ) : (l as any).usdcPrice || (l as any).currency === 'USDC' ? (
+                            ) : showUsdcPrice ? (
                               <>
                                 <p className="text-white font-serif text-2xl">${((l as any).usdcPrice || l.price).toLocaleString()} <span className="text-gold-500 text-sm">USDC</span></p>
                                 {(l as any).solPrice > 0 && (
