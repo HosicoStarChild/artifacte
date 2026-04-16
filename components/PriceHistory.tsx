@@ -312,8 +312,36 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           return;
         }
 
-        // Live search using cert card name if available, otherwise build from CC name
+        // Live search using cert card name if available, otherwise build from CC name.
+        // When we have the mint, the oracle can often derive the right assetId directly
+        // from on-chain metadata even when the free-text variant search fails.
         const searchQuery = certCardName ? certCardName : buildSearchQuery(cardName);
+
+        if (nftAddress) {
+          try {
+            const chartParams = new URLSearchParams();
+            chartParams.set("endpoint", "chart");
+            chartParams.set("q", searchQuery);
+            chartParams.set("mint", nftAddress);
+            if (grade) chartParams.set("grade", grade);
+
+            const directChartRes = await fetch(
+              `/api/oracle?${chartParams.toString()}`,
+              { signal: AbortSignal.timeout(15000) }
+            );
+
+            if (directChartRes.ok) {
+              const blob = await directChartRes.blob();
+              if (blob.size > 1000) {
+                setChartUrl(URL.createObjectURL(blob));
+                const sc = directChartRes.headers.get("x-sales-count") || directChartRes.headers.get("x-total-sales");
+                if (sc) setSalesCount(parseInt(sc));
+                setLoading(false);
+                return;
+              }
+            }
+          } catch {}
+        }
 
         const searchRes = await fetch(
           `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,

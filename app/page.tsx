@@ -1,9 +1,10 @@
 import { formatFullPrice } from "@/lib/data";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
-import { HomeTCGSection } from "@/components/HomeTCGSection";
+import { HomeTCGSection } from "../components/HomeTCGSection";
+import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
-const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
+const ORACLE_API = getOracleApiUrl();
 
 async function getSpiritsCarousel() {
   try {

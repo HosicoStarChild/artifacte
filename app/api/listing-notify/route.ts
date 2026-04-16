@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 /**
  * POST /api/listing-notify
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     const { mint } = await request.json();
     if (!mint) return NextResponse.json({ error: 'Missing mint' }, { status: 400 });
 
-    const ORACLE_URL = process.env.ORACLE_URL || 'https://artifacte-oracle-production.up.railway.app';
+    const ORACLE_URL = getOracleApiUrl();
     const ADMIN_TOKEN = process.env.ORACLE_ADMIN_TOKEN;
 
     if (!ADMIN_TOKEN) {

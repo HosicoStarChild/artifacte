@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
-const ORACLE_API = "https://artifacte-oracle-production.up.railway.app";
+const ORACLE_API = getOracleApiUrl();
 const TIMEOUT_MS = 45000;
 
 export const maxDuration = 60;
@@ -145,8 +146,21 @@ export async function GET(req: NextRequest) {
     const response = await fetchWithTimeout(url, {}, TIMEOUT_MS);
 
     if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      let errorMessage = `Oracle API error: ${response.statusText}`;
+
+      try {
+        if (contentType.includes("application/json")) {
+          const payload = await response.json();
+          errorMessage = payload?.error || payload?.message || errorMessage;
+        } else {
+          const text = await response.text();
+          if (text) errorMessage = text.slice(0, 240);
+        }
+      } catch {}
+
       return NextResponse.json(
-        { error: `Oracle API error: ${response.statusText}` },
+        { error: errorMessage },
         { status: response.status }
       );
     }
@@ -155,13 +169,25 @@ export async function GET(req: NextRequest) {
     if (responseType === "image") {
       // Return image as PNG
       const buffer = await response.arrayBuffer();
+      const totalSales = response.headers.get("x-total-sales");
+      const assetId = response.headers.get("x-asset-id");
+      const altValue = response.headers.get("x-alt-value");
+      const headers: Record<string, string> = {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET",
+      };
+
+      if (totalSales) {
+        headers["X-Total-Sales"] = totalSales;
+        headers["X-Sales-Count"] = totalSales;
+      }
+      if (assetId) headers["X-Asset-Id"] = assetId;
+      if (altValue) headers["X-Alt-Value"] = altValue;
+
       return new NextResponse(buffer, {
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET",
-        },
+        headers,
       });
     } else {
       // Return JSON

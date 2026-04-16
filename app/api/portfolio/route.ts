@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,8 @@ interface PortfolioResponse {
   marketCategoriesByValue?: Record<string, number>;
   error?: string;
 }
+
+const ORACLE_API = getOracleApiUrl();
 
 // Load oracle lookup (ccName uppercase -> altAssetId)
 import { readFileSync, existsSync } from "fs";
@@ -120,7 +123,7 @@ async function transformCCData(data: CCResponse, wallet: string): Promise<Portfo
     const cardNames = cards.map(c => c.itemName || '');
     if (nftAddresses.length > 0) {
       const res = await fetch(
-        `https://artifacte-oracle-production.up.railway.app/api/market/portfolio?nfts=${nftAddresses.join(',')}&names=${encodeURIComponent(cardNames.join('||'))}`,
+        `${ORACLE_API}/api/market/portfolio?nfts=${nftAddresses.join(',')}&names=${encodeURIComponent(cardNames.join('||'))}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.ok) {

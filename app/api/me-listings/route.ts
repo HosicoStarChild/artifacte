@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getActiveArtifacteMintSet } from '@/lib/artifacte-listings';
+import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 // Proxy to Railway oracle listings index — fast, pre-indexed, real-time via webhooks
-const ORACLE_API = 'https://artifacte-oracle-production.up.railway.app';
+const ORACLE_API = getOracleApiUrl();
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const TENSOR_MARKETPLACE = new PublicKey('TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp');
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
