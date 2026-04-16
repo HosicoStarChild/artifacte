@@ -67,7 +67,7 @@ export interface Listing {
   category?: Category;
   nftMint?: string;
   verifiedBy?: string;
-  source?: 'baxus' | 'native' | 'collector-crypt';
+  source?: 'baxus' | 'native' | 'collector-crypt' | 'phygitals' | 'artifacte';
   externalUrl?: string;
   // BAXUS-specific fields
   abv?: number | null;
@@ -88,6 +88,70 @@ export interface Listing {
   year?: number;
   ccCategory?: string; // original CC category (Pokemon, One Piece, etc.)
   ccUrl?: string;
+  solPrice?: number | null;
+  usdcPrice?: number | null;
+}
+
+type ListingPriceInput = {
+  price: number;
+  currency?: string | null;
+  source?: Listing['source'] | string | null;
+  solPrice?: number | null;
+  usdcPrice?: number | null;
+  auctionListing?: { currency?: string | null } | null;
+};
+
+type ListingPrimaryCurrency = 'SOL' | 'USDC' | 'USD1';
+
+export function getListingPurchaseCurrency(listing: ListingPriceInput): ListingPrimaryCurrency {
+  const displayCurrency = typeof listing.currency === 'string' && listing.currency ? listing.currency : 'USD1';
+  const solPrice = Number(listing.solPrice);
+  const usdcPrice = Number(listing.usdcPrice);
+  const hasSolPrice = Number.isFinite(solPrice) && solPrice > 0;
+  const hasUsdcPrice = Number.isFinite(usdcPrice) && usdcPrice > 0;
+  const prefersCollectorCryptSol = listing.source === 'collector-crypt' && !listing.auctionListing && hasSolPrice;
+
+  if (prefersCollectorCryptSol) return 'SOL';
+  if (hasUsdcPrice || displayCurrency === 'USDC') return 'USDC';
+  if (displayCurrency === 'SOL' || hasSolPrice) return 'SOL';
+  return 'USD1';
+}
+
+export function resolveListingDisplayPrice(listing: ListingPriceInput): {
+  amount: number;
+  currency: ListingPrimaryCurrency | string;
+  secondaryAmount?: number;
+  secondaryCurrency?: 'SOL';
+} {
+  const rawPrice = Number(listing.price);
+  const amount = Number.isFinite(rawPrice) ? rawPrice : 0;
+  const displayCurrency = typeof listing.currency === 'string' && listing.currency ? listing.currency : 'USD1';
+  const solPrice = Number(listing.solPrice);
+  const usdcPrice = Number(listing.usdcPrice);
+  const hasSolPrice = Number.isFinite(solPrice) && solPrice > 0;
+  const hasUsdcPrice = Number.isFinite(usdcPrice) && usdcPrice > 0;
+  const primaryCurrency = getListingPurchaseCurrency(listing);
+
+  if (primaryCurrency === 'USDC') {
+    return {
+      amount: hasUsdcPrice ? usdcPrice : amount,
+      currency: 'USDC',
+      secondaryAmount: hasSolPrice ? solPrice : undefined,
+      secondaryCurrency: hasSolPrice ? 'SOL' : undefined,
+    };
+  }
+
+  if (primaryCurrency === 'SOL') {
+    return {
+      amount: hasSolPrice ? solPrice : amount,
+      currency: 'SOL',
+    };
+  }
+
+  return {
+    amount,
+    currency: displayCurrency,
+  };
 }
 
 const now = Date.now();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing } from "@/lib/data";
+import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -415,19 +415,6 @@ export default function CategoryAuctionsPage() {
     ? (useMeApi ? meListings : listings.filter((l: any) => l.category === category))
     : [];
 
-  const getListingPurchaseCurrency = (listing: any): 'SOL' | 'USDC' | 'USD1' => {
-    if (listing?.source === 'collector-crypt' && Number(listing?.solPrice) > 0) {
-      return 'SOL';
-    }
-    if (listing?.usdcPrice || listing?.currency === 'USDC') {
-      return 'USDC';
-    }
-    if (listing?.currency === 'SOL' || Number(listing?.solPrice) > 0) {
-      return 'SOL';
-    }
-    return 'USD1';
-  };
-
   // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
   // Currency filter + sort always applied client-side (Tensor USDC enrichment happens after Oracle returns)
   const categoryListings = (useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
@@ -665,8 +652,8 @@ export default function CategoryAuctionsPage() {
               ) : null; })()}
               <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 transition-opacity duration-200 ${meFilterLoading ? 'opacity-40' : ''}`}>
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
-                  const usd1Amount = l.price.toLocaleString();
                   const purchaseCurrency = getListingPurchaseCurrency(l);
+                  const displayPrice = resolveListingDisplayPrice(l);
                   const showUsdcPrice = purchaseCurrency === 'USDC';
                   return (
                     <div
@@ -720,21 +707,21 @@ export default function CategoryAuctionsPage() {
                               </>
                             ) : showUsdcPrice ? (
                               <>
-                                <p className="text-white font-serif text-2xl">${((l as any).usdcPrice || l.price).toLocaleString()} <span className="text-gold-500 text-sm">USDC</span></p>
-                                {(l as any).solPrice > 0 && (
-                                  <p className="text-gray-500 text-xs mt-0.5">◎ {Number((l as any).solPrice).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</p>
+                                <p className="text-white font-serif text-2xl">${displayPrice.amount.toLocaleString()} <span className="text-gold-500 text-sm">USDC</span></p>
+                                {displayPrice.secondaryCurrency === 'SOL' && displayPrice.secondaryAmount !== undefined && (
+                                  <p className="text-gray-500 text-xs mt-0.5">◎ {Number(displayPrice.secondaryAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</p>
                                 )}
                               </>
-                            ) : (l as any).solPrice > 0 || (l as any).currency === 'SOL' ? (
+                            ) : purchaseCurrency === 'SOL' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">◎ {((l as any).solPrice || l.price).toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
+                                <p className="text-white font-serif text-2xl">◎ {displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
                             ) : (
                               <>
-                                <p className="text-white font-serif text-2xl">{formatFullPrice(l.price)}</p>
+                                <p className="text-white font-serif text-2xl">{formatFullPrice(displayPrice.amount)}</p>
                                 <p className="text-gold-500 text-xs mt-1">
-                                  {usd1Amount} USDC
+                                  {displayPrice.amount.toLocaleString()} {displayPrice.currency}
                                 </p>
                                 {BAXUS_SELLER_FEE_ENABLED && l.verifiedBy === "BAXUS" && (
                                   <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { resolveListingDisplayPrice } from "@/lib/data";
 
 interface MEListing {
   id: string;
@@ -13,6 +14,9 @@ interface MEListing {
   currency: string;
   verifiedBy: string;
   ccCategory: string;
+  source?: string;
+  solPrice?: number | null;
+  usdcPrice?: number | null;
 }
 
 function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { title: string; emoji: string; items: MEListing[]; bg?: string; viewAllHref?: string; viewAllLabel?: string }) {
@@ -46,34 +50,47 @@ function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { t
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
               {items.map((l) => (
-                <Link key={l.id} href={`/auctions/cards/${l.id}`} className="flex-shrink-0 w-72 snap-start group">
-                  <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
-                    <div className="aspect-square overflow-hidden bg-dark-900">
-                      <img
-                        src={l.image}
-                        alt={l.name}
-                        className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-500"
-                      />
-                    </div>
-                    <div className="p-5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
-                          <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                (() => {
+                  const displayPrice = resolveListingDisplayPrice(l);
+                  const primaryAmount = displayPrice.currency === "SOL"
+                    ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                    : displayPrice.amount.toLocaleString();
+                  const secondaryAmount = displayPrice.secondaryAmount?.toLocaleString(undefined, { maximumFractionDigits: 4 });
+
+                  return (
+                    <Link key={l.id} href={`/auctions/cards/${l.id}`} className="flex-shrink-0 w-72 snap-start group">
+                      <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
+                        <div className="aspect-square overflow-hidden bg-dark-900">
+                          <img
+                            src={l.image}
+                            alt={l.name}
+                            className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-500"
+                          />
                         </div>
-                        <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{l.name}</h3>
-                        <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
+                        <div className="p-5 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
+                              <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                            </div>
+                            <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{l.name}</h3>
+                            <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
+                            <p className="text-white font-serif text-xl">
+                              {displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
+                            </p>
+                            <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
+                            {displayPrice.secondaryCurrency === "SOL" && secondaryAmount && (
+                              <p className="text-gray-500 text-xs mt-1">◎ {secondaryAmount} SOL</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                        <p className="text-white font-serif text-xl">
-                          {l.currency === 'SOL' ? `◎ ${l.price.toLocaleString()}` : `$${l.price.toLocaleString()}`}
-                        </p>
-                        <p className="text-gold-500 text-xs mt-1">{l.currency}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                    </Link>
+                  );
+                })()
               ))}
             </div>
           </div>
