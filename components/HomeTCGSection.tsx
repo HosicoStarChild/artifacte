@@ -253,7 +253,11 @@ export function HomeTCGSection() {
         const chunkSize = 0x8000;
 
         for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+          const chunk = bytes.subarray(i, i + chunkSize);
+
+          for (let j = 0; j < chunk.length; j++) {
+            binary += String.fromCharCode(chunk[j]);
+          }
         }
 
         return btoa(binary);
