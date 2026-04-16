@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useWallet } from "@solana/wallet-adapter-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
+import { showToast } from "@/components/ToastContainer";
 import { resolveListingDisplayPrice } from "@/lib/data";
+
+const WalletMultiButton = dynamic(
+  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
+  { ssr: false }
+);
 
 interface MEListing {
   id: string;
@@ -17,11 +25,46 @@ interface MEListing {
   source?: string;
   solPrice?: number | null;
   usdcPrice?: number | null;
+  nftAddress?: string;
 }
 
-function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { title: string; emoji: string; items: MEListing[]; bg?: string; viewAllHref?: string; viewAllLabel?: string }) {
+type TCGCarouselProps = {
+  title: string;
+  emoji: string;
+  items: MEListing[];
+  bg?: string;
+  viewAllHref?: string;
+  viewAllLabel?: string;
+  showBuyButton?: boolean;
+  connected?: boolean;
+  buyingId?: string | null;
+  purchasedIds?: Record<string, boolean>;
+  onBuyNow?: (listing: MEListing, displayPrice: number) => void;
+};
+
+function getCardHref(listing: MEListing): string {
+  if (listing.source === "artifacte" && listing.nftAddress) {
+    return `/auctions/cards/${listing.nftAddress}`;
+  }
+
+  return `/auctions/cards/${listing.id}`;
+}
+
+function TCGCarousel({
+  title,
+  emoji,
+  items,
+  bg,
+  viewAllHref,
+  viewAllLabel,
+  showBuyButton,
+  connected,
+  buyingId,
+  purchasedIds,
+  onBuyNow,
+}: TCGCarouselProps) {
   return (
-    <section className={`${bg || ''} py-20 px-4 sm:px-6 lg:px-8`}>
+    <section className={`${bg || ""} py-20 px-4 sm:px-6 lg:px-8`}>
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-12">
           <div>
@@ -49,21 +92,24 @@ function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { t
         ) : (
           <div className="overflow-x-auto pb-4 -mx-4 px-4">
             <div className="flex gap-6 snap-x">
-              {items.map((l) => (
-                (() => {
-                  const displayPrice = resolveListingDisplayPrice(l);
-                  const primaryAmount = displayPrice.currency === "SOL"
-                    ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
-                    : displayPrice.amount.toLocaleString();
-                  const secondaryAmount = displayPrice.secondaryAmount?.toLocaleString(undefined, { maximumFractionDigits: 4 });
+              {items.map((listing) => {
+                const displayPrice = resolveListingDisplayPrice(listing);
+                const primaryAmount = displayPrice.currency === "SOL"
+                  ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                  : displayPrice.amount.toLocaleString();
+                const secondaryAmount = displayPrice.secondaryAmount?.toLocaleString(undefined, { maximumFractionDigits: 4 });
+                const cardHref = getCardHref(listing);
+                const canBuyHere = showBuyButton && (listing.source === "collector-crypt" || listing.source === "phygitals") && Boolean(listing.nftAddress);
+                const isPurchased = Boolean(purchasedIds?.[listing.id]);
 
-                  return (
-                    <Link key={l.id} href={`/auctions/cards/${l.id}`} className="flex-shrink-0 w-72 snap-start group">
-                      <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
+                return (
+                  <div key={listing.id} className="flex-shrink-0 w-72 snap-start">
+                    <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col group">
+                      <Link href={cardHref} className="flex-1 flex flex-col">
                         <div className="aspect-square overflow-hidden bg-dark-900">
                           <img
-                            src={l.image}
-                            alt={l.name}
+                            src={listing.image}
+                            alt={listing.name}
                             className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-500"
                           />
                         </div>
@@ -71,10 +117,10 @@ function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { t
                           <div>
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <span className="text-xs font-semibold tracking-widest text-gold-500 uppercase">Fixed Price</span>
-                              <VerifiedBadge collectionName={l.name} verifiedBy={l.verifiedBy} />
+                              <VerifiedBadge collectionName={listing.name} verifiedBy={listing.verifiedBy} />
                             </div>
-                            <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{l.name}</h3>
-                            <p className="text-gray-500 text-xs mb-3">{l.subtitle}</p>
+                            <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{listing.name}</h3>
+                            <p className="text-gray-500 text-xs mb-3">{listing.subtitle}</p>
                           </div>
                           <div>
                             <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
@@ -87,11 +133,42 @@ function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { t
                             )}
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  );
-                })()
-              ))}
+                      </Link>
+                      {showBuyButton && (
+                        <div className="px-5 pb-5">
+                          {isPurchased ? (
+                            <button
+                              disabled
+                              className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
+                            >
+                              Purchased
+                            </button>
+                          ) : canBuyHere ? (
+                            connected ? (
+                              <button
+                                onClick={() => onBuyNow?.(listing, displayPrice.amount)}
+                                disabled={buyingId === listing.id}
+                                className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
+                              >
+                                {buyingId === listing.id ? "Processing..." : "Buy Now"}
+                              </button>
+                            ) : (
+                              <WalletMultiButton className="w-full !bg-gold-500 hover:!bg-gold-600 !text-dark-900 !rounded-lg !text-sm !font-semibold !h-10 !justify-center" />
+                            )
+                          ) : (
+                            <Link
+                              href={cardHref}
+                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
+                            >
+                              View Details
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -101,31 +178,236 @@ function TCGCarousel({ title, emoji, items, bg, viewAllHref, viewAllLabel }: { t
 }
 
 export function HomeTCGSection() {
+  const { publicKey, sendTransaction, signTransaction, connected, wallet } = useWallet();
   const [onePiece, setOnePiece] = useState<MEListing[]>([]);
   const [pokemon, setPokemon] = useState<MEListing[]>([]);
   const [sealed, setSealed] = useState<MEListing[]>([]);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [purchasedIds, setPurchasedIds] = useState<Record<string, boolean>>({});
+
+  const markPurchased = (listingId: string) => {
+    setPurchasedIds((prev) => ({ ...prev, [listingId]: true }));
+  };
+
+  const handleBuyNow = async (listing: MEListing, displayPrice: number) => {
+    if (!connected || !publicKey) {
+      showToast.error("Please connect your wallet first");
+      return;
+    }
+
+    const mintAddr = listing.nftAddress;
+    if (!mintAddr) {
+      showToast.error("NFT mint address not available");
+      return;
+    }
+
+    setBuyingId(listing.id);
+
+    try {
+      if (listing.source === "phygitals") {
+        if (!signTransaction) throw new Error("Wallet does not support signing");
+
+        const { executeTensorBuy } = await import("@/lib/tensor-buy-client");
+        const result = await executeTensorBuy(
+          mintAddr,
+          publicKey.toBase58(),
+          signTransaction,
+          showToast.info,
+          sendTransaction ?? undefined,
+          wallet?.adapter?.name
+        );
+
+        if (result.confirmed) {
+          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+        } else {
+          showToast.info("Transaction sent but not confirmed yet. Check Solscan.");
+        }
+
+        markPurchased(listing.id);
+        return;
+      }
+
+      showToast.info("Building transaction...");
+
+      const buildRes = await fetch("/api/me-buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+      });
+
+      if (!buildRes.ok) {
+        const errData = await buildRes.json().catch(() => ({ error: "Failed to build transaction" }));
+        throw new Error(errData.error || "Failed to build transaction");
+      }
+
+      const { v0Tx, v0TxSigned, legacyTx, price: mePrice } = await buildRes.json();
+
+      if (!signTransaction) throw new Error("Wallet does not support signing");
+
+      showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+
+      const { Transaction, VersionedTransaction } = await import("@solana/web3.js");
+
+      const bytesToBase64 = (bytes: Uint8Array): string => {
+        let binary = "";
+        const chunkSize = 0x8000;
+
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+
+        return btoa(binary);
+      };
+
+      const sendViaProxy = async (rawTxBytes: Uint8Array): Promise<string> => {
+        const res = await fetch("/api/rpc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "sendTransaction",
+            params: [bytesToBase64(rawTxBytes), { skipPreflight: true, encoding: "base64", maxRetries: 3 }],
+          }),
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        return data.result;
+      };
+
+      const preSim = async (b64Tx: string) => {
+        try {
+          await fetch("/api/rpc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "simulateTransaction",
+              params: [b64Tx, { sigVerify: false, encoding: "base64", commitment: "processed" }],
+            }),
+          });
+        } catch {}
+      };
+
+      let sig = "";
+
+      if (v0TxSigned && v0Tx) {
+        await preSim(v0TxSigned);
+        const signedBytes = Uint8Array.from(atob(v0TxSigned), (char) => char.charCodeAt(0));
+        const notaryTx = VersionedTransaction.deserialize(signedBytes);
+        const signed = await signTransaction(notaryTx as any);
+        sig = await sendViaProxy((signed as any).serialize());
+      } else if (v0Tx) {
+        await preSim(v0Tx);
+        const txBytes = Uint8Array.from(atob(v0Tx), (char) => char.charCodeAt(0));
+        const versionedTx = VersionedTransaction.deserialize(txBytes);
+        const signed = await signTransaction(versionedTx as any);
+        sig = await sendViaProxy((signed as any).serialize());
+      } else if (legacyTx) {
+        const txBytes = Uint8Array.from(atob(legacyTx), (char) => char.charCodeAt(0));
+        const tx = Transaction.from(txBytes);
+        const signed = await signTransaction(tx);
+        sig = await sendViaProxy(signed.serialize());
+      } else {
+        throw new Error("No transaction returned from API");
+      }
+
+      let confirmed = false;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const statusRes = await fetch("/api/rpc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getSignatureStatuses", params: [[sig]] }),
+        });
+
+        if (statusRes.status === 429) continue;
+
+        const statusData = await statusRes.json();
+        const status = statusData.result?.value?.[0];
+        if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+          if (status.err) throw new Error("Transaction failed on-chain");
+          confirmed = true;
+          break;
+        }
+      }
+
+      if (confirmed) {
+        showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
+      } else {
+        showToast.info(`TX sent: ${sig.slice(0, 8)}... — check your wallet`);
+      }
+
+      markPurchased(listing.id);
+    } catch (err: any) {
+      const message = err.message || "Transaction failed";
+      const lowerMessage = message.toLowerCase();
+
+      if (
+        lowerMessage.includes("user rejected") ||
+        lowerMessage.includes("rejected the request") ||
+        lowerMessage.includes("declined") ||
+        lowerMessage.includes("cancelled") ||
+        lowerMessage.includes("canceled")
+      ) {
+        showToast.error("Transaction rejected by user");
+      } else if (lowerMessage.includes("insufficient")) {
+        const currencyLabel = listing.source === "phygitals" ? "USDC" : "SOL";
+        showToast.error(`Insufficient balance. Required: ${displayPrice} ${currencyLabel}`);
+      } else {
+        showToast.error(`Error: ${message.slice(0, 80)}`);
+      }
+    } finally {
+      setBuyingId(null);
+    }
+  };
 
   useEffect(() => {
-    fetch('/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8')
-      .then(r => r.json())
-      .then(data => setOnePiece(data.listings || []))
+    fetch("/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8")
+      .then((r) => r.json())
+      .then((data) => setOnePiece(data.listings || []))
       .catch(() => {});
 
-    fetch('/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10')
-      .then(r => r.json())
-      .then(data => setPokemon(data.listings || []))
+    fetch("/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10")
+      .then((r) => r.json())
+      .then((data) => setPokemon(data.listings || []))
       .catch(() => {});
 
-    fetch('/api/me-listings?category=SEALED&sort=price-desc&perPage=10')
-      .then(r => r.json())
-      .then(data => setSealed(data.listings || []))
+    fetch("/api/me-listings?category=SEALED&sort=price-desc&perPage=10")
+      .then((r) => r.json())
+      .then((data) => setSealed(data.listings || []))
       .catch(() => {});
   }, []);
 
   return (
     <>
-      <TCGCarousel title="One Piece TCG" emoji="🏴‍☠️" items={onePiece} viewAllHref="/auctions/categories/tcg-cards?ccCategory=One+Piece" viewAllLabel="View All One Piece" />
-      <TCGCarousel title="Pokémon TCG" emoji="⚡" items={pokemon} bg="bg-dark-800/30 border-t border-white/5" viewAllHref="/auctions/categories/tcg-cards?ccCategory=Pokemon" viewAllLabel="View All Pokémon" />
+      <TCGCarousel
+        title="One Piece TCG"
+        emoji="🏴‍☠️"
+        items={onePiece}
+        viewAllHref="/auctions/categories/tcg-cards?ccCategory=One+Piece"
+        viewAllLabel="View All One Piece"
+        showBuyButton
+        connected={connected}
+        buyingId={buyingId}
+        purchasedIds={purchasedIds}
+        onBuyNow={handleBuyNow}
+      />
+      <TCGCarousel
+        title="Pokémon TCG"
+        emoji="⚡"
+        items={pokemon}
+        bg="bg-dark-800/30 border-t border-white/5"
+        viewAllHref="/auctions/categories/tcg-cards?ccCategory=Pokemon"
+        viewAllLabel="View All Pokémon"
+        showBuyButton
+        connected={connected}
+        buyingId={buyingId}
+        purchasedIds={purchasedIds}
+        onBuyNow={handleBuyNow}
+      />
       <TCGCarousel title="Sealed Product" emoji="📦" items={sealed} viewAllHref="/auctions/categories/sealed" viewAllLabel="View All Sealed" />
     </>
   );
