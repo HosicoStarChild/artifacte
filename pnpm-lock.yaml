@@ -23,6 +23,9 @@ importers:
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^4.4.0
         version: 4.4.0(@metaplex-foundation/umi@1.5.1)
+      '@metaplex-foundation/mpl-token-metadata':
+        specifier: ^2.13.0
+        version: 2.13.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
       '@metaplex-foundation/mpl-toolbox':
         specifier: ^0.10.0
         version: 0.10.0(@metaplex-foundation/umi@1.5.1)
