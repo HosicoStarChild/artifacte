@@ -16,8 +16,27 @@ new Metaplex Core listing instructions (`list_core_item`,
 | Treasury (fees + royalty receiver) | `82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6` |
 | Artifacte Core collection | `jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS` |
 
-Cost: a full BPF program upgrade is ~5–6 SOL on mainnet (refundable as
-buffer rent if the upgrade fails). Devnet is free — practice there first.
+### SOL cost (mainnet)
+
+Computed against the current build (`target/deploy/auction.so` = **768,352 bytes**) and the live ProgramData account (`94TM4XutzWNCU3P7sr2vSvGTFYvbM8m7S453DdJZoC6B`, currently 577,928 bytes / 4.02 SOL):
+
+| Item | SOL | Notes |
+| --- | --- | --- |
+| Buffer account rent (one-time) | **~5.35** | Refunded after a successful upgrade, or recoverable via `solana program close --buffers` if the upgrade aborts |
+| ProgramData growth (768,352 − 577,928 = 190,424 B extra) | **~1.33** | Permanent — locked in the existing ProgramData account |
+| Tx fees | ~0.0001 | Negligible |
+| **Hold in upgrade-authority wallet** | **~6.7** | Recommended balance before starting |
+| **Net SOL actually spent** | **~1.33** | Everything else returns to your wallet |
+
+Recompute at any time:
+
+```bash
+SO_BYTES=$(stat -c%s target/deploy/auction.so)
+solana rent $((SO_BYTES + 45)) -u m   # buffer rent
+solana program show 81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3 -u m   # current size + balance
+```
+
+Devnet is free — always rehearse there first.
 
 ⚠️ The `Cargo.lock` file is intentionally pinned (`blake3 1.5.5`,
 `rmp 0.8.14`, `rmp-serde 1.3.0`) to work around a `cargo build-sbf`
