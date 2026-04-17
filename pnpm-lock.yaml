@@ -23,6 +23,9 @@ importers:
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^4.4.0
         version: 4.4.0(@metaplex-foundation/umi@1.5.1)
+      '@metaplex-foundation/mpl-toolbox':
+        specifier: ^0.10.0
+        version: 0.10.0(@metaplex-foundation/umi@1.5.1)
       '@metaplex-foundation/umi':
         specifier: ^1.5.1
         version: 1.5.1
