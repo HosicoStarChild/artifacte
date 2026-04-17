@@ -5,7 +5,10 @@ import { IDL } from "./auction-idl";
 
 // Program IDs and constants
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-const TREASURY_WALLET = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
+const TREASURY_WALLET = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
+const OWNER_WALLET = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
+const ARTIFACTE_COLLECTION = new PublicKey("jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS");
+const MPL_CORE_PROGRAM_ID = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
 
 // Treasury config PDA — initialized on-chain, allows treasury rotation
 const [TREASURY_CONFIG_PDA] = PublicKey.findProgramAddressSync(
@@ -432,7 +435,8 @@ export class AuctionProgram {
 
   /**
    * Buy a fixed-price listing
-   * Supports both standard SPL Token and Token-2022/WNS NFTs
+   * Supports both standard SPL Token and Token-2022/WNS NFTs.
+   * Auto-routes to `buyNowCore` when the asset has an active Metaplex Core listing.
    */
   async buyNow(
     nftMint: PublicKey,
@@ -442,6 +446,13 @@ export class AuctionProgram {
     price: number,
     paymentMint: PublicKey
   ): Promise<string> {
+    // Probe for a Core listing first — Artifacte v2 assets use that path.
+    const coreListingPda = this.coreListingPda(nftMint);
+    const coreListingInfo = await this.connection.getAccountInfo(coreListingPda);
+    if (coreListingInfo) {
+      return await this.buyNowCore(nftMint);
+    }
+
     const nftTokenProgram = await detectTokenProgram(this.connection, nftMint);
     const isT22 = nftTokenProgram.equals(TOKEN_2022_PROGRAM_ID);
     const isWNS = isT22 ? await isWNSNft(this.connection, nftMint) : false;
@@ -1125,6 +1136,206 @@ export class AuctionProgram {
         console.error("Error fetching listings:", e2);
         return [];
       }
+    }
+  }
+
+  // ==========================================================================
+  // Metaplex Core listing flow (Artifacte v2)
+  // ==========================================================================
+
+  private coreListingPda(asset: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("core_listing"), asset.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+  }
+
+  private coreAuthorityPda(asset: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("core_authority"), asset.toBuffer()],
+      AUCTION_PROGRAM_ID
+    )[0];
+  }
+
+  /**
+   * Read the Royalties plugin from a Core asset (or fall back to collection).
+   * Returns first creator + basis points. Mirrors on-chain `read_core_royalties`.
+   */
+  private async fetchCoreRoyalties(
+    asset: PublicKey,
+    collection: PublicKey
+  ): Promise<{ basisPoints: number; creator: PublicKey }> {
+    const { createUmi } = await import("@metaplex-foundation/umi-bundle-defaults");
+    const { fetchAsset, fetchCollection } = await import("@metaplex-foundation/mpl-core");
+    const { publicKey: umiPk } = await import("@metaplex-foundation/umi");
+    const umi = createUmi(this.connection.rpcEndpoint);
+
+    const tryRead = (plugins: any): { basisPoints: number; creator: PublicKey } | null => {
+      const r = plugins?.royalties;
+      if (!r) return null;
+      const first = r.creators?.[0]?.address;
+      if (!first) return null;
+      return { basisPoints: Number(r.basisPoints || 0), creator: new PublicKey(first.toString()) };
+    };
+
+    try {
+      const a: any = await fetchAsset(umi, umiPk(asset.toBase58()));
+      const fromAsset = tryRead(a);
+      if (fromAsset) return fromAsset;
+    } catch (e) {
+      console.warn("[fetchCoreRoyalties] asset fetch failed:", (e as any)?.message);
+    }
+    try {
+      const c: any = await fetchCollection(umi, umiPk(collection.toBase58()));
+      const fromCol = tryRead(c);
+      if (fromCol) return fromCol;
+    } catch (e) {
+      console.warn("[fetchCoreRoyalties] collection fetch failed:", (e as any)?.message);
+    }
+    // No royalties plugin — safe fallback
+    return { basisPoints: 0, creator: TREASURY_WALLET };
+  }
+
+  /**
+   * List a Metaplex Core asset for fixed-price USDC sale.
+   * Owner-only; the asset stays in the seller wallet (TransferDelegate model).
+   */
+  async listCoreItem(asset: PublicKey, priceUsdc: number | bigint): Promise<string> {
+    if (!this.wallet.publicKey?.equals(OWNER_WALLET)) {
+      throw new Error("Listing is restricted to the Artifacte owner wallet");
+    }
+    const coreListing = this.coreListingPda(asset);
+    const coreAuthority = this.coreAuthorityPda(asset);
+
+    const ix = await this.program.methods
+      .listCoreItem(new anchor.BN(priceUsdc.toString()))
+      .accounts({
+        seller: this.wallet.publicKey,
+        asset,
+        collection: ARTIFACTE_COLLECTION,
+        paymentMint: USDC_MINT,
+        coreListing,
+        coreAuthority,
+        mplCoreProgram: MPL_CORE_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
+      .add(ix);
+    return await this.sendAndConfirm(tx);
+  }
+
+  /** Cancel a Core listing — owner-only. */
+  async cancelCoreListing(asset: PublicKey): Promise<string> {
+    const coreListing = this.coreListingPda(asset);
+    const coreAuthority = this.coreAuthorityPda(asset);
+
+    // Read collection from the on-chain CoreListing
+    const listingAcc: any = await this.program.account.coreListing.fetch(coreListing);
+    const collection: PublicKey = listingAcc.collection;
+
+    const ix = await this.program.methods
+      .cancelCoreListing()
+      .accounts({
+        seller: this.wallet.publicKey,
+        asset,
+        collection,
+        coreListing,
+        coreAuthority,
+        mplCoreProgram: MPL_CORE_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }))
+      .add(ix);
+    return await this.sendAndConfirm(tx);
+  }
+
+  /**
+   * Buy a Core listing. Auto-derives ATAs, royalty creator, and treasury;
+   * adds idempotent ATA-create instructions where needed.
+   */
+  async buyNowCore(asset: PublicKey): Promise<string> {
+    const coreListing = this.coreListingPda(asset);
+    const coreAuthority = this.coreAuthorityPda(asset);
+
+    const listingAcc: any = await this.program.account.coreListing.fetch(coreListing);
+    const seller: PublicKey = listingAcc.seller;
+    const collection: PublicKey = listingAcc.collection;
+    const paymentMint: PublicKey = listingAcc.paymentMint;
+
+    // Resolve treasury (from PDA if initialized, fallback constant otherwise)
+    let treasury = TREASURY_WALLET;
+    try {
+      const cfg: any = await this.program.account.treasuryConfig.fetch(TREASURY_CONFIG_PDA);
+      if (cfg?.treasury) treasury = new PublicKey(cfg.treasury);
+    } catch {
+      // not initialized → fallback
+    }
+
+    const royalty = await this.fetchCoreRoyalties(asset, collection);
+
+    const buyer = this.wallet.publicKey as PublicKey;
+    const buyerAta = await getAssociatedTokenAddress(paymentMint, buyer);
+    const sellerAta = await getAssociatedTokenAddress(paymentMint, seller);
+    const treasuryAta = await getAssociatedTokenAddress(paymentMint, treasury);
+    const creatorAta = await getAssociatedTokenAddress(paymentMint, royalty.creator);
+
+    // Idempotent ATA creates for any payee that doesn't yet have an account
+    const preIxs: TransactionInstruction[] = [];
+    const ensureAta = async (ata: PublicKey, owner: PublicKey) => {
+      const info = await this.connection.getAccountInfo(ata);
+      if (!info) {
+        preIxs.push(
+          createAssociatedTokenAccountInstruction(buyer, ata, owner, paymentMint)
+        );
+      }
+    };
+    await ensureAta(sellerAta, seller);
+    await ensureAta(treasuryAta, treasury);
+    if (royalty.basisPoints > 0) await ensureAta(creatorAta, royalty.creator);
+
+    const ix = await this.program.methods
+      .buyNowCore()
+      .accounts({
+        buyer,
+        asset,
+        collection,
+        coreListing,
+        seller,
+        coreAuthority,
+        paymentMint,
+        buyerPaymentAccount: buyerAta,
+        sellerPaymentAccount: sellerAta,
+        treasuryPaymentAccount: treasuryAta,
+        creatorPaymentAccount: creatorAta,
+        treasury,
+        treasuryConfig: TREASURY_CONFIG_PDA,
+        mplCoreProgram: MPL_CORE_PROGRAM_ID,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+      .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }));
+    for (const p of preIxs) tx.add(p);
+    tx.add(ix);
+    return await this.sendAndConfirm(tx);
+  }
+
+  /** Fetch all Core listings (owner-filtered server-side). */
+  async fetchAllCoreListings(): Promise<any[]> {
+    try {
+      return await this.program.account.coreListing.all();
+    } catch (e) {
+      console.warn("Bulk core listing fetch failed:", (e as any)?.message);
+      return [];
     }
   }
 }

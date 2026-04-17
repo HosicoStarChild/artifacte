@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess } from "@/lib/data";
+import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess, isOwnerWallet, OWNER_WALLET } from "@/lib/data";
 import {
   ADMIN_CORE_ROYALTY_BASIS_POINTS,
   buildMetaplexCompatibleMetadata,
@@ -387,7 +387,10 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div className="mb-8 flex gap-4 border-b border-white/10 overflow-x-auto">
-          {(["overview", "listings", "submissions", "mint", "whitelist", "settings"] as const).map((tab) => (
+          {(isOwnerWallet(publicKey?.toBase58())
+            ? (["overview", "listings", "submissions", "mint", "whitelist", "settings"] as const)
+            : (["overview", "listings", "submissions", "whitelist", "settings"] as const)
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -999,7 +1002,13 @@ export default function AdminPage() {
         )}
 
         {!loading && activeTab === "mint" && (
-          <MintFormContent />
+          isOwnerWallet(publicKey?.toBase58()) ? (
+            <MintFormContent />
+          ) : (
+            <div className="bg-red-900/20 border border-red-700 rounded-lg p-6 text-red-300">
+              Minting is restricted to the Artifacte owner wallet ({OWNER_WALLET}). Connect that wallet to mint.
+            </div>
+          )
         )}
 
         {!loading && activeTab === "settings" && (

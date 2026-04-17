@@ -16,4 +16,5 @@ spl-token-2022 = { version = "*", features = ["no-entrypoint"] }
 spl-token = { version = "6", features = ["no-entrypoint"] }
 spl-token-interface = "2.0"
 spl-transfer-hook-interface = "0.8"
+mpl-core = { version = "0.12.0-beta.1", features = ["anchor"] }
 sha2 = "0.10"

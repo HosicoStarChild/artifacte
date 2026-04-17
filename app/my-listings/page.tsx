@@ -42,6 +42,7 @@ interface MyListing {
   royaltyBps: number;
   collectionAddress?: string;
   isPnft?: boolean;
+  isCore?: boolean;
 }
 
 export default function MyListingsPage() {
@@ -144,10 +145,11 @@ export default function MyListingsPage() {
       };
       const program = new AuctionProgram(connection, dummyWallet);
 
-      const [allListings, tensorListings, allowlist] = await Promise.all([
+      const [allListings, tensorListings, allowlist, allCoreListings] = await Promise.all([
         program.fetchAllListings(),
         fetchTensorListings(publicKey, connection),
         fetchAllowlist(),
+        program.fetchAllCoreListings(),
       ]);
 
       const allowedAddresses = new Set(
@@ -218,10 +220,38 @@ export default function MyListingsPage() {
       );
       console.log('[my-listings] tensor after allowlist filter:', filteredTensor.length, '/', tensorListings.length);
 
-      // Merge both sources, dedup by nftMint
+      // Filter Core listings to this wallet, enrich with metadata.
+      const myCore = (allCoreListings || []).filter(
+        (l: any) => l.account.seller.toBase58() === publicKey.toBase58()
+      );
+      console.log('[my-listings] core listings for wallet:', myCore.length);
+      const coreEnriched: MyListing[] = await Promise.all(
+        myCore.map(async (l: any) => {
+          const acc = l.account;
+          const mintAddr = acc.asset.toBase58();
+          const { name, image, collection } = await fetchNftMeta(mintAddr);
+          const price = Number(acc.price) / 1e6; // USDC
+          return {
+            id: l.publicKey.toBase58(),
+            name,
+            image,
+            nftMint: mintAddr,
+            price,
+            currency: "USDC",
+            status: "active" as const,
+            listingType: "Fixed Price",
+            royaltyBps: 0,
+            collectionAddress: collection || acc.collection.toBase58(),
+            isPnft: false,
+            isCore: true,
+          };
+        })
+      );
+
+      // Merge all sources, dedup by nftMint (Core takes precedence)
       const seen = new Set<string>();
       const all: MyListing[] = [];
-      for (const listing of [...auctionEnriched, ...filteredTensor]) {
+      for (const listing of [...coreEnriched, ...auctionEnriched, ...filteredTensor]) {
         if (!seen.has(listing.nftMint)) {
           seen.add(listing.nftMint);
           all.push(listing);
@@ -237,14 +267,16 @@ export default function MyListingsPage() {
     }
   }
 
-  async function handleCancelListing(nftMintStr: string, isPnft?: boolean) {
+  async function handleCancelListing(nftMintStr: string, isPnft?: boolean, isCore?: boolean) {
     if (!publicKey || !anchorWallet) return;
     setCancellingMint(nftMintStr);
     try {
       const nftMint = new PublicKey(nftMintStr);
       const auctionProgram = new AuctionProgram(connection, anchorWallet, sendTransaction);
 
-      if (isPnft) {
+      if (isCore) {
+        await auctionProgram.cancelCoreListing(nftMint);
+      } else if (isPnft) {
         // pNFT: use cancel_listing_pnft which handles escrow_authority + Metaplex TransferV1
         await auctionProgram.cancelListingPnft(nftMint);
       } else {
@@ -518,7 +550,7 @@ export default function MyListingsPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleCancelListing(listing.nftMint, listing.isPnft)}
+                          onClick={() => handleCancelListing(listing.nftMint, listing.isPnft, listing.isCore)}
                           disabled={cancellingMint === listing.nftMint}
                           className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >

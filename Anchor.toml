@@ -6,7 +6,12 @@ skip-lint = true
 
 [programs.mainnet]
 auction = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"
-rwa_nft = "dK6HkxoT5BHYdPJFomXNSSB1fBUoRjxGT7XxbQudFLH"
+
+[programs.localnet]
+auction = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3"
+
+[scripts]
+test = "pnpm exec ts-mocha -p ./tests/tsconfig.json -t 1000000 'tests/**/*.test.ts'"
 
 [registry]
 url = "https://api.apr.dev"

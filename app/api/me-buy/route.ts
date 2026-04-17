@@ -21,7 +21,7 @@ if (!ME_API_KEY) {
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const ME_BATCH_BASE = 'https://api-mainnet.magiceden.us/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
-const TREASURY_WALLET = '6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P';
+const TREASURY_WALLET = '82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
 const rateMap = new Map<string, { count: number; resetAt: number }>();
