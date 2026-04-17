@@ -7,6 +7,7 @@ import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, createAssociatedToken
 import { Transaction } from "@solana/web3.js";
 import Link from "next/link";
 import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
+import { isOwnerWallet } from "@/lib/admin";
 import { showToast } from "@/components/ToastContainer";
 
 interface NFTAsset {
@@ -132,6 +133,10 @@ export default function ListNFTPage() {
       !!(nft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
   }
 
+  function isCoreNft(nft: NFTAsset | null): boolean {
+    return !!nft && (nft as any).interface === 'MplCoreAsset';
+  }
+
   function getNftCategory(nft: NFTAsset): ItemCategory {
     const g = nft.grouping?.find((g: any) => g.group_key === "collection");
     const collectionAddr = g?.group_value;
@@ -248,12 +253,24 @@ export default function ListNFTPage() {
       // Detect NFT type from DAS API interface field
       const isCompressed = (selectedNft as any).compression?.compressed === true;
       const isPnft = (selectedNft as any).interface === 'ProgrammableNFT';
+      const isCore = (selectedNft as any).interface === 'MplCoreAsset';
       // Artifacte-minted NFTs are identified by their update authority
       const isArtifacteNFT = !!(selectedNft as any).authorities?.some((a: any) => a.address === ARTIFACTE_AUTHORITY);
 
       let tx: string;
 
-      if (listingType === "fixed" && isArtifacteNFT) {
+      if (isCore) {
+        // ── Metaplex Core (Artifacte v2): owner-only, USDC fixed-price ──
+        if (!isOwnerWallet(publicKey.toBase58())) {
+          throw new Error("Listing Artifacte Core assets is restricted to the owner wallet.");
+        }
+        if (listingType !== "fixed") {
+          throw new Error("Auctions are not supported for Artifacte Core assets — use Fixed Price.");
+        }
+        const priceUsdc = Math.floor(parseFloat(price) * 1e6);
+        showToast.info("Listing on Artifacte (Core)...");
+        tx = await auctionProgram.listCoreItem(nftMint, priceUsdc);
+      } else if (listingType === "fixed" && isArtifacteNFT) {
         // ── Artifacte collection: fixed-price listing on Artifacte's own on-chain program ──
         showToast.info("Listing on Artifacte...");
         if (isPnft) {
@@ -682,11 +699,11 @@ export default function ListNFTPage() {
                     Fixed Price
                   </button>
                   <button
-                    onClick={() => { if (!((selectedNft as any)?.compression?.compressed) && !(selectedNft && isRwaNft(selectedNft))) setListingType("auction"); }}
-                    disabled={(selectedNft as any)?.compression?.compressed === true || !!(selectedNft && isRwaNft(selectedNft))}
-                    title={(selectedNft && isRwaNft(selectedNft)) ? "Auctions are only available for Digital Collectibles" : (selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : undefined}
+                    onClick={() => { if (!((selectedNft as any)?.compression?.compressed) && !(selectedNft && isRwaNft(selectedNft)) && !isCoreNft(selectedNft)) setListingType("auction"); }}
+                    disabled={(selectedNft as any)?.compression?.compressed === true || !!(selectedNft && isRwaNft(selectedNft)) || isCoreNft(selectedNft)}
+                    title={isCoreNft(selectedNft) ? "Artifacte Core assets support fixed-price USDC listings only" : (selectedNft && isRwaNft(selectedNft)) ? "Auctions are only available for Digital Collectibles" : (selectedNft as any)?.compression?.compressed ? "Auctions are not available for compressed NFTs" : undefined}
                     className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition ${
-                      (selectedNft as any)?.compression?.compressed || (selectedNft && isRwaNft(selectedNft))
+                      (selectedNft as any)?.compression?.compressed || (selectedNft && isRwaNft(selectedNft)) || isCoreNft(selectedNft)
                         ? "border-white/5 text-gray-600 cursor-not-allowed opacity-50"
                         : listingType === "auction"
                         ? "border-gold-500 bg-gold-500/10 text-gold-400"
@@ -711,10 +728,10 @@ export default function ListNFTPage() {
               {/* Price */}
               <div className="mb-5">
                 <label className="block text-sm text-gray-400 mb-1.5 font-medium">
-                  {listingType === "fixed" ? "Price" : "Starting Price"} ({getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? "USDC" : "SOL"})
+                  {listingType === "fixed" ? "Price" : "Starting Price"} ({(isCoreNft(selectedNft) || getNftCategory(selectedNft) !== ItemCategory.DigitalArt) ? "USDC" : "SOL"})
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-2.5 text-gray-500">{getNftCategory(selectedNft) !== ItemCategory.DigitalArt ? "$" : "◎"}</span>
+                  <span className="absolute left-4 top-2.5 text-gray-500">{(isCoreNft(selectedNft) || getNftCategory(selectedNft) !== ItemCategory.DigitalArt) ? "$" : "◎"}</span>
                   <input
                     type="number"
                     step="0.01"

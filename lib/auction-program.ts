@@ -435,7 +435,8 @@ export class AuctionProgram {
 
   /**
    * Buy a fixed-price listing
-   * Supports both standard SPL Token and Token-2022/WNS NFTs
+   * Supports both standard SPL Token and Token-2022/WNS NFTs.
+   * Auto-routes to `buyNowCore` when the asset has an active Metaplex Core listing.
    */
   async buyNow(
     nftMint: PublicKey,
@@ -445,6 +446,13 @@ export class AuctionProgram {
     price: number,
     paymentMint: PublicKey
   ): Promise<string> {
+    // Probe for a Core listing first — Artifacte v2 assets use that path.
+    const coreListingPda = this.coreListingPda(nftMint);
+    const coreListingInfo = await this.connection.getAccountInfo(coreListingPda);
+    if (coreListingInfo) {
+      return await this.buyNowCore(nftMint);
+    }
+
     const nftTokenProgram = await detectTokenProgram(this.connection, nftMint);
     const isT22 = nftTokenProgram.equals(TOKEN_2022_PROGRAM_ID);
     const isWNS = isT22 ? await isWNSNft(this.connection, nftMint) : false;

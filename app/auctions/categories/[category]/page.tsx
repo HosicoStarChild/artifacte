@@ -350,32 +350,51 @@ export default function CategoryAuctionsPage() {
         try {
           const nftMintPubkey = new PublicKey(nftMint);
           const token = TOKENS[currency];
-          
+
           // Get buyer's NFT account (where they'll receive the NFT)
           const buyerNftAccount = await getAssociatedTokenAddress(nftMintPubkey, publicKey);
-          
-          // Get seller from on-chain listing PDA
+
+          // Probe for both legacy and Core listings — Core has its own PDA + flow.
           const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-          const [listingPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("listing"), nftMintPubkey.toBuffer()],
+          const [coreListingPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("core_listing"), nftMintPubkey.toBuffer()],
             AUCTION_PROGRAM_ID
           );
-          const listingInfo = await connection.getAccountInfo(listingPda);
-          if (!listingInfo) throw new Error("On-chain listing not found");
-          const sellerPubkey = new PublicKey(listingInfo.data.subarray(8, 40));
+          const coreListingInfo = await connection.getAccountInfo(coreListingPda);
 
-          // Get payment accounts
-          const buyerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
-          const sellerPaymentAccount = await getAssociatedTokenAddress(token.mint, sellerPubkey);
-          
-          sig = await auctionProgram.buyNow(
-            nftMintPubkey,
-            sellerPaymentAccount,
-            buyerPaymentAccount,
-            buyerNftAccount,
-            Math.round(price * (10 ** token.decimals)),
-            token.mint
-          );
+          if (coreListingInfo) {
+            // Core path — auctionProgram.buyNow auto-routes to buyNowCore.
+            sig = await auctionProgram.buyNow(
+              nftMintPubkey,
+              nftMintPubkey, // unused for Core path
+              nftMintPubkey, // unused for Core path
+              buyerNftAccount,
+              0,
+              token.mint
+            );
+          } else {
+            // Legacy SPL/pNFT path
+            const [listingPda] = PublicKey.findProgramAddressSync(
+              [Buffer.from("listing"), nftMintPubkey.toBuffer()],
+              AUCTION_PROGRAM_ID
+            );
+            const listingInfo = await connection.getAccountInfo(listingPda);
+            if (!listingInfo) throw new Error("On-chain listing not found");
+            const sellerPubkey = new PublicKey(listingInfo.data.subarray(8, 40));
+
+            // Get payment accounts
+            const buyerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
+            const sellerPaymentAccount = await getAssociatedTokenAddress(token.mint, sellerPubkey);
+
+            sig = await auctionProgram.buyNow(
+              nftMintPubkey,
+              sellerPaymentAccount,
+              buyerPaymentAccount,
+              buyerNftAccount,
+              Math.round(price * (10 ** token.decimals)),
+              token.mint
+            );
+          }
         } catch (programErr: any) {
           // Fall back to direct transfer if program call fails
           console.warn("AuctionProgram.buyNow failed, falling back to direct transfer:", programErr);
