@@ -1,15 +1,16 @@
 export {
   TREASURY_WALLET,
+  OWNER_WALLET,
   ADMIN_WALLET,
   ADMIN_WALLETS,
   ADMIN_ACCESS_WALLETS,
+  isOwnerWallet,
   isAdminWallet,
   hasAdminAccess,
 } from "./admin";
 
 // On-chain program constants
-export const AUCTION_PROGRAM_ID = "23fKEH3emeaJf1PW4Kts3exRnMjoNiqmqyFoNXH6qNiN";
-export const RWA_NFT_PROGRAM_ID = "F9mkXqMrgF1sSV3wDtTUpTs82B5XJ5qz9A33nBAdcNqb";
+export const AUCTION_PROGRAM_ID = "81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3";
 export const ARTIFACTE_COLLECTION = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 export const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";

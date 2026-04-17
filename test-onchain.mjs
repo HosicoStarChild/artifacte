@@ -18,7 +18,7 @@ console.log("Balance:", (await connection.getBalance(authority.publicKey)) / LAM
 
 const RWA_PROGRAM_ID = new PublicKey("3F9p3LxwVzPVgzJZQ59dxxBwQiobhtXdokr8iF7ZETSH");
 const AUCTION_PROGRAM_ID = new PublicKey("9KfPTwprxB5teuPGCbVjwJtFcLJhiLZhJEC8hcLH3SkL");
-const TREASURY = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
+const TREASURY = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
 
 // Load IDLs
 const rwaIdl = JSON.parse(fs.readFileSync("./target/idl/rwa_nft.json", "utf-8"));

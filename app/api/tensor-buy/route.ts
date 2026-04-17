@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       rentDestination: rentDest,
       currency: address(USDC_MINT),
       makerBroker,
-      takerBroker: address('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P'),
+      takerBroker: address('82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6'),
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
 
     // 2% platform fee in USDC (charged to buyer, sent to treasury)
-    const TREASURY = new PublicKey('6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P');
+    const TREASURY = new PublicKey('82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6');
     const usdcMintPk = new PublicKey(USDC_MINT);
     const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
     const platformFeeUsdc = Math.ceil(Number(listState.data.amount) * 0.02); // 2% in USDC micro-units

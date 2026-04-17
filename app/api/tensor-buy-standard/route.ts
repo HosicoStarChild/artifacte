@@ -7,7 +7,7 @@ const TENSOR_API_BASE = "https://api.mainnet.tensordev.io/api/v1";
 const HELIUS_RPC = process.env.HELIUS_API_KEY
   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   : "https://api.mainnet-beta.solana.com";
-const TREASURY_WALLET = '6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P';
+const TREASURY_WALLET = '82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6';
 const PLATFORM_FEE_BPS = 200; // 2%
 
 const rateMap = new Map<string, { count: number; resetAt: number }>();

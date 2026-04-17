@@ -7,7 +7,7 @@ const IDL = require("../target/idl/auction.json");
 
 const RPC = "https://margy-w7f73z-fast-mainnet.helius-rpc.com";
 const PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-const TREASURY_WALLET = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
+const TREASURY_WALLET = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
 
 const keypairData = JSON.parse(readFileSync("/Users/haas/.config/solana/id.json", "utf8"));
 const authority = Keypair.fromSecretKey(Uint8Array.from(keypairData));

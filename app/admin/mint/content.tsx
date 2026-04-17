@@ -4,7 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { SendTransactionError } from "@solana/web3.js";
-import { ADMIN_WALLET, ARTIFACTE_COLLECTION, hasAdminAccess } from "@/lib/data";
+import { ADMIN_WALLET, ARTIFACTE_COLLECTION, hasAdminAccess, isOwnerWallet, TREASURY_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
 import { createV1, createCollectionV1, fetchCollection, hasCollectionUpdateAuthority, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
@@ -271,7 +271,7 @@ function MintFormInner() {
       image: imageUri || "",
       imageMimeType,
       attributes,
-      creatorAddress: wallet.publicKey?.toBase58() || ADMIN_WALLET,
+      creatorAddress: TREASURY_WALLET,
       externalUrl: "https://artifacte.io",
       sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
     });
@@ -370,7 +370,7 @@ function MintFormInner() {
           symbol: DEFAULT_COLLECTION_SYMBOL,
           description: "Artifacte — RWA tokenized collectibles on Solana. Trading cards, sealed products, and more.",
           image: "",
-          creatorAddress: wallet.publicKey.toBase58(),
+          creatorAddress: TREASURY_WALLET,
           externalUrl: "https://artifacte.io",
           sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
         }),
@@ -397,7 +397,7 @@ function MintFormInner() {
             type: "Royalties",
             data: {
               basisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
-              creators: [{ address: umi.identity.publicKey, percentage: 100 }],
+              creators: [{ address: umiPublicKey(TREASURY_WALLET), percentage: 100 }],
               ruleSet: ruleSet("None"),
             },
           }),
@@ -516,7 +516,7 @@ function MintFormInner() {
             type: "Royalties",
             data: {
               basisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
-              creators: [{ address: umi.identity.publicKey, percentage: 100 }],
+              creators: [{ address: umiPublicKey(TREASURY_WALLET), percentage: 100 }],
               ruleSet: ruleSet("None"),
             },
           }),

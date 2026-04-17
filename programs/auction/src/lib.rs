@@ -120,12 +120,16 @@ fn close_token_account_cpi<'info>(
 const DEPLOY_AUTHORITY: &str = "H3s3zhbcDNrLgPbUQFZYvRd9xy58nVNRC3vdg1hK1KPt";
 
 // Fallback treasury (used only if config not yet initialized)
-const TREASURY_FALLBACK: &str = "6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P";
+const TREASURY_FALLBACK: &str = "82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6";
 
 // Standard token mints
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+// Artifacte v2 (Metaplex Core) constants
+const OWNER_WALLET: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 
 /// Perform a Token-2022 transfer_checked CPI that properly supports transfer hooks.
 /// remaining_accounts must include the hook-related accounts (extra_metas, approve_account, hook_program).
@@ -1289,6 +1293,281 @@ pub mod auction {
 
         Ok(())
     }
+
+    // ========================================================================
+    // Metaplex Core listing flow (Artifacte v2)
+    //
+    // Non-custodial: the asset stays in the seller's wallet during listing.
+    // The program is approved as a TransferDelegate plugin authority via
+    // mpl-core CPI; on buy, the program signs the TransferV1 CPI as that
+    // delegate, transferring the asset directly from seller to buyer.
+    //
+    // Constraints:
+    //   - Only OWNER_WALLET (the Artifacte owner) may list.
+    //   - Asset must belong to ARTIFACTE_COLLECTION.
+    //   - Payment mint must be USDC.
+    //   - 2% platform fee + creator royalty (from on-chain Royalties plugin)
+    //     routed to the configured treasury / royalty creator (= treasury);
+    //     remainder to the seller.
+    // ========================================================================
+
+    /// List a Metaplex Core asset for fixed-price USDC sale.
+    pub fn list_core_item(ctx: Context<ListCoreItem>, price_usdc: u64) -> Result<()> {
+        // Owner-only listing
+        require!(
+            ctx.accounts.seller.key().to_string() == OWNER_WALLET,
+            AuctionError::Unauthorized
+        );
+        // Artifacte collection only
+        require!(
+            ctx.accounts.collection.key().to_string() == ARTIFACTE_COLLECTION_ID,
+            AuctionError::Unauthorized
+        );
+        // USDC only
+        require!(
+            ctx.accounts.payment_mint.key().to_string() == USDC_MINT,
+            AuctionError::InvalidPaymentMint
+        );
+        require!(price_usdc > 0, AuctionError::InvalidPrice);
+
+        // Verify the seller owns the Core asset, and the asset belongs to the collection.
+        verify_core_asset_ownership(
+            &ctx.accounts.asset.to_account_info(),
+            ctx.accounts.seller.key(),
+            ctx.accounts.collection.key(),
+        )?;
+
+        let clock = Clock::get()?;
+        let listing = &mut ctx.accounts.core_listing;
+        listing.seller = ctx.accounts.seller.key();
+        listing.asset = ctx.accounts.asset.key();
+        listing.collection = ctx.accounts.collection.key();
+        listing.payment_mint = ctx.accounts.payment_mint.key();
+        listing.price = price_usdc;
+        listing.created_at = clock.unix_timestamp;
+        listing.bump = ctx.bumps.core_listing;
+
+        // Approve our `core_authority` PDA as the TransferDelegate authority
+        // by adding the TransferDelegate plugin with that PDA as initAuthority.
+        mpl_core::instructions::AddPluginV1Cpi {
+            __program: &ctx.accounts.mpl_core_program.to_account_info(),
+            asset: &ctx.accounts.asset.to_account_info(),
+            collection: Some(&ctx.accounts.collection.to_account_info()),
+            payer: &ctx.accounts.seller.to_account_info(),
+            authority: Some(&ctx.accounts.seller.to_account_info()),
+            system_program: &ctx.accounts.system_program.to_account_info(),
+            log_wrapper: None,
+            __args: mpl_core::instructions::AddPluginV1InstructionArgs {
+                plugin: mpl_core::types::Plugin::TransferDelegate(
+                    mpl_core::types::TransferDelegate {},
+                ),
+                init_authority: Some(mpl_core::types::PluginAuthority::Address {
+                    address: ctx.accounts.core_authority.key(),
+                }),
+            },
+        }
+        .invoke()?;
+
+        emit!(CoreListingCreated {
+            asset: listing.asset,
+            seller: listing.seller,
+            price_usdc,
+            payment_mint: listing.payment_mint,
+        });
+        Ok(())
+    }
+
+    /// Cancel a Core listing (owner only). Revokes the TransferDelegate authority
+    /// by removing the plugin, and closes the CoreListing PDA.
+    pub fn cancel_core_listing(ctx: Context<CancelCoreListing>) -> Result<()> {
+        // Only the original seller (= owner) may cancel
+        require!(
+            ctx.accounts.seller.key() == ctx.accounts.core_listing.seller,
+            AuctionError::Unauthorized
+        );
+
+        let asset_key = ctx.accounts.asset.key();
+        let core_authority_bump = ctx.bumps.core_authority;
+        let core_authority_seeds: &[&[u8]] = &[
+            b"core_authority",
+            asset_key.as_ref(),
+            &[core_authority_bump],
+        ];
+
+        // Remove the TransferDelegate plugin (the program PDA is the plugin
+        // authority, so it must sign the CPI).
+        mpl_core::instructions::RemovePluginV1Cpi {
+            __program: &ctx.accounts.mpl_core_program.to_account_info(),
+            asset: &ctx.accounts.asset.to_account_info(),
+            collection: Some(&ctx.accounts.collection.to_account_info()),
+            payer: &ctx.accounts.seller.to_account_info(),
+            authority: Some(&ctx.accounts.core_authority.to_account_info()),
+            system_program: &ctx.accounts.system_program.to_account_info(),
+            log_wrapper: None,
+            __args: mpl_core::instructions::RemovePluginV1InstructionArgs {
+                plugin_type: mpl_core::types::PluginType::TransferDelegate,
+            },
+        }
+        .invoke_signed(&[core_authority_seeds])?;
+
+        emit!(CoreListingCancelled {
+            asset: ctx.accounts.core_listing.asset,
+            seller: ctx.accounts.core_listing.seller,
+        });
+        // CoreListing PDA closed via `close = seller` constraint.
+        Ok(())
+    }
+
+    /// Public buy of a Core listing. Splits USDC (platform fee + royalty +
+    /// remainder), then CPIs TransferV1 to move the asset to the buyer.
+    pub fn buy_now_core(ctx: Context<BuyNowCore>) -> Result<()> {
+        let listing = &ctx.accounts.core_listing;
+
+        // Re-validate state (defence in depth)
+        require!(listing.payment_mint.to_string() == USDC_MINT, AuctionError::InvalidPaymentMint);
+        require!(
+            ctx.accounts.payment_mint.key() == listing.payment_mint,
+            AuctionError::InvalidPaymentMint
+        );
+        require!(
+            ctx.accounts.asset.key() == listing.asset,
+            AuctionError::Unauthorized
+        );
+        require!(
+            ctx.accounts.collection.key() == listing.collection,
+            AuctionError::Unauthorized
+        );
+
+        // Resolve treasury (config PDA if initialized, else fallback constant)
+        let treasury_address = if let Some(ref config) = ctx.accounts.treasury_config {
+            config.treasury
+        } else {
+            TREASURY_FALLBACK.parse::<Pubkey>().unwrap()
+        };
+        require!(
+            ctx.accounts.treasury_payment_account.owner == treasury_address,
+            AuctionError::Unauthorized
+        );
+        require!(
+            ctx.accounts.treasury.key() == treasury_address,
+            AuctionError::Unauthorized
+        );
+        require!(
+            ctx.accounts.seller_payment_account.owner == listing.seller,
+            AuctionError::Unauthorized
+        );
+
+        // Read on-chain Royalties plugin (asset first, fallback to collection)
+        // and validate creator_payment_account.
+        let (royalty_bps, royalty_creator) = read_core_royalties(
+            &ctx.accounts.asset.to_account_info(),
+            &ctx.accounts.collection.to_account_info(),
+        )?;
+        require!(royalty_bps <= 1000, AuctionError::RoyaltyTooHigh);
+
+        let platform_fee = listing
+            .price
+            .checked_mul(200)
+            .and_then(|x| x.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?;
+        let creator_royalty = listing
+            .price
+            .checked_mul(royalty_bps as u64)
+            .and_then(|x| x.checked_div(10000))
+            .ok_or(AuctionError::CalculationError)?;
+
+        if creator_royalty > 0 {
+            let expected_creator_ata =
+                anchor_spl::associated_token::get_associated_token_address(
+                    &royalty_creator,
+                    &listing.payment_mint,
+                );
+            require!(
+                ctx.accounts.creator_payment_account.key() == expected_creator_ata,
+                AuctionError::InvalidCreatorAccount
+            );
+        }
+
+        let seller_amount = listing
+            .price
+            .checked_sub(platform_fee)
+            .ok_or(AuctionError::CalculationError)?
+            .checked_sub(creator_royalty)
+            .ok_or(AuctionError::CalculationError)?;
+
+        // USDC: buyer → seller
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.buyer_payment_account.to_account_info(),
+                    to: ctx.accounts.seller_payment_account.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            seller_amount,
+        )?;
+        // USDC: buyer → treasury (platform fee)
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.buyer_payment_account.to_account_info(),
+                    to: ctx.accounts.treasury_payment_account.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            platform_fee,
+        )?;
+        if creator_royalty > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.buyer_payment_account.to_account_info(),
+                        to: ctx.accounts.creator_payment_account.to_account_info(),
+                        authority: ctx.accounts.buyer.to_account_info(),
+                    },
+                ),
+                creator_royalty,
+            )?;
+        }
+
+        // Transfer the Core asset (signed by the program's delegate PDA)
+        let asset_key = ctx.accounts.asset.key();
+        let core_authority_bump = ctx.bumps.core_authority;
+        let core_authority_seeds: &[&[u8]] = &[
+            b"core_authority",
+            asset_key.as_ref(),
+            &[core_authority_bump],
+        ];
+
+        mpl_core::instructions::TransferV1Cpi {
+            __program: &ctx.accounts.mpl_core_program.to_account_info(),
+            asset: &ctx.accounts.asset.to_account_info(),
+            collection: Some(&ctx.accounts.collection.to_account_info()),
+            payer: &ctx.accounts.buyer.to_account_info(),
+            authority: Some(&ctx.accounts.core_authority.to_account_info()),
+            new_owner: &ctx.accounts.buyer.to_account_info(),
+            system_program: Some(&ctx.accounts.system_program.to_account_info()),
+            log_wrapper: None,
+            __args: mpl_core::instructions::TransferV1InstructionArgs {
+                compression_proof: None,
+            },
+        }
+        .invoke_signed(&[core_authority_seeds])?;
+
+        emit!(CorePurchased {
+            asset: listing.asset,
+            seller: listing.seller,
+            buyer: ctx.accounts.buyer.key(),
+            price_usdc: listing.price,
+            platform_fee,
+            creator_royalty,
+        });
+        // CoreListing PDA closed via `close = seller` constraint.
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -1309,8 +1588,9 @@ fn validate_category_and_payment(category: &ItemCategory, payment_mint: Pubkey) 
         | ItemCategory::TCGCards
         | ItemCategory::SportsCards
         | ItemCategory::Watches => {
+            // USDC-only — USD1 removed per Artifacte v2 workflow.
             require!(
-                payment_str == USD1_MINT || payment_str == USDC_MINT,
+                payment_str == USDC_MINT,
                 AuctionError::InvalidPaymentMint
             );
         }
@@ -1932,4 +2212,248 @@ pub enum AuctionError {
     InvalidTokenProgram,
     #[msg("Invalid royalty basis points — must be 0 or >= 100 (1%)")]
     InvalidRoyaltyBps,
+}
+
+// ============================================================================
+// Metaplex Core (Artifacte v2) — accounts, state, events, helpers, errors
+// ============================================================================
+
+#[derive(Accounts)]
+pub struct ListCoreItem<'info> {
+    /// Owner-signed (must equal OWNER_WALLET — checked in handler).
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    /// CHECK: Metaplex Core asset. Validated in handler against owner + collection.
+    #[account(mut)]
+    pub asset: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core collection. Pubkey validated against ARTIFACTE_COLLECTION_ID in handler.
+    #[account(mut)]
+    pub collection: UncheckedAccount<'info>,
+
+    /// USDC mint (validated in handler).
+    pub payment_mint: Account<'info, anchor_spl::token::Mint>,
+
+    /// CoreListing PDA — created on list, closed on cancel/buy.
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + CoreListing::INIT_SPACE,
+        seeds = [b"core_listing", asset.key().as_ref()],
+        bump,
+    )]
+    pub core_listing: Account<'info, CoreListing>,
+
+    /// CHECK: Program-controlled PDA that becomes the TransferDelegate authority.
+    #[account(
+        seeds = [b"core_authority", asset.key().as_ref()],
+        bump,
+    )]
+    pub core_authority: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core program.
+    #[account(address = mpl_core::ID)]
+    pub mpl_core_program: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelCoreListing<'info> {
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    /// CHECK: Metaplex Core asset.
+    #[account(mut, address = core_listing.asset)]
+    pub asset: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core collection.
+    #[account(mut, address = core_listing.collection)]
+    pub collection: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"core_listing", asset.key().as_ref()],
+        bump = core_listing.bump,
+        close = seller,
+    )]
+    pub core_listing: Account<'info, CoreListing>,
+
+    /// CHECK: Program-controlled PDA = TransferDelegate authority.
+    #[account(
+        seeds = [b"core_authority", asset.key().as_ref()],
+        bump,
+    )]
+    pub core_authority: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core program.
+    #[account(address = mpl_core::ID)]
+    pub mpl_core_program: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct BuyNowCore<'info> {
+    /// Public buyer.
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    /// CHECK: Metaplex Core asset.
+    #[account(mut, address = core_listing.asset)]
+    pub asset: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core collection.
+    #[account(mut, address = core_listing.collection)]
+    pub collection: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"core_listing", asset.key().as_ref()],
+        bump = core_listing.bump,
+        close = seller,
+    )]
+    pub core_listing: Account<'info, CoreListing>,
+
+    /// CHECK: Original seller — receives PDA rent on close.
+    #[account(mut, address = core_listing.seller)]
+    pub seller: UncheckedAccount<'info>,
+
+    /// CHECK: Program-controlled PDA = TransferDelegate authority (signs CPI).
+    #[account(
+        seeds = [b"core_authority", asset.key().as_ref()],
+        bump,
+    )]
+    pub core_authority: UncheckedAccount<'info>,
+
+    /// USDC mint (validated in handler).
+    pub payment_mint: Account<'info, anchor_spl::token::Mint>,
+
+    #[account(mut)]
+    pub buyer_payment_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub seller_payment_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub treasury_payment_account: Account<'info, TokenAccount>,
+    /// CHECK: Royalty creator's payment account — validated against on-chain plugin in handler.
+    #[account(mut)]
+    pub creator_payment_account: UncheckedAccount<'info>,
+
+    /// CHECK: Treasury wallet — validated in handler against treasury_config or fallback.
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
+
+    #[account(seeds = [b"treasury_config"], bump)]
+    pub treasury_config: Option<Account<'info, TreasuryConfig>>,
+
+    /// CHECK: Metaplex Core program.
+    #[account(address = mpl_core::ID)]
+    pub mpl_core_program: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CoreListing {
+    pub seller: Pubkey,
+    pub asset: Pubkey,
+    pub collection: Pubkey,
+    pub payment_mint: Pubkey,
+    pub price: u64,
+    pub created_at: i64,
+    pub bump: u8,
+}
+
+#[event]
+pub struct CoreListingCreated {
+    pub asset: Pubkey,
+    pub seller: Pubkey,
+    pub price_usdc: u64,
+    pub payment_mint: Pubkey,
+}
+
+#[event]
+pub struct CoreListingCancelled {
+    pub asset: Pubkey,
+    pub seller: Pubkey,
+}
+
+#[event]
+pub struct CorePurchased {
+    pub asset: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub price_usdc: u64,
+    pub platform_fee: u64,
+    pub creator_royalty: u64,
+}
+
+/// Verify that a Metaplex Core asset is owned by `expected_owner` and belongs
+/// to `expected_collection`. Reads the BaseAssetV1 header directly from the
+/// account data.
+fn verify_core_asset_ownership(
+    asset_account: &AccountInfo,
+    expected_owner: Pubkey,
+    expected_collection: Pubkey,
+) -> Result<()> {
+    require_keys_eq!(*asset_account.owner, mpl_core::ID, AuctionError::Unauthorized);
+    let data = asset_account.try_borrow_data()?;
+    let asset = mpl_core::accounts::BaseAssetV1::from_bytes(&data)
+        .map_err(|_| error!(AuctionError::Unauthorized))?;
+    require_keys_eq!(asset.owner, expected_owner, AuctionError::Unauthorized);
+    match asset.update_authority {
+        mpl_core::types::UpdateAuthority::Collection(c) => {
+            require_keys_eq!(c, expected_collection, AuctionError::Unauthorized);
+        }
+        _ => return err!(AuctionError::Unauthorized),
+    }
+    Ok(())
+}
+
+/// Read the Royalties plugin from a Metaplex Core asset (or fall back to the
+/// collection if absent). Returns `(basis_points, royalty_creator)`.
+///
+/// The royalty creator is the first creator listed in the plugin (matching the
+/// Artifacte mint flow which sets a single creator at 100%). Returns
+/// `(0, default_pubkey)` if no Royalties plugin exists at all (no royalty owed).
+fn read_core_royalties(
+    asset_account: &AccountInfo,
+    collection_account: &AccountInfo,
+) -> Result<(u16, Pubkey)> {
+    use mpl_core::{
+        accounts::{BaseAssetV1, BaseCollectionV1},
+        fetch_plugin,
+        types::{Plugin, PluginType},
+    };
+
+    if let Ok((_auth, plugin, _offset)) =
+        fetch_plugin::<BaseAssetV1, Plugin>(asset_account, PluginType::Royalties)
+    {
+        if let Plugin::Royalties(r) = plugin {
+            let creator = r
+                .creators
+                .first()
+                .map(|c| c.address)
+                .unwrap_or_default();
+            return Ok((r.basis_points, creator));
+        }
+    }
+
+    if let Ok((_auth, plugin, _offset)) =
+        fetch_plugin::<BaseCollectionV1, Plugin>(collection_account, PluginType::Royalties)
+    {
+        if let Plugin::Royalties(r) = plugin {
+            let creator = r
+                .creators
+                .first()
+                .map(|c| c.address)
+                .unwrap_or_default();
+            return Ok((r.basis_points, creator));
+        }
+    }
+
+    Ok((0u16, Pubkey::default()))
 }

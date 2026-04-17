@@ -5,7 +5,7 @@ import { IDL } from "./auction-idl";
 
 // Program IDs and constants
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-const TREASURY_WALLET = new PublicKey("6drXw31FjHch4ixXa4ngTyUD2cySUs3mpcB2YYGA9g7P");
+const TREASURY_WALLET = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
 
 // Treasury config PDA — initialized on-chain, allows treasury rotation
 const [TREASURY_CONFIG_PDA] = PublicKey.findProgramAddressSync(
