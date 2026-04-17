@@ -10,3 +10,7 @@ sync-engine/node_modules
 .agents
 .claude
 skills-lock.json
+
+# anchor
+
+.anchor

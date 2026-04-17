@@ -26,7 +26,7 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import { Program, BN } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import {
   PublicKey,
   Keypair,
@@ -34,11 +34,7 @@ import {
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
-  TOKEN_PROGRAM_ID,
   createMint,
-  createAssociatedTokenAccount,
-  mintTo,
-  getAccount,
 } from "@solana/spl-token";
 import { expect } from "chai";
 
@@ -78,7 +74,12 @@ describe("auction — Metaplex Core listings", () => {
   // Anchor will spin up a local validator for `anchor test`.
   anchor.setProvider(anchor.AnchorProvider.env());
   const provider = anchor.AnchorProvider.env();
-  const program = anchor.workspace.Auction as Program<any>;
+  // Cast to `any` to bypass Anchor 0.31's deeply nested generic inference
+  // for `.methods.<ix>(...).accounts({...})`. Runtime behavior is unchanged.
+  const program = anchor.workspace.Auction as unknown as {
+    programId: PublicKey;
+    methods: any;
+  };
   const programId = program.programId;
 
   // Owner of the program / Artifacte authority. In real life this is
