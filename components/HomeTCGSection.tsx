@@ -7,6 +7,10 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { showToast } from "@/components/ToastContainer";
 import { resolveListingDisplayPrice } from "@/lib/data";
+import {
+  calculateExternalMarketplaceFee,
+  shouldApplyExternalMarketplaceFee,
+} from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -48,6 +52,24 @@ function getCardHref(listing: MEListing): string {
   }
 
   return `/auctions/cards/${listing.id}`;
+}
+
+function isInAppExternalCardListing(listing: MEListing): boolean {
+  return listing.source === "collector-crypt" || listing.source === "phygitals";
+}
+
+function formatFeeDisplay(amount: number, currency: string): string {
+  if (currency === "SOL") {
+    return `◎ ${amount.toLocaleString(undefined, {
+      minimumFractionDigits: amount < 1 ? 2 : 0,
+      maximumFractionDigits: 4,
+    })}`;
+  }
+
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function TCGCarousel({
@@ -99,7 +121,11 @@ function TCGCarousel({
                   : displayPrice.amount.toLocaleString();
                 const secondaryAmount = displayPrice.secondaryAmount?.toLocaleString(undefined, { maximumFractionDigits: 4 });
                 const cardHref = getCardHref(listing);
-                const canBuyHere = showBuyButton && (listing.source === "collector-crypt" || listing.source === "phygitals") && Boolean(listing.nftAddress);
+                const canBuyHere = showBuyButton && isInAppExternalCardListing(listing) && Boolean(listing.nftAddress);
+                const showExternalFeeNote = canBuyHere && shouldApplyExternalMarketplaceFee({ source: listing.source });
+                const externalFee = showExternalFeeNote
+                  ? calculateExternalMarketplaceFee(displayPrice.amount)
+                  : 0;
                 const isPurchased = Boolean(purchasedIds?.[listing.id]);
 
                 return (
@@ -130,6 +156,11 @@ function TCGCarousel({
                             <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
                             {displayPrice.secondaryCurrency === "SOL" && secondaryAmount && (
                               <p className="text-gray-500 text-xs mt-1">◎ {secondaryAmount} SOL</p>
+                            )}
+                            {showExternalFeeNote && (
+                              <p className="text-amber-300 text-xs mt-2">
+                                + {formatFeeDisplay(externalFee, displayPrice.currency)} Artifacte fee at checkout
+                              </p>
                             )}
                           </div>
                         </div>
@@ -214,7 +245,8 @@ export function HomeTCGSection() {
           signTransaction,
           showToast.info,
           sendTransaction ?? undefined,
-          wallet?.adapter?.name
+          wallet?.adapter?.name,
+          { source: listing.source }
         );
 
         if (result.confirmed) {
@@ -232,7 +264,11 @@ export function HomeTCGSection() {
       const buildRes = await fetch("/api/me-buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+        body: JSON.stringify({
+          mint: mintAddr,
+          buyer: publicKey.toBase58(),
+          source: listing.source,
+        }),
       });
 
       if (!buildRes.ok) {
@@ -240,11 +276,21 @@ export function HomeTCGSection() {
         throw new Error(errData.error || "Failed to build transaction");
       }
 
-      const { v0Tx, v0TxSigned, legacyTx, price: mePrice } = await buildRes.json();
+      const {
+        v0Tx,
+        v0TxSigned,
+        legacyTx,
+        price: mePrice,
+        platformFee,
+        platformFeeCurrency,
+      } = await buildRes.json();
 
       if (!signTransaction) throw new Error("Wallet does not support signing");
 
-      showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+      const feeDisplay = platformFee
+        ? ` + ${platformFee.toFixed(platformFeeCurrency === "SOL" ? 4 : 2)} ${platformFeeCurrency} fee`
+        : "";
+      showToast.info(`💳 Confirm purchase — ${mePrice} SOL${feeDisplay}`);
 
       const { Transaction, VersionedTransaction } = await import("@solana/web3.js");
 
@@ -387,6 +433,11 @@ export function HomeTCGSection() {
 
   return (
     <>
+      <section className="px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="max-w-7xl mx-auto rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+          External NFT purchases made through Artifacte include a 2% fee. Artifacte collection items are exempt.
+        </div>
+      </section>
       <TCGCarousel
         title="One Piece TCG"
         emoji="🏴‍☠️"

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { isArtifacteExternalFeeExempt } from "@/lib/external-purchase-fees";
 
 type MarketplaceSource = "magiceden" | "tensor";
 
@@ -134,6 +135,10 @@ export default function CollectionPage() {
   const [sortOpen, setSortOpen] = useState(false);
 
   const walletAddress = publicKey?.toBase58();
+  const collectionIsFeeExempt = isArtifacteExternalFeeExempt({
+    collectionAddress,
+    collectionName: collection?.name,
+  });
   const hasMarketplaceConfig = Boolean(
     collection?.marketplaces?.magicEden?.symbol || collection?.marketplaces?.tensor?.slug || collection?.collectionAddress
   );
@@ -619,6 +624,11 @@ export default function CollectionPage() {
               <p className="text-gray-400 text-sm mt-1">
                 Curated external listings from Tensor and Magic Eden for this
                 collection.
+              </p>
+              <p className="text-amber-200/90 text-sm mt-2">
+                {collectionIsFeeExempt
+                  ? "Artifacte collection items are exempt from the 2% external purchase fee."
+                  : "External NFT purchases made through Artifacte include a 2% Artifacte fee."}
               </p>
             </div>
             {hasMarketplaceConfig && !loadingMarketplace && !marketplaceError && (

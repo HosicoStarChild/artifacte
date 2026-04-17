@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  calculateExternalMarketplaceFeeAmount,
+  shouldApplyExternalMarketplaceFee,
+  EXTERNAL_MARKETPLACE_FEE_WALLET,
+} from '@/lib/external-purchase-fees';
 
 /**
  * Artifacte ME Proxy Buy API
@@ -21,7 +26,6 @@ if (!ME_API_KEY) {
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const ME_BATCH_BASE = 'https://api-mainnet.magiceden.us/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
-const TREASURY_WALLET = '82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Rate limit exceeded. Try again in a minute.' }, { status: 429 });
     }
 
-    const { mint, buyer } = await req.json();
+    const { mint, buyer, source, collectionAddress, collectionName } = await req.json();
     if (!mint || !buyer) {
       return NextResponse.json({ error: 'Missing mint or buyer' }, { status: 400 });
     }
@@ -76,10 +80,11 @@ export async function POST(req: NextRequest) {
     const auctionHouse = listing.auctionHouse;
     const listingSource = listing.listingSource;
     const isM3 = !auctionHouse || listingSource === 'M3';
+    let heliusAsset: any = null;
 
-    // 1b. Verify NFT is still available (skip for M3 — pool handles availability)
+    // 1b. Load asset metadata for ownership validation and Artifacte fee exemption.
     const HELIUS_KEY = process.env.HELIUS_API_KEY;
-    if (HELIUS_KEY && !isM3) {
+    if (HELIUS_KEY) {
       try {
         const assetRes = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`, {
           method: 'POST',
@@ -91,23 +96,33 @@ export async function POST(req: NextRequest) {
           }),
         });
         const assetData = await assetRes.json();
-        const currentOwner = assetData?.result?.ownership?.owner;
-        // For M3/MMM listings, NFT is held in ME's escrow PDA (2aSJBUGp...)
-        const ME_CNFT_ESCROW = '2aSJBUGpWWUZty3dafov1Z8Edw3YPA6Z1e2X3aqXu27i';
-        const ME_M2_ESCROW = '1BWutmTvYPwDtmw9abTkS4Ssr8no61spGAvW1X6NDix';
-        if (currentOwner && currentOwner !== seller && currentOwner !== ME_CNFT_ESCROW && currentOwner !== ME_M2_ESCROW) {
-          console.log('[me-buy] Ownership mismatch:', { currentOwner, seller, mint, isM3 });
-          return NextResponse.json({ 
-            error: 'This listing is no longer available — the NFT has already been sold.' 
-          }, { status: 410 });
+        heliusAsset = assetData?.result || null;
+
+        if (!isM3) {
+          const currentOwner = assetData?.result?.ownership?.owner;
+          // For M3/MMM listings, NFT is held in ME's escrow PDA (2aSJBUGp...)
+          const ME_CNFT_ESCROW = '2aSJBUGpWWUZty3dafov1Z8Edw3YPA6Z1e2X3aqXu27i';
+          const ME_M2_ESCROW = '1BWutmTvYPwDtmw9abTkS4Ssr8no61spGAvW1X6NDix';
+          if (currentOwner && currentOwner !== seller && currentOwner !== ME_CNFT_ESCROW && currentOwner !== ME_M2_ESCROW) {
+            console.log('[me-buy] Ownership mismatch:', { currentOwner, seller, mint, isM3 });
+            return NextResponse.json({ 
+              error: 'This listing is no longer available — the NFT has already been sold.' 
+            }, { status: 410 });
+          }
         }
       } catch (e) {
         console.warn('[me-buy] Ownership check failed, proceeding:', e);
       }
     }
 
+    const feeApplied = shouldApplyExternalMarketplaceFee({
+      source,
+      collectionAddress,
+      collectionName,
+      asset: heliusAsset,
+    });
+
     let buyData: any;
-    const platformFeeBps = 200; // 2%
 
     if (isM3) {
       // Uses the batch endpoint on api-mainnet.magiceden.us
@@ -169,16 +184,40 @@ export async function POST(req: NextRequest) {
       buyData = await buyRes.json();
     }
 
-    // ── Inject 2% platform fee (SOL transfer from buyer to treasury) ──
-    const { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } = await import('@solana/web3.js');
+    const originalV0Base64 = buyData.v0?.tx?.data
+      ? Buffer.from(buyData.v0.tx.data).toString('base64')
+      : null;
+    const originalLegacyBase64 = buyData.tx?.data
+      ? Buffer.from(buyData.tx.data).toString('base64')
+      : null;
+
+    if (!feeApplied) {
+      return NextResponse.json({
+        v0Tx: originalV0Base64,
+        v0TxSigned: null,
+        legacyTx: originalLegacyBase64,
+        blockhash: buyData.blockhashData?.blockhash,
+        lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
+        price,
+        platformFee: 0,
+        platformFeeCurrency: 'SOL',
+        feeApplied: false,
+        seller,
+        mint,
+        listingSource: isM3 ? 'M3' : 'M2',
+        auctionHouse: auctionHouse || null,
+      });
+    }
+
+    // ── Inject 2% platform fee (SOL transfer from buyer to the fee wallet) ──
+    const { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, Transaction } = await import('@solana/web3.js');
     const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
     const connection = new Connection(HELIUS_RPC, 'confirmed');
 
-    // Calculate 2% fee in lamports (price is in SOL)
-    const platformFeeLamports = Math.ceil(price * 1e9 * platformFeeBps / 10000);
+    const platformFeeLamports = calculateExternalMarketplaceFeeAmount(Math.ceil(price * 1e9));
     const platformFee = platformFeeLamports / 1e9;
     const buyerPk = new PublicKey(buyer);
-    const treasuryPk = new PublicKey(TREASURY_WALLET);
+    const treasuryPk = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
 
     const feeIx = SystemProgram.transfer({
       fromPubkey: buyerPk,
@@ -188,7 +227,8 @@ export async function POST(req: NextRequest) {
 
     // Decompile the unsigned v0 transaction, append fee instruction, recompile
     const rawV0 = buyData.v0?.tx?.data;
-    let modifiedV0Base64: string | null = null;
+    let modifiedV0Base64: string | null = originalV0Base64;
+    let modifiedLegacyBase64: string | null = originalLegacyBase64;
 
     if (rawV0) {
       try {
@@ -217,21 +257,37 @@ export async function POST(req: NextRequest) {
 
         console.log(`[me-buy] Injected 2% platform fee: ${platformFee} SOL (${platformFeeLamports} lamports)`);
       } catch (feeErr: any) {
-        console.error('[me-buy] Failed to inject platform fee, falling back to unmodified tx:', feeErr.message);
-        // Fall back to original transaction without fee
-        modifiedV0Base64 = Buffer.from(rawV0).toString('base64');
+        console.error('[me-buy] Failed to inject platform fee:', feeErr.message);
+        return NextResponse.json({ error: 'Failed to apply Artifacte fee to transaction' }, { status: 500 });
       }
+    } else if (buyData.tx?.data) {
+      try {
+        const txBytes = typeof buyData.tx.data === 'string'
+          ? Buffer.from(buyData.tx.data, 'base64')
+          : Uint8Array.from(buyData.tx.data);
+        const legacyTx = Transaction.from(txBytes);
+        legacyTx.add(feeIx);
+        modifiedLegacyBase64 = Buffer.from(
+          legacyTx.serialize({ requireAllSignatures: false })
+        ).toString('base64');
+      } catch (feeErr: any) {
+        console.error('[me-buy] Failed to inject platform fee:', feeErr.message);
+        return NextResponse.json({ error: 'Failed to apply Artifacte fee to transaction' }, { status: 500 });
+      }
+    } else {
+      return NextResponse.json({ error: 'No transaction returned from marketplace' }, { status: 502 });
     }
 
-    // 3. Return modified tx (v0TxSigned is invalidated by modification, so we use the unsigned modified tx)
     return NextResponse.json({
-      v0Tx: modifiedV0Base64 || (buyData.v0?.tx?.data ? Buffer.from(buyData.v0.tx.data).toString('base64') : null),
-      v0TxSigned: null, // Notary cosign is invalidated by fee injection
-      legacyTx: buyData.tx?.data ? Buffer.from(buyData.tx.data).toString('base64') : null,
+      v0Tx: modifiedV0Base64,
+      v0TxSigned: null,
+      legacyTx: modifiedLegacyBase64,
       blockhash: buyData.blockhashData?.blockhash,
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
       price,
       platformFee,
+      platformFeeCurrency: 'SOL',
+      feeApplied: true,
       seller,
       mint,
       listingSource: isM3 ? 'M3' : 'M2',

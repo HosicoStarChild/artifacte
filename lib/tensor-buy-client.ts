@@ -8,6 +8,12 @@
 
 import { VersionedTransaction, Connection } from '@solana/web3.js';
 
+interface TensorBuyFeeContext {
+  collectionAddress?: string;
+  collectionName?: string;
+  source?: string;
+}
+
 interface TensorBuyResult {
   sig: string;
   price: number;
@@ -55,12 +61,13 @@ export async function executeTensorBuy(
   onStatus?: (msg: string) => void,
   sendTransaction?: (tx: any, connection: Connection, options?: any) => Promise<string>,
   walletName?: string,
+  feeContext?: TensorBuyFeeContext,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mint, buyer }),
+    body: JSON.stringify({ mint, buyer, ...feeContext }),
   });
 
   if (!tensorRes.ok) {

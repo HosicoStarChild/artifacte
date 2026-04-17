@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, Transaction } from "@solana/web3.js";
 import { getCuratedMarketplaceListing } from "@/app/lib/digital-art-marketplaces";
+import {
+  EXTERNAL_MARKETPLACE_FEE_WALLET,
+  calculateExternalMarketplaceFeeAmount,
+  shouldApplyExternalMarketplaceFee,
+} from "@/lib/external-purchase-fees";
 
 const TENSOR_API_KEY = process.env.TENSOR_API_KEY;
 const TENSOR_API_BASE = "https://api.mainnet.tensordev.io/api/v1";
 const HELIUS_RPC = process.env.HELIUS_API_KEY
   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   : "https://api.mainnet-beta.solana.com";
-const TREASURY_WALLET = '82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6';
-const PLATFORM_FEE_BPS = 200; // 2%
 
 const rateMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 10;
@@ -131,11 +134,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const feeApplied = shouldApplyExternalMarketplaceFee({
+      collectionAddress: listing.collectionAddress,
+      collectionName: listing.collectionName,
+      source: listing.source,
+    });
+
+    if (!feeApplied) {
+      return NextResponse.json({
+        ok: true,
+        mint: listing.mint,
+        seller: listing.seller,
+        price: listing.price,
+        platformFee: 0,
+        platformFeeCurrency: "SOL",
+        feeApplied: false,
+        priceRaw: listing.priceRaw,
+        currencySymbol: listing.currencySymbol,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        txs: txs.map((tx: any) => ({
+          txV0: toBase64(tx?.txV0?.data || tx?.txV0),
+          tx: toBase64(tx?.tx?.data || tx?.tx),
+        })),
+      });
+    }
+
     // ── Inject 2% platform fee into the first transaction ──
-    const platformFeeLamports = Math.ceil(listing.priceRaw * PLATFORM_FEE_BPS / 10000);
+    const platformFeeLamports = calculateExternalMarketplaceFeeAmount(listing.priceRaw);
     const platformFee = platformFeeLamports / 1e9;
     const buyerPk = new PublicKey(buyer);
-    const treasuryPk = new PublicKey(TREASURY_WALLET);
+    const treasuryPk = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
 
     const feeIx = SystemProgram.transfer({
       fromPubkey: buyerPk,
@@ -196,11 +225,11 @@ export async function POST(req: NextRequest) {
           }
           console.log(`[tensor-buy-standard] Injected 2% platform fee: ${platformFee} SOL (${platformFeeLamports} lamports)`);
         } catch (feeErr: any) {
-          console.error('[tensor-buy-standard] Failed to inject fee, using original tx:', feeErr.message);
-          modifiedTxs.push({
-            txV0: toBase64(txV0Data),
-            tx: toBase64(txData),
-          });
+          console.error('[tensor-buy-standard] Failed to inject fee:', feeErr.message);
+          return NextResponse.json(
+            { error: 'Failed to apply Artifacte fee to transaction' },
+            { status: 500 }
+          );
         }
       } else {
         // Pass through subsequent transactions unmodified
@@ -217,6 +246,8 @@ export async function POST(req: NextRequest) {
       seller: listing.seller,
       price: listing.price,
       platformFee,
+      platformFeeCurrency: "SOL",
+      feeApplied: true,
       priceRaw: listing.priceRaw,
       currencySymbol: listing.currencySymbol,
       blockhash: latestBlockhash.blockhash,

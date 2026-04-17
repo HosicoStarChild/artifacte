@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
+import {
+  EXTERNAL_MARKETPLACE_FEE_WALLET,
+  calculateExternalMarketplaceFeeAmount,
+  shouldApplyExternalMarketplaceFee,
+} from '@/lib/external-purchase-fees';
 
 export async function POST(request: Request) {
   try {
-    const { mint, buyer } = await request.json();
+    const { mint, buyer, source, collectionAddress, collectionName } = await request.json();
     if (!mint || !buyer) return NextResponse.json({ error: 'Missing mint or buyer' }, { status: 400 });
 
     const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
@@ -26,6 +31,31 @@ export async function POST(request: Request) {
     const cnftArgs = await getCNFTArgs(rpc, mint, assetFields, proofFields);
     const [listStatePda] = await findListStatePda({ mint: address(mint) });
     const listState = await fetchListState(rpc, listStatePda);
+    let heliusAsset: any = null;
+
+    try {
+      const assetResponse = await fetch(HELIUS_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getAsset',
+          params: { id: mint },
+        }),
+      });
+      const assetPayload = await assetResponse.json();
+      heliusAsset = assetPayload?.result || null;
+    } catch (error) {
+      console.warn('[tensor-buy] Failed to load Helius asset for fee context:', error);
+    }
+
+    const feeApplied = shouldApplyExternalMarketplaceFee({
+      source,
+      collectionAddress,
+      collectionName,
+      asset: heliusAsset,
+    });
 
     const makerBroker = listState.data.makerBroker?.__option === 'Some'
       ? listState.data.makerBroker.value : undefined;
@@ -45,7 +75,7 @@ export async function POST(request: Request) {
       rentDestination: rentDest,
       currency: address(USDC_MINT),
       makerBroker,
-      takerBroker: address('82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6'),
+      takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) : undefined,
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
@@ -138,33 +168,39 @@ export async function POST(request: Request) {
     const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
 
-    // 2% platform fee in USDC (charged to buyer, sent to treasury)
-    const TREASURY = new PublicKey('82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6');
+    // 2% platform fee in USDC (charged to buyer, sent to the fee wallet)
+    const TREASURY = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
     const usdcMintPk = new PublicKey(USDC_MINT);
     const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
-    const platformFeeUsdc = Math.ceil(Number(listState.data.amount) * 0.02); // 2% in USDC micro-units
+    const platformFeeUsdc = feeApplied
+      ? calculateExternalMarketplaceFeeAmount(Number(listState.data.amount))
+      : 0;
     const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
     const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, TREASURY);
 
-    // Create treasury USDC ATA if it doesn't exist
     const preIxs: InstanceType<typeof TransactionInstruction>[] = [];
-    const treasuryAtaInfo = await conn.getAccountInfo(treasuryUsdcAta);
-    if (!treasuryAtaInfo) {
+    const feeIxs: InstanceType<typeof TransactionInstruction>[] = [];
+    const treasuryAtaInfo = feeApplied ? await conn.getAccountInfo(treasuryUsdcAta) : null;
+    if (feeApplied && !treasuryAtaInfo) {
       preIxs.push(createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, TREASURY, usdcMintPk));
     }
 
-    const feeIx = createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeUsdc);
+    if (feeApplied && platformFeeUsdc > 0) {
+      feeIxs.push(
+        createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeUsdc)
+      );
+    }
 
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [...preIxs, cuIx, v1Ix, feeIx],
+      instructions: [cuIx, ...preIxs, v1Ix, ...feeIxs],
     }).compileToV0Message(alts);
 
     const tx = new VersionedTransaction(msg);
     const size = tx.serialize().length;
     const platformFeeUsdc$ = platformFeeUsdc / 1e6;
-    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: $${platformFeeUsdc$.toFixed(4)} USDC)`);
+    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: $${platformFeeUsdc$.toFixed(4)} USDC, feeApplied: ${feeApplied})`);
 
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
@@ -173,6 +209,7 @@ export async function POST(request: Request) {
       price,
       platformFee: platformFeeUsdc$,
       platformFeeCurrency: 'USDC',
+      feeApplied,
       currency: 'USDC',
       seller: String(listState.data.owner),
       mint,

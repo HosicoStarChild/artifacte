@@ -9,14 +9,15 @@ import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solan
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
+import {
+  calculateExternalMarketplaceFee,
+  shouldApplyExternalMarketplaceFee,
+} from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
   { ssr: false }
 );
-
-// Fee collection happens on our auction program listings only (2% on-chain)
-// CC card buys pass through to ME with no separate fee
 
 const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -127,6 +128,20 @@ async function fetchAuctionListing(conn: Connection, mint: string): Promise<Auct
   } catch {
     return null;
   }
+}
+
+function formatFeeDisplay(amount: number, currency: string): string {
+  if (currency === 'SOL') {
+    return `◎ ${amount.toLocaleString(undefined, {
+      minimumFractionDigits: amount < 1 ? 2 : 0,
+      maximumFractionDigits: 4,
+    })}`;
+  }
+
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 export default function CardDetailPage() {
@@ -432,7 +447,18 @@ export default function CardDetailPage() {
       if (isTensorBuy) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-        const result = await executeTensorBuy(card.nftAddress, publicKey.toBase58(), signTransaction, showToast.info, sendTransaction ?? undefined, wallet?.adapter?.name);
+        const result = await executeTensorBuy(
+          card.nftAddress,
+          publicKey.toBase58(),
+          signTransaction,
+          showToast.info,
+          sendTransaction ?? undefined,
+          wallet?.adapter?.name,
+          {
+            source: card.source,
+            collectionName: card.collection,
+          }
+        );
         if (result.confirmed) {
           showToast.success(`✅ Card purchased for ${result.price} USDC!`);
         } else {
@@ -450,6 +476,8 @@ export default function CardDetailPage() {
         body: JSON.stringify({
           mint: card.nftAddress,
           buyer: publicKey.toBase58(),
+          source: card.source,
+          collectionName: card.collection,
         }),
       });
 
@@ -459,7 +487,15 @@ export default function CardDetailPage() {
         throw new Error(`Buy failed: ${buildRes.status}`);
       }
 
-      const { v0Tx, v0TxSigned, price, platformFee, blockhash, lastValidBlockHeight, listingSource } = await buildRes.json();
+      const {
+        v0Tx,
+        v0TxSigned,
+        price,
+        platformFee,
+        platformFeeCurrency,
+        blockhash,
+        lastValidBlockHeight,
+      } = await buildRes.json();
       
       if (!v0Tx && !v0TxSigned) throw new Error("No transaction returned from API");
       
@@ -467,7 +503,9 @@ export default function CardDetailPage() {
         throw new Error("Wallet does not support signing");
       }
 
-      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} SOL fee` : '';
+      const feeDisplay = platformFee
+        ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
+        : '';
       showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
       
       const txBase64 = v0TxSigned || v0Tx;
@@ -679,6 +717,22 @@ export default function CardDetailPage() {
   const primaryCurrency = showSolTransactionPrice ? 'SOL' : (card.usdcPrice || card.currency === 'USDC' ? 'USDC' : card.currency);
   const buyPrice = showSolTransactionPrice ? card.solPrice : card.price;
   const buyCurrency = showSolTransactionPrice ? 'SOL' : card.currency;
+  const isExternalMarketplaceCard = !card.auctionListing && (
+    card.source === 'collector-crypt'
+    || card.source === 'phygitals'
+    || card.buyKind === 'tensorCompressed'
+    || card.buyKind === 'tensorStandard'
+  );
+  const showExternalFeeNote = isExternalMarketplaceCard && shouldApplyExternalMarketplaceFee({
+    source: card.source,
+    collectionName: card.collection,
+  });
+  const externalFee = showExternalFeeNote ? calculateExternalMarketplaceFee(buyPrice) : 0;
+  const marketplaceLabel = card.auctionListing
+    ? 'Listed on Artifacte'
+    : (card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard')
+      ? 'Powered by Tensor'
+      : 'Powered by Magic Eden';
 
   return (
     <div className="pt-24 pb-20 min-h-screen">
@@ -756,6 +810,11 @@ export default function CardDetailPage() {
                     )}
                     {!card.auctionListing && primaryCurrency !== 'SOL' && card.solPrice > 0 && (
                       <p className="text-gray-400 text-sm mt-1 mb-4">◎ {card.solPrice.toLocaleString()} SOL</p>
+                    )}
+                    {showExternalFeeNote && (
+                      <p className="text-amber-300 text-sm mt-2 mb-4">
+                        + {formatFeeDisplay(externalFee, buyCurrency)} Artifacte fee at checkout
+                      </p>
                     )}
                   </>
                 ) : (
@@ -841,7 +900,7 @@ export default function CardDetailPage() {
                 ) : (
                   <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
                 )}
-                {card.price && <p className="text-gray-600 text-xs mt-2">{card.auctionListing ? 'Listed on Artifacte' : 'Powered by Magic Eden'}</p>}
+                {card.price && <p className="text-gray-600 text-xs mt-2">{marketplaceLabel}</p>}
               </div>
             )}
 
@@ -1116,6 +1175,12 @@ function ArtifactePriceSection({ card }: { card: any }) {
         {card.grade && <span className="bg-dark-700 px-2 py-1 rounded">{card.grade}</span>}
         <span className="bg-dark-700 px-2 py-1 rounded">Artifacte Collection</span>
       </div>
+
+      {card.price && !card.auctionListing && (
+        <p className="text-emerald-300 text-sm">
+          Artifacte collection items do not incur the 2% external Artifacte fee.
+        </p>
+      )}
     </div>
   );
 }

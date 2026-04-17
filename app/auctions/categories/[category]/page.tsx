@@ -14,6 +14,10 @@ import Link from "next/link";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { AuctionProgram } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
+import {
+  calculateExternalMarketplaceFee,
+  shouldApplyExternalMarketplaceFee,
+} from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -36,6 +40,24 @@ const categoryEmojis: Record<string, string> = {
   "sealed": "📦",
   "merchandise": "🛍️",
 };
+
+function isInAppExternalCardListing(listing: any): boolean {
+  return listing?.source === "collector-crypt" || listing?.source === "phygitals";
+}
+
+function formatFeeDisplay(amount: number, currency: string): string {
+  if (currency === "SOL") {
+    return `◎ ${amount.toLocaleString(undefined, {
+      minimumFractionDigits: amount < 1 ? 2 : 0,
+      maximumFractionDigits: 4,
+    })}`;
+  }
+
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export default function CategoryAuctionsPage() {
   const params = useParams();
@@ -239,7 +261,15 @@ export default function CategoryAuctionsPage() {
         if (listing?.source === 'phygitals' || listingId.startsWith('phyg-')) {
           if (!signTransaction) throw new Error("Wallet does not support signing");
           const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-          const result = await executeTensorBuy(mintAddr, publicKey.toBase58(), signTransaction, showToast.info, sendTransaction ?? undefined, wallet?.adapter?.name);
+          const result = await executeTensorBuy(
+            mintAddr,
+            publicKey.toBase58(),
+            signTransaction,
+            showToast.info,
+            sendTransaction ?? undefined,
+            wallet?.adapter?.name,
+            { source: listing?.source }
+          );
           if (result.confirmed) {
             showToast.success(`✅ Card purchased for ${result.price} USDC!`);
           } else {
@@ -256,7 +286,11 @@ export default function CategoryAuctionsPage() {
         const buildRes = await fetch('/api/me-buy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mint: mintAddr, buyer: publicKey.toBase58() }),
+          body: JSON.stringify({
+            mint: mintAddr,
+            buyer: publicKey.toBase58(),
+            source: listing?.source,
+          }),
         });
 
         if (!buildRes.ok) {
@@ -264,10 +298,20 @@ export default function CategoryAuctionsPage() {
           throw new Error(errData.error || 'Failed to build transaction');
         }
 
-        const { v0Tx, v0TxSigned, legacyTx, price: mePrice, listingSource } = await buildRes.json();
+        const {
+          v0Tx,
+          v0TxSigned,
+          legacyTx,
+          price: mePrice,
+          platformFee,
+          platformFeeCurrency,
+        } = await buildRes.json();
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
-        showToast.info(`💳 Confirm purchase — ${mePrice} SOL`);
+        const feeDisplay = platformFee
+          ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
+          : '';
+        showToast.info(`💳 Confirm purchase — ${mePrice} SOL${feeDisplay}`);
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 
@@ -504,6 +548,11 @@ export default function CategoryAuctionsPage() {
               <p className="text-gray-400 text-base max-w-2xl">
                 Discover authenticated {categoryName.toLowerCase()} tokenized on Solana. Bid on live auctions or purchase items at fixed prices.
               </p>
+              {category === "TCG_CARDS" && (
+                <p className="mt-4 max-w-2xl rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+                  External NFT purchases made through Artifacte include a 2% fee. Artifacte collection items are exempt.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -674,6 +723,11 @@ export default function CategoryAuctionsPage() {
                   const purchaseCurrency = getListingPurchaseCurrency(l);
                   const displayPrice = resolveListingDisplayPrice(l);
                   const showUsdcPrice = purchaseCurrency === 'USDC';
+                  const showExternalFeeNote = isInAppExternalCardListing(l)
+                    && shouldApplyExternalMarketplaceFee({ source: l.source });
+                  const externalFee = showExternalFeeNote
+                    ? calculateExternalMarketplaceFee(displayPrice.amount)
+                    : 0;
                   return (
                     <div
                       key={l.id}
@@ -746,6 +800,11 @@ export default function CategoryAuctionsPage() {
                                   <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
                                 )}
                               </>
+                            )}
+                            {showExternalFeeNote && (
+                              <p className="text-amber-300 text-xs mt-2">
+                                + {formatFeeDisplay(externalFee, displayPrice.currency)} Artifacte fee at checkout
+                              </p>
                             )}
                           </div>
                           {l.source === 'baxus' && (l.externalUrl || (l as any).nftAddress) ? (

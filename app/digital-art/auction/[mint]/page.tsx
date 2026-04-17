@@ -23,6 +23,10 @@ import { AuctionProgram } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
 import { AuctionCountdownTimer } from "@/components/AuctionCountdownTimer";
 import { BidHistory } from "@/components/BidHistory";
+import {
+  calculateExternalMarketplaceFee,
+  shouldApplyExternalMarketplaceFee,
+} from "@/lib/external-purchase-fees";
 
 const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 const TOKEN_PROGRAM_ID = new PublicKey(
@@ -106,6 +110,20 @@ function formatListedAt(listedAt?: number): string | null {
   return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
+function formatFeeDisplay(amount: number, currency: string): string {
+  if (currency === "SOL") {
+    return `◎ ${amount.toLocaleString(undefined, {
+      minimumFractionDigits: amount < 1 ? 2 : 0,
+      maximumFractionDigits: 4,
+    })}`;
+  }
+
+  return `$${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export default function AuctionDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -147,6 +165,16 @@ export default function AuctionDetailPage() {
   const isSeller = !isExternal && listing?.seller === publicKey?.toBase58();
   const isSettled = !isExternal && listing?.status?.settled !== undefined;
   const isCancelled = !isExternal && listing?.status?.cancelled !== undefined;
+  const showExternalFeeNote = Boolean(
+    externalListing && shouldApplyExternalMarketplaceFee({
+      source: externalListing.source,
+      collectionAddress: externalListing.collectionAddress,
+      collectionName: externalListing.collectionName,
+    })
+  );
+  const externalFee = showExternalFeeNote && externalListing
+    ? calculateExternalMarketplaceFee(externalListing.price)
+    : 0;
 
   useEffect(() => {
     setAuctionEnded(false);
@@ -324,6 +352,9 @@ export default function AuctionDetailPage() {
         body: JSON.stringify({
           mint: externalListing.mint,
           buyer: publicKey.toBase58(),
+          source: externalListing.source,
+          collectionAddress: externalListing.collectionAddress,
+          collectionName: externalListing.collectionName,
         }),
       });
 
@@ -332,7 +363,15 @@ export default function AuctionDetailPage() {
         throw new Error(payload.error || `Buy failed: ${buildRes.status}`);
       }
 
-      const { v0Tx, v0TxSigned, legacyTx, price, platformFee, blockhash } = payload;
+      const {
+        v0Tx,
+        v0TxSigned,
+        legacyTx,
+        price,
+        platformFee,
+        platformFeeCurrency,
+        blockhash,
+      } = payload;
       const versionedTxBase64 = v0TxSigned || v0Tx;
       const txBase64 = versionedTxBase64 || legacyTx;
 
@@ -340,7 +379,9 @@ export default function AuctionDetailPage() {
         throw new Error("No transaction returned from API");
       }
 
-      const feeDisplay = platformFee ? ` + ${platformFee.toFixed(4)} SOL fee` : '';
+      const feeDisplay = platformFee
+        ? ` + ${platformFee.toFixed(platformFeeCurrency === "SOL" ? 4 : 2)} ${platformFeeCurrency} fee`
+        : '';
       showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
 
       let rawTx: Uint8Array;
@@ -436,7 +477,12 @@ export default function AuctionDetailPage() {
           signTransaction,
           showToast.info,
           sendTransaction ?? undefined,
-          wallet?.adapter?.name
+          wallet?.adapter?.name,
+          {
+            source: externalListing.source,
+            collectionAddress: externalListing.collectionAddress,
+            collectionName: externalListing.collectionName,
+          }
         );
 
         if (result.confirmed) {
@@ -475,7 +521,9 @@ export default function AuctionDetailPage() {
         throw new Error("Tensor did not return any transactions");
       }
 
-      const feeDisplay = payload.platformFee ? ` + ${payload.platformFee.toFixed(4)} SOL fee` : '';
+      const feeDisplay = payload.platformFee
+        ? ` + ${payload.platformFee.toFixed(payload.platformFeeCurrency === "SOL" ? 4 : 2)} ${payload.platformFeeCurrency} fee`
+        : '';
       showToast.info(`💳 Confirm purchase — ${payload.price} ${payload.currencySymbol}${feeDisplay}`);
 
       let lastSignature = "";
@@ -905,6 +953,11 @@ export default function AuctionDetailPage() {
                 <p className="text-4xl font-serif text-gold-400">
                   {formatExternalPrice(externalListing)}
                 </p>
+                <p className={`text-sm mt-3 ${showExternalFeeNote ? 'text-amber-200' : 'text-emerald-300'}`}>
+                  {showExternalFeeNote
+                    ? `+ ${formatFeeDisplay(externalFee, externalListing.currencySymbol)} Artifacte fee at checkout`
+                    : 'Artifacte collection items do not incur the 2% external Artifacte fee.'}
+                </p>
                 {listedAt && (
                   <p className="text-gray-500 text-xs mt-2">Listed {listedAt}</p>
                 )}
@@ -967,6 +1020,12 @@ export default function AuctionDetailPage() {
                   </a>
                 )}
               </div>
+
+              <p className={`text-sm ${showExternalFeeNote ? 'text-amber-200/90' : 'text-emerald-300/90'}`}>
+                {showExternalFeeNote
+                  ? 'This external marketplace purchase is executed through Artifacte with a separate 2% fee.'
+                  : 'This listing is fee-exempt under the Artifacte collection rule.'}
+              </p>
             </div>
           </div>
         </div>
