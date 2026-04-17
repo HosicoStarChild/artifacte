@@ -1,4 +1,8 @@
 import { Connection, PublicKey } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
+
+const bs58Encode = (data: Buffer | Uint8Array): string =>
+  anchor.utils.bytes.bs58.encode(data instanceof Buffer ? data : Buffer.from(data));
 
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
@@ -9,6 +13,15 @@ const OFFSET_LISTING_TYPE = 112;
 const OFFSET_STATUS = 130;
 const ARTIFACTE_LISTINGS_CACHE_TTL = 30_000;
 const DAS_BATCH_SIZE = 100;
+
+// Core listing layout (153 bytes total):
+//   8 (discriminator) + 32 seller + 32 asset + 32 collection + 32 payment_mint
+//   + 8 price + 8 created_at + 1 bump
+const CORE_LISTING_DISCRIMINATOR = Buffer.from([205, 178, 162, 169, 199, 166, 133, 157]);
+const CORE_LISTING_SIZE = 153;
+const CORE_OFFSET_SELLER = 8;
+const CORE_OFFSET_ASSET = 8 + 32;
+const CORE_OFFSET_PRICE = 8 + 32 + 32 + 32 + 32;
 
 type ActiveMint = { nftMint: string; price: bigint };
 
@@ -157,6 +170,26 @@ async function fetchActiveArtifacteListingsFromChain(heliusRpc: string): Promise
 
       const nftMint = new PublicKey(data.slice(OFFSET_NFT_MINT, OFFSET_NFT_MINT + 32)).toBase58();
       const price = data.readBigUInt64LE(OFFSET_PRICE);
+      activeMints.push({ nftMint, price });
+    } catch {
+      // Skip unparseable accounts.
+    }
+  }
+
+  // Also include Core listings (USDC fixed-price; seller-filtered to owner).
+  const coreAccounts = await connection.getProgramAccounts(AUCTION_PROGRAM_ID, {
+    filters: [
+      { dataSize: CORE_LISTING_SIZE },
+      { memcmp: { offset: 0, bytes: bs58Encode(CORE_LISTING_DISCRIMINATOR) } },
+    ],
+  });
+  for (const { account } of coreAccounts) {
+    const data = account.data;
+    try {
+      const seller = new PublicKey(data.slice(CORE_OFFSET_SELLER, CORE_OFFSET_SELLER + 32)).toBase58();
+      if (seller !== ARTIFACTE_AUTHORITY) continue;
+      const nftMint = new PublicKey(data.slice(CORE_OFFSET_ASSET, CORE_OFFSET_ASSET + 32)).toBase58();
+      const price = data.readBigUInt64LE(CORE_OFFSET_PRICE);
       activeMints.push({ nftMint, price });
     } catch {
       // Skip unparseable accounts.
