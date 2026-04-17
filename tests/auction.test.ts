@@ -22,7 +22,7 @@ describe("auction", () => {
 
   it("Should create auction with proper state", async () => {
     // This would require:
-    // 1. Creating an RWA NFT in the rwa_nft program
+    // 1. Minting a Metaplex Core asset in the Artifacte collection
     // 2. Calling create_auction instruction
     // 3. Verifying auction account was created
     // 4. Checking prices, dates, and status
