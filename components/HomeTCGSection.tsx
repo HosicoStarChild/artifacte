@@ -435,11 +435,6 @@ export function HomeTCGSection() {
 
   return (
     <>
-      <section className="px-4 sm:px-6 lg:px-8 pt-6">
-        <div className="max-w-7xl mx-auto rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
-          External NFT purchases made through Artifacte include a 2% fee. Artifacte collection items are exempt.
-        </div>
-      </section>
       <TCGCarousel
         title="One Piece TCG"
         emoji="🏴‍☠️"

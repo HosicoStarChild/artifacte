@@ -560,11 +560,6 @@ export default function CategoryAuctionsPage() {
               <p className="text-gray-400 text-base max-w-2xl">
                 Discover authenticated {categoryName.toLowerCase()} tokenized on Solana. Bid on live auctions or purchase items at fixed prices.
               </p>
-              {category === "TCG_CARDS" && (
-                <p className="mt-4 max-w-2xl rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
-                  External NFT purchases made through Artifacte include a 2% fee. Artifacte collection items are exempt.
-                </p>
-              )}
             </div>
           </div>
         </div>
