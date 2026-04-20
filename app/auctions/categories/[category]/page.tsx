@@ -1,33 +1,28 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
+import { auctions, listings as staticListings, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useAuctionProgram } from "@/hooks/useAuctionProgram";
-import { AuctionProgram } from "@/lib/auction-program";
-import { showToast } from "@/components/ToastContainer";
-import {
-  getExternalMarketplaceTotalPrice,
-} from "@/lib/external-purchase-fees";
+import { getExternalMarketplaceTotalPrice } from "@/lib/external-purchase-fees";
 
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
+const CategoryListingPurchaseAction = dynamic(
+  () => import("@/components/category/CategoryListingPurchaseAction"),
+  {
+    ssr: false,
+    loading: () => (
+      <button
+        disabled
+        className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
+      >
+        Loading...
+      </button>
+    ),
+  }
 );
-
-const TREASURY = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
-const TOKENS: Record<string, { mint: PublicKey; decimals: number; label: string }> = {
-  USD1: { mint: new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"), decimals: 6, label: "USD1" },
-  USDC: { mint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), decimals: 6, label: "USDC" },
-};
 
 const categoryEmojis: Record<string, string> = {
   "artifacte": "✨",
@@ -40,33 +35,116 @@ const categoryEmojis: Record<string, string> = {
   "merchandise": "🛍️",
 };
 
-function isInAppExternalCardListing(listing: any): boolean {
-  return listing?.source === "collector-crypt" || listing?.source === "phygitals";
-}
+const ITEMS_PER_PAGE = 24;
 
-function formatFeeDisplay(amount: number, currency: string): string {
-  if (currency === "SOL") {
-    return `◎ ${amount.toLocaleString(undefined, {
-      minimumFractionDigits: amount < 1 ? 2 : 0,
-      maximumFractionDigits: 4,
-    })}`;
+const REVERSE_TCG_CATEGORY_MAP: Record<string, string> = {
+  Pokemon: "Pokemon",
+  "One Piece": "One Piece",
+  "Yu-Gi-Oh": "Yu-Gi-Oh",
+  "Dragon Ball": "Dragon Ball Z",
+  Lorcana: "Lorcana",
+  Magic: "Magic",
+  "Magic: The Gathering": "Magic",
+};
+
+const SERVER_TCG_CATEGORY_MAP: Record<string, string> = {
+  pokemon: "Pokemon",
+  "one piece": "One Piece",
+  "yu-gi-oh": "Yu-Gi-Oh,Yu-Gi-Oh!",
+  magic: "Magic: The Gathering",
+  "dragon ball z": "Dragon Ball Z,Dragon Ball Super",
+  lorcana: "Lorcana",
+};
+
+const SOURCE_FILTER_MAP: Record<string, string> = {
+  "Collectors Crypt": "collector-crypt",
+  Phygitals: "phygitals",
+};
+
+const CATEGORY_FILTERS: Record<string, { label: string; key: string; options: string[] }[]> = {
+  TCG_CARDS: [
+    { label: "Source", key: "source", options: ["All", "Collectors Crypt", "Phygitals"] },
+    { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
+    { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
+    { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
+    { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
+  ],
+  SPIRITS: [
+    { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
+  ],
+  WATCHES: [
+    { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
+  ],
+  SPORTS_CARDS: [
+    { label: "Sport", key: "sport", options: ["All", "Baseball", "Basketball", "Football", "Soccer"] },
+    { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "BGS 9.5", "BGS 10", "SGC 10"] },
+    { label: "Brand", key: "brand", options: ["All", "Topps", "Panini", "Upper Deck"] },
+  ],
+  DIGITAL_ART: [
+    { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
+  ],
+  SEALED: [
+    { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
+  ],
+};
+
+function buildListingsQueryParams({
+  category,
+  currencyFilter,
+  filters,
+  isArtifacteCollection,
+  page,
+  sortBy,
+}: {
+  category: string;
+  currencyFilter: "All" | "USDC" | "SOL";
+  filters: Record<string, string>;
+  isArtifacteCollection: boolean;
+  page: number;
+  sortBy: "default" | "price-high" | "price-low" | "newest";
+}) {
+  const params = new URLSearchParams({
+    ...(isArtifacteCollection ? {} : { category }),
+    perPage: String(ITEMS_PER_PAGE),
+    page: String(page),
+    sort: sortBy === "newest"
+      ? "newest"
+      : sortBy === "price-high"
+        ? "price-desc"
+        : sortBy === "price-low"
+          ? "price-asc"
+          : "price-desc",
+  });
+
+  if (currencyFilter !== "All") params.set("displayCurrency", currencyFilter);
+
+  const tcgFilter = filters.tcg;
+  if (tcgFilter && tcgFilter !== "All") {
+    const mapped = SERVER_TCG_CATEGORY_MAP[tcgFilter.toLowerCase()];
+    if (mapped) params.set("ccCategory", mapped);
   }
 
-  return `$${amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  const forwardedFilterKeys = ["grade", "search", "rarity", "language", "sport", "brand", "spiritType"] as const;
+  for (const key of forwardedFilterKeys) {
+    const value = filters[key];
+    if (!value || value === "All") continue;
+    params.set(key === "search" ? "q" : key, value);
+  }
+
+  const sourceFilter = filters.source;
+  if (sourceFilter && sourceFilter !== "All") {
+    params.set("source", SOURCE_FILTER_MAP[sourceFilter] || sourceFilter);
+  }
+
+  return params;
 }
 
-function formatListingQuote(amount: number, currency: string): string {
-  const formattedAmount = amount.toLocaleString(
-    undefined,
-    currency === "SOL" ? { maximumFractionDigits: 4 } : undefined
-  );
-
-  return currency === "SOL"
-    ? `◎ ${formattedAmount} SOL`
-    : `$${formattedAmount} ${currency}`;
+function getListingHref(listing: any): string {
+  if (listing.source === "collector-crypt") return `/auctions/cards/${listing.id}`;
+  if (listing.source === "phygitals" && listing.nftAddress) return `/auctions/cards/${listing.id}`;
+  if (listing.source === "artifacte" && listing.nftAddress) return `/auctions/cards/${listing.nftAddress}`;
+  if (listing.source === "baxus") return listing.externalUrl || `https://app.baxus.co/asset/${listing.nftAddress}`;
+  return "#";
 }
 
 export default function CategoryAuctionsPage() {
@@ -74,11 +152,6 @@ export default function CategoryAuctionsPage() {
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
   const [tab, setTab] = useState<"fixed" | "live">("fixed");
-  const { publicKey, sendTransaction, signTransaction, connected, wallet } = useWallet();
-  const { connection } = useConnection();
-  const auctionProgram = useAuctionProgram();
-  const [buyingId, setBuyingId] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
   // URL search params (triggers re-render on change)
   const urlSearchParams = useSearchParams();
   const urlCcCategoryParam = urlSearchParams.get('ccCategory');
@@ -93,14 +166,9 @@ export default function CategoryAuctionsPage() {
 
   // Restore state from sessionStorage/URL after hydration
   useEffect(() => {
-    const reverseMap: Record<string, string> = {
-      'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
-      'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
-      'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
-    };
     const urlCcCategory = new URLSearchParams(window.location.search).get('ccCategory');
     if (urlCcCategory) {
-      const tcgVal = reverseMap[urlCcCategory] || urlCcCategory;
+      const tcgVal = REVERSE_TCG_CATEGORY_MAP[urlCcCategory] || urlCcCategory;
       setFilters({ tcg: tcgVal });
       setPage(1);
     } else {
@@ -116,12 +184,7 @@ export default function CategoryAuctionsPage() {
   // Sync URL ccCategory param → filter state (handles navigation between carousels)
   useEffect(() => {
     if (!hydrated || !urlCcCategoryParam) return;
-    const reverseMap: Record<string, string> = {
-      'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
-      'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
-      'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
-    };
-    const tcgVal = reverseMap[urlCcCategoryParam] || urlCcCategoryParam;
+    const tcgVal = REVERSE_TCG_CATEGORY_MAP[urlCcCategoryParam] || urlCcCategoryParam;
     setFilters((prev) => {
       if (prev.tcg === tcgVal && Object.keys(prev).length === 1) {
         return prev;
@@ -143,7 +206,6 @@ export default function CategoryAuctionsPage() {
   }, [filters, page, currencyFilter, sortBy, searchInput, storageKey]);
   const searchTimer = useRef<NodeJS.Timeout>();
   const listingsRequestRef = useRef(0);
-  const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
   const [meLoading, setMeLoading] = useState(true);
   const [meFilterLoading, setMeFilterLoading] = useState(false);
@@ -159,9 +221,19 @@ export default function CategoryAuctionsPage() {
   const isArtifacteCollection = category === "ARTIFACTE";
   const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS" || isArtifacteCollection;
 
+  const handleListingPurchased = (listingId: string, nftAddress?: string) => {
+    setMeListings((prev) => prev.filter((listing: any) => (
+      listing.id !== listingId &&
+      listing.id !== nftAddress &&
+      listing.nftAddress !== nftAddress &&
+      listing.mintAddress !== nftAddress
+    )));
+  };
+
   useEffect(() => {
     if (!hydrated || !useMeApi || !category) return;
     let cancelled = false;
+    const abortController = new AbortController();
     const requestId = ++listingsRequestRef.current;
     const requestedPage = page;
 
@@ -169,67 +241,20 @@ export default function CategoryAuctionsPage() {
     if (meListings.length === 0) setMeLoading(true);
     else setMeFilterLoading(true);
 
-    // Artifacte collection queries the Artifacte on-chain program directly (not Oracle)
-    const params = new URLSearchParams({
-      ...(isArtifacteCollection ? {} : { category }),
-      perPage: String(ITEMS_PER_PAGE),
-      page: String(page),
-      sort: sortBy === 'newest'
-        ? 'newest'
-        : sortBy === 'price-high'
-          ? 'price-desc'
-          : sortBy === 'price-low'
-            ? 'price-asc'
-            : 'price-desc',
+    const params = buildListingsQueryParams({
+      category,
+      currencyFilter,
+      filters,
+      isArtifacteCollection,
+      page,
+      sortBy,
     });
-
-    if (currencyFilter !== 'All') params.set('displayCurrency', currencyFilter);
-
-    // Pass filters to server
-    const tcgFilter = filters['tcg'];
-    if (tcgFilter && tcgFilter !== 'All') {
-      const ccCatMap: Record<string, string> = {
-        'pokemon': 'Pokemon',
-        'one piece': 'One Piece',
-        'yu-gi-oh': 'Yu-Gi-Oh,Yu-Gi-Oh!',
-        'magic': 'Magic: The Gathering',
-        'dragon ball z': 'Dragon Ball Z,Dragon Ball Super',
-        'lorcana': 'Lorcana',
-      };
-      const mapped = ccCatMap[tcgFilter.toLowerCase()];
-      if (mapped) params.set('ccCategory', mapped);
-    }
-    const gradeFilter = filters['grade'];
-    if (gradeFilter && gradeFilter !== 'All') params.set('grade', gradeFilter);
-    // Currency filter applied client-side after Tensor USDC enrichment — not sent to Oracle
-    // Pass search query
-    const searchFilter = filters['search'];
-    if (searchFilter) params.set('q', searchFilter);
-    // Additional filters
-    const rarityFilter = filters['rarity'];
-    if (rarityFilter && rarityFilter !== 'All') params.set('rarity', rarityFilter);
-    const langFilter = filters['language'];
-    if (langFilter && langFilter !== 'All') params.set('language', langFilter);
-    const sportFilter = filters['sport'];
-    if (sportFilter && sportFilter !== 'All') params.set('sport', sportFilter);
-    const brandFilter = filters['brand'];
-    if (brandFilter && brandFilter !== 'All') params.set('brand', brandFilter);
-    const spiritFilter = filters['spiritType'];
-    if (spiritFilter && spiritFilter !== 'All') params.set('spiritType', spiritFilter);
-    const sourceFilter = filters['source'];
-    if (sourceFilter && sourceFilter !== 'All') {
-      const sourceMap: Record<string, string> = {
-        'Collectors Crypt': 'collector-crypt',
-        'Phygitals': 'phygitals',
-      };
-      params.set('source', sourceMap[sourceFilter] || sourceFilter);
-    }
 
     const apiUrl = isArtifacteCollection
       ? `/api/artifacte-program-listings?${params}`
       : `/api/me-listings?${params}`;
 
-    fetch(apiUrl)
+    fetch(apiUrl, { signal: abortController.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -255,7 +280,10 @@ export default function CategoryAuctionsPage() {
         setMeLoading(false);
         setMeFilterLoading(false);
       })
-      .catch(() => {
+      .catch((error) => {
+        if (error?.name === 'AbortError') {
+          return;
+        }
         if (cancelled || listingsRequestRef.current !== requestId) {
           return;
         }
@@ -265,278 +293,14 @@ export default function CategoryAuctionsPage() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
     };
   }, [hydrated, useMeApi, category, filters, currencyFilter, page, sortBy, isArtifacteCollection]);
 
   // Use ME listings for TCG/Sports, static for everything else
   const listings = useMeApi ? meListings : staticListings;
 
-  // Category-specific filter options
-  const categoryFilters: Record<string, { label: string; key: string; options: string[] }[]> = {
-    TCG_CARDS: [
-      { label: "Source", key: "source", options: ["All", "Collectors Crypt", "Phygitals"] },
-      { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
-      { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
-      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
-      { label: "Language", key: "language", options: ["All", "EN", "JPN"] },
-    ],
-    SPIRITS: [
-      { label: "Type", key: "spiritType", options: ["All", "Bourbon", "Rye", "Single Malt Whisky", "Blended Whisky", "American Whiskey", "Rum", "Tequila", "Cognac", "Wine"] },
-    ],
-    WATCHES: [
-      { label: "Brand", key: "brand", options: ["All", "Rolex", "Patek Philippe", "Audemars Piguet", "Omega", "Cartier", "Hublot", "Richard Mille"] },
-    ],
-    SPORTS_CARDS: [
-      { label: "Sport", key: "sport", options: ["All", "Baseball", "Basketball", "Football", "Soccer"] },
-      { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "BGS 9.5", "BGS 10", "SGC 10"] },
-      { label: "Brand", key: "brand", options: ["All", "Topps", "Panini", "Upper Deck"] },
-    ],
-    DIGITAL_ART: [
-      { label: "Collection", key: "collection", options: ["All", "SMB Gen 2", "SMB Gen 3", "Claynosaurz", "Galactic Gecko", "Famous Fox Federation", "Mad Lads", "Sensei"] },
-    ],
-    SEALED: [
-      { label: "TCG", key: "tcg", options: ["All", "Pokemon", "One Piece", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
-    ],
-  };
-
   const isDigitalArt = category === "DIGITAL_ART";
-
-  const handleBuyNow = async (listingId: string, price: number, nftMint?: string, listing?: any) => {
-    if (!connected || !publicKey) {
-      showToast.error("Please connect your wallet first");
-      return;
-    }
-
-    const listingDisplayPrice = listing ? resolveListingDisplayPrice(listing) : null;
-    setBuyingId(listingId);
-    try {
-      let sig: string = "";
-
-      // CC / ME-listed cards / Phygitals: buy via ME notary-cosigned transaction
-      if (listing?.source === 'collector-crypt' || listing?.source === 'phygitals' || listing?.nftAddress) {
-        const mintAddr = listing?.nftAddress || nftMint;
-        if (!mintAddr) {
-          showToast.error("NFT mint address not available");
-          setBuyingId(null);
-          return;
-        }
-
-        // Phygitals: always use Tensor directly
-        if (listing?.source === 'phygitals' || listingId.startsWith('phyg-')) {
-          if (!signTransaction) throw new Error("Wallet does not support signing");
-          const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
-          const result = await executeTensorBuy(
-            mintAddr,
-            publicKey.toBase58(),
-            signTransaction,
-            showToast.info,
-            sendTransaction ?? undefined,
-            wallet?.adapter?.name,
-            { source: listing?.source },
-            true
-          );
-          if (result.confirmed) {
-            showToast.success(`✅ Card purchased for ${formatListingQuote(result.totalPrice, result.currency)}!`);
-          } else {
-            showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
-          }
-          setMeListings(prev => prev.filter((l: any) => l.mintAddress !== mintAddr && l.nftAddress !== mintAddr && l.id !== mintAddr && l.id !== listingId));
-          setBuyingId(null);
-          return;
-        }
-
-        // Card-category purchases stay in-app once they reach this flow.
-        // Phygitals use Tensor above; the remaining card listings use ME below.
-        showToast.info("Building transaction...");
-        const buildRes = await fetch('/api/me-buy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mint: mintAddr,
-            buyer: publicKey.toBase58(),
-            source: listing?.source,
-          }),
-        });
-
-        if (!buildRes.ok) {
-          const errData = await buildRes.json().catch(() => ({ error: 'Failed to build transaction' }));
-          throw new Error(errData.error || 'Failed to build transaction');
-        }
-
-        const {
-          v0Tx,
-          v0TxSigned,
-          legacyTx,
-          displayPrice,
-          displayCurrency,
-          platformFee,
-          platformFeeCurrency,
-        } = await buildRes.json();
-
-        if (!signTransaction) throw new Error("Wallet does not support signing");
-        const toastCurrency = displayCurrency || listingDisplayPrice?.currency || (isDigitalArt ? 'SOL' : currency);
-        const toastBaseAmount = displayPrice ?? listingDisplayPrice?.amount ?? price;
-        const toastTotal = toastBaseAmount + ((platformFeeCurrency === toastCurrency && platformFee) ? platformFee : 0);
-        showToast.info(`💳 Confirm purchase — ${formatListingQuote(toastTotal, toastCurrency)}`);
-
-        const { VersionedTransaction } = await import('@solana/web3.js');
-
-        const sendViaPoxy = async (rawTxBytes: Uint8Array): Promise<string> => {
-          const b64 = Buffer.from(rawTxBytes).toString('base64');
-          const res = await fetch('/api/rpc', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'sendTransaction', params: [b64, { skipPreflight: true, encoding: 'base64', maxRetries: 3 }] }),
-          });
-          const data = await res.json();
-          if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-          return data.result;
-        };
-
-        // Pre-simulate with sigVerify:false before wallet signing.
-        // Phantom internally simulates during signTransaction — multi-signer notary txs
-        // fail Phantom's simulation without this step, showing "unable to safely predict" warning.
-        const preSim = async (b64Tx: string) => {
-          try {
-            await fetch('/api/rpc', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'simulateTransaction', params: [b64Tx, { sigVerify: false, encoding: 'base64', commitment: 'processed' }] }),
-            });
-          } catch {}
-        };
-
-        if (v0TxSigned && v0Tx) {
-          // Notary-cosigned flow (M2 CC cards)
-          await preSim(v0TxSigned);
-          const signedBytes = Uint8Array.from(atob(v0TxSigned), c => c.charCodeAt(0));
-          const notaryTx = VersionedTransaction.deserialize(signedBytes);
-          const signed = await signTransaction(notaryTx as any);
-          sig = await sendViaPoxy((signed as any).serialize());
-        } else if (v0Tx) {
-          await preSim(v0Tx);
-          const txBytes = Uint8Array.from(atob(v0Tx), c => c.charCodeAt(0));
-          const vTx = VersionedTransaction.deserialize(txBytes);
-          const signed = await signTransaction(vTx as any);
-          sig = await sendViaPoxy((signed as any).serialize());
-        } else if (legacyTx) {
-          const txBytes = Uint8Array.from(atob(legacyTx), c => c.charCodeAt(0));
-          const tx = Transaction.from(txBytes);
-          const signed = await signTransaction(tx);
-          sig = await sendViaPoxy(signed.serialize());
-        } else {
-          throw new Error("No transaction returned from API");
-        }
-
-        // Poll via HTTP proxy — WebSocket not supported on /api/rpc
-        let ccConfirmed = false;
-        for (let i = 0; i < 20; i++) {
-          await new Promise(r => setTimeout(r, 3000));
-          const statusRes = await fetch('/api/rpc', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig]] }),
-          });
-          if (statusRes.status === 429) continue;
-          const statusData = await statusRes.json();
-          const status = statusData.result?.value?.[0];
-          if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
-            if (status.err) throw new Error('Transaction failed on-chain');
-            ccConfirmed = true;
-            break;
-          }
-        }
-        if (ccConfirmed) {
-          showToast.success(`✅ Card purchased! TX: ${sig.slice(0, 16)}...`);
-        } else {
-          showToast.info(`TX sent: ${sig.slice(0, 8)}... — check your wallet`);
-        }
-        setBuyingId(null);
-        return;
-      }
-
-      // Use AuctionProgram if listing has nftMint (real on-chain listing)
-      if (nftMint && auctionProgram) {
-        try {
-          const nftMintPubkey = new PublicKey(nftMint);
-          const token = TOKENS[currency];
-
-          // Get buyer's NFT account (where they'll receive the NFT)
-          const buyerNftAccount = await getAssociatedTokenAddress(nftMintPubkey, publicKey);
-
-          // Probe for both legacy and Core listings — Core has its own PDA + flow.
-          const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-          const [coreListingPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("core_listing"), nftMintPubkey.toBuffer()],
-            AUCTION_PROGRAM_ID
-          );
-          const coreListingInfo = await connection.getAccountInfo(coreListingPda);
-
-          if (coreListingInfo) {
-            // Core path — auctionProgram.buyNow auto-routes to buyNowCore.
-            sig = await auctionProgram.buyNow(
-              nftMintPubkey,
-              nftMintPubkey, // unused for Core path
-              nftMintPubkey, // unused for Core path
-              buyerNftAccount,
-              0,
-              token.mint
-            );
-          } else {
-            // Legacy SPL/pNFT path
-            const [listingPda] = PublicKey.findProgramAddressSync(
-              [Buffer.from("listing"), nftMintPubkey.toBuffer()],
-              AUCTION_PROGRAM_ID
-            );
-            const listingInfo = await connection.getAccountInfo(listingPda);
-            if (!listingInfo) throw new Error("On-chain listing not found");
-            const sellerPubkey = new PublicKey(listingInfo.data.subarray(8, 40));
-
-            // Get payment accounts
-            const buyerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
-            const sellerPaymentAccount = await getAssociatedTokenAddress(token.mint, sellerPubkey);
-
-            sig = await auctionProgram.buyNow(
-              nftMintPubkey,
-              sellerPaymentAccount,
-              buyerPaymentAccount,
-              buyerNftAccount,
-              Math.round(price * (10 ** token.decimals)),
-              token.mint
-            );
-          }
-        } catch (programErr: any) {
-          // Fall back to direct transfer if program call fails
-          console.warn("AuctionProgram.buyNow failed, falling back to direct transfer:", programErr);
-          throw new Error(`On-chain purchase failed: ${programErr.message?.slice(0, 50)}`);
-        }
-      } else {
-        // No on-chain listing found — cannot proceed
-        throw new Error("This item is not available for purchase");
-      }
-
-      showToast.success(`✓ Purchase successful! TX: ${sig.slice(0, 12)}...`);
-    } catch (err: any) {
-      const message = err.message || "Transaction failed";
-      const lowerMessage = message.toLowerCase();
-      
-      if (
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("rejected the request") ||
-        lowerMessage.includes("declined") ||
-        lowerMessage.includes("cancelled") ||
-        lowerMessage.includes("canceled")
-      ) {
-        showToast.error("Transaction rejected by user");
-      } else if (lowerMessage.includes("insufficient")) {
-        showToast.error(`Insufficient balance. Required: ${formatListingQuote(listingDisplayPrice?.amount ?? price, listingDisplayPrice?.currency ?? (isDigitalArt ? 'SOL' : currency))}`);
-      } else {
-        showToast.error(`Error: ${message.slice(0, 80)}`);
-      }
-    } finally {
-      setBuyingId(null);
-    }
-  };
 
   // Filter auctions and listings by category
   const categoryAuctions = category ? auctions.filter((a) => a.category === category) : [];
@@ -580,6 +344,9 @@ export default function CategoryAuctionsPage() {
     }
     return 0;
   });
+
+  const totalItems = useMeApi ? meTotal : categoryListings.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   if (!category) {
     return (
@@ -697,9 +464,9 @@ export default function CategoryAuctionsPage() {
         </div>
 
         {/* Category Filters */}
-        {category && categoryFilters[category] && (
+        {category && CATEGORY_FILTERS[category] && (
           <div className="flex flex-wrap gap-3 mb-8">
-            {categoryFilters[category].map((filter) => (
+            {CATEGORY_FILTERS[category].map((filter) => (
               <div key={filter.key} className="relative">
                 <select
                   value={filters[filter.key] || "All"}
@@ -754,10 +521,7 @@ export default function CategoryAuctionsPage() {
               </div>
             ) : categoryListings.length > 0 ? (
               <>
-              {(() => {
-                const totalItems = useMeApi ? meTotal : categoryListings.length;
-                const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-                return totalItems > ITEMS_PER_PAGE ? (
+              {totalItems > ITEMS_PER_PAGE ? (
                 <div className="flex items-center justify-between mb-6">
                   <p className="text-gray-400 text-sm">{totalItems.toLocaleString()} items</p>
                   <div className="flex items-center gap-2">
@@ -780,7 +544,7 @@ export default function CategoryAuctionsPage() {
                     </button>
                   </div>
                 </div>
-              ) : null; })()}
+              ) : null}
               <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 transition-opacity duration-200 ${meFilterLoading ? 'opacity-40' : ''}`}>
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const purchaseCurrency = getListingPurchaseCurrency(l);
@@ -797,7 +561,7 @@ export default function CategoryAuctionsPage() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={l.source === 'collector-crypt' ? `/auctions/cards/${l.id}` : l.source === 'phygitals' && (l as any).nftAddress ? `/auctions/cards/${l.id}` : l.source === 'artifacte' && (l as any).nftAddress ? `/auctions/cards/${(l as any).nftAddress}` : l.source === 'baxus' ? (l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`) : '#'} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
+                      <Link href={getListingHref(l)} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
@@ -856,62 +620,19 @@ export default function CategoryAuctionsPage() {
                               </>
                             )}
                           </div>
-                          {l.source === 'baxus' && (l.externalUrl || (l as any).nftAddress) ? (
-                            <a
-                              href={l.externalUrl || `https://app.baxus.co/asset/${(l as any).nftAddress}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
-                            >
-                              Buy on BAXUS
-                            </a>
-                          ) : l.source === 'artifacte' && (l as any).nftAddress ? (
-                            <Link
-                              href={`/auctions/cards/${(l as any).nftAddress}`}
-                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
-                            >
-                              View Details
-                            </Link>
-                          ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
-                            connected ? (
-                              <button
-                                onClick={() => handleBuyNow(l.id, displayPrice.amount, (l as any).nftAddress, l)}
-                                disabled={buyingId === l.id}
-                                className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
-                              >
-                                {buyingId === l.id ? "Processing..." : `Buy Now`}
-                              </button>
-                            ) : (
-                              <WalletMultiButton className="w-full !bg-gold-500 hover:!bg-gold-600 !text-dark-900 !rounded-lg !text-sm !font-semibold !h-10 !justify-center" />
-                            )
-                          ) : useMeApi ? (
-                            <button
-                              disabled
-                              className="w-full px-4 py-2.5 bg-gray-600/50 cursor-not-allowed text-gray-400 rounded-lg text-sm font-semibold"
-                            >
-                              Coming Soon
-                            </button>
-                          ) : connected ? (
-                            <button
-                              onClick={() => handleBuyNow(l.id, l.price, (l as any).nftMint, l)}
-                              disabled={buyingId === l.id}
-                              className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
-                            >
-                              {buyingId === l.id ? "Processing..." : "Buy Now"}
-                            </button>
-                          ) : (
-                            <WalletMultiButton className="!w-full !bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-sm !font-semibold" />
-                          )}
+                          <CategoryListingPurchaseAction
+                            listing={l}
+                            useMeApi={useMeApi}
+                            isDigitalArt={isDigitalArt}
+                            onPurchased={handleListingPurchased}
+                          />
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {(() => {
-                const totalItems = useMeApi ? meTotal : categoryListings.length;
-                const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-                return totalItems > ITEMS_PER_PAGE ? (
+              {totalItems > ITEMS_PER_PAGE ? (
                 <div className="flex items-center justify-center gap-2 mt-10">
                   <button
                     onClick={() => { setPage(Math.max(1, page - 1)); window.scrollTo(0, 0); }}
@@ -931,7 +652,7 @@ export default function CategoryAuctionsPage() {
                     Next →
                   </button>
                 </div>
-              ) : null; })()}
+              ) : null}
               </>
             ) : (
               <div className="text-center py-20">
