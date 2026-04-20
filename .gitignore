@@ -5,12 +5,6 @@ target/
 sync-engine/node_modules
 .vercel
 
-# Skills
-
-.agents
-.claude
-skills-lock.json
-
 # anchor
 
 .anchor
