@@ -98,21 +98,23 @@ function TCGCarousel({
           </Link>
         </div>
         {items.length === 0 ? (
-          <div className="flex gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex-shrink-0 w-72 bg-dark-800 rounded-lg border border-white/5 overflow-hidden animate-pulse">
-                <div className="aspect-square bg-dark-700" />
-                <div className="p-5 space-y-3">
-                  <div className="h-3 bg-dark-700 rounded w-20" />
-                  <div className="h-4 bg-dark-700 rounded w-48" />
-                  <div className="h-3 bg-dark-700 rounded w-32" />
-                  <div className="h-6 bg-dark-700 rounded w-24 mt-4" />
+          <div className="overflow-x-auto overscroll-x-contain pb-4">
+            <div className="flex gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex-shrink-0 w-72 bg-dark-800 rounded-lg border border-white/5 overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-dark-700" />
+                  <div className="p-5 space-y-3">
+                    <div className="h-3 bg-dark-700 rounded w-20" />
+                    <div className="h-4 bg-dark-700 rounded w-48" />
+                    <div className="h-3 bg-dark-700 rounded w-32" />
+                    <div className="h-6 bg-dark-700 rounded w-24 mt-4" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto pb-4 -mx-4 px-4">
+          <div className="overflow-x-auto overscroll-x-contain pb-4">
             <div className="flex gap-6 snap-x">
               {items.map((listing) => {
                 const displayPrice = resolveListingDisplayPrice(listing);

@@ -184,7 +184,7 @@ export default async function Home() {
               View All →
             </Link>
           </div>
-          <div className="overflow-x-auto pb-4 -mx-4 px-4">
+          <div className="overflow-x-auto overscroll-x-contain pb-4">
             <div className="flex gap-6 snap-x">
               {spiritsCarousel.map((l: any) => (
                 <a key={l.id} href={l.externalUrl || `https://app.baxus.co/asset/${l.nftAddress}`} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-80 snap-start group">

@@ -1,9 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { WalletProviderWrapper } from "@/components/WalletProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ToastContainer } from "@/components/ToastContainer";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "Artifacte — RWA Tokenization on Solana",

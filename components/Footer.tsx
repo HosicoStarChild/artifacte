@@ -17,7 +17,7 @@ export default function Footer() {
           </div>
 
           {/* Links */}
-          <div className="flex gap-12">
+          <div className="grid grid-cols-2 gap-8 lg:grid-cols-3">
             <div>
               <p className="text-xs font-semibold text-white tracking-widest uppercase mb-4">Platform</p>
               <ul className="space-y-2 text-sm text-gray-500">
