@@ -11,8 +11,7 @@ import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import {
-  calculateExternalMarketplaceFee,
-  shouldApplyExternalMarketplaceFee,
+  getExternalMarketplaceTotalPrice,
 } from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
@@ -777,19 +776,24 @@ export default function CardDetailPage() {
   }
 
   const displayPrice = resolveListingDisplayPrice(card);
-  const primaryPrice = displayPrice.amount;
-  const primaryCurrency = displayPrice.currency;
-  const buyPrice = card.auctionListing ? card.auctionListing.price : displayPrice.amount;
-  const buyCurrency = card.auctionListing ? card.auctionListing.currency : displayPrice.currency;
-  const formattedPrimaryAmount = primaryCurrency === 'SOL'
-    ? primaryPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
-    : primaryPrice.toLocaleString();
   const isExternalMarketplaceCard = !card.auctionListing && (
     card.source === 'collector-crypt'
     || card.source === 'phygitals'
     || card.buyKind === 'tensorCompressed'
     || card.buyKind === 'tensorStandard'
   );
+  const primaryPrice = isExternalMarketplaceCard
+    ? getExternalMarketplaceTotalPrice(displayPrice.amount, {
+        source: card.source,
+        collectionName: card.collection,
+      })
+    : displayPrice.amount;
+  const primaryCurrency = displayPrice.currency;
+  const buyPrice = card.auctionListing ? card.auctionListing.price : primaryPrice;
+  const buyCurrency = card.auctionListing ? card.auctionListing.currency : displayPrice.currency;
+  const formattedPrimaryAmount = primaryCurrency === 'SOL'
+    ? primaryPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    : primaryPrice.toLocaleString();
 
   const marketplaceLabel = card.auctionListing
     ? 'Listed on Artifacte'

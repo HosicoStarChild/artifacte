@@ -8,8 +8,7 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 import { showToast } from "@/components/ToastContainer";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import {
-  calculateExternalMarketplaceFee,
-  shouldApplyExternalMarketplaceFee,
+  getExternalMarketplaceTotalPrice,
 } from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
@@ -129,9 +128,12 @@ function TCGCarousel({
             <div className="flex gap-6 snap-x">
               {items.map((listing) => {
                 const displayPrice = resolveListingDisplayPrice(listing);
+                const totalDisplayPrice = getExternalMarketplaceTotalPrice(displayPrice.amount, {
+                  source: listing.source,
+                });
                 const primaryAmount = displayPrice.currency === "SOL"
-                  ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
-                  : displayPrice.amount.toLocaleString();
+                  ? totalDisplayPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                  : totalDisplayPrice.toLocaleString();
                 const cardHref = getCardHref(listing);
                 const canBuyHere = showBuyButton && isInAppExternalCardListing(listing) && Boolean(listing.nftAddress);
 

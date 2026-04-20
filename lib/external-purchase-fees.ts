@@ -103,6 +103,22 @@ export function calculateExternalMarketplaceFee(amount: number): number {
   return amount * EXTERNAL_MARKETPLACE_FEE_RATE;
 }
 
+export function getExternalMarketplaceTotalPrice(
+  amount: number,
+  context?: ExternalFeeContext | null
+): number {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return 0;
+  }
+
+  if (!shouldApplyExternalMarketplaceFee(context)) {
+    return numericAmount;
+  }
+
+  return numericAmount + calculateExternalMarketplaceFee(numericAmount);
+}
+
 export function calculateExternalMarketplaceFeeAmount(
   amountInBaseUnits: number
 ): number {

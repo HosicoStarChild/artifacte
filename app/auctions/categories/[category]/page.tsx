@@ -15,8 +15,7 @@ import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { AuctionProgram } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
 import {
-  calculateExternalMarketplaceFee,
-  shouldApplyExternalMarketplaceFee,
+  getExternalMarketplaceTotalPrice,
 } from "@/lib/external-purchase-fees";
 
 const WalletMultiButton = dynamic(
@@ -517,8 +516,10 @@ export default function CategoryAuctionsPage() {
     if (currencyFilter === "SOL") return purchaseCurrency === "SOL";
     return true;
   }).sort((a: any, b: any) => {
-    if (sortBy === "price-high") return resolveListingDisplayPrice(b).amount - resolveListingDisplayPrice(a).amount;
-    if (sortBy === "price-low") return resolveListingDisplayPrice(a).amount - resolveListingDisplayPrice(b).amount;
+    const aTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(a).amount, { source: a.source });
+    const bTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(b).amount, { source: b.source });
+    if (sortBy === "price-high") return bTotal - aTotal;
+    if (sortBy === "price-low") return aTotal - bTotal;
     if (sortBy === "newest") {
       const aId = a.id || '';
       const bId = b.id || '';
@@ -731,11 +732,12 @@ export default function CategoryAuctionsPage() {
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const purchaseCurrency = getListingPurchaseCurrency(l);
                   const displayPrice = resolveListingDisplayPrice(l);
-
-
+                  const totalDisplayPrice = getExternalMarketplaceTotalPrice(displayPrice.amount, {
+                    source: l.source,
+                  });
                   const formattedAmount = displayPrice.currency === 'SOL'
-                    ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
-                    : displayPrice.amount.toLocaleString();
+                    ? totalDisplayPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                    : totalDisplayPrice.toLocaleString();
                   return (
                     <div
                       key={l.id}
