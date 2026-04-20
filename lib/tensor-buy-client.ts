@@ -17,6 +17,8 @@ interface TensorBuyFeeContext {
 interface TensorBuyResult {
   sig: string;
   price: number;
+  totalPrice: number;
+  currency: string;
   confirmed: boolean;
 }
 
@@ -78,8 +80,9 @@ export async function executeTensorBuy(
 
   const tensorData = await tensorRes.json();
   const feeCurrency = tensorData.platformFeeCurrency || 'USDC';
+  const totalPrice = Number(tensorData.price || 0) + Number(tensorData.platformFee || 0);
   const feeDisplay = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} ${feeCurrency} fee` : '';
-  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC${hideFeeInToast ? '' : feeDisplay}`);
+  onStatus?.(`💳 Confirm purchase — ${hideFeeInToast ? totalPrice : tensorData.price} ${feeCurrency}${hideFeeInToast ? '' : feeDisplay}`);
 
   // Step 2: Deserialize tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
@@ -156,9 +159,9 @@ export async function executeTensorBuy(
       if (status.err) throw new Error('Transaction failed on-chain');
       // Remove from oracle immediately after confirmed buy (fire and forget)
       fetch('/api/listing-sold', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mint }) }).catch(() => {});
-      return { sig: sig!, price: tensorData.price, confirmed: true };
+      return { sig: sig!, price: tensorData.price, totalPrice, currency: feeCurrency, confirmed: true };
     }
   }
 
-  return { sig: sig!, price: tensorData.price, confirmed: false };
+  return { sig: sig!, price: tensorData.price, totalPrice, currency: feeCurrency, confirmed: false };
 }

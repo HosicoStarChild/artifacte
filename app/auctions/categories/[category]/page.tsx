@@ -284,7 +284,7 @@ export default function CategoryAuctionsPage() {
             true
           );
           if (result.confirmed) {
-            showToast.success(`✅ Card purchased for ${formatListingQuote(listingDisplayPrice?.amount ?? result.price, listingDisplayPrice?.currency ?? 'USDC')}!`);
+            showToast.success(`✅ Card purchased for ${formatListingQuote(result.totalPrice, result.currency)}!`);
           } else {
             showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
           }
@@ -315,10 +315,17 @@ export default function CategoryAuctionsPage() {
           v0Tx,
           v0TxSigned,
           legacyTx,
+          displayPrice,
+          displayCurrency,
+          platformFee,
+          platformFeeCurrency,
         } = await buildRes.json();
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
-        showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice?.amount ?? price, listingDisplayPrice?.currency ?? (isDigitalArt ? 'SOL' : currency))}`);
+        const toastCurrency = displayCurrency || listingDisplayPrice?.currency || (isDigitalArt ? 'SOL' : currency);
+        const toastBaseAmount = displayPrice ?? listingDisplayPrice?.amount ?? price;
+        const toastTotal = toastBaseAmount + ((platformFeeCurrency === toastCurrency && platformFee) ? platformFee : 0);
+        showToast.info(`💳 Confirm purchase — ${formatListingQuote(toastTotal, toastCurrency)}`);
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 

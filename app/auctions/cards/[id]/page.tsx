@@ -524,7 +524,7 @@ export default function CardDetailPage() {
           true
         );
         if (result.confirmed) {
-          showToast.success(`✅ Card purchased for ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}!`);
+          showToast.success(`✅ Card purchased for ${formatListingQuote(result.totalPrice, result.currency)}!`);
         } else {
           showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
         }
@@ -554,6 +554,10 @@ export default function CardDetailPage() {
       const {
         v0Tx,
         v0TxSigned,
+        displayPrice,
+        displayCurrency,
+        platformFee,
+        platformFeeCurrency,
         blockhash,
         lastValidBlockHeight,
       } = await buildRes.json();
@@ -564,7 +568,9 @@ export default function CardDetailPage() {
         throw new Error("Wallet does not support signing");
       }
 
-      showToast.info(`💳 Confirm purchase — ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}`);
+      const toastCurrency = displayCurrency || cardDisplayPrice.currency;
+      const toastTotal = (displayPrice ?? cardDisplayPrice.amount) + ((platformFeeCurrency === toastCurrency && platformFee) ? platformFee : 0);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(toastTotal, toastCurrency)}`);
       
       const txBase64 = v0TxSigned || v0Tx;
       const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));

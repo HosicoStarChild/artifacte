@@ -254,7 +254,7 @@ export function HomeTCGSection() {
         );
 
         if (result.confirmed) {
-          showToast.success(`✅ Card purchased for ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}!`);
+          showToast.success(`✅ Card purchased for ${formatListingQuote(result.totalPrice, result.currency)}!`);
         } else {
           showToast.info("Transaction sent but not confirmed yet. Check Solscan.");
         }
@@ -284,10 +284,16 @@ export function HomeTCGSection() {
         v0Tx,
         v0TxSigned,
         legacyTx,
+        displayPrice,
+        displayCurrency,
+        platformFee,
+        platformFeeCurrency,
       } = await buildRes.json();
 
       if (!signTransaction) throw new Error("Wallet does not support signing");
-      showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}`);
+      const toastCurrency = displayCurrency || listingDisplayPrice.currency;
+      const toastTotal = (displayPrice ?? listingDisplayPrice.amount) + ((platformFeeCurrency === toastCurrency && platformFee) ? platformFee : 0);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(toastTotal, toastCurrency)}`);
 
       const { Transaction, VersionedTransaction } = await import("@solana/web3.js");
 
