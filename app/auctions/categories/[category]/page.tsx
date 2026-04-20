@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { auctions, listings as staticListings, formatFullPrice, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, Listing, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
@@ -102,10 +102,11 @@ export default function CategoryAuctionsPage() {
     if (urlCcCategory) {
       const tcgVal = reverseMap[urlCcCategory] || urlCcCategory;
       setFilters({ tcg: tcgVal });
+      setPage(1);
     } else {
       try { setFilters(JSON.parse(sessionStorage.getItem(storageKey) || '{}')); } catch {}
+      try { setPage(parseInt(sessionStorage.getItem(`${storageKey}-page`) || '1')); } catch {}
     }
-    try { setPage(parseInt(sessionStorage.getItem(`${storageKey}-page`) || '1')); } catch {}
     try { setCurrencyFilter((sessionStorage.getItem(`${storageKey}-currency`) as any) || "All"); } catch {}
     try { setSortBy((sessionStorage.getItem(`${storageKey}-sort`) as any) || "default"); } catch {}
     try { setSearchInput(sessionStorage.getItem(`${storageKey}-search`) || ""); } catch {}
@@ -114,18 +115,21 @@ export default function CategoryAuctionsPage() {
 
   // Sync URL ccCategory param → filter state (handles navigation between carousels)
   useEffect(() => {
-    if (!urlCcCategoryParam) return;
+    if (!hydrated || !urlCcCategoryParam) return;
     const reverseMap: Record<string, string> = {
       'Pokemon': 'Pokemon', 'One Piece': 'One Piece',
       'Yu-Gi-Oh': 'Yu-Gi-Oh', 'Dragon Ball': 'Dragon Ball Z', 'Lorcana': 'Lorcana',
       'Magic': 'Magic', 'Magic: The Gathering': 'Magic',
     };
     const tcgVal = reverseMap[urlCcCategoryParam] || urlCcCategoryParam;
-    if (filters.tcg !== tcgVal) {
-      setFilters({ tcg: tcgVal });
-      setPage(1);
-    }
-  }, [urlCcCategoryParam]);
+    setFilters((prev) => {
+      if (prev.tcg === tcgVal && Object.keys(prev).length === 1) {
+        return prev;
+      }
+      return { tcg: tcgVal };
+    });
+    setPage(1);
+  }, [hydrated, urlCcCategoryParam]);
 
   // Persist filters to sessionStorage on change
   useEffect(() => {
@@ -138,28 +142,49 @@ export default function CategoryAuctionsPage() {
     } catch {}
   }, [filters, page, currencyFilter, sortBy, searchInput, storageKey]);
   const searchTimer = useRef<NodeJS.Timeout>();
+  const listingsRequestRef = useRef(0);
   const ITEMS_PER_PAGE = 24;
   const [meListings, setMeListings] = useState<any[]>([]);
   const [meLoading, setMeLoading] = useState(true);
   const [meFilterLoading, setMeFilterLoading] = useState(false);
   const [meTotal, setMeTotal] = useState(0);
 
+  useEffect(() => {
+    return () => {
+      clearTimeout(searchTimer.current);
+    };
+  }, []);
+
   // Fetch from ME API for TCG and Sports cards
   const isArtifacteCollection = category === "ARTIFACTE";
   const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS" || isArtifacteCollection;
 
   useEffect(() => {
-    if (!useMeApi || !category) return;
+    if (!hydrated || !useMeApi || !category) return;
+    let cancelled = false;
+    const requestId = ++listingsRequestRef.current;
+    const requestedPage = page;
+
     // Only show full spinner on initial load; filter changes keep old results visible
     if (meListings.length === 0) setMeLoading(true);
     else setMeFilterLoading(true);
+
     // Artifacte collection queries the Artifacte on-chain program directly (not Oracle)
     const params = new URLSearchParams({
       ...(isArtifacteCollection ? {} : { category }),
       perPage: String(ITEMS_PER_PAGE),
       page: String(page),
-      sort: sortBy === 'price-high' ? 'price-desc' : sortBy === 'price-low' ? 'price-asc' : 'price-desc',
+      sort: sortBy === 'newest'
+        ? 'newest'
+        : sortBy === 'price-high'
+          ? 'price-desc'
+          : sortBy === 'price-low'
+            ? 'price-asc'
+            : 'price-desc',
     });
+
+    if (currencyFilter !== 'All') params.set('displayCurrency', currencyFilter);
+
     // Pass filters to server
     const tcgFilter = filters['tcg'];
     if (tcgFilter && tcgFilter !== 'All') {
@@ -205,15 +230,43 @@ export default function CategoryAuctionsPage() {
       : `/api/me-listings?${params}`;
 
     fetch(apiUrl)
-      .then(r => r.json())
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || data.message || 'Failed to fetch listings');
+        }
+        return data;
+      })
       .then(data => {
-        setMeListings(data.listings || []);
-        setMeTotal(data.total || 0);
+        if (cancelled || listingsRequestRef.current !== requestId) {
+          return;
+        }
+
+        const total = Number(data.total) || 0;
+        const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+        if (total > 0 && requestedPage > totalPages) {
+          setMeTotal(total);
+          setPage(totalPages);
+          return;
+        }
+
+        setMeListings(Array.isArray(data.listings) ? data.listings : []);
+        setMeTotal(total);
         setMeLoading(false);
         setMeFilterLoading(false);
       })
-      .catch(() => { setMeLoading(false); setMeFilterLoading(false); });
-  }, [useMeApi, category, filters, currencyFilter, page, sortBy]);
+      .catch(() => {
+        if (cancelled || listingsRequestRef.current !== requestId) {
+          return;
+        }
+        setMeLoading(false);
+        setMeFilterLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, useMeApi, category, filters, currencyFilter, page, sortBy, isArtifacteCollection]);
 
   // Use ME listings for TCG/Sports, static for everything else
   const listings = useMeApi ? meListings : staticListings;
@@ -493,7 +546,7 @@ export default function CategoryAuctionsPage() {
 
   // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
   // Currency filter + sort always applied client-side (Tensor USDC enrichment happens after Oracle returns)
-  const categoryListings = (useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
+  const categoryListings = useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
     for (const [key, value] of Object.entries(filters)) {
       if (!value || value === "All") continue;
       if (key === "spiritType") {
@@ -509,7 +562,7 @@ export default function CategoryAuctionsPage() {
       }
     }
     return true;
-  })).filter((l: any) => {
+  }).filter((l: any) => {
     if (currencyFilter === "All") return true;
     const purchaseCurrency = getListingPurchaseCurrency(l);
     if (currencyFilter === "USDC") return purchaseCurrency === "USDC";

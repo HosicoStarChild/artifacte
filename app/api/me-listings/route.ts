@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getActiveArtifacteMintSet } from '@/lib/artifacte-listings';
+import { getListingPurchaseCurrency } from '@/lib/listing-price';
 import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 // Proxy to Railway oracle listings index — fast, pre-indexed, real-time via webhooks
@@ -74,7 +75,33 @@ function getEffectiveListingPrice(listing: OracleListing): number {
   return rawPrice;
 }
 
-function sortListingsByRequestedPrice(listings: OracleListing[], sort: string | null): void {
+function getDisplayCurrency(listing: OracleListing): 'SOL' | 'USDC' | 'USD1' {
+  return getListingPurchaseCurrency({
+    price: Number(listing.price) || 0,
+    currency: typeof listing.currency === 'string' ? listing.currency : null,
+    source: typeof listing.source === 'string' ? listing.source : null,
+    solPrice: Number(listing.solPrice),
+    usdcPrice: Number(listing.usdcPrice),
+  });
+}
+
+function parseDisplayCurrency(value: string | null): 'SOL' | 'USDC' | null {
+  if (value === 'SOL' || value === 'USDC') {
+    return value;
+  }
+  return null;
+}
+
+function sortListingsByRequestedSort(listings: OracleListing[], sort: string | null): void {
+  if (sort === 'newest') {
+    listings.sort((a, b) => {
+      const aId = typeof a.id === 'string' ? a.id : '';
+      const bId = typeof b.id === 'string' ? b.id : '';
+      return bId.localeCompare(aId);
+    });
+    return;
+  }
+
   if (sort === 'price-asc') {
     listings.sort((a, b) => getEffectiveListingPrice(a) - getEffectiveListingPrice(b));
   } else if (sort === 'price-desc') {
@@ -317,15 +344,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category');
   const sort = searchParams.get('sort');
+  const displayCurrency = parseDisplayCurrency(searchParams.get('displayCurrency'));
   const requestedPage = parsePositiveInt(searchParams.get('page'), 1);
   const requestedPerPage = Math.min(100, Math.max(1, parsePositiveInt(searchParams.get('perPage'), 24)));
   const filterArtifacteRows = shouldFilterArtifacteRows(category);
+  const paginateAfterEnrichment = filterArtifacteRows || sort === 'newest' || displayCurrency !== null;
 
   // Forward all query params to Railway
   const params = new URLSearchParams(searchParams.toString());
 
   try {
-    const data = filterArtifacteRows
+    const data = paginateAfterEnrichment
       ? await fetchAllOracleListings(params)
       : await fetchOraclePage(params);
 
@@ -346,8 +375,6 @@ export async function GET(request: Request) {
       }
 
       total = listings.length;
-      const start = (requestedPage - 1) * requestedPerPage;
-      listings = listings.slice(start, start + requestedPerPage);
     }
 
     for (const listing of listings) {
@@ -371,19 +398,27 @@ export async function GET(request: Request) {
       }
     }
 
-    sortListingsByRequestedPrice(listings, sort);
+    if (displayCurrency) {
+      listings = listings.filter((listing) => getDisplayCurrency(listing) === displayCurrency);
+    }
+
+    sortListingsByRequestedSort(listings, sort);
+
+    total = listings.length;
+
+    if (paginateAfterEnrichment) {
+      const start = (requestedPage - 1) * requestedPerPage;
+      listings = listings.slice(start, start + requestedPerPage);
+    }
 
     const responsePayload: OracleListingsResponse = {
       ...data,
       listings,
       total,
+      page: requestedPage,
+      perPage: requestedPerPage,
+      totalPages: Math.max(1, Math.ceil(total / requestedPerPage)),
     };
-
-    if (filterArtifacteRows) {
-      responsePayload.page = requestedPage;
-      responsePayload.perPage = requestedPerPage;
-      responsePayload.totalPages = Math.max(1, Math.ceil(total / requestedPerPage));
-    }
 
     const response = NextResponse.json(responsePayload);
     response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
