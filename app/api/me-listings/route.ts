@@ -18,6 +18,7 @@ type OracleListing = {
   source?: string;
   marketplace?: string;
   verifiedBy?: string;
+  currency?: string;
   usdcPrice?: number;
   solPrice?: number;
   price?: number;
@@ -35,6 +36,51 @@ const TENSOR_CACHE_TTL = 60_000; // 60 seconds
 const tensorPriceCache = new Map<string, { usdcPrice?: number; solPrice?: number; ts: number }>();
 const ME_CACHE_TTL = 60_000; // 60 seconds
 const magicEdenPriceCache = new Map<string, { solPrice?: number; usdcPrice?: number; ts: number }>();
+
+function getPositiveNumber(value: unknown): number | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function getListingCurrency(listing: OracleListing): string | null {
+  return typeof listing.currency === 'string' && listing.currency
+    ? listing.currency.toUpperCase()
+    : null;
+}
+
+function assignRawPriceToMatchingCurrency(listing: OracleListing): void {
+  const rawPrice = getPositiveNumber(listing.price);
+  if (!rawPrice) return;
+
+  const currency = getListingCurrency(listing);
+  if (currency === 'USDC' && !getPositiveNumber(listing.usdcPrice)) {
+    listing.usdcPrice = rawPrice;
+  }
+
+  if (currency === 'SOL' && !getPositiveNumber(listing.solPrice)) {
+    listing.solPrice = rawPrice;
+  }
+}
+
+function getEffectiveListingPrice(listing: OracleListing): number {
+  const rawPrice = getPositiveNumber(listing.price) ?? 0;
+  const currency = getListingCurrency(listing);
+  const usdcPrice = getPositiveNumber(listing.usdcPrice);
+  const solPrice = getPositiveNumber(listing.solPrice);
+
+  if (usdcPrice) return usdcPrice;
+  if (currency === 'USDC') return rawPrice;
+  if (solPrice) return solPrice;
+  return rawPrice;
+}
+
+function sortListingsByRequestedPrice(listings: OracleListing[], sort: string | null): void {
+  if (sort === 'price-asc') {
+    listings.sort((a, b) => getEffectiveListingPrice(a) - getEffectiveListingPrice(b));
+  } else if (sort === 'price-desc') {
+    listings.sort((a, b) => getEffectiveListingPrice(b) - getEffectiveListingPrice(a));
+  }
+}
 
 function getCachedPrice(mint: string) {
   const entry = tensorPriceCache.get(mint);
@@ -68,7 +114,7 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
     if (cached) {
       if (cached.usdcPrice) {
         l.usdcPrice = cached.usdcPrice;
-        if (!l.solPrice) l.solPrice = l.price || 0;
+        assignRawPriceToMatchingCurrency(l);
       } else if (cached.solPrice && !l.solPrice) {
         l.solPrice = cached.solPrice;
       }
@@ -113,7 +159,7 @@ async function enrichWithTensorPrices(listings: any[]): Promise<void> {
         if (currencyAddr === USDC_MINT) {
           const usdcPrice = amount / 1e6;
           listing.usdcPrice = usdcPrice;
-          if (!listing.solPrice) listing.solPrice = listing.price || 0;
+          assignRawPriceToMatchingCurrency(listing);
           tensorPriceCache.set(mint, { usdcPrice, ts: now });
         } else if (amount > 0) {
           const solPrice = amount / 1e9;
@@ -270,6 +316,7 @@ async function fetchAllOracleListings(params: URLSearchParams): Promise<OracleLi
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category');
+  const sort = searchParams.get('sort');
   const requestedPage = parsePositiveInt(searchParams.get('page'), 1);
   const requestedPerPage = Math.min(100, Math.max(1, parsePositiveInt(searchParams.get('perPage'), 24)));
   const filterArtifacteRows = shouldFilterArtifacteRows(category);
@@ -303,6 +350,10 @@ export async function GET(request: Request) {
       listings = listings.slice(start, start + requestedPerPage);
     }
 
+    for (const listing of listings) {
+      assignRawPriceToMatchingCurrency(listing);
+    }
+
     // Enrich listings with Tensor USDC prices
     if (listings.length && process.env.HELIUS_API_KEY) {
       try {
@@ -319,6 +370,8 @@ export async function GET(request: Request) {
         console.warn('[me-listings] Collector Crypt SOL enrichment failed:', e?.message);
       }
     }
+
+    sortListingsByRequestedPrice(listings, sort);
 
     const responsePayload: OracleListingsResponse = {
       ...data,

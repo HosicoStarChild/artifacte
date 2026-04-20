@@ -105,14 +105,14 @@ type ListingPriceInput = {
 type ListingPrimaryCurrency = 'SOL' | 'USDC' | 'USD1';
 
 export function getListingPurchaseCurrency(listing: ListingPriceInput): ListingPrimaryCurrency {
-  const displayCurrency = typeof listing.currency === 'string' && listing.currency ? listing.currency : 'USD1';
+  const displayCurrency = typeof listing.currency === 'string' && listing.currency
+    ? listing.currency.toUpperCase()
+    : 'USD1';
   const solPrice = Number(listing.solPrice);
   const usdcPrice = Number(listing.usdcPrice);
   const hasSolPrice = Number.isFinite(solPrice) && solPrice > 0;
   const hasUsdcPrice = Number.isFinite(usdcPrice) && usdcPrice > 0;
-  const prefersCollectorCryptSol = listing.source === 'collector-crypt' && !listing.auctionListing && hasSolPrice;
 
-  if (prefersCollectorCryptSol) return 'SOL';
   if (hasUsdcPrice || displayCurrency === 'USDC') return 'USDC';
   if (displayCurrency === 'SOL' || hasSolPrice) return 'SOL';
   return 'USD1';
@@ -126,7 +126,9 @@ export function resolveListingDisplayPrice(listing: ListingPriceInput): {
 } {
   const rawPrice = Number(listing.price);
   const amount = Number.isFinite(rawPrice) ? rawPrice : 0;
-  const displayCurrency = typeof listing.currency === 'string' && listing.currency ? listing.currency : 'USD1';
+  const displayCurrency = typeof listing.currency === 'string' && listing.currency
+    ? listing.currency.toUpperCase()
+    : 'USD1';
   const solPrice = Number(listing.solPrice);
   const usdcPrice = Number(listing.usdcPrice);
   const hasSolPrice = Number.isFinite(solPrice) && solPrice > 0;

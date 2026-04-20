@@ -59,6 +59,17 @@ function formatFeeDisplay(amount: number, currency: string): string {
   })}`;
 }
 
+function formatListingQuote(amount: number, currency: string): string {
+  const formattedAmount = amount.toLocaleString(
+    undefined,
+    currency === "SOL" ? { maximumFractionDigits: 4 } : undefined
+  );
+
+  return currency === "SOL"
+    ? `◎ ${formattedAmount} SOL`
+    : `$${formattedAmount} ${currency}`;
+}
+
 export default function CategoryAuctionsPage() {
   const params = useParams();
   const categorySlug = params.category as string;
@@ -244,6 +255,7 @@ export default function CategoryAuctionsPage() {
       return;
     }
 
+    const listingDisplayPrice = listing ? resolveListingDisplayPrice(listing) : null;
     setBuyingId(listingId);
     try {
       let sig: string = "";
@@ -271,7 +283,7 @@ export default function CategoryAuctionsPage() {
             { source: listing?.source }
           );
           if (result.confirmed) {
-            showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+            showToast.success(`✅ Card purchased for ${formatListingQuote(listingDisplayPrice?.amount ?? result.price, listingDisplayPrice?.currency ?? 'USDC')}!`);
           } else {
             showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
           }
@@ -311,7 +323,7 @@ export default function CategoryAuctionsPage() {
         const feeDisplay = platformFee
           ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
           : '';
-        showToast.info(`💳 Confirm purchase — ${mePrice} SOL${feeDisplay}`);
+        showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice?.amount ?? mePrice, listingDisplayPrice?.currency ?? 'SOL')}${feeDisplay}`);
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 
@@ -463,7 +475,7 @@ export default function CategoryAuctionsPage() {
       ) {
         showToast.error("Transaction rejected by user");
       } else if (lowerMessage.includes("insufficient")) {
-        showToast.error(`Insufficient balance. Required: ${price} ${isDigitalArt ? "SOL" : currency}`);
+        showToast.error(`Insufficient balance. Required: ${formatListingQuote(listingDisplayPrice?.amount ?? price, listingDisplayPrice?.currency ?? (isDigitalArt ? 'SOL' : currency))}`);
       } else {
         showToast.error(`Error: ${message.slice(0, 80)}`);
       }
@@ -503,8 +515,8 @@ export default function CategoryAuctionsPage() {
     if (currencyFilter === "SOL") return purchaseCurrency === "SOL";
     return true;
   }).sort((a: any, b: any) => {
-    if (sortBy === "price-high") return b.price - a.price;
-    if (sortBy === "price-low") return a.price - b.price;
+    if (sortBy === "price-high") return resolveListingDisplayPrice(b).amount - resolveListingDisplayPrice(a).amount;
+    if (sortBy === "price-low") return resolveListingDisplayPrice(a).amount - resolveListingDisplayPrice(b).amount;
     if (sortBy === "newest") {
       const aId = a.id || '';
       const bId = b.id || '';
@@ -722,12 +734,14 @@ export default function CategoryAuctionsPage() {
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const purchaseCurrency = getListingPurchaseCurrency(l);
                   const displayPrice = resolveListingDisplayPrice(l);
-                  const showUsdcPrice = purchaseCurrency === 'USDC';
                   const showExternalFeeNote = isInAppExternalCardListing(l)
                     && shouldApplyExternalMarketplaceFee({ source: l.source });
                   const externalFee = showExternalFeeNote
                     ? calculateExternalMarketplaceFee(displayPrice.amount)
                     : 0;
+                  const formattedAmount = displayPrice.currency === 'SOL'
+                    ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                    : displayPrice.amount.toLocaleString();
                   return (
                     <div
                       key={l.id}
@@ -778,24 +792,15 @@ export default function CategoryAuctionsPage() {
                                 <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
-                            ) : showUsdcPrice ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">${displayPrice.amount.toLocaleString()} <span className="text-gold-500 text-sm">USDC</span></p>
-                                {displayPrice.secondaryCurrency === 'SOL' && displayPrice.secondaryAmount !== undefined && (
-                                  <p className="text-gray-500 text-xs mt-0.5">◎ {Number(displayPrice.secondaryAmount).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL</p>
-                                )}
-                              </>
                             ) : purchaseCurrency === 'SOL' ? (
                               <>
-                                <p className="text-white font-serif text-2xl">◎ {displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</p>
+                                <p className="text-white font-serif text-2xl">◎ {formattedAmount}</p>
                                 <p className="text-gold-500 text-xs mt-1">SOL</p>
                               </>
                             ) : (
                               <>
-                                <p className="text-white font-serif text-2xl">{formatFullPrice(displayPrice.amount)}</p>
-                                <p className="text-gold-500 text-xs mt-1">
-                                  {displayPrice.amount.toLocaleString()} {displayPrice.currency}
-                                </p>
+                                <p className="text-white font-serif text-2xl">${formattedAmount}</p>
+                                <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
                                 {BAXUS_SELLER_FEE_ENABLED && l.verifiedBy === "BAXUS" && (
                                   <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
                                 )}
@@ -826,7 +831,7 @@ export default function CategoryAuctionsPage() {
                           ) : (l.source === 'phygitals' || l.source === 'collector-crypt') && (l as any).nftAddress ? (
                             connected ? (
                               <button
-                                onClick={() => handleBuyNow(l.id, (l as any).solPrice || l.price, (l as any).nftAddress, l)}
+                                onClick={() => handleBuyNow(l.id, displayPrice.amount, (l as any).nftAddress, l)}
                                 disabled={buyingId === l.id}
                                 className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
                               >

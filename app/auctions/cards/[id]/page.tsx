@@ -9,6 +9,7 @@ import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solan
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import PriceHistory from "@/components/PriceHistory";
+import { resolveListingDisplayPrice } from "@/lib/data";
 import {
   calculateExternalMarketplaceFee,
   shouldApplyExternalMarketplaceFee,
@@ -144,6 +145,46 @@ function formatFeeDisplay(amount: number, currency: string): string {
   })}`;
 }
 
+function getPositiveNumber(value: unknown): number | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function getRawListingPriceForCurrency(listing: { price?: unknown; currency?: unknown } | null | undefined, currency: 'SOL' | 'USDC'): number | null {
+  const rawPrice = getPositiveNumber(listing?.price);
+  const rawCurrency = typeof listing?.currency === 'string' ? listing.currency.toUpperCase() : null;
+  return rawPrice && rawCurrency === currency ? rawPrice : null;
+}
+
+function getFirstPositivePrice(...candidates: Array<unknown>): number {
+  for (const candidate of candidates) {
+    const amount = getPositiveNumber(candidate);
+    if (amount) return amount;
+  }
+
+  return 0;
+}
+
+function getFirstPositiveNullable(...candidates: Array<unknown>): number | null {
+  for (const candidate of candidates) {
+    const amount = getPositiveNumber(candidate);
+    if (amount) return amount;
+  }
+
+  return null;
+}
+
+function formatListingQuote(amount: number, currency: string): string {
+  const formattedAmount = amount.toLocaleString(
+    undefined,
+    currency === 'SOL' ? { maximumFractionDigits: 4 } : undefined
+  );
+
+  return currency === 'SOL'
+    ? `◎ ${formattedAmount} SOL`
+    : `$${formattedAmount} ${currency}`;
+}
+
 export default function CardDetailPage() {
   const params = useParams();
   const cardId = params.id as string;
@@ -181,9 +222,26 @@ export default function CardDetailPage() {
           const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
 
           // Merge prices: oracle has SOL price from ME, Tensor may have USDC price, Anchor may have auction listing
-          const solPrice = oracleListing?.solPrice || oracleListing?.price || tensorPrice?.solPrice || 0;
-          const usdcPrice = auctionListing?.currency === 'USDC' ? auctionListing.price
-            : tensorPrice?.usdcPrice || (oracleListing?.currency === 'USDC' ? oracleListing?.price : null) || oracleListing?.usdcPrice || null;
+          const oracleSolPrice = getRawListingPriceForCurrency(oracleListing, 'SOL');
+          const oracleUsdcPrice = getRawListingPriceForCurrency(oracleListing, 'USDC');
+          const solPrice = getFirstPositivePrice(
+            auctionListing?.currency === 'SOL' ? auctionListing.price : null,
+            oracleListing?.solPrice,
+            oracleSolPrice,
+            tensorPrice?.solPrice
+          );
+          const usdcPrice = getFirstPositiveNullable(
+            auctionListing?.currency === 'USDC' ? auctionListing.price : null,
+            tensorPrice?.usdcPrice,
+            oracleUsdcPrice,
+            oracleListing?.usdcPrice
+          );
+          const listingCurrency = auctionListing?.currency || (usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'));
+          const listingPrice = auctionListing?.price || getFirstPositivePrice(
+            listingCurrency === 'USDC' ? usdcPrice : solPrice,
+            usdcPrice,
+            solPrice
+          );
 
           setCard({
             id: cardId,
@@ -195,9 +253,9 @@ export default function CardDetailPage() {
             image: oracleListing?.image || nft.image || '',
             nftAddress: mint,
             source: 'phygitals',
-            currency: auctionListing ? auctionListing.currency : usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'),
+            currency: listingCurrency,
             category: 'TCG_CARDS',
-            price: auctionListing ? auctionListing.price : (usdcPrice || solPrice),
+            price: listingPrice,
             solPrice,
             usdcPrice,
             auctionListing,
@@ -238,10 +296,14 @@ export default function CardDetailPage() {
         if (found) {
           // Also check Tensor for a USDC listing price
           const mint = found.nftAddress || cardId;
+          const rawFoundSolPrice = getRawListingPriceForCurrency(found, 'SOL');
+          const rawFoundUsdcPrice = getRawListingPriceForCurrency(found, 'USDC');
+          if (!found.solPrice && rawFoundSolPrice) found.solPrice = rawFoundSolPrice;
+          if (!found.usdcPrice && rawFoundUsdcPrice) found.usdcPrice = rawFoundUsdcPrice;
           const tp = await fetchTensorPrice(connection, mint);
           if (tp?.usdcPrice) {
             found.usdcPrice = tp.usdcPrice;
-            found.solPrice = found.solPrice || found.price || tp.solPrice || 0;
+            if (!found.solPrice && tp.solPrice) found.solPrice = tp.solPrice;
             found.currency = 'USDC';
             found.price = tp.usdcPrice;
             if (tp.seller) found.seller = tp.seller;
@@ -409,6 +471,7 @@ export default function CardDetailPage() {
       return;
     }
     setBuying(true);
+    const cardDisplayPrice = resolveListingDisplayPrice(card);
 
     try {
       showToast.info("Building transaction...");
@@ -460,7 +523,7 @@ export default function CardDetailPage() {
           }
         );
         if (result.confirmed) {
-          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+          showToast.success(`✅ Card purchased for ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}!`);
         } else {
           showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
         }
@@ -506,7 +569,7 @@ export default function CardDetailPage() {
       const feeDisplay = platformFee
         ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
         : '';
-      showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}${feeDisplay}`);
       
       const txBase64 = v0TxSigned || v0Tx;
       const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
@@ -590,7 +653,7 @@ export default function CardDetailPage() {
       ) {
         showToast.error("Transaction cancelled");
       } else if (lowerMessage.includes("insufficient")) {
-        showToast.error("Insufficient SOL balance");
+        showToast.error(`Insufficient balance. Required: ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}`);
       } else if (lowerMessage.includes("no longer available") || lowerMessage.includes("already been sold")) {
         showToast.error("This item has already been sold");
       } else if (message.includes("No active listing")) {
@@ -712,11 +775,14 @@ export default function CardDetailPage() {
     );
   }
 
-  const showSolTransactionPrice = card.source === 'collector-crypt' && !card.auctionListing && card.solPrice > 0;
-  const primaryPrice = showSolTransactionPrice ? card.solPrice : (card.usdcPrice || card.price);
-  const primaryCurrency = showSolTransactionPrice ? 'SOL' : (card.usdcPrice || card.currency === 'USDC' ? 'USDC' : card.currency);
-  const buyPrice = showSolTransactionPrice ? card.solPrice : card.price;
-  const buyCurrency = showSolTransactionPrice ? 'SOL' : card.currency;
+  const displayPrice = resolveListingDisplayPrice(card);
+  const primaryPrice = displayPrice.amount;
+  const primaryCurrency = displayPrice.currency;
+  const buyPrice = card.auctionListing ? card.auctionListing.price : displayPrice.amount;
+  const buyCurrency = card.auctionListing ? card.auctionListing.currency : displayPrice.currency;
+  const formattedPrimaryAmount = primaryCurrency === 'SOL'
+    ? primaryPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    : primaryPrice.toLocaleString();
   const isExternalMarketplaceCard = !card.auctionListing && (
     card.source === 'collector-crypt'
     || card.source === 'phygitals'
@@ -794,7 +860,7 @@ export default function CardDetailPage() {
                   <>
                     <div className="flex items-baseline gap-3">
                       <p className="text-white font-serif text-4xl">
-                        {primaryCurrency === 'SOL' ? `◎ ${primaryPrice.toLocaleString()}` : `$${primaryPrice.toLocaleString()}`}
+                        {primaryCurrency === 'SOL' ? `◎ ${formattedPrimaryAmount}` : `$${formattedPrimaryAmount}`}
                       </p>
                       <span className="text-gold-500 text-sm font-medium">{primaryCurrency}</span>
                     </div>
@@ -807,9 +873,6 @@ export default function CardDetailPage() {
                       <p className="text-gray-400 text-sm mt-1 mb-4">
                         Ends: {new Date(card.auctionListing.endTime).toLocaleDateString()} {new Date(card.auctionListing.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
-                    )}
-                    {!card.auctionListing && primaryCurrency !== 'SOL' && card.solPrice > 0 && (
-                      <p className="text-gray-400 text-sm mt-1 mb-4">◎ {card.solPrice.toLocaleString()} SOL</p>
                     )}
                     {showExternalFeeNote && (
                       <p className="text-amber-300 text-sm mt-2 mb-4">
@@ -877,7 +940,7 @@ export default function CardDetailPage() {
                             : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                         }`}
                       >
-                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${buyCurrency === 'SOL' ? '◎' : '$'}${buyPrice.toLocaleString()} ${buyCurrency}`}
+                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                       </button>
                     ) : (
                       <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
@@ -892,7 +955,7 @@ export default function CardDetailPage() {
                           : "bg-gold-500 hover:bg-gold-600 text-dark-900"
                       }`}
                     >
-                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${buyCurrency === 'SOL' ? '◎' : '$'}${buyPrice.toLocaleString()} ${buyCurrency}`}
+                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                     </button>
                   ) : (
                     <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />

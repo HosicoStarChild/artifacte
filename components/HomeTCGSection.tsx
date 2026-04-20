@@ -43,7 +43,7 @@ type TCGCarouselProps = {
   connected?: boolean;
   buyingId?: string | null;
   purchasedIds?: Record<string, boolean>;
-  onBuyNow?: (listing: MEListing, displayPrice: number) => void;
+  onBuyNow?: (listing: MEListing) => void;
 };
 
 function getCardHref(listing: MEListing): string {
@@ -72,6 +72,17 @@ function formatFeeDisplay(amount: number, currency: string): string {
   })}`;
 }
 
+function formatListingQuote(amount: number, currency: string): string {
+  const formattedAmount = amount.toLocaleString(
+    undefined,
+    currency === "SOL" ? { maximumFractionDigits: 4 } : undefined
+  );
+
+  return currency === "SOL"
+    ? `◎ ${formattedAmount} SOL`
+    : `$${formattedAmount} ${currency}`;
+}
+
 function TCGCarousel({
   title,
   emoji,
@@ -87,13 +98,13 @@ function TCGCarousel({
 }: TCGCarouselProps) {
   return (
     <section className={`${bg || ""} py-20 px-4 sm:px-6 lg:px-8`}>
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-12">
-          <div>
+      <div className="max-w-7xl mx-auto min-w-0">
+        <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-2">Top Listings</p>
-            <h2 className="font-serif text-3xl md:text-4xl text-white">{title} {emoji}</h2>
+            <h2 className="font-serif text-3xl md:text-4xl text-white leading-tight break-words">{title} {emoji}</h2>
           </div>
-          <Link href={viewAllHref || "/auctions/categories/tcg-cards"} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+          <Link href={viewAllHref || "/auctions/categories/tcg-cards"} className="self-start text-gold-500 hover:text-gold-400 text-sm font-medium transition sm:self-auto">
             {viewAllLabel || "View All TCG"} →
           </Link>
         </div>
@@ -121,7 +132,6 @@ function TCGCarousel({
                 const primaryAmount = displayPrice.currency === "SOL"
                   ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
                   : displayPrice.amount.toLocaleString();
-                const secondaryAmount = displayPrice.secondaryAmount?.toLocaleString(undefined, { maximumFractionDigits: 4 });
                 const cardHref = getCardHref(listing);
                 const canBuyHere = showBuyButton && isInAppExternalCardListing(listing) && Boolean(listing.nftAddress);
                 const showExternalFeeNote = canBuyHere && shouldApplyExternalMarketplaceFee({ source: listing.source });
@@ -156,9 +166,6 @@ function TCGCarousel({
                               {displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
                             </p>
                             <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
-                            {displayPrice.secondaryCurrency === "SOL" && secondaryAmount && (
-                              <p className="text-gray-500 text-xs mt-1">◎ {secondaryAmount} SOL</p>
-                            )}
                             {showExternalFeeNote && (
                               <p className="text-amber-300 text-xs mt-2">
                                 + {formatFeeDisplay(externalFee, displayPrice.currency)} Artifacte fee at checkout
@@ -179,7 +186,7 @@ function TCGCarousel({
                           ) : canBuyHere ? (
                             connected ? (
                               <button
-                                onClick={() => onBuyNow?.(listing, displayPrice.amount)}
+                                onClick={() => onBuyNow?.(listing)}
                                 disabled={buyingId === listing.id}
                                 className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
                               >
@@ -222,13 +229,14 @@ export function HomeTCGSection() {
     setPurchasedIds((prev) => ({ ...prev, [listingId]: true }));
   };
 
-  const handleBuyNow = async (listing: MEListing, displayPrice: number) => {
+  const handleBuyNow = async (listing: MEListing) => {
     if (!connected || !publicKey) {
       showToast.error("Please connect your wallet first");
       return;
     }
 
     const mintAddr = listing.nftAddress;
+    const listingDisplayPrice = resolveListingDisplayPrice(listing);
     if (!mintAddr) {
       showToast.error("NFT mint address not available");
       return;
@@ -252,7 +260,7 @@ export function HomeTCGSection() {
         );
 
         if (result.confirmed) {
-          showToast.success(`✅ Card purchased for ${result.price} USDC!`);
+          showToast.success(`✅ Card purchased for ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}!`);
         } else {
           showToast.info("Transaction sent but not confirmed yet. Check Solscan.");
         }
@@ -292,7 +300,7 @@ export function HomeTCGSection() {
       const feeDisplay = platformFee
         ? ` + ${platformFee.toFixed(platformFeeCurrency === "SOL" ? 4 : 2)} ${platformFeeCurrency} fee`
         : "";
-      showToast.info(`💳 Confirm purchase — ${mePrice} SOL${feeDisplay}`);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}${feeDisplay}`);
 
       const { Transaction, VersionedTransaction } = await import("@solana/web3.js");
 
@@ -406,8 +414,7 @@ export function HomeTCGSection() {
       ) {
         showToast.error("Transaction rejected by user");
       } else if (lowerMessage.includes("insufficient")) {
-        const currencyLabel = listing.source === "phygitals" ? "USDC" : "SOL";
-        showToast.error(`Insufficient balance. Required: ${displayPrice} ${currencyLabel}`);
+        showToast.error(`Insufficient balance. Required: ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}`);
       } else {
         showToast.error(`Error: ${message.slice(0, 80)}`);
       }
