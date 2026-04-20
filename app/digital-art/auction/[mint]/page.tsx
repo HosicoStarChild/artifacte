@@ -165,16 +165,6 @@ export default function AuctionDetailPage() {
   const isSeller = !isExternal && listing?.seller === publicKey?.toBase58();
   const isSettled = !isExternal && listing?.status?.settled !== undefined;
   const isCancelled = !isExternal && listing?.status?.cancelled !== undefined;
-  const showExternalFeeNote = Boolean(
-    externalListing && shouldApplyExternalMarketplaceFee({
-      source: externalListing.source,
-      collectionAddress: externalListing.collectionAddress,
-      collectionName: externalListing.collectionName,
-    })
-  );
-  const externalFee = showExternalFeeNote && externalListing
-    ? calculateExternalMarketplaceFee(externalListing.price)
-    : 0;
 
   useEffect(() => {
     setAuctionEnded(false);
@@ -953,11 +943,7 @@ export default function AuctionDetailPage() {
                 <p className="text-4xl font-serif text-gold-400">
                   {formatExternalPrice(externalListing)}
                 </p>
-                <p className={`text-sm mt-3 ${showExternalFeeNote ? 'text-amber-200' : 'text-emerald-300'}`}>
-                  {showExternalFeeNote
-                    ? `+ ${formatFeeDisplay(externalFee, externalListing.currencySymbol)} Artifacte fee at checkout`
-                    : 'Artifacte collection items do not incur the 2% external Artifacte fee.'}
-                </p>
+
                 {listedAt && (
                   <p className="text-gray-500 text-xs mt-2">Listed {listedAt}</p>
                 )}
@@ -1021,11 +1007,6 @@ export default function AuctionDetailPage() {
                 )}
               </div>
 
-              <p className={`text-sm ${showExternalFeeNote ? 'text-amber-200/90' : 'text-emerald-300/90'}`}>
-                {showExternalFeeNote
-                  ? 'This external marketplace purchase is executed through Artifacte with a separate 2% fee.'
-                  : 'This listing is fee-exempt under the Artifacte collection rule.'}
-              </p>
             </div>
           </div>
         </div>

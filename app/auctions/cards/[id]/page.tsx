@@ -789,11 +789,7 @@ export default function CardDetailPage() {
     || card.buyKind === 'tensorCompressed'
     || card.buyKind === 'tensorStandard'
   );
-  const showExternalFeeNote = isExternalMarketplaceCard && shouldApplyExternalMarketplaceFee({
-    source: card.source,
-    collectionName: card.collection,
-  });
-  const externalFee = showExternalFeeNote ? calculateExternalMarketplaceFee(buyPrice) : 0;
+
   const marketplaceLabel = card.auctionListing
     ? 'Listed on Artifacte'
     : (card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard')
@@ -872,11 +868,6 @@ export default function CardDetailPage() {
                     {card.auctionListing?.listingType === 'auction' && card.auctionListing.endTime > 0 && (
                       <p className="text-gray-400 text-sm mt-1 mb-4">
                         Ends: {new Date(card.auctionListing.endTime).toLocaleDateString()} {new Date(card.auctionListing.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    )}
-                    {showExternalFeeNote && (
-                      <p className="text-amber-300 text-sm mt-2 mb-4">
-                        + {formatFeeDisplay(externalFee, buyCurrency)} Artifacte fee at checkout
                       </p>
                     )}
                   </>

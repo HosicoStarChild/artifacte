@@ -734,11 +734,8 @@ export default function CategoryAuctionsPage() {
                 {(useMeApi ? categoryListings : categoryListings.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)).map((l) => {
                   const purchaseCurrency = getListingPurchaseCurrency(l);
                   const displayPrice = resolveListingDisplayPrice(l);
-                  const showExternalFeeNote = isInAppExternalCardListing(l)
-                    && shouldApplyExternalMarketplaceFee({ source: l.source });
-                  const externalFee = showExternalFeeNote
-                    ? calculateExternalMarketplaceFee(displayPrice.amount)
-                    : 0;
+
+
                   const formattedAmount = displayPrice.currency === 'SOL'
                     ? displayPrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
                     : displayPrice.amount.toLocaleString();
@@ -805,11 +802,6 @@ export default function CategoryAuctionsPage() {
                                   <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
                                 )}
                               </>
-                            )}
-                            {showExternalFeeNote && (
-                              <p className="text-amber-300 text-xs mt-2">
-                                + {formatFeeDisplay(externalFee, displayPrice.currency)} Artifacte fee at checkout
-                              </p>
                             )}
                           </div>
                           {l.source === 'baxus' && (l.externalUrl || (l as any).nftAddress) ? (

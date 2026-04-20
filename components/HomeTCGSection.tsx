@@ -134,10 +134,7 @@ function TCGCarousel({
                   : displayPrice.amount.toLocaleString();
                 const cardHref = getCardHref(listing);
                 const canBuyHere = showBuyButton && isInAppExternalCardListing(listing) && Boolean(listing.nftAddress);
-                const showExternalFeeNote = canBuyHere && shouldApplyExternalMarketplaceFee({ source: listing.source });
-                const externalFee = showExternalFeeNote
-                  ? calculateExternalMarketplaceFee(displayPrice.amount)
-                  : 0;
+
                 const isPurchased = Boolean(purchasedIds?.[listing.id]);
 
                 return (
@@ -166,11 +163,7 @@ function TCGCarousel({
                               {displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
                             </p>
                             <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
-                            {showExternalFeeNote && (
-                              <p className="text-amber-300 text-xs mt-2">
-                                + {formatFeeDisplay(externalFee, displayPrice.currency)} Artifacte fee at checkout
-                              </p>
-                            )}
+                           
                           </div>
                         </div>
                       </Link>
