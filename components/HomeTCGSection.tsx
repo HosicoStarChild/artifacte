@@ -249,7 +249,8 @@ export function HomeTCGSection() {
           showToast.info,
           sendTransaction ?? undefined,
           wallet?.adapter?.name,
-          { source: listing.source }
+          { source: listing.source },
+          true
         );
 
         if (result.confirmed) {
@@ -283,17 +284,10 @@ export function HomeTCGSection() {
         v0Tx,
         v0TxSigned,
         legacyTx,
-        price: mePrice,
-        platformFee,
-        platformFeeCurrency,
       } = await buildRes.json();
 
       if (!signTransaction) throw new Error("Wallet does not support signing");
-
-      const feeDisplay = platformFee
-        ? ` + ${platformFee.toFixed(platformFeeCurrency === "SOL" ? 4 : 2)} ${platformFeeCurrency} fee`
-        : "";
-      showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}${feeDisplay}`);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}`);
 
       const { Transaction, VersionedTransaction } = await import("@solana/web3.js");
 

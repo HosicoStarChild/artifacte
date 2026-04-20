@@ -520,7 +520,8 @@ export default function CardDetailPage() {
           {
             source: card.source,
             collectionName: card.collection,
-          }
+          },
+          true
         );
         if (result.confirmed) {
           showToast.success(`✅ Card purchased for ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}!`);
@@ -553,9 +554,6 @@ export default function CardDetailPage() {
       const {
         v0Tx,
         v0TxSigned,
-        price,
-        platformFee,
-        platformFeeCurrency,
         blockhash,
         lastValidBlockHeight,
       } = await buildRes.json();
@@ -566,10 +564,7 @@ export default function CardDetailPage() {
         throw new Error("Wallet does not support signing");
       }
 
-      const feeDisplay = platformFee
-        ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
-        : '';
-      showToast.info(`💳 Confirm purchase — ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}${feeDisplay}`);
+      showToast.info(`💳 Confirm purchase — ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}`);
       
       const txBase64 = v0TxSigned || v0Tx;
       const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));

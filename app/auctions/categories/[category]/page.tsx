@@ -280,7 +280,8 @@ export default function CategoryAuctionsPage() {
             showToast.info,
             sendTransaction ?? undefined,
             wallet?.adapter?.name,
-            { source: listing?.source }
+            { source: listing?.source },
+            true
           );
           if (result.confirmed) {
             showToast.success(`✅ Card purchased for ${formatListingQuote(listingDisplayPrice?.amount ?? result.price, listingDisplayPrice?.currency ?? 'USDC')}!`);
@@ -314,16 +315,10 @@ export default function CategoryAuctionsPage() {
           v0Tx,
           v0TxSigned,
           legacyTx,
-          price: mePrice,
-          platformFee,
-          platformFeeCurrency,
         } = await buildRes.json();
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
-        const feeDisplay = platformFee
-          ? ` + ${platformFee.toFixed(platformFeeCurrency === 'SOL' ? 4 : 2)} ${platformFeeCurrency} fee`
-          : '';
-        showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice?.amount ?? mePrice, listingDisplayPrice?.currency ?? 'SOL')}${feeDisplay}`);
+        showToast.info(`💳 Confirm purchase — ${formatListingQuote(listingDisplayPrice?.amount ?? price, listingDisplayPrice?.currency ?? (isDigitalArt ? 'SOL' : currency))}`);
 
         const { VersionedTransaction } = await import('@solana/web3.js');
 

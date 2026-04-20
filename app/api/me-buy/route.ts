@@ -26,6 +26,7 @@ if (!ME_API_KEY) {
 const ME_API_BASE = 'https://api-mainnet.magiceden.dev/v2';
 const ME_BATCH_BASE = 'https://api-mainnet.magiceden.us/v2';
 const CC_AUCTION_HOUSE = 'E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 // Simple in-memory rate limiter: max 10 requests per minute per IP
 const rateMap = new Map<string, { count: number; resetAt: number }>();
@@ -42,6 +43,48 @@ function checkRateLimit(ip: string): boolean {
   if (entry.count >= RATE_LIMIT) return false;
   entry.count++;
   return true;
+}
+
+function getPositiveAmount(value: unknown): number | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function toBaseUnits(value: unknown, decimals: number): number | null {
+  const amount = getPositiveAmount(value);
+  return amount ? Math.round(amount * 10 ** decimals) : null;
+}
+
+function detectListingPayment(listing: any): {
+  currency: 'SOL' | 'USDC';
+  rawAmount: number;
+  displayAmount: number;
+} {
+  const splPrice = listing?.priceInfo?.splPrice || listing?.splPrice;
+  const splSymbol = String(splPrice?.symbol || splPrice?.currency || '').toUpperCase();
+  const splMint = String(
+    splPrice?.mintAddress || splPrice?.tokenMint || splPrice?.address || ''
+  ).trim();
+  const rawUsdcAmount = getPositiveAmount(splPrice?.rawAmount)
+    || toBaseUnits(splPrice?.amount ?? splPrice?.price, 6);
+
+  if (rawUsdcAmount && (splSymbol === 'USDC' || splMint === USDC_MINT)) {
+    return {
+      currency: 'USDC',
+      rawAmount: rawUsdcAmount,
+      displayAmount: rawUsdcAmount / 1e6,
+    };
+  }
+
+  const rawSolAmount = getPositiveAmount(listing?.priceInfo?.solPrice?.rawAmount)
+    || toBaseUnits(listing?.price, 9)
+    || 0;
+
+  return {
+    currency: 'SOL',
+    rawAmount: rawSolAmount,
+    displayAmount: rawSolAmount / 1e9,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -76,6 +119,7 @@ export async function POST(req: NextRequest) {
     const seller = listing.seller;
     const tokenATA = listing.tokenAddress;
     const price = listing.price;
+    const listingPayment = detectListingPayment(listing);
     const sellerExpiry = listing.expiry ?? -1;
     const auctionHouse = listing.auctionHouse;
     const listingSource = listing.listingSource;
@@ -200,7 +244,7 @@ export async function POST(req: NextRequest) {
         lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
         price,
         platformFee: 0,
-        platformFeeCurrency: 'SOL',
+        platformFeeCurrency: listingPayment.currency,
         feeApplied: false,
         seller,
         mint,
@@ -209,21 +253,42 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Inject 2% platform fee (SOL transfer from buyer to the fee wallet) ──
+    // ── Inject 2% platform fee in the same currency as the listing ──
     const { Connection, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction, Transaction } = await import('@solana/web3.js');
     const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
     const connection = new Connection(HELIUS_RPC, 'confirmed');
 
-    const platformFeeLamports = calculateExternalMarketplaceFeeAmount(Math.ceil(price * 1e9));
-    const platformFee = platformFeeLamports / 1e9;
     const buyerPk = new PublicKey(buyer);
     const treasuryPk = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
+    const feeInstructions: any[] = [];
+    const platformFeeRawAmount = calculateExternalMarketplaceFeeAmount(listingPayment.rawAmount);
+    const platformFee = listingPayment.currency === 'USDC'
+      ? platformFeeRawAmount / 1e6
+      : platformFeeRawAmount / 1e9;
 
-    const feeIx = SystemProgram.transfer({
-      fromPubkey: buyerPk,
-      toPubkey: treasuryPk,
-      lamports: platformFeeLamports,
-    });
+    if (listingPayment.currency === 'USDC') {
+      const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+      const usdcMintPk = new PublicKey(USDC_MINT);
+      const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
+      const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, treasuryPk);
+      const treasuryAtaInfo = await connection.getAccountInfo(treasuryUsdcAta);
+
+      if (!treasuryAtaInfo) {
+        feeInstructions.push(
+          createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, treasuryPk, usdcMintPk)
+        );
+      }
+
+      feeInstructions.push(
+        createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeRawAmount)
+      );
+    } else {
+      feeInstructions.push(SystemProgram.transfer({
+        fromPubkey: buyerPk,
+        toPubkey: treasuryPk,
+        lamports: platformFeeRawAmount,
+      }));
+    }
 
     // Decompile the unsigned v0 transaction, append fee instruction, recompile
     const rawV0 = buyData.v0?.tx?.data;
@@ -249,13 +314,13 @@ export async function POST(req: NextRequest) {
         const decompiled = TransactionMessage.decompile(message, {
           addressLookupTableAccounts: validAlts,
         });
-        decompiled.instructions.push(feeIx);
+        decompiled.instructions.push(...feeInstructions);
 
         const recompiled = decompiled.compileToV0Message(validAlts);
         const newTx = new VersionedTransaction(recompiled);
         modifiedV0Base64 = Buffer.from(newTx.serialize()).toString('base64');
 
-        console.log(`[me-buy] Injected 2% platform fee: ${platformFee} SOL (${platformFeeLamports} lamports)`);
+        console.log(`[me-buy] Injected 2% platform fee: ${platformFee} ${listingPayment.currency} (${platformFeeRawAmount} base units)`);
       } catch (feeErr: any) {
         console.error('[me-buy] Failed to inject platform fee:', feeErr.message);
         return NextResponse.json({ error: 'Failed to apply Artifacte fee to transaction' }, { status: 500 });
@@ -266,7 +331,7 @@ export async function POST(req: NextRequest) {
           ? Buffer.from(buyData.tx.data, 'base64')
           : Uint8Array.from(buyData.tx.data);
         const legacyTx = Transaction.from(txBytes);
-        legacyTx.add(feeIx);
+        legacyTx.add(...feeInstructions);
         modifiedLegacyBase64 = Buffer.from(
           legacyTx.serialize({ requireAllSignatures: false })
         ).toString('base64');
@@ -286,7 +351,7 @@ export async function POST(req: NextRequest) {
       lastValidBlockHeight: buyData.blockhashData?.lastValidBlockHeight,
       price,
       platformFee,
-      platformFeeCurrency: 'SOL',
+      platformFeeCurrency: listingPayment.currency,
       feeApplied: true,
       seller,
       mint,

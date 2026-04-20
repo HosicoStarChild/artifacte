@@ -62,6 +62,7 @@ export async function executeTensorBuy(
   sendTransaction?: (tx: any, connection: Connection, options?: any) => Promise<string>,
   walletName?: string,
   feeContext?: TensorBuyFeeContext,
+  hideFeeInToast = false,
 ): Promise<TensorBuyResult> {
   // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
@@ -78,7 +79,7 @@ export async function executeTensorBuy(
   const tensorData = await tensorRes.json();
   const feeCurrency = tensorData.platformFeeCurrency || 'USDC';
   const feeDisplay = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} ${feeCurrency} fee` : '';
-  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC${feeDisplay}`);
+  onStatus?.(`💳 Confirm purchase — ${tensorData.price} USDC${hideFeeInToast ? '' : feeDisplay}`);
 
   // Step 2: Deserialize tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
