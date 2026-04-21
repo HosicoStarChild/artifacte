@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
-  useWallet,
   useConnection,
   useAnchorWallet,
 } from "@solana/wallet-adapter-react";
@@ -23,6 +22,7 @@ import { AuctionProgram } from "@/lib/auction-program";
 import { showToast } from "@/components/ToastContainer";
 import { AuctionCountdownTimer } from "@/components/AuctionCountdownTimer";
 import { BidHistory } from "@/components/BidHistory";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import {
   calculateExternalMarketplaceFee,
   shouldApplyExternalMarketplaceFee,
@@ -140,8 +140,8 @@ function AuctionDetailPageContent() {
     connected,
     sendTransaction,
     signTransaction,
-    wallet,
-  } = useWallet();
+    walletName,
+  } = useWalletCapabilities();
   const anchorWallet = useAnchorWallet();
   const { connection } = useConnection();
 
@@ -467,7 +467,7 @@ function AuctionDetailPageContent() {
           signTransaction,
           showToast.info,
           sendTransaction ?? undefined,
-          wallet?.adapter?.name,
+          walletName ?? undefined,
           {
             source: externalListing.source,
             collectionAddress: externalListing.collectionAddress,

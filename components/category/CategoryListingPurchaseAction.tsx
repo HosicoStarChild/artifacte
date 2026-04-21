@@ -3,9 +3,10 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { showToast } from "@/components/ToastContainer";
@@ -44,7 +45,7 @@ export default function CategoryListingPurchaseAction({
   isDigitalArt = false,
   onPurchased,
 }: CategoryListingPurchaseActionProps) {
-  const { publicKey, sendTransaction, signTransaction, connected, wallet } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, connected, walletName } = useWalletCapabilities();
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export default function CategoryListingPurchaseAction({
             signTransaction,
             showToast.info,
             sendTransaction ?? undefined,
-            wallet?.adapter?.name,
+            walletName ?? undefined,
             { source: listing?.source },
             true
           );

@@ -4,7 +4,6 @@ import { FC, ReactNode, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -28,7 +27,7 @@ export const WalletProviderWrapper: FC<{ children: ReactNode }> = ({ children })
 
   // RPC proxy — keeps API key server-side  
   const endpoint = useMemo(() => `${typeof window !== 'undefined' ? window.location.origin : 'https://artifacte.io'}/api/rpc`, []);
-  const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+  const wallets = useMemo(() => [], []);
 
   return (
     <QueryClientProvider client={queryClient}>

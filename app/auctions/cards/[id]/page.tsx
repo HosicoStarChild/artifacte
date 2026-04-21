@@ -4,10 +4,11 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import PriceHistory from "@/components/PriceHistory";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import {
@@ -191,7 +192,7 @@ function CardDetailPageContent() {
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [unlisting, setUnlisting] = useState(false);
-  const { publicKey, signTransaction, signAllTransactions, sendTransaction, connected, wallet } = useWallet();
+  const { publicKey, signTransaction, signAllTransactions, sendTransaction, connected, walletName } = useWalletCapabilities();
   const { connection } = useConnection();
 
   useEffect(() => {
@@ -515,7 +516,7 @@ function CardDetailPageContent() {
           signTransaction,
           showToast.info,
           sendTransaction ?? undefined,
-          wallet?.adapter?.name,
+          walletName ?? undefined,
           {
             source: card.source,
             collectionName: card.collection,

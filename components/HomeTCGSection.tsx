@@ -4,9 +4,9 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useWallet } from "@solana/wallet-adapter-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { showToast } from "@/components/ToastContainer";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import {
   getExternalMarketplaceTotalPrice,
@@ -225,7 +225,7 @@ function TCGCarousel({
 }
 
 export function HomeTCGSection() {
-  const { publicKey, sendTransaction, signTransaction, connected, wallet } = useWallet();
+  const { publicKey, sendTransaction, signTransaction, connected, walletName } = useWalletCapabilities();
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Record<string, boolean>>({});
   const { data: onePiece = [] } = useQuery({
@@ -273,7 +273,7 @@ export function HomeTCGSection() {
           signTransaction,
           showToast.info,
           sendTransaction ?? undefined,
-          wallet?.adapter?.name,
+          walletName ?? undefined,
           { source: listing.source },
           true
         );

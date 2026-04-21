@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Transaction } from "@solana/web3.js";
@@ -9,6 +8,7 @@ import Link from "next/link";
 import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program";
 import { isOwnerWallet } from "@/lib/admin";
 import { showToast } from "@/components/ToastContainer";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 
 interface NFTAsset {
   id: string;
@@ -32,8 +32,7 @@ const PHYG_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 
 export default function ListNFTPage() {
-  const { publicKey, connected, wallet, sendTransaction, signTransaction } = useWallet();
-  const { connection } = useConnection();
+  const { publicKey, connected, sendTransaction, signTransaction, connection, anchorWallet } = useWalletCapabilities();
   const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
   const [nfts, setNfts] = useState<NFTAsset[]>([]);
   const [loadingNfts, setLoadingNfts] = useState(false);
@@ -188,7 +187,7 @@ export default function ListNFTPage() {
   }
 
   async function handleSubmit() {
-    if (!selectedNft || !price || !publicKey || !wallet) return;
+    if (!selectedNft || !price || !publicKey || !anchorWallet) return;
     setSubmitting(true);
     setError("");
     try {
@@ -216,7 +215,7 @@ export default function ListNFTPage() {
         isToken2022 ? TOKEN_2022_PROGRAM_ID : undefined
       );
 
-      const auctionProgram = new AuctionProgram(connection, wallet.adapter, sendTransaction);
+      const auctionProgram = new AuctionProgram(connection, anchorWallet, sendTransaction);
 
       // Check for stale listing PDA and close it first
       const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
@@ -243,7 +242,7 @@ export default function ListNFTPage() {
           );
           const { blockhash } = await connection.getLatestBlockhash();
           const ataTx = new Transaction({ feePayer: publicKey, recentBlockhash: blockhash }).add(createAtaIx);
-          const signedAtaTx = await wallet.adapter.sendTransaction(ataTx, connection);
+          const signedAtaTx = await sendTransaction(ataTx, connection);
           await connection.confirmTransaction(signedAtaTx, 'confirmed');
         }
       }

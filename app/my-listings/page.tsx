@@ -1,6 +1,5 @@
 "use client";
 
-import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -12,6 +11,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { AuctionProgram } from "@/lib/auction-program";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { fetchAllowlist } from "@/lib/allowlist";
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -46,9 +46,7 @@ interface MyListing {
 }
 
 export default function MyListingsPage() {
-  const { publicKey, connected, wallet, sendTransaction, signTransaction } = useWallet();
-  const { connection } = useConnection();
-  const anchorWallet = useAnchorWallet();
+  const { publicKey, connected, sendTransaction, signTransaction, connection, anchorWallet } = useWalletCapabilities();
   const [activeTab, setActiveTab] = useState<TabType>("active");
   const [myListings, setMyListings] = useState<MyListing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -133,7 +131,7 @@ export default function MyListingsPage() {
   }
 
   async function fetchMyListings() {
-    if (!publicKey || !wallet) return;
+    if (!publicKey) return;
     setLoading(true);
     setError("");
     try {
