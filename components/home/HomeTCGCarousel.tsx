@@ -3,8 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
-import VerifiedBadge from "@/components/VerifiedBadge";
-import { Badge } from "@/components/ui/badge";
+import { MarketplaceListingCard } from "@/components/MarketplaceListingCard";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +16,6 @@ import {
 } from "@/lib/home-tcg";
 import { cn } from "@/lib/utils";
 
-import { HomeImage } from "./HomeImage";
 import { HomeSectionHeading } from "./HomeSectionHeading";
 
 const WalletMultiButton = dynamic(
@@ -113,43 +111,20 @@ export function HomeTCGCarousel({
 
                 return (
                   <div key={listing.id} className="w-72 shrink-0 snap-start">
-                    <Card className="group h-full gap-0 overflow-hidden rounded-lg border border-white/5 bg-dark-800 py-0 text-white shadow-none">
-                      <Link href={cardHref} className="flex flex-1 flex-col">
-                        <div className="relative aspect-square overflow-hidden bg-dark-900">
-                          <HomeImage
-                            src={listing.image}
-                            alt={listing.name}
-                            sizes="288px"
-                            contain
-                            className="p-2 group-hover:scale-105"
-                          />
-                        </div>
-
-                        <div className="flex flex-1 flex-col justify-between p-5">
-                          <div>
-                            <div className="mb-2 flex items-start justify-between gap-2">
-                              <Badge className="rounded bg-transparent px-0 text-xs font-semibold tracking-widest uppercase text-gold-500 hover:bg-transparent">
-                                Fixed Price
-                              </Badge>
-                              <VerifiedBadge collectionName={listing.name} verifiedBy={listing.verifiedBy} />
-                            </div>
-                            <h3 className="mb-1 line-clamp-2 text-sm font-medium text-white">{listing.name}</h3>
-                            <p className="mb-3 text-xs text-gray-500">{listing.subtitle}</p>
-                          </div>
-
-                          <div>
-                            <p className="mb-1 text-xs font-medium tracking-wider text-gray-500">Price</p>
-                            <p className="font-serif text-xl text-white">
-                              {displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
-                            </p>
-                            <p className="mt-1 text-xs text-gold-500">{displayPrice.currency}</p>
-                          </div>
-                        </div>
-                      </Link>
-
-                      {showBuyButton ? (
-                        <div className="px-5 pb-5">
-                          {isPurchased ? (
+                    <MarketplaceListingCard
+                      href={cardHref}
+                      imageSrc={listing.image}
+                      imageAlt={listing.name}
+                      title={listing.name}
+                      subtitle={listing.subtitle}
+                      verifiedBy={listing.verifiedBy}
+                      priceLabel={displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
+                      currencyLabel={displayPrice.currency}
+                      imageFit="contain"
+                      imageSizes="288px"
+                      action={
+                        showBuyButton ? (
+                          isPurchased ? (
                             <button
                               type="button"
                               disabled
@@ -180,10 +155,10 @@ export function HomeTCGCarousel({
                             >
                               View Details
                             </Link>
-                          )}
-                        </div>
-                      ) : null}
-                    </Card>
+                          )
+                        ) : null
+                      }
+                    />
                   </div>
                 );
               })}

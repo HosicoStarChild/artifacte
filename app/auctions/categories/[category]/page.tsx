@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { auctions, listings as staticListings, categorySlugMap, categoryLabels, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
+import { auctions, listings as staticListings, categorySlugMap, categoryLabels, getListingPurchaseCurrency, resolveListingDisplayPrice, type Listing } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
-import VerifiedBadge from "@/components/VerifiedBadge";
+import { MarketplaceListingCard } from "@/components/MarketplaceListingCard";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { getExternalMarketplaceTotalPrice } from "@/lib/external-purchase-fees";
@@ -59,6 +59,10 @@ const SERVER_TCG_CATEGORY_MAP: Record<string, string> = {
 const SOURCE_FILTER_MAP: Record<string, string> = {
   "Collectors Crypt": "collector-crypt",
   Phygitals: "phygitals",
+};
+
+type CategoryMarketplaceListing = Listing & {
+  mintAddress?: string;
 };
 
 const CATEGORY_FILTERS: Record<string, { label: string; key: string; options: string[] }[]> = {
@@ -139,12 +143,43 @@ function buildListingsQueryParams({
   return params;
 }
 
-function getListingHref(listing: any): string {
+function getListingHref(listing: CategoryMarketplaceListing): string {
   if (listing.source === "collector-crypt") return `/auctions/cards/${listing.id}`;
   if (listing.source === "phygitals" && listing.nftAddress) return `/auctions/cards/${listing.id}`;
   if (listing.source === "artifacte" && listing.nftAddress) return `/auctions/cards/${listing.nftAddress}`;
   if (listing.externalUrl) return listing.externalUrl;
   return "#";
+}
+
+function getListingSourceBadge(listing: CategoryMarketplaceListing) {
+  if (listing.source === "phygitals") {
+    return {
+      label: "PHYGITALS",
+      className: "bg-violet-500/90 text-white",
+    };
+  }
+
+  if (listing.source === "collector-crypt") {
+    return {
+      label: "COLLECTOR CRYPT",
+      className: "bg-violet-500/90 text-white",
+    };
+  }
+
+  if (listing.source === "artifacte") {
+    return {
+      label: "ARTIFACTE",
+      className: "bg-gold-500/90 text-dark-900",
+    };
+  }
+
+  return undefined;
+}
+
+function getListingImageFit(listing: CategoryMarketplaceListing): "contain" | "cover" {
+  return listing.source === "collector-crypt" || listing.source === "phygitals" || listing.source === "artifacte"
+    ? "contain"
+    : "cover";
 }
 
 function CategoryAuctionsPageContent() {
@@ -206,7 +241,7 @@ function CategoryAuctionsPageContent() {
   }, [filters, page, currencyFilter, sortBy, searchInput, storageKey]);
   const searchTimer = useRef<NodeJS.Timeout>(undefined);
   const listingsRequestRef = useRef(0);
-  const [meListings, setMeListings] = useState<any[]>([]);
+  const [meListings, setMeListings] = useState<CategoryMarketplaceListing[]>([]);
   const [meLoading, setMeLoading] = useState(true);
   const [meFilterLoading, setMeFilterLoading] = useState(false);
   const [meTotal, setMeTotal] = useState(0);
@@ -222,7 +257,7 @@ function CategoryAuctionsPageContent() {
   const useMeApi = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "SEALED" || category === "MERCHANDISE" || category === "SPIRITS" || isArtifacteCollection;
 
   const handleListingPurchased = (listingId: string, nftAddress?: string) => {
-    setMeListings((prev) => prev.filter((listing: any) => (
+    setMeListings((prev) => prev.filter((listing) => (
       listing.id !== listingId &&
       listing.id !== nftAddress &&
       listing.nftAddress !== nftAddress &&
@@ -275,7 +310,7 @@ function CategoryAuctionsPageContent() {
           return;
         }
 
-        setMeListings(Array.isArray(data.listings) ? data.listings : []);
+  setMeListings(Array.isArray(data.listings) ? (data.listings as CategoryMarketplaceListing[]) : []);
         setMeTotal(total);
         setMeLoading(false);
         setMeFilterLoading(false);
@@ -305,34 +340,34 @@ function CategoryAuctionsPageContent() {
   // Filter auctions and listings by category
   const categoryAuctions = category ? auctions.filter((a) => a.category === category) : [];
   const categoryListingsBase = category
-    ? (useMeApi ? meListings : listings.filter((l: any) => l.category === category))
+    ? (useMeApi ? meListings : listings.filter((listing) => listing.category === category))
     : [];
 
   // Apply dropdown filters — only for non-ME categories (ME categories filter server-side)
   // Currency filter + sort always applied client-side (Tensor USDC enrichment happens after Oracle returns)
-  const categoryListings = useMeApi ? categoryListingsBase : categoryListingsBase.filter((l: any) => {
+  const categoryListings = useMeApi ? categoryListingsBase : categoryListingsBase.filter((listing) => {
     for (const [key, value] of Object.entries(filters)) {
       if (!value || value === "All") continue;
       if (key === "spiritType") {
-        const st = (l.spirit_type || l.subtitle || "").toLowerCase();
+        const st = (listing.spirit_type || listing.subtitle || "").toLowerCase();
         if (!st.includes(value.toLowerCase())) return false;
       } else if (key === "brand") {
-        const name = (l.name || "").toLowerCase();
-        const sub = (l.subtitle || "").toLowerCase();
+        const name = (listing.name || "").toLowerCase();
+        const sub = (listing.subtitle || "").toLowerCase();
         if (!name.includes(value.toLowerCase()) && !sub.includes(value.toLowerCase())) return false;
       } else if (key === "collection") {
-        const sub = (l.subtitle || "").toLowerCase();
+        const sub = (listing.subtitle || "").toLowerCase();
         if (!sub.includes(value.toLowerCase())) return false;
       }
     }
     return true;
-  }).filter((l: any) => {
+  }).filter((listing) => {
     if (currencyFilter === "All") return true;
-    const purchaseCurrency = getListingPurchaseCurrency(l);
+    const purchaseCurrency = getListingPurchaseCurrency(listing);
     if (currencyFilter === "USDC") return purchaseCurrency === "USDC";
     if (currencyFilter === "SOL") return purchaseCurrency === "SOL";
     return true;
-  }).sort((a: any, b: any) => {
+  }).sort((a, b) => {
     const aTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(a).amount, { source: a.source });
     const bTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(b).amount, { source: b.source });
     if (sortBy === "price-high") return bTotal - aTotal;
@@ -556,76 +591,36 @@ function CategoryAuctionsPageContent() {
                     ? totalDisplayPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
                     : totalDisplayPrice.toLocaleString();
                   return (
-                    <div
+                    <MarketplaceListingCard
                       key={l.id}
-                      className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
-                    >
-                      {/* Image */}
-                      <Link href={getListingHref(l)} target={l.externalUrl ? '_blank' : undefined} rel={l.externalUrl ? 'noopener noreferrer' : undefined} className="block">
-                      <div className="aspect-square overflow-hidden bg-dark-900 relative">
-                        <img
-                          src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
-                          alt={l.name}
-                          className={`w-full h-full ${l.source === 'collector-crypt' || l.source === 'phygitals' || l.source === 'artifacte' ? 'object-contain p-2' : 'object-cover'} group-hover:scale-105 transition duration-500`}
-                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
-                          onLoad={(e) => { const img = e.target as HTMLImageElement; if (img.naturalWidth === 0) img.src = '/placeholder-card.svg'; }}
+                      href={getListingHref(l)}
+                      external={Boolean(l.externalUrl)}
+                      imageSrc={l.image}
+                      imageAlt={l.name}
+                      title={l.name}
+                      subtitle={l.subtitle}
+                      meta={categoryName}
+                      verifiedBy={l.source === 'phygitals' ? 'TCGplayer' : l.verifiedBy}
+                      priceLabel={
+                        isDigitalArt
+                          ? `◎ ${l.price.toLocaleString()}`
+                          : purchaseCurrency === 'SOL'
+                            ? `◎ ${formattedAmount}`
+                            : `$${formattedAmount}`
+                      }
+                      currencyLabel={isDigitalArt ? 'SOL' : displayPrice.currency}
+                      sourceBadge={getListingSourceBadge(l)}
+                      imageFit={getListingImageFit(l)}
+                      imageSizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      action={
+                        <CategoryListingPurchaseAction
+                          listing={l}
+                          useMeApi={useMeApi}
+                          isDigitalArt={isDigitalArt}
+                          onPurchased={handleListingPurchased}
                         />
-                        {l.source === 'phygitals' && (
-                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            PHYGITALS
-                          </span>
-                        )}
-                        {l.source === 'collector-crypt' && (
-                          <span className="absolute top-2 right-2 bg-violet-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            COLLECTOR CRYPT
-                          </span>
-                        )}
-                        {l.source === 'artifacte' && (
-                          <span className="absolute top-2 right-2 bg-gold-500/90 text-dark-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            ARTIFACTE
-                          </span>
-                        )}
-                      </div>
-                      </Link>
-                      {/* Details */}
-                      <div className="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <VerifiedBadge collectionName={l.name} verifiedBy={l.source === 'phygitals' ? 'TCGplayer' : l.verifiedBy} />
-                          </div>
-                          <h3 className="text-white font-medium text-base mb-1">{l.name}</h3>
-                          <p className="text-gray-500 text-xs mb-1">{l.subtitle}</p>
-                          <p className="text-gray-600 text-xs mb-4">{categoryName}</p>
-                        </div>
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-gray-500 text-xs font-medium tracking-wider mb-1">Price</p>
-                            {isDigitalArt ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">◎ {l.price.toLocaleString()}</p>
-                                <p className="text-gold-500 text-xs mt-1">SOL</p>
-                              </>
-                            ) : purchaseCurrency === 'SOL' ? (
-                              <>
-                                <p className="text-white font-serif text-2xl">◎ {formattedAmount}</p>
-                                <p className="text-gold-500 text-xs mt-1">SOL</p>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-white font-serif text-2xl">${formattedAmount}</p>
-                                <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
-                              </>
-                            )}
-                          </div>
-                          <CategoryListingPurchaseAction
-                            listing={l}
-                            useMeApi={useMeApi}
-                            isDigitalArt={isDigitalArt}
-                            onPurchased={handleListingPurchased}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      }
+                    />
                   );
                 })}
               </div>
