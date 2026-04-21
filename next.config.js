@@ -2,6 +2,15 @@
 const nextConfig = {
   cacheComponents: true,
   images: {
+    localPatterns: [
+      {
+        pathname: '/**',
+        search: '',
+      },
+      {
+        pathname: '/api/img-proxy',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'https',
