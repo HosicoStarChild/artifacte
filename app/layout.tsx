@@ -19,34 +19,46 @@ const playfairDisplay = Playfair_Display({
   display: "swap",
 });
 
+const siteName = "Artifacte";
+const siteTitle = "Artifacte — RWA Tokenization on Solana";
+const siteDescription = "Buy, sell and trade tokenized collectibles on Solana. PSA & CGC graded trading cards, spirits, sealed products and more — verified on-chain.";
+const metadataBase = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://artifacte.io");
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  colorScheme: "dark",
+  themeColor: "#0a0a0f",
 };
 
 export const metadata: Metadata = {
-  title: "Artifacte — RWA Tokenization on Solana",
-  description: "Buy, sell and trade tokenized collectibles on Solana. PSA & CGC graded trading cards, spirits, sealed products and more — verified on-chain.",
-  metadataBase: new URL("https://artifacte.io"),
+  title: siteTitle,
+  description: siteDescription,
+  metadataBase,
+  applicationName: siteName,
+  alternates: {
+    canonical: "/",
+  },
+  category: "collectibles",
   openGraph: {
-    title: "Artifacte — RWA Tokenization on Solana",
-    description: "Buy, sell and trade tokenized collectibles on Solana. PSA & CGC graded trading cards, spirits, sealed products and more.",
-    url: "https://artifacte.io",
-    siteName: "Artifacte",
+    title: siteTitle,
+    description: siteDescription,
+    url: "/",
+    siteName,
     images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "Artifacte — RWA Marketplace" }],
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Artifacte — RWA Tokenization on Solana",
-    description: "Buy, sell and trade tokenized collectibles on Solana.",
+    title: siteTitle,
+    description: siteDescription,
     images: ["/og-image.jpg"],
   },
   keywords: ["Solana", "NFT", "trading cards", "PSA", "CGC", "graded cards", "RWA", "tokenization", "collectibles", "Pokemon cards", "sports cards"],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
