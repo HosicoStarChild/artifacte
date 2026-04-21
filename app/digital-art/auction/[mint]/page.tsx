@@ -336,97 +336,26 @@ function AuctionDetailPageContent() {
     try {
       showToast.info("Building transaction...");
 
-      const buildRes = await fetch("/api/me-buy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mint: externalListing.mint,
-          buyer: publicKey.toBase58(),
-          source: externalListing.source,
-          listingCurrency: externalListing.currencySymbol,
-          collectionAddress: externalListing.collectionAddress,
-          collectionName: externalListing.collectionName,
-        }),
+      const { executeMagicEdenBuy } = await import("@/lib/client/magic-eden-buy-client");
+      const result = await executeMagicEdenBuy({
+        mint: externalListing.mint,
+        buyer: publicKey.toBase58(),
+        source: externalListing.source,
+        collectionAddress: externalListing.collectionAddress,
+        collectionName: externalListing.collectionName,
+        signTransaction,
+        listingDisplayPrice: {
+          amount: externalListing.price,
+          currency: externalListing.currencySymbol,
+        },
+        onStatus: showToast.info,
       });
 
-      const payload = await buildRes.json().catch(() => ({}));
-      if (!buildRes.ok) {
-        throw new Error(payload.error || `Buy failed: ${buildRes.status}`);
-      }
-
-      const {
-        v0Tx,
-        v0TxSigned,
-        legacyTx,
-        price,
-        platformFee,
-        platformFeeCurrency,
-        blockhash,
-      } = payload;
-      const versionedTxBase64 = v0TxSigned || v0Tx;
-      const txBase64 = versionedTxBase64 || legacyTx;
-
-      if (!txBase64) {
-        throw new Error("No transaction returned from API");
-      }
-
-      const feeDisplay = platformFee
-        ? ` + ${platformFee.toFixed(platformFeeCurrency === "SOL" ? 4 : 2)} ${platformFeeCurrency} fee`
-        : '';
-      showToast.info(`💳 Confirm purchase — ${price} SOL${feeDisplay}`);
-
-      let rawTx: Uint8Array;
-      if (versionedTxBase64) {
-        const txBytes = Uint8Array.from(atob(versionedTxBase64), (char) =>
-          char.charCodeAt(0)
-        );
-        const vTx = VersionedTransaction.deserialize(txBytes);
-        const feePayer = vTx.message.staticAccountKeys[0];
-
-        if (feePayer.toBase58() !== publicKey.toBase58()) {
-          throw new Error("Transaction fee payer does not match connected wallet");
-        }
-
-        try {
-          await fetch("/api/rpc", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              id: 1,
-              method: "simulateTransaction",
-              params: [
-                versionedTxBase64,
-                { sigVerify: false, encoding: "base64", commitment: "processed" },
-              ],
-            }),
-          });
-        } catch {
-          // Ignore simulation failures before wallet signing.
-        }
-
-        const signed = await signTransaction(vTx as any);
-        rawTx = signed.serialize();
-      } else {
-        const txBytes = Uint8Array.from(atob(txBase64), (char) =>
-          char.charCodeAt(0)
-        );
-        const tx = Transaction.from(txBytes);
-
-        if (tx.feePayer && tx.feePayer.toBase58() !== publicKey.toBase58()) {
-          throw new Error("Transaction fee payer does not match connected wallet");
-        }
-
-        const signed = await signTransaction(tx as any);
-        rawTx = signed.serialize();
-      }
-
-      const result = await sendAndConfirmRawTransaction(rawTx, blockhash);
       if (result.confirmed) {
-        showToast.success(`✅ NFT purchased for ${price} SOL!`);
+        showToast.success(`✅ NFT purchased for ${formatFeeDisplay(result.totalPrice, result.currency)}!`);
       } else {
         showToast.info(
-          `⏳ TX sent: ${result.signature.slice(0, 8)}... — check your wallet in a moment`
+          `⏳ TX sent: ${result.sig.slice(0, 8)}... — check your wallet in a moment`
         );
       }
 

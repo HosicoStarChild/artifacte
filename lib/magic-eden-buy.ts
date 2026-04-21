@@ -47,6 +47,7 @@ export type MagicEdenBuyResponse = {
   displayPrice: number;
   displayCurrency: MagicEdenPaymentCurrency;
   platformFee: number;
+  platformFeeRawAmount: number;
   platformFeeCurrency: MagicEdenPaymentCurrency;
   feeApplied: boolean;
   seller: string;

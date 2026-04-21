@@ -1,5 +1,10 @@
 import { createSolanaRpc, signature } from "@solana/kit";
-import { Transaction, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, VersionedTransaction, Connection } from "@solana/web3.js";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 
 import type { AnchorWalletLike } from "@/hooks/useWalletCapabilities";
 import {
@@ -9,6 +14,7 @@ import {
   type MagicEdenBuyResponse,
 } from "@/lib/magic-eden-buy";
 import { formatHomeListingQuote } from "@/lib/home-tcg";
+import { EXTERNAL_MARKETPLACE_FEE_WALLET } from "@/lib/external-purchase-fees";
 
 type WalletSignTransaction = AnchorWalletLike["signTransaction"];
 
@@ -33,6 +39,8 @@ type MagicEdenBuyOptions = {
   mint: string;
   buyer: string;
   source?: string;
+  collectionAddress?: string;
+  collectionName?: string;
   signTransaction: WalletSignTransaction;
   listingDisplayPrice: ListingDisplayPrice;
   onStatus?: (message: string) => void;
@@ -81,6 +89,14 @@ function decodeBase64Transaction(base64Transaction: string): Uint8Array {
   return Uint8Array.from(atob(base64Transaction), (character) => character.charCodeAt(0));
 }
 
+function createProxyConnection(): Connection {
+  if (typeof window === "undefined") {
+    throw new Error("Magic Eden buy client must run in the browser");
+  }
+
+  return new Connection(new URL("/api/rpc", window.location.origin).toString(), "confirmed");
+}
+
 async function sendViaProxy(rawTransactionBytes: Uint8Array): Promise<string> {
   const encodedTransaction = encodeBase64Transaction(rawTransactionBytes);
   const signatureValue = await rpc
@@ -110,23 +126,62 @@ async function signVersionedTransaction(
   base64Transaction: string,
   signTransaction: WalletSignTransaction,
   buyer: string
-): Promise<string> {
+): Promise<Uint8Array> {
   await preSimulateTransaction(base64Transaction);
   const transactionBytes = decodeBase64Transaction(base64Transaction);
   const transaction = VersionedTransaction.deserialize(transactionBytes);
   validateMagicEdenTransaction(transaction, buyer);
   const signedTransaction = await signTransaction(transaction);
-  return sendViaProxy(signedTransaction.serialize());
+  return signedTransaction.serialize();
 }
 
 async function signLegacyTransaction(
   base64Transaction: string,
   signTransaction: WalletSignTransaction
-): Promise<string> {
+): Promise<Uint8Array> {
   const transactionBytes = decodeBase64Transaction(base64Transaction);
   const transaction = Transaction.from(transactionBytes);
   const signedTransaction = await signTransaction(transaction);
-  return sendViaProxy(signedTransaction.serialize());
+  return signedTransaction.serialize();
+}
+
+async function buildM2FeeTransaction(base64Buyer: string, rawAmount: number, currency: MagicEdenPaymentCurrency): Promise<Transaction> {
+  const connection = createProxyConnection();
+  const buyer = new PublicKey(base64Buyer);
+  const treasury = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
+  const transaction = new Transaction();
+  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+
+  transaction.feePayer = buyer;
+  transaction.recentBlockhash = latestBlockhash.blockhash;
+
+  if (currency === "SOL") {
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: buyer,
+        toPubkey: treasury,
+        lamports: rawAmount,
+      }),
+    );
+    return transaction;
+  }
+
+  const usdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const buyerUsdcAta = await getAssociatedTokenAddress(usdcMint, buyer);
+  const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMint, treasury);
+  const treasuryAtaInfo = await connection.getAccountInfo(treasuryUsdcAta);
+
+  if (!treasuryAtaInfo) {
+    transaction.add(
+      createAssociatedTokenAccountInstruction(buyer, treasuryUsdcAta, treasury, usdcMint),
+    );
+  }
+
+  transaction.add(
+    createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyer, rawAmount),
+  );
+
+  return transaction;
 }
 
 async function waitForTransactionConfirmation(signatureValue: string): Promise<boolean> {
@@ -176,6 +231,8 @@ export async function executeMagicEdenBuy({
   mint,
   buyer,
   source,
+  collectionAddress,
+  collectionName,
   signTransaction,
   listingDisplayPrice,
   onStatus,
@@ -188,6 +245,8 @@ export async function executeMagicEdenBuy({
       buyer,
       source,
       listingCurrency: getRequestedPaymentCurrency(listingDisplayPrice.currency),
+      collectionAddress,
+      collectionName,
     }),
   });
 
@@ -210,19 +269,45 @@ export async function executeMagicEdenBuy({
 
   onStatus?.(`💳 Confirm purchase — ${formatHomeListingQuote(totalPrice, currency)}`);
 
-  let transactionSignature = "";
+  let signedMainTransaction: Uint8Array;
 
   if (buildResult.v0TxSigned) {
-    transactionSignature = await signVersionedTransaction(buildResult.v0TxSigned, signTransaction, buyer);
+    signedMainTransaction = await signVersionedTransaction(buildResult.v0TxSigned, signTransaction, buyer);
   } else if (buildResult.v0Tx) {
-    transactionSignature = await signVersionedTransaction(buildResult.v0Tx, signTransaction, buyer);
+    signedMainTransaction = await signVersionedTransaction(buildResult.v0Tx, signTransaction, buyer);
   } else if (buildResult.legacyTx) {
-    transactionSignature = await signLegacyTransaction(buildResult.legacyTx, signTransaction);
+    signedMainTransaction = await signLegacyTransaction(buildResult.legacyTx, signTransaction);
   } else {
     throw new Error("No transaction returned from API");
   }
 
+  let signedFeeTransaction: Uint8Array | null = null;
+  const needsSeparateM2Fee =
+    buildResult.feeApplied &&
+    buildResult.listingSource === "M2" &&
+    buildResult.platformFeeRawAmount > 0;
+
+  if (needsSeparateM2Fee) {
+    onStatus?.(`💳 Confirm Artifacte fee — ${formatHomeListingQuote(buildResult.platformFee, buildResult.platformFeeCurrency)}`);
+    const feeTransaction = await buildM2FeeTransaction(buyer, buildResult.platformFeeRawAmount, buildResult.platformFeeCurrency);
+    const signedFee = await signTransaction(feeTransaction);
+    signedFeeTransaction = signedFee.serialize();
+  }
+
+  const transactionSignature = await sendViaProxy(signedMainTransaction);
+
   const confirmed = await waitForTransactionConfirmation(transactionSignature);
+
+  if (confirmed && signedFeeTransaction) {
+    try {
+      onStatus?.("⏳ Finalizing Artifacte fee...");
+      const feeSignature = await sendViaProxy(signedFeeTransaction);
+      await waitForTransactionConfirmation(feeSignature);
+    } catch (error) {
+      onStatus?.("Artifacte fee transfer failed after purchase. Please contact support.");
+      console.warn("[me-buy-client] Artifacte fee transfer failed after purchase", error);
+    }
+  }
 
   return {
     sig: transactionSignature,

@@ -209,6 +209,7 @@ export async function buildMagicEdenBuyResponse(
       displayPrice: listingPayment.displayAmount,
       displayCurrency: listingPayment.currency,
       platformFee: 0,
+      platformFeeRawAmount: 0,
       platformFeeCurrency: listingPayment.currency,
       feeApplied: false,
       seller,
@@ -225,6 +226,28 @@ export async function buildMagicEdenBuyResponse(
   const platformFee = listingPayment.currency === 'USDC'
     ? platformFeeRawAmount / 1e6
     : platformFeeRawAmount / 1e9;
+
+  if (listingSource === 'M2') {
+    return {
+      v0Tx: originalV0Base64,
+      v0TxSigned: null,
+      legacyTx: originalLegacyBase64,
+      blockhash: marketplaceResponse.blockhashData?.blockhash ?? null,
+      lastValidBlockHeight: marketplaceResponse.blockhashData?.lastValidBlockHeight ?? null,
+      price: listingPayment.displayAmount,
+      displayPrice: listingPayment.displayAmount,
+      displayCurrency: listingPayment.currency,
+      platformFee,
+      platformFeeRawAmount,
+      platformFeeCurrency: listingPayment.currency,
+      feeApplied: true,
+      seller,
+      mint: request.mint,
+      listingSource,
+      auctionHouse,
+    };
+  }
+
   const feeInstructions = await buildFeeInstructions({
     buyerPublicKey,
     connection,
@@ -302,6 +325,7 @@ export async function buildMagicEdenBuyResponse(
     displayPrice: listingPayment.displayAmount,
     displayCurrency: listingPayment.currency,
     platformFee,
+    platformFeeRawAmount,
     platformFeeCurrency: listingPayment.currency,
     feeApplied: true,
     seller,

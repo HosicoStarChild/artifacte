@@ -540,113 +540,23 @@ function CardDetailPageContent() {
         return;
       }
 
-      // Step 1: Get ME notary-cosigned transaction from our API (CC cards)
-      const buildRes = await fetch('/api/me-buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mint: card.nftAddress,
-          buyer: publicKey.toBase58(),
-          source: card.source,
-          listingCurrency: cardDisplayPrice.currency,
-          collectionName: card.collection,
-        }),
+      if (!signTransaction) throw new Error("Wallet does not support signing");
+
+      const { executeMagicEdenBuy } = await import('@/lib/client/magic-eden-buy-client');
+      const result = await executeMagicEdenBuy({
+        mint: card.nftAddress,
+        buyer: publicKey.toBase58(),
+        source: card.source,
+        collectionName: card.collection,
+        signTransaction,
+        listingDisplayPrice: cardDisplayPrice,
+        onStatus: showToast.info,
       });
 
-      let sig = '';
-
-      if (!buildRes.ok) {
-        throw new Error(`Buy failed: ${buildRes.status}`);
-      }
-
-      const {
-        v0Tx,
-        v0TxSigned,
-        displayPrice,
-        displayCurrency,
-        platformFee,
-        platformFeeCurrency,
-        blockhash,
-        lastValidBlockHeight,
-      } = await buildRes.json();
-      
-      if (!v0Tx && !v0TxSigned) throw new Error("No transaction returned from API");
-      
-      if (!signTransaction) {
-        throw new Error("Wallet does not support signing");
-      }
-
-      const toastCurrency = displayCurrency || cardDisplayPrice.currency;
-      const toastTotal = (displayPrice ?? cardDisplayPrice.amount) + ((platformFeeCurrency === toastCurrency && platformFee) ? platformFee : 0);
-      showToast.info(`💳 Confirm purchase — ${formatListingQuote(toastTotal, toastCurrency)}`);
-      
-      const txBase64 = v0TxSigned || v0Tx;
-      const txBytes = Uint8Array.from(atob(txBase64), c => c.charCodeAt(0));
-      const vTx = VersionedTransaction.deserialize(txBytes);
-      
-      const feePayer = vTx.message.staticAccountKeys[0];
-      if (feePayer.toBase58() !== publicKey.toBase58()) {
-        throw new Error("Transaction fee payer doesn't match connected wallet");
-      }
-      
-      const M2_PROGRAM = 'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K';
-      const M3_PROGRAM = 'M3mxk5W2tt27WGT7THox7PmgRDp4m6NEhL5xvxrBfS1';
-      const hasME = vTx.message.staticAccountKeys.some(k => 
-        k.toBase58() === M2_PROGRAM || k.toBase58() === M3_PROGRAM
-      );
-      if (!hasME) {
-        throw new Error("Transaction doesn't interact with ME marketplace");
-      }
-
-      // Pre-simulate with sigVerify:false before wallet signing.
-      // Phantom simulates during signTransaction — multi-signer notary txs fail
-      // Phantom's simulation without this, showing "unable to safely predict" warning.
-      try {
-        await fetch('/api/rpc', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'simulateTransaction', params: [txBase64, { sigVerify: false, encoding: 'base64', commitment: 'processed' }] }),
-        });
-      } catch {}
-      
-      const signed = await signTransaction(vTx as any);
-      const rawTx = (signed as any).serialize();
-      
-      showToast.info("⏳ Submitting transaction...");
-      sig = await connection.sendRawTransaction(rawTx, {
-        skipPreflight: true,
-        maxRetries: 0,
-      });
-      
-      const startTime = Date.now();
-      const MAX_RETRY_MS = 60_000;
-      let confirmed = false;
-      
-      while (!confirmed && Date.now() - startTime < MAX_RETRY_MS) {
-        const status = await connection.getSignatureStatus(sig);
-        if (status?.value?.confirmationStatus === 'confirmed' || 
-            status?.value?.confirmationStatus === 'finalized') {
-          confirmed = true;
-          break;
-        }
-        if (status?.value?.err) {
-          throw new Error('Transaction failed on-chain');
-        }
-        
-        const valid = await connection.isBlockhashValid(blockhash);
-        if (!valid?.value) break;
-        
-        try {
-          await connection.sendRawTransaction(rawTx, { skipPreflight: true, maxRetries: 0 });
-        } catch {}
-        
-        await new Promise(r => setTimeout(r, 1000));
-      }
-      
-      if (confirmed) {
-        showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
+      if (result.confirmed) {
+        showToast.success(`✅ NFT purchased! TX: ${result.sig.slice(0, 16)}...`);
       } else {
-        showToast.info(`⏳ TX sent: ${sig.slice(0, 8)}... — check your wallet in a moment`);
+        showToast.info(`⏳ TX sent: ${result.sig.slice(0, 8)}... — check your wallet in a moment`);
       }
       setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
     } catch (error) {
