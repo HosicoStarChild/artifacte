@@ -9,6 +9,11 @@ import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solan
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import {
+  getTransactionErrorMessage,
+  isTransactionRequestRejected,
+  TRANSACTION_REQUEST_REJECTED_MESSAGE,
+} from "@/lib/client/transaction-errors";
 import PriceHistory from "@/components/PriceHistory";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import {
@@ -641,18 +646,12 @@ function CardDetailPageContent() {
         showToast.info(`⏳ TX sent: ${sig.slice(0, 8)}... — check your wallet in a moment`);
       }
       setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
-    } catch (err: any) {
-      const message = err.message || "";
+    } catch (error) {
+      const message = getTransactionErrorMessage(error, "");
       const lowerMessage = message.toLowerCase();
 
-      if (
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("rejected the request") ||
-        lowerMessage.includes("declined") ||
-        lowerMessage.includes("cancelled") ||
-        lowerMessage.includes("canceled")
-      ) {
-        showToast.error("Transaction cancelled");
+      if (isTransactionRequestRejected(error)) {
+        showToast.error(TRANSACTION_REQUEST_REJECTED_MESSAGE);
       } else if (lowerMessage.includes("insufficient")) {
         showToast.error(`Insufficient balance. Required: ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}`);
       } else if (lowerMessage.includes("no longer available") || lowerMessage.includes("already been sold")) {

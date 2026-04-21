@@ -5,6 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { HomeTCGCarousel } from "@/components/home/HomeTCGCarousel";
 import { showToast } from "@/components/ToastContainer";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import {
+  getTransactionErrorMessage,
+  isTransactionRequestRejected,
+  TRANSACTION_REQUEST_REJECTED_MESSAGE,
+} from "@/lib/client/transaction-errors";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import { fetchHomeTCGListings, formatHomeListingQuote, type HomeTCGListing } from "@/lib/home-tcg";
 
@@ -94,17 +99,11 @@ export function HomeTCGSection() {
 
       markPurchased(listing.id);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Transaction failed";
+      const message = getTransactionErrorMessage(error);
       const lowerMessage = message.toLowerCase();
 
-      if (
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("rejected the request") ||
-        lowerMessage.includes("declined") ||
-        lowerMessage.includes("cancelled") ||
-        lowerMessage.includes("canceled")
-      ) {
-        showToast.error("Transaction rejected by user");
+      if (isTransactionRequestRejected(error)) {
+        showToast.error(TRANSACTION_REQUEST_REJECTED_MESSAGE);
       } else if (lowerMessage.includes("insufficient")) {
         showToast.error(`Insufficient balance. Required: ${formatHomeListingQuote(listingDisplayPrice.amount, listingDisplayPrice.currency)}`);
       } else {

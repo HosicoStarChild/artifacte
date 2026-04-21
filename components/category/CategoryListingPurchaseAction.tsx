@@ -7,6 +7,11 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import {
+  getTransactionErrorMessage,
+  isTransactionRequestRejected,
+  TRANSACTION_REQUEST_REJECTED_MESSAGE,
+} from "@/lib/client/transaction-errors";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { showToast } from "@/components/ToastContainer";
@@ -277,18 +282,12 @@ export default function CategoryListingPurchaseAction({
 
       showToast.success(`✓ Purchase successful! TX: ${signature.slice(0, 12)}...`);
       onPurchased?.(listingId, nftMint || listing?.nftAddress);
-    } catch (error: any) {
-      const message = error.message || "Transaction failed";
+    } catch (error) {
+      const message = getTransactionErrorMessage(error);
       const lowerMessage = message.toLowerCase();
 
-      if (
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("rejected the request") ||
-        lowerMessage.includes("declined") ||
-        lowerMessage.includes("cancelled") ||
-        lowerMessage.includes("canceled")
-      ) {
-        showToast.error("Transaction rejected by user");
+      if (isTransactionRequestRejected(error)) {
+        showToast.error(TRANSACTION_REQUEST_REJECTED_MESSAGE);
       } else if (lowerMessage.includes("insufficient")) {
         showToast.error(
           `Insufficient balance. Required: ${formatListingQuote(
