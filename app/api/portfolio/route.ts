@@ -7,8 +7,8 @@ import { getOracleApiUrl } from "@/lib/server/oracle-env";
  * Fetches portfolio data from Collector Crypt API and transforms it
  * with additional metrics and analysis.
  *
- * Currently shows Collector Crypt insured valuations.
- * Oracle market pricing integration coming soon via /api/portfolio/oracle
+ * Currently shows Collector Crypt insured valuations with oracle sold-comp enrichment
+ * fetched directly from the configured oracle service.
  */
 
 interface CCCard {
