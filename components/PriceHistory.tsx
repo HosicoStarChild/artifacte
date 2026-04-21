@@ -591,7 +591,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
       {/* Fullscreen lightbox */}
       {expanded && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setExpanded(false)}
         >
           <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>

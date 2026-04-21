@@ -141,7 +141,7 @@ export default function AgentsPage() {
             placeholder="Search agents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2.5 bg-dark-800 border border-white/5 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-gold-500 transition-colors"
+            className="flex-1 px-4 py-2.5 bg-dark-800 border border-white/5 rounded-lg text-white placeholder-gray-500 focus:outline-hidden focus:border-gold-500 transition-colors"
           />
 
           <div className="flex gap-2 flex-wrap">

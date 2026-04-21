@@ -111,7 +111,7 @@ function TCGCarousel({
           <div className="overflow-x-auto overscroll-x-contain pb-4">
             <div className="flex gap-6">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex-shrink-0 w-72 bg-dark-800 rounded-lg border border-white/5 overflow-hidden animate-pulse">
+                <div key={i} className="shrink-0 w-72 bg-dark-800 rounded-lg border border-white/5 overflow-hidden animate-pulse">
                   <div className="aspect-square bg-dark-700" />
                   <div className="p-5 space-y-3">
                     <div className="h-3 bg-dark-700 rounded w-20" />
@@ -140,7 +140,7 @@ function TCGCarousel({
                 const isPurchased = Boolean(purchasedIds?.[listing.id]);
 
                 return (
-                  <div key={listing.id} className="flex-shrink-0 w-72 snap-start">
+                  <div key={listing.id} className="shrink-0 w-72 snap-start">
                     <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col group">
                       <Link href={cardHref} className="flex-1 flex flex-col">
                         <div className="aspect-square overflow-hidden bg-dark-900">

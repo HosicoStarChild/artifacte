@@ -339,7 +339,7 @@ export default function AuctionDetail() {
                         placeholder={`Min: ${minBid.toLocaleString()} ${currencyLabel}`}
                         value={bidUsd1}
                         onChange={(e) => setBidUsd1(e.target.value)}
-                        className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-none transition-colors"
+                        className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-hidden transition-colors"
                       />
                       {connected ? (
                         <button
@@ -388,7 +388,7 @@ export default function AuctionDetail() {
                     return (
                       <div key={i} className="flex justify-between items-start pb-4 border-b border-white/5 last:border-b-0 last:pb-0">
                         <div className="flex items-center gap-4 flex-1">
-                          <div className="w-8 h-8 rounded-full bg-dark-900 border border-white/5 flex items-center justify-center text-xs text-gray-400 font-medium flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-dark-900 border border-white/5 flex items-center justify-center text-xs text-gray-400 font-medium shrink-0">
                             {i + 1}
                           </div>
                           <div>

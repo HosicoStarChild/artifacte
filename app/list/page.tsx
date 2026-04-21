@@ -738,7 +738,7 @@ export default function ListNFTPage() {
                     min="0.01"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
-                    className="w-full bg-dark-700 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="0.00"
                   />
                 </div>
@@ -751,7 +751,7 @@ export default function ListNFTPage() {
                   <select
                     value={auctionDuration}
                     onChange={e => setAuctionDuration(e.target.value)}
-                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                   >
                     <option value="0.0833">5 minutes (testing)</option>
                     <option value="0.5">30 minutes (testing)</option>

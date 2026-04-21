@@ -574,7 +574,7 @@ function MintFormInner() {
         <div className="mb-6 p-4 bg-dark-700 rounded-lg border border-white/5">
           <h4 className="text-gold-400 font-semibold mb-2">Collection</h4>
           <div className="flex gap-2 mb-2">
-            <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-gold-500" placeholder="Collection address (create one first)" />
+            <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-hidden focus:border-gold-500" placeholder="Collection address (create one first)" />
           </div>
           <div className="mb-3 rounded-lg border border-white/10 bg-dark-800/70 p-3">
             <div className="flex items-start justify-between gap-3 mb-2">
@@ -623,13 +623,13 @@ function MintFormInner() {
           <div className="grid grid-cols-2 gap-4 mb-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1">Type</label>
-              <select value={formData.type} onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+              <select value={formData.type} onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500">
                 <option value="Card">Card</option><option value="Sealed Product">Sealed Product</option>
               </select>
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">TCG</label>
-              <select value={formData.tcg} onChange={(e) => setFormData(prev => ({ ...prev, tcg: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+              <select value={formData.tcg} onChange={(e) => setFormData(prev => ({ ...prev, tcg: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500">
                 <option value="Pokemon">Pokemon</option><option value="One Piece">One Piece</option><option value="Dragon Ball">Dragon Ball</option><option value="Yu-Gi-Oh">Yu-Gi-Oh</option><option value="Sports">Sports</option><option value="Other">Other</option>
               </select>
             </div>
@@ -658,29 +658,29 @@ function MintFormInner() {
         {formData.type === "Card" && (
           <div className="mb-6">
             <h4 className="text-gold-400 font-semibold mb-3">Card Details</h4>
-            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Card Name</label><input type="text" value={formData.cardName} onChange={(e) => setFormData(prev => ({ ...prev, cardName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Monkey D. Luffy" /></div>
+            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Card Name</label><input type="text" value={formData.cardName} onChange={(e) => setFormData(prev => ({ ...prev, cardName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="e.g. Monkey D. Luffy" /></div>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.set} onChange={(e) => setFormData(prev => ({ ...prev, set: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. OP09" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Card Number</label><input type="text" value={formData.cardNumber} onChange={(e) => setFormData(prev => ({ ...prev, cardNumber: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. 051" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.set} onChange={(e) => setFormData(prev => ({ ...prev, set: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="e.g. OP09" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Card Number</label><input type="text" value={formData.cardNumber} onChange={(e) => setFormData(prev => ({ ...prev, cardNumber: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="e.g. 051" /></div>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.year} onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Language</label><select value={formData.language} onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="English">English</option><option value="Japanese">Japanese</option><option value="Chinese">Chinese</option><option value="Korean">Korean</option><option value="French">French</option><option value="German">German</option></select></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.year} onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Language</label><select value={formData.language} onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500"><option value="English">English</option><option value="Japanese">Japanese</option><option value="Chinese">Chinese</option><option value="Korean">Korean</option><option value="French">French</option><option value="German">German</option></select></div>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><label className="block text-sm text-gray-400 mb-1">Variant</label><input type="text" value={formData.variant} onChange={(e) => setFormData(prev => ({ ...prev, variant: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Manga Alternate Art" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Condition</label><select value={formData.condition} onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="Graded">Graded</option><option value="Near Mint">Near Mint</option><option value="Lightly Played">Lightly Played</option><option value="Moderately Played">Moderately Played</option><option value="Heavily Played">Heavily Played</option></select></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Variant</label><input type="text" value={formData.variant} onChange={(e) => setFormData(prev => ({ ...prev, variant: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="e.g. Manga Alternate Art" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Condition</label><select value={formData.condition} onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as any }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500"><option value="Graded">Graded</option><option value="Near Mint">Near Mint</option><option value="Lightly Played">Lightly Played</option><option value="Moderately Played">Moderately Played</option><option value="Heavily Played">Heavily Played</option></select></div>
             </div>
             {formData.condition === "Graded" && (
               <div className="bg-dark-700 rounded-lg p-4 border border-white/5">
                 <h5 className="text-gold-400 font-medium mb-2 text-sm">Grading Details</h5>
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div><label className="block text-xs text-gray-400 mb-1">Company</label><select value={formData.gradingCompany} onChange={(e) => setFormData(prev => ({ ...prev, gradingCompany: e.target.value as any }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500"><option value="PSA">PSA</option><option value="BGS">BGS</option><option value="CGC">CGC</option></select></div>
-                  <div><label className="block text-xs text-gray-400 mb-1">Grade</label><input type="text" value={formData.grade} onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="10" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Company</label><select value={formData.gradingCompany} onChange={(e) => setFormData(prev => ({ ...prev, gradingCompany: e.target.value as any }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500"><option value="PSA">PSA</option><option value="BGS">BGS</option><option value="CGC">CGC</option></select></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Grade</label><input type="text" value={formData.grade} onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="10" /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-xs text-gray-400 mb-1">Label</label><input type="text" value={formData.gradeLabel} onChange={(e) => setFormData(prev => ({ ...prev, gradeLabel: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="GEM-MT" /></div>
-                  <div><label className="block text-xs text-gray-400 mb-1">Cert #</label><input type="text" value={formData.certNumber} onChange={(e) => setFormData(prev => ({ ...prev, certNumber: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Label</label><input type="text" value={formData.gradeLabel} onChange={(e) => setFormData(prev => ({ ...prev, gradeLabel: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="GEM-MT" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Cert #</label><input type="text" value={formData.certNumber} onChange={(e) => setFormData(prev => ({ ...prev, certNumber: e.target.value }))} className="w-full bg-dark-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" /></div>
                 </div>
               </div>
             )}
@@ -690,10 +690,10 @@ function MintFormInner() {
         {formData.type === "Sealed Product" && (
           <div className="mb-6">
             <h4 className="text-gold-400 font-semibold mb-3">Sealed Product Details</h4>
-            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Product Name</label><input type="text" value={formData.productName} onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" placeholder="e.g. Booster Box" /></div>
+            <div className="mb-3"><label className="block text-sm text-gray-400 mb-1">Product Name</label><input type="text" value={formData.productName} onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" placeholder="e.g. Booster Box" /></div>
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.sealedSet} onChange={(e) => setFormData(prev => ({ ...prev, sealedSet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
-              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.sealedYear} onChange={(e) => setFormData(prev => ({ ...prev, sealedYear: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Set</label><input type="text" value={formData.sealedSet} onChange={(e) => setFormData(prev => ({ ...prev, sealedSet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" /></div>
+              <div><label className="block text-sm text-gray-400 mb-1">Year</label><input type="number" value={formData.sealedYear} onChange={(e) => setFormData(prev => ({ ...prev, sealedYear: e.target.value ? parseInt(e.target.value) : "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500" /></div>
             </div>
           </div>
         )}
@@ -704,7 +704,7 @@ function MintFormInner() {
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1">Source</label>
-              <select value={formData.priceSource} onChange={(e) => setFormData(prev => ({ ...prev, priceSource: e.target.value as any, priceSourceId: "", priceSourceName: "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500">
+              <select value={formData.priceSource} onChange={(e) => setFormData(prev => ({ ...prev, priceSource: e.target.value as any, priceSourceId: "", priceSourceName: "" }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500">
                 <option value="Alt.xyz">Alt.xyz (Graded)</option>
                 <option value="TCGplayer">TCGplayer (Ungraded/Sealed)</option>
                 <option value="None">None</option>
@@ -712,7 +712,7 @@ function MintFormInner() {
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Source ID</label>
-              <input type="text" value={formData.priceSourceId} onChange={(e) => setFormData(prev => ({ ...prev, priceSourceId: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-gold-500" placeholder="Auto-filled from search" />
+              <input type="text" value={formData.priceSourceId} onChange={(e) => setFormData(prev => ({ ...prev, priceSourceId: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-hidden focus:border-gold-500" placeholder="Auto-filled from search" />
             </div>
           </div>
           {formData.priceSourceName && (
@@ -741,12 +741,12 @@ function MintFormInner() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-gray-400 mb-1">Front</label>
-              <input type="file" accept="image/*" onChange={handleImageUpload('frontImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
+              <input type="file" accept="image/*" onChange={handleImageUpload('frontImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
               {formData.frontImagePreview && <img src={formData.frontImagePreview} alt="Front" className="mt-2 w-full h-24 object-cover rounded-lg border border-white/10" />}
             </div>
             <div>
               <label className="block text-sm text-gray-400 mb-1">Back (Optional)</label>
-              <input type="file" accept="image/*" onChange={handleImageUpload('backImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
+              <input type="file" accept="image/*" onChange={handleImageUpload('backImage')} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-hidden focus:border-gold-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gold-500 file:text-dark-900" />
               {formData.backImagePreview && <img src={formData.backImagePreview} alt="Back" className="mt-2 w-full h-24 object-cover rounded-lg border border-white/10" />}
             </div>
           </div>
@@ -754,7 +754,7 @@ function MintFormInner() {
         {/* Recipient */}
         <div className="mb-6">
           <h4 className="text-gold-400 font-semibold mb-3">Recipient</h4>
-          <input type="text" value={formData.recipientWallet} onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-gold-500" placeholder="Solana wallet address" />
+          <input type="text" value={formData.recipientWallet} onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-hidden focus:border-gold-500" placeholder="Solana wallet address" />
         </div>
         <button onClick={handleMint} disabled={!formData.name || !formData.recipientWallet || minting} className={`w-full py-3 rounded-lg font-semibold text-sm transition ${!formData.name || !formData.recipientWallet || minting ? "bg-gray-600 text-gray-400 cursor-not-allowed" : "bg-gold-500 hover:bg-gold-600 text-dark-900"}`}>{minting ? "Minting..." : "Mint NFT"}</button>
         {mintResult && (
@@ -1021,7 +1021,7 @@ export function MintContent() {
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as "Card" | "Sealed Product" }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                   >
                     <option value="Card">Card</option>
                     <option value="Sealed Product">Sealed Product</option>
@@ -1033,7 +1033,7 @@ export function MintContent() {
                   <select
                     value={formData.tcg}
                     onChange={(e) => setFormData(prev => ({ ...prev, tcg: e.target.value as typeof formData.tcg }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                   >
                     <option value="Pokemon">Pokemon</option>
                     <option value="One Piece">One Piece</option>
@@ -1069,7 +1069,7 @@ export function MintContent() {
                       type="text"
                       value={formData.cardName}
                       onChange={(e) => setFormData(prev => ({ ...prev, cardName: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. Monkey D. Luffy"
                     />
                   </div>
@@ -1082,7 +1082,7 @@ export function MintContent() {
                       type="text"
                       value={formData.set}
                       onChange={(e) => setFormData(prev => ({ ...prev, set: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. OP09 - Emperors in the New World"
                     />
                   </div>
@@ -1093,7 +1093,7 @@ export function MintContent() {
                       type="text"
                       value={formData.cardNumber}
                       onChange={(e) => setFormData(prev => ({ ...prev, cardNumber: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. 051"
                     />
                   </div>
@@ -1106,7 +1106,7 @@ export function MintContent() {
                       type="number"
                       value={formData.year}
                       onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value ? parseInt(e.target.value) : "" }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. 2024"
                     />
                   </div>
@@ -1116,7 +1116,7 @@ export function MintContent() {
                     <select
                       value={formData.language}
                       onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as typeof formData.language }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     >
                       <option value="English">English</option>
                       <option value="Japanese">Japanese</option>
@@ -1135,7 +1135,7 @@ export function MintContent() {
                       type="text"
                       value={formData.variant}
                       onChange={(e) => setFormData(prev => ({ ...prev, variant: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. Manga Alternate Art, Holo"
                     />
                   </div>
@@ -1145,7 +1145,7 @@ export function MintContent() {
                     <select
                       value={formData.condition}
                       onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as typeof formData.condition }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     >
                       <option value="Graded">Graded</option>
                       <option value="Near Mint">Near Mint</option>
@@ -1167,7 +1167,7 @@ export function MintContent() {
                         <select
                           value={formData.gradingCompany}
                           onChange={(e) => setFormData(prev => ({ ...prev, gradingCompany: e.target.value as typeof formData.gradingCompany }))}
-                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                         >
                           <option value="PSA">PSA</option>
                           <option value="BGS">BGS</option>
@@ -1181,7 +1181,7 @@ export function MintContent() {
                           type="text"
                           value={formData.grade}
                           onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
-                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                           placeholder="e.g. 10, 9.5"
                         />
                       </div>
@@ -1194,7 +1194,7 @@ export function MintContent() {
                           type="text"
                           value={formData.gradeLabel}
                           onChange={(e) => setFormData(prev => ({ ...prev, gradeLabel: e.target.value }))}
-                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                           placeholder="e.g. GEM-MT, PRISTINE"
                         />
                       </div>
@@ -1205,7 +1205,7 @@ export function MintContent() {
                           type="text"
                           value={formData.certNumber}
                           onChange={(e) => setFormData(prev => ({ ...prev, certNumber: e.target.value }))}
-                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="w-full bg-dark-800 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                           placeholder="Certificate number"
                         />
                       </div>
@@ -1227,7 +1227,7 @@ export function MintContent() {
                       type="text"
                       value={formData.productName}
                       onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. Booster Box"
                     />
                   </div>
@@ -1240,7 +1240,7 @@ export function MintContent() {
                       type="text"
                       value={formData.sealedSet}
                       onChange={(e) => setFormData(prev => ({ ...prev, sealedSet: e.target.value }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. Base Set"
                     />
                   </div>
@@ -1251,7 +1251,7 @@ export function MintContent() {
                       type="number"
                       value={formData.sealedYear}
                       onChange={(e) => setFormData(prev => ({ ...prev, sealedYear: e.target.value ? parseInt(e.target.value) : "" }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                       placeholder="e.g. 1998"
                     />
                   </div>
@@ -1263,7 +1263,7 @@ export function MintContent() {
                     <select
                       value={formData.sealedLanguage}
                       onChange={(e) => setFormData(prev => ({ ...prev, sealedLanguage: e.target.value as typeof formData.sealedLanguage }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     >
                       <option value="English">English</option>
                       <option value="Japanese">Japanese</option>
@@ -1279,7 +1279,7 @@ export function MintContent() {
                     <select
                       value={formData.sealedTcg}
                       onChange={(e) => setFormData(prev => ({ ...prev, sealedTcg: e.target.value as typeof formData.sealedTcg }))}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     >
                       <option value="Pokemon">Pokemon</option>
                       <option value="One Piece">One Piece</option>
@@ -1305,7 +1305,7 @@ export function MintContent() {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload('frontImage')}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gold-500 file:text-dark-900"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gold-500 file:text-dark-900"
                     />
                   </div>
                   {formData.frontImagePreview && (
@@ -1326,7 +1326,7 @@ export function MintContent() {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload('backImage')}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gold-500 file:text-dark-900"
+                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-gold-500 file:text-dark-900"
                     />
                   </div>
                   {formData.backImagePreview && (
@@ -1352,7 +1352,7 @@ export function MintContent() {
                   type="text"
                   value={formData.recipientWallet}
                   onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))}
-                  className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition font-mono"
+                  className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition font-mono"
                   placeholder="Solana wallet address who receives the NFT"
                 />
               </div>

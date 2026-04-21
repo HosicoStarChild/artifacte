@@ -455,7 +455,7 @@ export default function CategoryAuctionsPage() {
                 clearTimeout(searchTimer.current);
                 searchTimer.current = setTimeout(() => { setFilters(prev => ({ ...prev, search: val })); setPage(1); }, 400);
               }}
-              className="w-full bg-dark-800 border border-white/10 text-white text-sm rounded-lg pl-10 pr-4 py-2.5 focus:border-gold-500 focus:outline-none transition-colors placeholder-gray-500"
+              className="w-full bg-dark-800 border border-white/10 text-white text-sm rounded-lg pl-10 pr-4 py-2.5 focus:border-gold-500 focus:outline-hidden transition-colors placeholder-gray-500"
             />
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -471,7 +471,7 @@ export default function CategoryAuctionsPage() {
                 <select
                   value={filters[filter.key] || "All"}
                   onChange={(e) => { setFilters({ ...filters, [filter.key]: e.target.value }); setPage(1); }}
-                  className="appearance-none bg-dark-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2.5 pr-8 focus:border-gold-500 focus:outline-none transition-colors cursor-pointer hover:border-white/20"
+                  className="appearance-none bg-dark-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2.5 pr-8 focus:border-gold-500 focus:outline-hidden transition-colors cursor-pointer hover:border-white/20"
                 >
                   {filter.options.map((opt) => (
                     <option key={opt} value={opt} className="bg-dark-900">
@@ -500,7 +500,7 @@ export default function CategoryAuctionsPage() {
             <select
               value={sortBy}
               onChange={(e) => { setSortBy(e.target.value as any); setPage(1); }}
-              className="appearance-none bg-dark-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2.5 pr-8 focus:border-gold-500 focus:outline-none transition-colors cursor-pointer hover:border-white/20"
+              className="appearance-none bg-dark-800 border border-white/10 text-white text-sm rounded-lg px-4 py-2.5 pr-8 focus:border-gold-500 focus:outline-hidden transition-colors cursor-pointer hover:border-white/20"
             >
               <option value="default" className="bg-dark-900">Default</option>
               <option value="price-high" className="bg-dark-900">Price: High to Low</option>

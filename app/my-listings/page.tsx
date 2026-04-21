@@ -477,24 +477,24 @@ export default function MyListingsPage() {
                       
                       <div className="absolute top-3 right-3">
                         {listing.status === "active" && (
-                          <span className="bg-green-900/60 text-green-300 border border-green-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                          <span className="bg-green-900/60 text-green-300 border border-green-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-xs">
                             Active
                           </span>
                         )}
                         {listing.status === "completed" && (
-                          <span className="bg-blue-900/60 text-blue-300 border border-blue-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                          <span className="bg-blue-900/60 text-blue-300 border border-blue-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-xs">
                             Sold
                           </span>
                         )}
                         {listing.status === "cancelled" && (
-                          <span className="bg-red-900/60 text-red-300 border border-red-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                          <span className="bg-red-900/60 text-red-300 border border-red-700/50 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-xs">
                             Cancelled
                           </span>
                         )}
                       </div>
 
                       {listing.status === "active" && listing.endsAt && (
-                        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-dark-900/80 backdrop-blur-sm border border-white/10">
+                        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-dark-900/80 backdrop-blur-xs border border-white/10">
                           <p className="text-xs text-gold-500 font-semibold">
                             {getTimeRemaining(listing.endsAt)}
                           </p>
@@ -502,7 +502,7 @@ export default function MyListingsPage() {
                       )}
 
                       <div className="absolute top-3 left-3">
-                        <span className="bg-dark-900/80 backdrop-blur-sm text-gold-400 px-2 py-1 rounded text-xs font-semibold">
+                        <span className="bg-dark-900/80 backdrop-blur-xs text-gold-400 px-2 py-1 rounded text-xs font-semibold">
                           {listing.listingType}
                         </span>
                       </div>

@@ -474,7 +474,7 @@ export function AgentRegistrationContent() {
                     type="text"
                     value={agentName}
                     onChange={(e) => setAgentName(e.target.value)}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="e.g., ArtCollector Bot"
                   />
                 </div>
@@ -486,7 +486,7 @@ export function AgentRegistrationContent() {
                   <textarea
                     value={agentDescription}
                     onChange={(e) => setAgentDescription(e.target.value)}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold-500 transition resize-none"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-gold-500 transition resize-none"
                     rows={4}
                     placeholder="Describe your agent's purpose and trading strategy..."
                   />
@@ -561,7 +561,7 @@ export function AgentRegistrationContent() {
                     type="number"
                     value={permissions.spendingLimit}
                     onChange={(e) => setPermissions(prev => ({ ...prev, spendingLimit: Number(e.target.value) }))}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-hidden focus:border-gold-500 transition"
                     min="1"
                     max="100000"
                   />

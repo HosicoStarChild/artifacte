@@ -122,7 +122,7 @@ export default function SubmitPage() {
             <div className="space-y-8">
               {steps.map((step, i) => (
                 <div key={i} className="flex items-start gap-5 relative">
-                  <div className="w-9 h-9 rounded-lg bg-dark-800 border border-white/10 flex items-center justify-center flex-shrink-0 z-10 text-lg">
+                  <div className="w-9 h-9 rounded-lg bg-dark-800 border border-white/10 flex items-center justify-center shrink-0 z-10 text-lg">
                     {step.icon}
                   </div>
                   <div>
@@ -162,7 +162,7 @@ export default function SubmitPage() {
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="e.g. Vintage Rolex Submariner"
                     disabled={!connected}
                   />
@@ -174,7 +174,7 @@ export default function SubmitPage() {
                   <select
                     value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     disabled={!connected}
                   >
                     {categories.map((cat) => (
@@ -193,7 +193,7 @@ export default function SubmitPage() {
                     rows={4}
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition resize-none"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition resize-none"
                     placeholder="Describe your asset, condition, provenance, and any relevant details..."
                     disabled={!connected}
                   />
@@ -212,7 +212,7 @@ export default function SubmitPage() {
                         type="url"
                         value={photo}
                         onChange={(e) => handlePhotoChange(index, e.target.value)}
-                        className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                        className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                         placeholder={`Photo ${index + 1} URL (optional)`}
                         disabled={!connected}
                       />
@@ -228,7 +228,7 @@ export default function SubmitPage() {
                     required
                     value={form.contact}
                     onChange={(e) => setForm({ ...form, contact: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="email@example.com or @telegram_username"
                     disabled={!connected}
                   />

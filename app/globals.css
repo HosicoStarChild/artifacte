@@ -1,15 +1,105 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+@custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --dark-900: #0a0a0f;
-  --dark-800: #141419;
-  --gold-500: #C9A55C;
+@theme inline {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-heading: var(--font-playfair), Georgia, serif;
+  --text-hero: 3.5rem;
+  --text-hero--line-height: 1.1;
+  --text-section: 2.5rem;
+  --text-section--line-height: 1.1;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-4xl: 2rem;
+  --blur-xs: 2px;
 }
 
-* {
+@theme {
+  --color-dark-900: #0a0a0f;
+  --color-dark-800: #141419;
+  --color-dark-700: #1a1a1f;
+  --color-dark-600: #242429;
+  --color-gold-300: #e0c27a;
+  --color-gold-400: #d4a843;
+  --color-gold-500: #c9a55c;
+  --color-gold-600: #b8860b;
+  --color-gold-900: #4f3a10;
+  --color-navy-800: #1a1f3a;
+  --color-navy-900: #0d1229;
+}
+
+:root,
+.dark {
   color-scheme: dark;
+  --dark-900: #0a0a0f;
+  --dark-800: #141419;
+  --gold-500: #c9a55c;
+  --radius: 0.875rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --background: hsl(240 18% 5%);
+  --foreground: hsl(50 20% 94%);
+  --card: hsl(240 8% 10%);
+  --card-foreground: hsl(50 20% 94%);
+  --popover: hsl(240 9% 9%);
+  --popover-foreground: hsl(50 20% 94%);
+  --primary: hsl(40 49% 58%);
+  --primary-foreground: hsl(240 12% 8%);
+  --secondary: hsl(240 7% 18%);
+  --secondary-foreground: hsl(50 20% 94%);
+  --muted: hsl(240 6% 16%);
+  --muted-foreground: hsl(240 5% 64%);
+  --accent: hsl(42 28% 20%);
+  --accent-foreground: hsl(50 20% 94%);
+  --destructive: hsl(0 72% 58%);
+  --border: hsl(240 6% 22%);
+  --input: hsl(240 6% 24%);
+  --ring: hsl(40 49% 58%);
+  --chart-1: hsl(40 49% 58%);
+  --chart-2: hsl(32 42% 48%);
+  --chart-3: hsl(24 38% 41%);
+  --chart-4: hsl(240 8% 22%);
+  --chart-5: hsl(240 10% 32%);
+  --sidebar: hsl(240 9% 8%);
+  --sidebar-foreground: hsl(50 20% 94%);
+  --sidebar-primary: hsl(40 49% 58%);
+  --sidebar-primary-foreground: hsl(240 12% 8%);
+  --sidebar-accent: hsl(240 7% 18%);
+  --sidebar-accent-foreground: hsl(50 20% 94%);
+  --sidebar-border: hsl(240 6% 22%);
+  --sidebar-ring: hsl(40 49% 58%);
 }
 
 html,
@@ -17,11 +107,6 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-}
-
-body {
-  background: var(--dark-900);
-  color: #f5f5f0;
 }
 
 /* Custom scrollbar */
@@ -38,6 +123,7 @@ body {
 .card-hover {
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
+
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -47,6 +133,7 @@ body {
 .image-hover {
   transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
+
 .image-hover:hover {
   transform: scale(1.02);
 }
@@ -56,6 +143,7 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.8; }
 }
+
 .pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
 
 /* Elegant line separator */
@@ -70,68 +158,15 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
-.text-label {
-  @apply text-xs font-semibold tracking-widest uppercase;
-}
-
-.text-secondary {
-  @apply text-gray-500;
-}
-
-.text-tertiary {
-  @apply text-gray-600;
-}
-
 @layer base {
-  .theme {
-    --font-heading: var(--font-playfair);
-    --font-sans: var(--font-inter);
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
-  }
-  :root,
-  .dark {
-    --background: 240 18% 5%;
-    --foreground: 50 20% 94%;
-    --card: 240 8% 10%;
-    --card-foreground: 50 20% 94%;
-    --popover: 240 9% 9%;
-    --popover-foreground: 50 20% 94%;
-    --primary: 40 49% 58%;
-    --primary-foreground: 240 12% 8%;
-    --secondary: 240 7% 18%;
-    --secondary-foreground: 50 20% 94%;
-    --muted: 240 6% 16%;
-    --muted-foreground: 240 5% 64%;
-    --accent: 42 28% 20%;
-    --accent-foreground: 50 20% 94%;
-    --destructive: 0 72% 58%;
-    --border: 240 6% 22%;
-    --input: 240 6% 24%;
-    --ring: 40 49% 58%;
-    --chart-1: 40 49% 58%;
-    --chart-2: 32 42% 48%;
-    --chart-3: 24 38% 41%;
-    --chart-4: 240 8% 22%;
-    --chart-5: 240 10% 32%;
-    --radius: 0.875rem;
-    --sidebar: 240 9% 8%;
-    --sidebar-foreground: 50 20% 94%;
-    --sidebar-primary: 40 49% 58%;
-    --sidebar-primary-foreground: 240 12% 8%;
-    --sidebar-accent: 240 7% 18%;
-    --sidebar-accent-foreground: 50 20% 94%;
-    --sidebar-border: 240 6% 22%;
-    --sidebar-ring: 40 49% 58%;
-  }
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }

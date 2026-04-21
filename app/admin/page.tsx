@@ -752,7 +752,7 @@ export default function AdminPage() {
                               placeholder="Enter rejection reason (optional)..."
                               value={rejectReason}
                               onChange={(e) => setRejectReason(e.target.value)}
-                              className="w-full bg-dark-900 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-red-500 outline-none mb-3 resize-none"
+                              className="w-full bg-dark-900 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-red-500 outline-hidden mb-3 resize-none"
                               rows={3}
                             />
                             <div className="flex gap-3">
@@ -800,7 +800,7 @@ export default function AdminPage() {
                     type="text"
                     value={mintForm.nftName}
                     onChange={(e) => setMintForm({ ...mintForm, nftName: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="NFT name..."
                   />
                   <p className={`mt-2 text-xs ${mintNameStatus.fits ? "text-gray-500" : "text-red-400"}`}>
@@ -815,7 +815,7 @@ export default function AdminPage() {
                     type="text"
                     value={mintForm.nftSymbol}
                     onChange={(e) => setMintForm({ ...mintForm, nftSymbol: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="Symbol (default: Artifacte)"
                   />
                   <p className={`mt-2 text-xs ${mintSymbolStatus.fits ? "text-gray-500" : "text-red-400"}`}>
@@ -830,7 +830,7 @@ export default function AdminPage() {
                     type="url"
                     value={mintForm.nftImageUri}
                     onChange={(e) => setMintForm({ ...mintForm, nftImageUri: e.target.value })}
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="https://example.com/image.png"
                   />
                 </div>
@@ -849,7 +849,7 @@ export default function AdminPage() {
                             newAttrs[idx].key = e.target.value;
                             setMintForm({ ...mintForm, attributes: newAttrs });
                           }}
-                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                           placeholder="Attribute key (e.g., Rarity)"
                         />
                         <input
@@ -860,7 +860,7 @@ export default function AdminPage() {
                             newAttrs[idx].value = e.target.value;
                             setMintForm({ ...mintForm, attributes: newAttrs });
                           }}
-                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                          className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                           placeholder="Attribute value (e.g., Rare)"
                         />
                         {idx === mintForm.attributes.length - 1 && (
@@ -916,7 +916,7 @@ export default function AdminPage() {
                     type="text"
                     value={newWalletAddr}
                     onChange={e => setNewWalletAddr(e.target.value)}
-                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition font-mono"
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition font-mono"
                     placeholder="Solana wallet address..."
                   />
                 </div>
@@ -926,7 +926,7 @@ export default function AdminPage() {
                     type="text"
                     value={newWalletName}
                     onChange={e => setNewWalletName(e.target.value)}
-                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                    className="w-full bg-dark-700 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                     placeholder="Seller name..."
                   />
                 </div>
@@ -1055,7 +1055,7 @@ export default function AdminPage() {
                 <div className="p-4 bg-dark-700 rounded-lg border border-white/10">
                   <label className="block">
                     <p className="font-semibold text-white mb-2">Marketplace Status</p>
-                    <select className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all">
+                    <select className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-hidden transition-all">
                       <option>Active</option>
                       <option>Maintenance</option>
                       <option>Paused</option>
@@ -1068,7 +1068,7 @@ export default function AdminPage() {
                     <input
                       type="number"
                       defaultValue="10"
-                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all"
+                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-hidden transition-all"
                     />
                   </label>
                 </div>
@@ -1078,7 +1078,7 @@ export default function AdminPage() {
                     <input
                       type="number"
                       defaultValue="90"
-                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-none transition-all"
+                      className="w-full bg-dark-600 border border-white/10 rounded px-3 py-2 text-white focus:border-gold-500 outline-hidden transition-all"
                     />
                   </label>
                 </div>

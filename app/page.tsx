@@ -137,7 +137,7 @@ export default async function Home() {
                         <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-white">The Artifacte Collection</h3>
                         <p className="text-gray-300 text-sm mt-1">Explore collection →</p>
                       </div>
-                      <span className="hidden sm:inline text-gold-500 text-xs font-semibold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap flex-shrink-0">Artifacte Originals</span>
+                      <span className="hidden sm:inline text-gold-500 text-xs font-semibold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-xs whitespace-nowrap shrink-0">Artifacte Originals</span>
                     </div>
                   </div>
                 </div>
@@ -187,7 +187,7 @@ export default async function Home() {
           <div className="overflow-x-auto overscroll-x-contain pb-4">
             <div className="flex gap-6 snap-x">
               {spiritsCarousel.map((l: any) => (
-                <a key={l.id} href={l.externalUrl || `https://app.baxus.co/asset/${l.nftAddress}`} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-80 snap-start group">
+                <a key={l.id} href={l.externalUrl || `https://app.baxus.co/asset/${l.nftAddress}`} target="_blank" rel="noopener noreferrer" className="shrink-0 w-80 snap-start group">
                   <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover h-full flex flex-col">
                     <div className="aspect-square overflow-hidden bg-dark-900">
                       <img

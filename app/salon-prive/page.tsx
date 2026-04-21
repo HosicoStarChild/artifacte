@@ -361,7 +361,7 @@ export default function ClawPage() {
 
       {/* Mobile Chat Drawer */}
       {isChatOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex flex-col">
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex flex-col">
           <div className="mt-auto max-h-[85vh] w-full rounded-t-2xl overflow-hidden">
             <div className="bg-[#0d1229] border border-[#1a1f3a] h-[85vh] flex flex-col">
               {/* Drawer handle */}
@@ -386,7 +386,7 @@ export default function ClawPage() {
 
       {/* Pull Modal */}
       {showPullModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-dark-800 rounded-lg border border-gold-500/20 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Claw Animation / Card Reveal */}
             <div className="relative bg-gradient-to-b from-dark-900 to-dark-800 p-8 min-h-96">

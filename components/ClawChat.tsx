@@ -493,7 +493,7 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Say something..."
-            className="flex-1 bg-[#1a1f3a] border border-[#1a1f3a] hover:border-[#d4af37]/30 focus:border-[#d4af37]/50 focus:outline-none text-white text-sm rounded-lg px-3 py-2 placeholder-gray-500 transition-colors duration-200"
+            className="flex-1 bg-[#1a1f3a] border border-[#1a1f3a] hover:border-[#d4af37]/30 focus:border-[#d4af37]/50 focus:outline-hidden text-white text-sm rounded-lg px-3 py-2 placeholder-gray-500 transition-colors duration-200"
           />
           <button
             onClick={handleSendMessage}

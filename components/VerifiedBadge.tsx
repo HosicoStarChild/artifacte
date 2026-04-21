@@ -58,7 +58,7 @@ export default function VerifiedBadge({
   return (
     <div className="flex items-center gap-1 text-gold-500">
       <svg
-        className="w-4 h-4 flex-shrink-0"
+        className="w-4 h-4 shrink-0"
         fill="currentColor"
         viewBox="0 0 20 20"
       >

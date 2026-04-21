@@ -50,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={cn(inter.variable, playfairDisplay.variable, "dark theme")}
+      className={cn(inter.variable, playfairDisplay.variable, "dark")}
     >
       <body className="bg-background font-sans text-foreground antialiased">
         <WalletProviderWrapper>

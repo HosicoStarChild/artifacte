@@ -1118,7 +1118,7 @@ export default function AuctionDetailPage() {
                         }
                         value={bidAmount}
                         onChange={(event) => setBidAmount(event.target.value)}
-                        className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition"
+                        className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-hidden focus:border-gold-500 transition"
                         placeholder="0.00"
                       />
                     </div>
