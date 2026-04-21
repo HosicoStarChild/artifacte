@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBudgetStatus } from "@/app/lib/api-keys";
 
-export const dynamic = 'force-dynamic';
-
 /**
  * GET /api/agents/budget?address=<wallet_address>
  * Get current budget status for an agent

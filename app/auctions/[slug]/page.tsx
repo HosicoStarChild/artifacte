@@ -1,11 +1,11 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { auctions, formatFullPrice, Bid, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
 import Countdown from "@/components/Countdown";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PriceHistory from "@/components/PriceHistory";
-import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -23,7 +23,7 @@ const TOKENS: Record<string, { mint: PublicKey; decimals: number }> = {
   USDC: { mint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), decimals: 6 },
 };
 
-export default function AuctionDetail() {
+function AuctionDetailContent() {
   const { slug } = useParams();
   const auction = auctions.find((a) => a.slug === slug);
   const { connection } = useConnection();
@@ -422,5 +422,23 @@ export default function AuctionDetail() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AuctionDetailFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+        <p className="text-gray-400">Loading auction...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AuctionDetail() {
+  return (
+    <Suspense fallback={<AuctionDetailFallback />}>
+      <AuctionDetailContent />
+    </Suspense>
   );
 }

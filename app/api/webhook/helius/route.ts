@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     if (listingChanges > 0 || salesCount > 0) {
       try {
         revalidateTag("me-listings", "max");
+        revalidateTag("home-listings", "max");
       } catch {
         // revalidateTag may not work in all contexts
       }

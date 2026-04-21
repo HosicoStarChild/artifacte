@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
-
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 if (!process.env.HELIUS_API_KEY) console.warn("[nft] HELIUS_API_KEY not set");
 

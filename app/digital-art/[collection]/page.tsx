@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -106,7 +106,7 @@ function formatListedAt(listedAt?: number): string | null {
   return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
-export default function CollectionPage() {
+function CollectionPageContent() {
   const params = useParams();
   const collectionAddress = params.collection as string;
   const { publicKey } = useWallet();
@@ -804,5 +804,23 @@ export default function CollectionPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function CollectionPageFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+        <p className="text-gray-400">Loading collection...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={<CollectionPageFallback />}>
+      <CollectionPageContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadActiveArtifacteFixedPriceListings } from "@/lib/artifacte-listings";
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;

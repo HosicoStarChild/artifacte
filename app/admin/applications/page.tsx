@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { hasAdminAccess } from "@/lib/data";
@@ -25,59 +30,82 @@ interface Application {
 
 type TabType = "pending" | "approved" | "rejected";
 
+async function fetchApplications(): Promise<Application[]> {
+  const response = await fetch("/api/applications?admin=true");
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch applications");
+  }
+
+  const data = await response.json();
+  return data.applications || [];
+}
+
+async function reviewApplication({
+  action,
+  adminWallet,
+  applicationId,
+  rejectionReason,
+}: {
+  action: "approve" | "reject";
+  adminWallet: string;
+  applicationId: string;
+  rejectionReason?: string;
+}) {
+  const response = await fetch("/api/applications", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: applicationId,
+      action,
+      adminWallet,
+      rejectionReason,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to ${action} application`);
+  }
+}
+
 export default function AdminApplicationsPage() {
   const { publicKey, connected } = useWallet();
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
-
-  useEffect(() => {
-    if (connected && hasAdminAccess(publicKey?.toBase58())) {
-      fetchApplications();
-    } else {
-      setLoading(false);
-    }
-  }, [connected, publicKey]);
-
-  const fetchApplications = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/applications?admin=true");
-      if (!response.ok) throw new Error("Failed to fetch applications");
-      const data = await response.json();
-      setApplications(data.applications || []);
-    } catch (err) {
-      console.error("Error fetching applications:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const adminWallet = publicKey?.toBase58();
+  const isAdmin = connected && Boolean(adminWallet) && hasAdminAccess(adminWallet);
+  const { data: applications = [], isPending: loading } = useQuery({
+    queryKey: ["admin-applications"],
+    queryFn: fetchApplications,
+    enabled: isAdmin,
+  });
+  const reviewMutation = useMutation({
+    mutationFn: reviewApplication,
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
+      setReviewingId(null);
+      if (variables.action === "reject") {
+        setRejectionReason("");
+      }
+    },
+  });
+  const actionLoading = reviewMutation.isPending;
 
   const handleApprove = async (applicationId: string) => {
+    if (!adminWallet) {
+      return;
+    }
+
     try {
-      setActionLoading(true);
-      const response = await fetch("/api/applications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: applicationId,
-          action: "approve",
-          adminWallet: publicKey?.toBase58(),
-        }),
+      await reviewMutation.mutateAsync({
+        action: "approve",
+        adminWallet,
+        applicationId,
       });
-
-      if (!response.ok) throw new Error("Failed to approve application");
-
-      // Refresh applications
-      await fetchApplications();
-      setReviewingId(null);
     } catch (err) {
       console.error("Error approving application:", err);
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -87,29 +115,19 @@ export default function AdminApplicationsPage() {
       return;
     }
 
+    if (!adminWallet) {
+      return;
+    }
+
     try {
-      setActionLoading(true);
-      const response = await fetch("/api/applications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: applicationId,
-          action: "reject",
-          rejectionReason: rejectionReason.trim(),
-          adminWallet: publicKey?.toBase58(),
-        }),
+      await reviewMutation.mutateAsync({
+        action: "reject",
+        adminWallet,
+        applicationId,
+        rejectionReason: rejectionReason.trim(),
       });
-
-      if (!response.ok) throw new Error("Failed to reject application");
-
-      // Refresh applications
-      await fetchApplications();
-      setReviewingId(null);
-      setRejectionReason("");
     } catch (err) {
       console.error("Error rejecting application:", err);
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -133,7 +151,7 @@ export default function AdminApplicationsPage() {
     );
   }
 
-  if (!hasAdminAccess(publicKey.toBase58())) {
+  if (!isAdmin) {
     return (
       <div className="pt-24 pb-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

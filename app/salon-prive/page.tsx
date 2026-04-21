@@ -1,10 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import Navbar from '@/components/Navbar';
 import ClawChat from '@/components/ClawChat';
+
+function ClawChatFallback() {
+  return (
+    <div className="flex h-full items-center justify-center rounded-lg border border-[#1a1f3a] bg-[#0d1229] px-4 text-center text-sm text-gray-400">
+      Loading chat...
+    </div>
+  );
+}
 
 // Mock data for claw machines
 const machines = [
@@ -234,7 +242,9 @@ export default function ClawPage() {
 
           {/* Chat Panel - Right side (Desktop only: 30%, Mobile: hidden) */}
           <div className="hidden lg:flex lg:w-1/3 lg:flex-col h-full min-h-96">
-            <ClawChat connectedWallet={publicKey?.toBase58()} />
+            <Suspense fallback={<ClawChatFallback />}>
+              <ClawChat connectedWallet={publicKey?.toBase58()} />
+            </Suspense>
           </div>
         </div>
       </section>
@@ -370,7 +380,9 @@ export default function ClawPage() {
               </div>
               {/* Chat component */}
               <div className="flex-1 overflow-hidden">
-                <ClawChat connectedWallet={publicKey?.toBase58()} />
+                <Suspense fallback={<ClawChatFallback />}>
+                  <ClawChat connectedWallet={publicKey?.toBase58()} />
+                </Suspense>
               </div>
             </div>
           </div>

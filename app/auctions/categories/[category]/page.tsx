@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { auctions, listings as staticListings, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
@@ -147,7 +147,7 @@ function getListingHref(listing: any): string {
   return "#";
 }
 
-export default function CategoryAuctionsPage() {
+function CategoryAuctionsPageContent() {
   const params = useParams();
   const categorySlug = params.category as string;
   const category = categorySlugMap[categorySlug];
@@ -686,5 +686,23 @@ export default function CategoryAuctionsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function CategoryAuctionsPageFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+        <p className="text-gray-400">Loading category...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function CategoryAuctionsPage() {
+  return (
+    <Suspense fallback={<CategoryAuctionsPageFallback />}>
+      <CategoryAuctionsPageContent />
+    </Suspense>
   );
 }

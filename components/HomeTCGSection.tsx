@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { showToast } from "@/components/ToastContainer";
@@ -29,6 +30,17 @@ interface MEListing {
   solPrice?: number | null;
   usdcPrice?: number | null;
   nftAddress?: string;
+}
+
+async function fetchListings(url: string): Promise<MEListing[]> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch listings");
+  }
+
+  const data = await response.json();
+  return data.listings || [];
 }
 
 type TCGCarouselProps = {
@@ -214,11 +226,22 @@ function TCGCarousel({
 
 export function HomeTCGSection() {
   const { publicKey, sendTransaction, signTransaction, connected, wallet } = useWallet();
-  const [onePiece, setOnePiece] = useState<MEListing[]>([]);
-  const [pokemon, setPokemon] = useState<MEListing[]>([]);
-  const [sealed, setSealed] = useState<MEListing[]>([]);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Record<string, boolean>>({});
+  const { data: onePiece = [] } = useQuery({
+    queryKey: ["me-listings", "home-tcg", "one-piece"],
+    queryFn: () =>
+      fetchListings("/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8"),
+  });
+  const { data: pokemon = [] } = useQuery({
+    queryKey: ["me-listings", "home-tcg", "pokemon"],
+    queryFn: () =>
+      fetchListings("/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10"),
+  });
+  const { data: sealed = [] } = useQuery({
+    queryKey: ["me-listings", "home-tcg", "sealed"],
+    queryFn: () => fetchListings("/api/me-listings?category=SEALED&sort=price-desc&perPage=10"),
+  });
 
   const markPurchased = (listingId: string) => {
     setPurchasedIds((prev) => ({ ...prev, [listingId]: true }));
@@ -417,23 +440,6 @@ export function HomeTCGSection() {
       setBuyingId(null);
     }
   };
-
-  useEffect(() => {
-    fetch("/api/me-listings?category=TCG_CARDS&ccCategory=One Piece&sort=price-desc&perPage=8")
-      .then((r) => r.json())
-      .then((data) => setOnePiece(data.listings || []))
-      .catch(() => {});
-
-    fetch("/api/me-listings?category=TCG_CARDS&ccCategory=Pokemon&sort=price-desc&perPage=10")
-      .then((r) => r.json())
-      .then((data) => setPokemon(data.listings || []))
-      .catch(() => {});
-
-    fetch("/api/me-listings?category=SEALED&sort=price-desc&perPage=10")
-      .then((r) => r.json())
-      .then((data) => setSealed(data.listings || []))
-      .catch(() => {});
-  }, []);
 
   return (
     <>

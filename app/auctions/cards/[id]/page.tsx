@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import VerifiedBadge from "@/components/VerifiedBadge";
@@ -184,7 +184,7 @@ function formatListingQuote(amount: number, currency: string): string {
     : `$${formattedAmount} ${currency}`;
 }
 
-export default function CardDetailPage() {
+function CardDetailPageContent() {
   const params = useParams();
   const cardId = params.id as string;
   const [card, setCard] = useState<any>(null);
@@ -1138,6 +1138,24 @@ export default function CardDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CardDetailPageFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+        <p className="text-gray-400">Loading card...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function CardDetailPage() {
+  return (
+    <Suspense fallback={<CardDetailPageFallback />}>
+      <CardDetailPageContent />
+    </Suspense>
   );
 }
 

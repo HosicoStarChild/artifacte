@@ -1,16 +1,19 @@
 import { formatFullPrice } from "@/lib/data";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import Link from "next/link";
+import { cacheLife, cacheTag } from "next/cache";
 import { HomeTCGSection } from "../components/HomeTCGSection";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
 const ORACLE_API = getOracleApiUrl();
 
 async function getSpiritsCarousel() {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("home-listings");
+
   try {
-    const res = await fetch(`${ORACLE_API}/api/listings?category=SPIRITS&perPage=12&sort=price-desc`, {
-      next: { revalidate: 3600 },
-    });
+    const res = await fetch(`${ORACLE_API}/api/listings?category=SPIRITS&perPage=12&sort=price-desc`);
     if (!res.ok) return [];
     const data = await res.json();
     return (data.listings || []).filter((l: any) => l.image && l.price > 0);
@@ -20,6 +23,10 @@ async function getSpiritsCarousel() {
 }
 
 async function getFeaturedListing() {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("home-listings");
+
   try {
     // Use day of year as seed for daily rotation
     const now = new Date();
@@ -27,9 +34,7 @@ async function getFeaturedListing() {
     const dayOfYear = Math.floor(((now as any) - (start as any)) / (1000 * 60 * 60 * 24));
     
     // Fetch premium listings ($500+) from all sources
-    const res = await fetch(`${ORACLE_API}/api/listings?perPage=100&sort=price-desc`, {
-      next: { revalidate: 3600 }, // revalidate every hour
-    });
+    const res = await fetch(`${ORACLE_API}/api/listings?perPage=100&sort=price-desc`);
     if (!res.ok) return null;
     const data = await res.json();
     const premium = (data.listings || []).filter((l: any) => l.image && l.price >= 500);
@@ -43,8 +48,10 @@ async function getFeaturedListing() {
 }
 
 export default async function Home() {
-  const heroListing = await getFeaturedListing();
-  const spiritsCarousel = await getSpiritsCarousel();
+  const [heroListing, spiritsCarousel] = await Promise.all([
+    getFeaturedListing(),
+    getSpiritsCarousel(),
+  ]);
 
   return (
     <div>

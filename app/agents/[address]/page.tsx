@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useAgentRegistry } from "@/hooks/useAgentRegistry";
 
@@ -57,7 +57,7 @@ interface BudgetStatus {
   };
 }
 
-export default function AgentProfilePage() {
+function AgentProfilePageContent() {
   const params = useParams();
   const { publicKey } = useWallet();
   const { loadAgent, getSummary, giveFeedback } = useAgentRegistry();
@@ -667,5 +667,23 @@ export default function AgentProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AgentProfilePageFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
+        <p className="text-gray-400">Loading agent...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AgentProfilePage() {
+  return (
+    <Suspense fallback={<AgentProfilePageFallback />}>
+      <AgentProfilePageContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
-export const dynamic = 'force-dynamic';
-
 /**
  * Portfolio API Route
  *

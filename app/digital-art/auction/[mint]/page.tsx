@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   useWallet,
@@ -124,7 +124,7 @@ function formatFeeDisplay(amount: number, currency: string): string {
   })}`;
 }
 
-export default function AuctionDetailPage() {
+function AuctionDetailPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const mint = params.mint as string;
@@ -1277,5 +1277,23 @@ export default function AuctionDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AuctionDetailPageFallback() {
+  return (
+    <div className="pt-24 pb-20 min-h-screen">
+      <div className="max-w-4xl mx-auto px-4 text-center py-20">
+        <p className="text-gray-400">Loading listing...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AuctionDetailPage() {
+  return (
+    <Suspense fallback={<AuctionDetailPageFallback />}>
+      <AuctionDetailPageContent />
+    </Suspense>
   );
 }
