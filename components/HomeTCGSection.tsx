@@ -12,6 +12,7 @@ import {
 } from "@/lib/client/transaction-errors";
 import { resolveListingDisplayPrice } from "@/lib/data";
 import { fetchHomeTCGListings, formatHomeListingQuote, type HomeTCGListing } from "@/lib/home-tcg";
+import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
 export function HomeTCGSection() {
   const { publicKey, sendTransaction, signTransaction, connected, walletName } = useWalletCapabilities();
@@ -52,7 +53,7 @@ export function HomeTCGSection() {
     setBuyingId(listing.id);
 
     try {
-      if (listing.source === "phygitals") {
+      if (isTensorMarketplaceListing(listing)) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
 
         const { executeTensorBuy } = await import("@/lib/tensor-buy-client");

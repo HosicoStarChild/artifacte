@@ -19,6 +19,7 @@ import { resolveListingDisplayPrice } from "@/lib/data";
 import {
   getExternalMarketplaceTotalPrice,
 } from "@/lib/external-purchase-fees";
+import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -440,6 +441,7 @@ function CardDetailPageContent() {
                 category: "TCG_CARDS",
                 source: "collector-crypt",
                 collection: "Collectors Crypt",
+                marketplace: !auctionListing && (tp?.usdcPrice || tp?.solPrice) ? 'tensor' : undefined,
                 currency: listingCurrency,
                 price: listingPrice,
                 solPrice: tp?.solPrice || 0,
@@ -511,7 +513,7 @@ function CardDetailPageContent() {
       }
 
       // Route Tensor listings to Tensor buy flow (phyg- prefix or source/buyKind)
-      const isTensorBuy = cardId.startsWith('phyg-') || card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard';
+      const isTensorBuy = isTensorMarketplaceListing(card);
       if (isTensorBuy) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         const { executeTensorBuy } = await import('@/lib/tensor-buy-client');
@@ -798,7 +800,7 @@ function CardDetailPageContent() {
 
   const marketplaceLabel = card.auctionListing
     ? 'Listed on Artifacte'
-    : (card.source === 'phygitals' || card.buyKind === 'tensorCompressed' || card.buyKind === 'tensorStandard')
+    : isTensorMarketplaceListing(card)
       ? 'Powered by Tensor'
       : 'Powered by Magic Eden';
 

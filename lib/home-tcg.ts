@@ -8,6 +8,8 @@ export type HomeTCGListing = {
   verifiedBy: string;
   ccCategory: string;
   source?: string;
+  marketplace?: string;
+  buyKind?: string;
   solPrice?: number | null;
   usdcPrice?: number | null;
   nftAddress?: string;

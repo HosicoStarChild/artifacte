@@ -3,52 +3,364 @@ import {
   EXTERNAL_MARKETPLACE_FEE_WALLET,
   calculateExternalMarketplaceFeeAmount,
   shouldApplyExternalMarketplaceFee,
+  type ArtifacteAssetLike,
 } from '@/lib/external-purchase-fees';
+import { getOracleApiUrl } from '@/lib/server/oracle-env';
+
+const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+const TENSOR_API_BASE = 'https://api.mainnet.tensordev.io/api/v1';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+type HeliusAsset = ArtifacteAssetLike & {
+  compression?: {
+    compressed?: boolean;
+  } | null;
+};
+
+type OracleTensorListing = {
+  nftAddress?: string;
+  seller?: string;
+  price?: number;
+  currency?: string;
+  marketplace?: string;
+  source?: string;
+};
+
+type OracleListingsResponse = {
+  listings?: OracleTensorListing[];
+};
+
+type HeliusAssetResponse = {
+  result?: HeliusAsset | null;
+};
+
+type TensorBufferData = {
+  data?: number[];
+  type?: string;
+};
+
+type TensorWireData = string | number[] | Uint8Array | TensorBufferData | null | undefined;
+
+type TensorTxRecord = {
+  tx?: TensorWireData;
+  txV0?: TensorWireData;
+  lastValidBlockHeight?: number | null;
+};
+
+type TensorTxPayload = {
+  txs?: TensorTxRecord[];
+};
+
+type TensorCreatorTuple = [
+  string,
+  ...(string | number | boolean | null | undefined)[],
+];
+
+function toBase64(value: TensorWireData): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) || value instanceof Uint8Array) {
+    return Buffer.from(value).toString('base64');
+  }
+
+  if (Array.isArray(value.data)) {
+    return Buffer.from(value.data).toString('base64');
+  }
+
+  return null;
+}
+
+function unwrapWireData(value: TensorWireData): TensorWireData {
+  if (!value || typeof value === 'string' || Array.isArray(value) || value instanceof Uint8Array) {
+    return value;
+  }
+
+  return value.data;
+}
+
+function toBuffer(value: Exclude<TensorWireData, null | undefined>): Buffer {
+  if (typeof value === 'string') {
+    return Buffer.from(value, 'base64');
+  }
+
+  if (Array.isArray(value) || value instanceof Uint8Array) {
+    return Buffer.from(value);
+  }
+
+  return Buffer.from(value.data ?? []);
+}
+
+async function fetchHeliusAsset(mint: string): Promise<HeliusAsset | null> {
+  try {
+    const assetResponse = await fetch(HELIUS_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getAsset',
+        params: { id: mint },
+      }),
+      cache: 'no-store',
+    });
+    const assetPayload = (await assetResponse.json()) as HeliusAssetResponse;
+    return assetPayload.result ?? null;
+  } catch (error) {
+    console.warn('[tensor-buy] Failed to load Helius asset for fee context:', error);
+    return null;
+  }
+}
+
+async function fetchOracleTensorListing(mint: string): Promise<OracleTensorListing | null> {
+  const oracleUrl = getOracleApiUrl();
+  const response = await fetch(
+    `${oracleUrl}/api/listings?q=${encodeURIComponent(mint)}&perPage=10`,
+    {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(12000),
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as OracleListingsResponse;
+  const listings = Array.isArray(payload.listings) ? payload.listings : [];
+
+  return listings.find((listing) => {
+    if (listing.nftAddress !== mint) {
+      return false;
+    }
+
+    if (listing.marketplace === 'tensor') {
+      return true;
+    }
+
+    return (
+      listing.source === 'phygitals' ||
+      (listing.source === 'collector-crypt' && String(listing.currency || '').trim().toUpperCase() === 'USDC')
+    );
+  }) ?? null;
+}
+
+function getListingCurrencyDecimals(currency: string): 6 | 9 {
+  return currency === 'USDC' ? 6 : 9;
+}
+
+async function buildStandardTensorBuyResponse(input: {
+  mint: string;
+  buyer: string;
+  source?: string;
+  collectionAddress?: string;
+  collectionName?: string;
+  heliusAsset: HeliusAsset | null;
+}) {
+  if (!process.env.TENSOR_API_KEY) {
+    throw new Error('TENSOR_API_KEY is not configured');
+  }
+
+  const listing = await fetchOracleTensorListing(input.mint);
+  if (!listing?.seller || typeof listing.price !== 'number' || !Number.isFinite(listing.price) || listing.price <= 0) {
+    throw new Error('Listing not found or no longer available');
+  }
+
+  const listingCurrency = String(listing.currency || 'SOL').trim().toUpperCase() === 'USDC' ? 'USDC' : 'SOL';
+  const decimals = getListingCurrencyDecimals(listingCurrency);
+  const priceRaw = Math.round(listing.price * 10 ** decimals);
+
+  const { Connection, PublicKey, SystemProgram, Transaction, TransactionMessage, VersionedTransaction } = await import('@solana/web3.js');
+  const connection = new Connection(HELIUS_RPC, 'confirmed');
+  const latestBlockhash = await connection.getLatestBlockhash('finalized');
+
+  const params = new URLSearchParams({
+    buyer: input.buyer,
+    mint: input.mint,
+    owner: listing.seller,
+    maxPrice: String(priceRaw),
+    blockhash: latestBlockhash.blockhash,
+  });
+
+  const response = await fetch(`${TENSOR_API_BASE}/tx/buy?${params.toString()}`, {
+    headers: {
+      accept: 'application/json',
+      'x-tensor-api-key': process.env.TENSOR_API_KEY,
+    },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Failed to build Tensor buy transaction');
+  }
+
+  const payload = (await response.json()) as TensorTxPayload;
+  const txs = Array.isArray(payload?.txs) ? payload.txs : [];
+  const firstTx = txs[0];
+  const txV0Data = unwrapWireData(firstTx?.txV0);
+  const txData = unwrapWireData(firstTx?.tx);
+  const raw = txV0Data || txData;
+
+  if (!raw) {
+    throw new Error('Tensor did not return any transactions');
+  }
+
+  const feeApplied = shouldApplyExternalMarketplaceFee({
+    source: input.source,
+    collectionAddress: input.collectionAddress,
+    collectionName: input.collectionName,
+    asset: input.heliusAsset,
+  });
+
+  if (!feeApplied) {
+    return {
+      tx: toBase64(raw),
+      price: listing.price,
+      platformFee: 0,
+      platformFeeCurrency: listingCurrency,
+      feeApplied: false,
+      currency: listingCurrency,
+      seller: listing.seller,
+      mint: input.mint,
+    };
+  }
+
+  const txBytes = toBuffer(raw);
+
+  const buyerPk = new PublicKey(input.buyer);
+  const treasuryPk = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
+  const feeAmount = calculateExternalMarketplaceFeeAmount(priceRaw);
+  let encodedTx: string;
+
+  if (txV0Data) {
+    const vTx = VersionedTransaction.deserialize(Uint8Array.from(txBytes));
+    const altAccounts = await Promise.all(
+      vTx.message.addressTableLookups.map(async (lookup) => {
+        const result = await connection.getAddressLookupTable(lookup.accountKey);
+        return result.value;
+      }),
+    );
+    const validAlts = altAccounts.filter((account): account is NonNullable<typeof account> => account != null);
+    const decompiled = TransactionMessage.decompile(vTx.message, {
+      addressLookupTableAccounts: validAlts,
+    });
+
+    if (listingCurrency === 'USDC') {
+      const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+      const usdcMintPk = new PublicKey(USDC_MINT);
+      const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
+      const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, treasuryPk);
+      const treasuryAtaInfo = await connection.getAccountInfo(treasuryUsdcAta);
+
+      if (!treasuryAtaInfo) {
+        decompiled.instructions.push(
+          createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, treasuryPk, usdcMintPk),
+        );
+      }
+
+      decompiled.instructions.push(
+        createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, feeAmount),
+      );
+    } else {
+      decompiled.instructions.push(
+        SystemProgram.transfer({
+          fromPubkey: buyerPk,
+          toPubkey: treasuryPk,
+          lamports: feeAmount,
+        }),
+      );
+    }
+
+    const recompiled = decompiled.compileToV0Message(validAlts);
+    encodedTx = Buffer.from(new VersionedTransaction(recompiled).serialize()).toString('base64');
+  } else {
+    const legacyTx = Transaction.from(txBytes);
+
+    if (listingCurrency === 'USDC') {
+      const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+      const usdcMintPk = new PublicKey(USDC_MINT);
+      const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
+      const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, treasuryPk);
+      const treasuryAtaInfo = await connection.getAccountInfo(treasuryUsdcAta);
+
+      if (!treasuryAtaInfo) {
+        legacyTx.add(createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, treasuryPk, usdcMintPk));
+      }
+
+      legacyTx.add(createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, feeAmount));
+    } else {
+      legacyTx.add(SystemProgram.transfer({ fromPubkey: buyerPk, toPubkey: treasuryPk, lamports: feeAmount }));
+    }
+
+    encodedTx = Buffer.from(legacyTx.serialize({ requireAllSignatures: false })).toString('base64');
+  }
+
+  return {
+    tx: encodedTx,
+    price: listing.price,
+    platformFee: feeAmount / 10 ** decimals,
+    platformFeeCurrency: listingCurrency,
+    feeApplied: true,
+    currency: listingCurrency,
+    seller: listing.seller,
+    mint: input.mint,
+  };
+}
 
 export async function POST(request: Request) {
   try {
     const { mint, buyer, source, collectionAddress, collectionName } = await request.json();
     if (!mint || !buyer) return NextResponse.json({ error: 'Missing mint or buyer' }, { status: 400 });
 
-    const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
-    const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+    const heliusAsset = await fetchHeliusAsset(mint);
+
+    if (!heliusAsset?.compression?.compressed) {
+      const standardResponse = await buildStandardTensorBuyResponse({
+        mint,
+        buyer,
+        source,
+        collectionAddress,
+        collectionName,
+        heliusAsset,
+      });
+
+      return NextResponse.json(standardResponse);
+    }
 
     // Dynamic imports for Tensor SDK (uses @solana/web3.js v2 internally)
     const { getBuySplCompressedInstructionAsync, fetchListState, findListStatePda } = await import('@tensor-foundation/marketplace');
     const { retrieveAssetFields, retrieveProofFields, getCNFTArgs } = await import('@tensor-foundation/common-helpers');
     const { createSolanaRpc, address } = await import('@solana/kit');
 
-    const rpc = createSolanaRpc(HELIUS_RPC) as any;
+    const rpc = createSolanaRpc(HELIUS_RPC);
+    type TensorCnftRpc = Parameters<typeof getCNFTArgs>[0];
+    type TensorListStateRpc = Parameters<typeof fetchListState>[0];
+    type TensorCompressedBuyInput = Parameters<typeof getBuySplCompressedInstructionAsync>[0];
+    type TensorPayer = TensorCompressedBuyInput['payer'];
+    type TensorBuyer = TensorCompressedBuyInput['buyer'];
+    type TensorOwner = TensorCompressedBuyInput['owner'];
+    type TensorRentDestination = TensorCompressedBuyInput['rentDestination'];
+    type TensorCurrency = TensorCompressedBuyInput['currency'];
+    type TensorBroker = NonNullable<TensorCompressedBuyInput['takerBroker']>;
+    type TensorCreators = TensorCompressedBuyInput['creators'];
+    type TensorProof = TensorCompressedBuyInput['proof'];
+    type TensorBuyInstruction = Awaited<ReturnType<typeof getBuySplCompressedInstructionAsync>>;
 
     const buyerAddress = address(buyer);
-    const fakeSigner = { address: buyerAddress, signTransactions: async () => [] };
+    const fakeSigner = {
+      address: buyerAddress,
+      signTransactions: async () => [],
+    } as never as TensorPayer;
 
     const [assetFields, proofFields] = await Promise.all([
       retrieveAssetFields(HELIUS_RPC, mint),
       retrieveProofFields(HELIUS_RPC, mint),
     ]);
 
-    const cnftArgs = await getCNFTArgs(rpc, mint, assetFields, proofFields);
+    const cnftArgs = await getCNFTArgs(rpc as never as TensorCnftRpc, mint, assetFields, proofFields);
     const [listStatePda] = await findListStatePda({ mint: address(mint) });
-    const listState = await fetchListState(rpc, listStatePda);
-    let heliusAsset: any = null;
-
-    try {
-      const assetResponse = await fetch(HELIUS_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'getAsset',
-          params: { id: mint },
-        }),
-      });
-      const assetPayload = await assetResponse.json();
-      heliusAsset = assetPayload?.result || null;
-    } catch (error) {
-      console.warn('[tensor-buy] Failed to load Helius asset for fee context:', error);
-    }
+    const listState = await fetchListState(rpc as never as TensorListStateRpc, listStatePda);
 
     const feeApplied = shouldApplyExternalMarketplaceFee({
       source,
@@ -60,22 +372,23 @@ export async function POST(request: Request) {
     const makerBroker = listState.data.makerBroker?.__option === 'Some'
       ? listState.data.makerBroker.value : undefined;
     const rentDest = listState.data.rentPayer || listState.data.owner;
-    const creatorAddresses = (cnftArgs.creators ?? []).map((c: any) => c[0]);
-    const trimmedProof = proofFields.proof.map((p: string) => address(p));
+    const creatorTuples = (cnftArgs.creators ?? []) as TensorCreatorTuple[];
+    const creatorAddresses = creatorTuples.map((creator) => address(creator[0])) as never as TensorCreators;
+    const trimmedProof = proofFields.proof.map((p: string) => address(p)) as never as TensorProof;
 
     const price = Number(listState.data.amount) / 1e6;
     const maxAmount = BigInt(listState.data.amount) * BigInt(105) / BigInt(100);
 
-    const buyIx = await (getBuySplCompressedInstructionAsync as any)({
+    const compressedBuyInput: TensorCompressedBuyInput = {
       merkleTree: cnftArgs.merkleTree,
       listState: listStatePda,
       payer: fakeSigner,
-      buyer: fakeSigner,
-      owner: listState.data.owner,
-      rentDestination: rentDest,
-      currency: address(USDC_MINT),
+      buyer: buyerAddress as never as TensorBuyer,
+      owner: listState.data.owner as never as TensorOwner,
+      rentDestination: rentDest as never as TensorRentDestination,
+      currency: address(USDC_MINT) as never as TensorCurrency,
       makerBroker,
-      takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) : undefined,
+      takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) as never as TensorBroker : undefined,
       index: cnftArgs.index,
       root: cnftArgs.root,
       metaHash: cnftArgs.metaHash,
@@ -87,7 +400,8 @@ export async function POST(request: Request) {
       creators: creatorAddresses,
       proof: trimmedProof,
       canopyDepth: 0,
-    });
+    };
+    const buyIx = await getBuySplCompressedInstructionAsync(compressedBuyInput);
 
     const {
       PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
@@ -98,9 +412,9 @@ export async function POST(request: Request) {
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
     const buyerPk = new PublicKey(buyer);
 
-    const v1Keys = buyIx.accounts.map((acct: any) => {
-      const addr = typeof acct.address === 'object' && acct.address.address
-        ? acct.address.address : String(acct.address);
+    const buyInstruction = buyIx as TensorBuyInstruction;
+    const v1Keys = buyInstruction.accounts.map((acct) => {
+      const addr = String(acct.address);
       return {
         pubkey: new PublicKey(addr),
         isSigner: acct.role >= 2,
@@ -109,9 +423,9 @@ export async function POST(request: Request) {
     });
 
     const v1Ix = new TransactionInstruction({
-      programId: new PublicKey(buyIx.programAddress),
+      programId: new PublicKey(String(buyInstruction.programAddress)),
       keys: v1Keys,
-      data: Buffer.from(buyIx.data),
+      data: Buffer.from(buyInstruction.data),
     });
 
     // Phygitals' program ALT (59 addresses covering all Tensor/Bubblegum/compression programs)
@@ -215,9 +529,9 @@ export async function POST(request: Request) {
       mint,
     });
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('[tensor-buy] Error:', err);
-    const msg = err.message || '';
+    const msg = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
     if (msg.includes('Account not found') || msg.includes('3230000')) {
       return NextResponse.json({ error: 'This listing is no longer available. It may have been sold or delisted.' }, { status: 404 });
     }

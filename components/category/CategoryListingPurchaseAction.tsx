@@ -13,6 +13,7 @@ import {
   TRANSACTION_REQUEST_REJECTED_MESSAGE,
 } from "@/lib/client/transaction-errors";
 import { resolveListingDisplayPrice, type Listing } from "@/lib/data";
+import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { showToast } from "@/components/ToastContainer";
 
@@ -81,7 +82,7 @@ export default function CategoryListingPurchaseAction({
 
         if (!signTransaction) throw new Error("Wallet does not support signing");
 
-        if (listing?.source === "phygitals" || String(listingId).startsWith("phyg-")) {
+        if (isTensorMarketplaceListing(listing)) {
           const { executeTensorBuy } = await import("@/lib/tensor-buy-client");
           const result = await executeTensorBuy(
             mintAddr,

@@ -91,6 +91,8 @@ export interface Listing {
   year?: number;
   ccCategory?: string; // original CC category (Pokemon, One Piece, etc.)
   ccUrl?: string;
+  marketplace?: string;
+  buyKind?: string;
   solPrice?: number | null;
   usdcPrice?: number | null;
 }
