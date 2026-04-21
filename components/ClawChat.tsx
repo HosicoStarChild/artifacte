@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Client } from '@xmtp/xmtp-js';
 
 // Message type definition
 interface ChatMessage {
@@ -106,7 +105,7 @@ const truncateAddress = (address: string): string => {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 };
 
-// Create context for chat (integrated with XMTP)
+// Create context for chat
 export const ChatContext = ({ 
   children, 
   connectedWallet 
@@ -204,7 +203,7 @@ export default function ClawChat({ connectedWallet }: ClawChatProps) {
   const messagePollingRef = useRef<NodeJS.Timeout | null>(null);
   const onlineUsers = 47;
 
-  // Initialize XMTP client and load messages
+  // Initialize chat state and load messages
   useEffect(() => {
     if (!connectedWallet) {
       setChatError(null);
