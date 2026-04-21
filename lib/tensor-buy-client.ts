@@ -3,17 +3,38 @@
  *
  * Strategy:
  * - Solflare: sendTransaction (wallet handles submission natively — balance preview, reliable)
- * - Phantom + others: signTransaction + manual send via Helius (we own the submission — reliable)
+ * - Phantom + others: signTransaction + manual send via the RPC proxy (we own the submission — reliable)
  */
 
-import { VersionedTransaction, Connection } from '@solana/web3.js';
+import { createSolanaRpc, signature } from '@solana/kit';
+import type { SendTransactionOptions } from '@solana/wallet-adapter-base';
+import { Connection, VersionedTransaction } from '@solana/web3.js';
 
+import type { AnchorWalletLike } from '@/hooks/useWalletCapabilities';
 import { isTransactionRequestRejected } from '@/lib/client/transaction-errors';
+
+type WalletSignTransaction = AnchorWalletLike['signTransaction'];
+type WalletSendTransaction = (
+  transaction: VersionedTransaction,
+  connection: Connection,
+  options?: SendTransactionOptions,
+) => Promise<string>;
 
 interface TensorBuyFeeContext {
   collectionAddress?: string;
   collectionName?: string;
   source?: string;
+}
+
+interface TensorBuyBuildResponse {
+  tx: string;
+  price: number;
+  platformFee?: number;
+  platformFeeCurrency?: string;
+}
+
+interface TensorBuyErrorResponse {
+  error?: string;
 }
 
 interface TensorBuyResult {
@@ -24,17 +45,26 @@ interface TensorBuyResult {
   confirmed: boolean;
 }
 
+interface RpcSignatureStatus {
+  confirmationStatus?: 'processed' | 'confirmed' | 'finalized' | null;
+  err?: object | string | null;
+}
+
+const RPC_PROXY_PATH = '/api/rpc';
+const rpc = createSolanaRpc(RPC_PROXY_PATH);
+
+type WireTransactionBase64 = Parameters<typeof rpc.sendTransaction>[0];
+
 export async function executeTensorBuy(
   mint: string,
   buyer: string,
-  signTransaction: (tx: any) => Promise<any>,
+  signTransaction: WalletSignTransaction,
   onStatus?: (msg: string) => void,
-  sendTransaction?: (tx: any, connection: Connection, options?: any) => Promise<string>,
+  sendTransaction?: WalletSendTransaction,
   walletName?: string,
   feeContext?: TensorBuyFeeContext,
   hideFeeInToast = false,
 ): Promise<TensorBuyResult> {
-  // Step 1: Get server-built tx
   const tensorRes = await fetch('/api/tensor-buy', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -42,45 +72,55 @@ export async function executeTensorBuy(
   });
 
   if (!tensorRes.ok) {
-    const errData = await tensorRes.json().catch(() => ({ error: 'Failed to build transaction' }));
-    throw new Error(errData.error || 'Failed to build Tensor transaction');
+    let errorMessage = 'Failed to build Tensor transaction';
+
+    try {
+      const errorPayload: TensorBuyErrorResponse = await tensorRes.json();
+      errorMessage = errorPayload.error ?? errorMessage;
+    } catch {}
+
+    throw new Error(errorMessage);
   }
 
-  const tensorData = await tensorRes.json();
-  const feeCurrency = tensorData.platformFeeCurrency || 'USDC';
-  const totalPrice = Number(tensorData.price || 0) + Number(tensorData.platformFee || 0);
-  const feeDisplay = tensorData.platformFee ? ` + $${tensorData.platformFee.toFixed(2)} ${feeCurrency} fee` : '';
+  const tensorData: TensorBuyBuildResponse = await tensorRes.json();
+  const feeCurrency = tensorData.platformFeeCurrency ?? 'USDC';
+  const platformFee = tensorData.platformFee ?? 0;
+  const totalPrice = Number(tensorData.price) + Number(platformFee);
+  const feeDisplay = platformFee > 0 ? ` + $${platformFee.toFixed(2)} ${feeCurrency} fee` : '';
   onStatus?.(`💳 Confirm purchase — ${hideFeeInToast ? totalPrice : tensorData.price} ${feeCurrency}${hideFeeInToast ? '' : feeDisplay}`);
 
-  // Step 2: Deserialize tx
   const txBytes = Uint8Array.from(atob(tensorData.tx), (c: string) => c.charCodeAt(0));
   const tx = VersionedTransaction.deserialize(txBytes);
 
-  const HELIUS_RPC = 'https://margy-w7f73z-fast-mainnet.helius-rpc.com';
-  const conn = new Connection(HELIUS_RPC, 'confirmed');
-
-  let sig: string;
+  let sig = '';
 
   // Solflare: use sendTransaction — wallet submits natively with balance preview
-  // Phantom + all others: use signTransaction + manual Helius send — we control submission
-  const isSolflare = walletName?.toLowerCase().includes('solflare');
+  // Phantom + all others: use signTransaction + manual RPC submission
+  const isSolflare = walletName?.toLowerCase().includes('solflare') ?? false;
   let usedSendTransaction = false;
 
   if (isSolflare && sendTransaction) {
+    const connection = createProxyConnection();
+
     try {
-      sig = await sendTransaction(tx, conn, { skipPreflight: true, preflightCommitment: 'confirmed' });
+      sig = await sendTransaction(tx, connection, {
+        skipPreflight: true,
+        preflightCommitment: 'confirmed',
+      });
       usedSendTransaction = true;
       console.log('[tensor-buy] Solflare: sendTransaction used');
-    } catch (e: any) {
-      if (isTransactionRequestRejected(e)) {
-        throw e;
+    } catch (error) {
+      if (isTransactionRequestRejected(error)) {
+        throw error;
       }
-      console.log('[tensor-buy] Solflare sendTransaction failed, falling back:', e?.message);
+
+      const fallbackMessage = error instanceof Error ? error.message : 'Unknown sendTransaction failure';
+      console.log('[tensor-buy] Solflare sendTransaction failed, falling back:', fallbackMessage);
     }
   }
 
   if (!usedSendTransaction) {
-    // Phantom + fallback: signTransaction + manual send via Helius
+    // Phantom + fallback: signTransaction + manual RPC send — we own the submission
     // We own the submission — reliable, no silent drops
     console.log(`[tensor-buy] ${walletName || 'unknown'}: using signTransaction + Helius send`);
     const signed = await signTransaction(tx);
@@ -95,41 +135,87 @@ export async function executeTensorBuy(
       txToSend = patched;
     }
 
-    const b64Tx = Buffer.from(txToSend).toString('base64');
-    const sendRes = await fetch('/api/rpc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1,
-        method: 'sendTransaction',
-        params: [b64Tx, { skipPreflight: true, encoding: 'base64', maxRetries: 5 }],
-      }),
-    });
-    const sendData = await sendRes.json();
-    if (sendData.error) throw new Error(sendData.error.message || JSON.stringify(sendData.error));
-    sig = sendData.result;
+    sig = await sendViaProxy(txToSend);
   }
 
-  onStatus?.(`⏳ Transaction sent: ${sig!.slice(0, 8)}...`);
+  if (!sig) {
+    throw new Error('Failed to submit Tensor transaction');
+  }
 
-  // Step 3: Poll for confirmation (60s window — Solana can be slow)
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 1000));
-    const statusRes = await fetch('/api/rpc', {
+  onStatus?.(`⏳ Transaction sent: ${sig.slice(0, 8)}...`);
+
+  const confirmed = await waitForTransactionConfirmation(sig);
+
+  if (confirmed) {
+    fetch('/api/listing-sold', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getSignatureStatuses', params: [[sig!]] }),
-    });
-    if (statusRes.status === 429) continue; // rate limited — skip this poll, try again
-    const statusData = await statusRes.json();
-    const status = statusData.result?.value?.[0];
-    if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
-      if (status.err) throw new Error('Transaction failed on-chain');
-      // Remove from oracle immediately after confirmed buy (fire and forget)
-      fetch('/api/listing-sold', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mint }) }).catch(() => {});
-      return { sig: sig!, price: tensorData.price, totalPrice, currency: feeCurrency, confirmed: true };
+      body: JSON.stringify({ mint }),
+    }).catch(() => {});
+  }
+
+  return { sig, price: tensorData.price, totalPrice, currency: feeCurrency, confirmed };
+}
+
+function createProxyConnection(): Connection {
+  if (typeof window === 'undefined') {
+    throw new Error('Tensor buy client must run in the browser');
+  }
+
+  return new Connection(new URL(RPC_PROXY_PATH, window.location.origin).toString(), 'confirmed');
+}
+
+function toWireTransactionBase64(base64Transaction: string): WireTransactionBase64 {
+  return base64Transaction as WireTransactionBase64;
+}
+
+function encodeBase64Transaction(rawTransactionBytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < rawTransactionBytes.length; index += chunkSize) {
+    const chunk = rawTransactionBytes.subarray(index, index + chunkSize);
+
+    for (let chunkIndex = 0; chunkIndex < chunk.length; chunkIndex += 1) {
+      binary += String.fromCharCode(chunk[chunkIndex] ?? 0);
     }
   }
 
-  return { sig: sig!, price: tensorData.price, totalPrice, currency: feeCurrency, confirmed: false };
+  return btoa(binary);
+}
+
+async function sendViaProxy(rawTransactionBytes: Uint8Array): Promise<string> {
+  const encodedTransaction = encodeBase64Transaction(rawTransactionBytes);
+  const signatureValue = await rpc
+    .sendTransaction(toWireTransactionBase64(encodedTransaction), {
+      skipPreflight: true,
+      encoding: 'base64',
+      maxRetries: BigInt(5),
+    })
+    .send();
+
+  return `${signatureValue}`;
+}
+
+function isConfirmedStatus(status: RpcSignatureStatus | null | undefined): boolean {
+  return status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized';
+}
+
+async function waitForTransactionConfirmation(signatureValue: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const statusResponse = await rpc.getSignatureStatuses([signature(signatureValue)]).send();
+    const status = (statusResponse.value[0] ?? null) as RpcSignatureStatus | null;
+
+    if (status?.err) {
+      throw new Error('Transaction failed on-chain');
+    }
+
+    if (isConfirmedStatus(status)) {
+      return true;
+    }
+  }
+
+  return false;
 }
