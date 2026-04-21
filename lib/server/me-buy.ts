@@ -135,6 +135,7 @@ export function parseMagicEdenBuyRequest(body: JsonValue): MagicEdenBuyRequest {
     mint,
     buyer,
     source: getOptionalString(body.source),
+    listingCurrency: getOptionalPaymentCurrency(body.listingCurrency),
     collectionAddress: getOptionalString(body.collectionAddress),
     collectionName: getOptionalString(body.collectionName),
   };
@@ -156,7 +157,7 @@ export async function buildMagicEdenBuyResponse(
   }
 
   const tokenATA = getNonEmptyString(listing.tokenAddress);
-  const listingPayment = detectListingPayment(listing);
+  const listingPayment = detectListingPayment(listing, request.listingCurrency);
   const sellerExpiry = listing.expiry ?? -1;
   const auctionHouse = getNonEmptyString(listing.auctionHouse) ?? null;
   const listingSourceName = getNonEmptyString(listing.listingSource);
@@ -323,6 +324,15 @@ function getOptionalString(value: JsonValue | undefined): string | undefined {
   return trimmedValue.length > 0 ? trimmedValue : undefined;
 }
 
+function getOptionalPaymentCurrency(value: JsonValue | undefined): MagicEdenPaymentCurrency | undefined {
+  const normalizedValue = getOptionalString(value)?.toUpperCase();
+  if (normalizedValue === 'SOL' || normalizedValue === 'USDC') {
+    return normalizedValue;
+  }
+
+  return undefined;
+}
+
 function getRequiredString(body: JsonObject, fieldName: string): string {
   const value = getOptionalString(body[fieldName]);
   if (!value) {
@@ -351,14 +361,36 @@ function toBaseUnits(value: NumericValue, decimals: number): number | null {
   return amount === null ? null : Math.round(amount * 10 ** decimals);
 }
 
-function detectListingPayment(listing: MagicEdenListing): ListingPayment {
+function detectListingPayment(
+  listing: MagicEdenListing,
+  preferredCurrency?: MagicEdenPaymentCurrency,
+): ListingPayment {
   const splPrice = listing.priceInfo?.splPrice ?? listing.splPrice;
   const splSymbol = String(splPrice?.symbol ?? splPrice?.currency ?? '').toUpperCase();
   const splMint = String(
     splPrice?.mintAddress ?? splPrice?.tokenMint ?? splPrice?.address ?? '',
   ).trim();
+  const rawSolAmount = getPositiveAmount(listing.priceInfo?.solPrice?.rawAmount)
+    ?? toBaseUnits(listing.price, 9)
+    ?? 0;
   const rawUsdcAmount = getPositiveAmount(splPrice?.rawAmount)
     ?? toBaseUnits(splPrice?.amount ?? splPrice?.price, 6);
+
+  if (preferredCurrency === 'SOL' && rawSolAmount > 0) {
+    return {
+      currency: 'SOL',
+      rawAmount: rawSolAmount,
+      displayAmount: rawSolAmount / 1e9,
+    };
+  }
+
+  if (preferredCurrency === 'USDC' && rawUsdcAmount) {
+    return {
+      currency: 'USDC',
+      rawAmount: rawUsdcAmount,
+      displayAmount: rawUsdcAmount / 1e6,
+    };
+  }
 
   if (rawUsdcAmount && (splSymbol === 'USDC' || splMint === USDC_MINT)) {
     return {
@@ -367,10 +399,6 @@ function detectListingPayment(listing: MagicEdenListing): ListingPayment {
       displayAmount: rawUsdcAmount / 1e6,
     };
   }
-
-  const rawSolAmount = getPositiveAmount(listing.priceInfo?.solPrice?.rawAmount)
-    ?? toBaseUnits(listing.price, 9)
-    ?? 0;
 
   return {
     currency: 'SOL',

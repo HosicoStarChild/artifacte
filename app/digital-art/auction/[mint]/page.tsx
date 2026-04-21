@@ -343,6 +343,7 @@ function AuctionDetailPageContent() {
           mint: externalListing.mint,
           buyer: publicKey.toBase58(),
           source: externalListing.source,
+          listingCurrency: externalListing.currencySymbol,
           collectionAddress: externalListing.collectionAddress,
           collectionName: externalListing.collectionName,
         }),

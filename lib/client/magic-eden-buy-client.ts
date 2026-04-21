@@ -5,6 +5,7 @@ import type { AnchorWalletLike } from "@/hooks/useWalletCapabilities";
 import {
   MAGIC_EDEN_M2_PROGRAM,
   MAGIC_EDEN_M3_PROGRAM,
+  type MagicEdenPaymentCurrency,
   type MagicEdenBuyResponse,
 } from "@/lib/magic-eden-buy";
 import { formatHomeListingQuote } from "@/lib/home-tcg";
@@ -40,6 +41,14 @@ type MagicEdenBuyOptions = {
 const rpc = createSolanaRpc("/api/rpc");
 
 type WireTransactionBase64 = Parameters<typeof rpc.sendTransaction>[0];
+
+function getRequestedPaymentCurrency(currency: string): MagicEdenPaymentCurrency | undefined {
+  if (currency === "SOL" || currency === "USDC") {
+    return currency;
+  }
+
+  return undefined;
+}
 
 function isConfirmedStatus(status: RpcSignatureStatus | null | undefined): boolean {
   return status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized";
@@ -178,6 +187,7 @@ export async function executeMagicEdenBuy({
       mint,
       buyer,
       source,
+      listingCurrency: getRequestedPaymentCurrency(listingDisplayPrice.currency),
     }),
   });
 

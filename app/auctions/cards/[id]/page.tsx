@@ -546,6 +546,7 @@ function CardDetailPageContent() {
           mint: card.nftAddress,
           buyer: publicKey.toBase58(),
           source: card.source,
+          listingCurrency: cardDisplayPrice.currency,
           collectionName: card.collection,
         }),
       });

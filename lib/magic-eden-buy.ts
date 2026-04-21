@@ -14,6 +14,7 @@ export type MagicEdenBuyRequest = {
   mint: string;
   buyer: string;
   source?: string;
+  listingCurrency?: MagicEdenPaymentCurrency;
   collectionAddress?: string;
   collectionName?: string;
 };

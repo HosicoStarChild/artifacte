@@ -18,6 +18,8 @@ export function getListingPurchaseCurrency(listing: ListingPriceInput): ListingP
   const hasSolPrice = Number.isFinite(solPrice) && solPrice > 0;
   const hasUsdcPrice = Number.isFinite(usdcPrice) && usdcPrice > 0;
 
+  if (displayCurrency === 'SOL') return 'SOL';
+  if (displayCurrency === 'USDC') return 'USDC';
   if (hasUsdcPrice || displayCurrency === 'USDC') return 'USDC';
   if (displayCurrency === 'SOL' || hasSolPrice) return 'SOL';
   return 'USD1';
