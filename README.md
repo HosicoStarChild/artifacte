@@ -10,11 +10,9 @@ Dark luxury UI with wallet integration, live auction bidding, and portfolio mana
 ## Architecture
 
 ### Smart Contracts (Anchor/Rust)
-Two Anchor programs in `/programs/`:
+Anchor program in `/programs/`:
 
-1. **rwa_nft** — Mint full NFTs representing real-world assets with metadata (name, category, appraised value, condition grade, image URI). Supports 7 asset categories. Each asset is a single NFT — no fractionalization.
-
-2. **auction** — Timed auction system with escrow via PDAs. Place bids with SOL (must beat current), auto-refund previous bidder, settle after end time. Winner receives the full NFT.
+1. **auction** — Marketplace and auction logic with escrow via PDAs and fixed-price support for the current Artifacte flows.
 
 ### Frontend (Next.js 16)
 - **Homepage**: Portfolio grid, live auctions carousel, recent listings
@@ -80,13 +78,11 @@ artifacte/
 │   ├── WalletProvider.tsx
 │   ├── Navbar.tsx
 │   ├── Footer.tsx
-│   ├── AssetCard.tsx
 │   ├── AuctionCard.tsx
 │   └── Countdown.tsx
 ├── lib/
 │   └── data.ts           # Seed data + types
 ├── programs/              # Anchor smart contracts
-│   ├── rwa_nft/
 │   └── auction/
 ├── Anchor.toml
 └── README.md
