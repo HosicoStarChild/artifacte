@@ -3,15 +3,17 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
+import { Buffer } from "buffer";
 import { ADMIN_WALLET } from "@/lib/data";
 import { PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, SystemProgram } from "@solana/web3.js";
-import { createHash } from "crypto";
 
 const SAID_PROGRAM_ID = new PublicKey("5dpw6KEQPn248pnkkaYyWfHwu2nfb3LUMbTucb6LaA8G");
+const textEncoder = new TextEncoder();
 
-function getSaidDiscriminator(name: string): Buffer {
-  const hash = createHash("sha256").update(name).digest();
-  return hash.subarray(0, 8);
+async function getSaidDiscriminator(name: string): Promise<Buffer> {
+  const input = Uint8Array.from(textEncoder.encode(name));
+  const hash = await crypto.subtle.digest("SHA-256", input.buffer);
+  return Buffer.from(hash).subarray(0, 8);
 }
 
 function getAgentPDA(owner: PublicKey): [PublicKey, number] {
@@ -177,7 +179,7 @@ export function AgentRegistrationContent() {
     try {
       const wallet = publicKey.toBase58();
       const metadataUri = `https://api.saidprotocol.com/api/cards/${wallet}.json`;
-      const discriminator = getSaidDiscriminator("global:register_agent");
+      const discriminator = await getSaidDiscriminator("global:register_agent");
       const uriBytes = Buffer.from(metadataUri, "utf8");
       const lenBuf = Buffer.alloc(4);
       lenBuf.writeUInt32LE(uriBytes.length, 0);
@@ -225,7 +227,7 @@ export function AgentRegistrationContent() {
     try {
       const [agentPDA] = getAgentPDA(publicKey);
       const [treasuryPDA] = getTreasuryPDA();
-      const discriminator = getSaidDiscriminator("global:get_verified");
+      const discriminator = await getSaidDiscriminator("global:get_verified");
 
       const ix = new TransactionInstruction({
         programId: SAID_PROGRAM_ID,

@@ -1,5 +1,8 @@
 "use client";
 
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
 export interface SkeletonCardProps {
   variant?: "auction" | "listing" | "compact";
   count?: number;
@@ -8,38 +11,38 @@ export interface SkeletonCardProps {
 function SingleSkeletonCard({ variant = "auction" }: { variant: "auction" | "listing" | "compact" }) {
   if (variant === "compact") {
     return (
-      <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden p-4 animate-pulse">
-        <div className="aspect-square bg-dark-700 rounded-lg mb-4" />
-        <div className="space-y-2">
-          <div className="h-4 bg-dark-700 rounded w-3/4" />
-          <div className="h-3 bg-dark-700 rounded w-1/2" />
-          <div className="h-8 bg-dark-700 rounded w-full mt-4" />
-        </div>
-      </div>
+      <Card className="overflow-hidden border border-white/5 bg-dark-800 py-0">
+        <CardContent className="p-4">
+          <Skeleton className="mb-4 aspect-square rounded-lg bg-dark-700" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4 bg-dark-700" />
+            <Skeleton className="h-3 w-1/2 bg-dark-700" />
+            <Skeleton className="mt-4 h-8 w-full bg-dark-700" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover flex flex-col h-full animate-pulse">
-      {/* Image skeleton */}
-      <div className="aspect-square bg-dark-700" />
-      {/* Content skeleton */}
-      <div className="p-6 flex-1 flex flex-col justify-between">
+    <Card className="card-hover flex h-full flex-col gap-0 overflow-hidden border border-white/5 bg-dark-800 py-0">
+      <Skeleton className="aspect-square rounded-none bg-dark-700" />
+      <CardContent className="flex flex-1 flex-col justify-between p-6">
         <div>
           <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="h-4 bg-dark-700 rounded w-20" />
-            <div className="h-4 bg-dark-700 rounded w-16" />
+            <Skeleton className="h-4 w-20 bg-dark-700" />
+            <Skeleton className="h-4 w-16 bg-dark-700" />
           </div>
-          <div className="h-5 bg-dark-700 rounded mb-3 w-3/4" />
-          <div className="h-4 bg-dark-700 rounded mb-2 w-2/3" />
-          <div className="h-4 bg-dark-700 rounded w-1/2" />
+          <Skeleton className="mb-3 h-5 w-3/4 bg-dark-700" />
+          <Skeleton className="mb-2 h-4 w-2/3 bg-dark-700" />
+          <Skeleton className="h-4 w-1/2 bg-dark-700" />
         </div>
         <div className="space-y-3 mt-6">
-          <div className="h-8 bg-dark-700 rounded w-full" />
-          <div className="h-10 bg-dark-700 rounded w-full" />
+          <Skeleton className="h-8 w-full bg-dark-700" />
+          <Skeleton className="h-10 w-full bg-dark-700" />
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 

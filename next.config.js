@@ -1,7 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['images.unsplash.com', 'picsum.photos'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+      },
+    ],
   },
   async headers() {
     return [
@@ -15,28 +24,6 @@ const nextConfig = {
         ],
       },
     ];
-  },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // 8004-solana uses node:fs and fs/promises — exclude from client bundles
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        'fs/promises': false,
-        'node:fs': false,
-        'node:fs/promises': false,
-        'node:path': false,
-        'node:os': false,
-        path: false,
-        os: false,
-      };
-    }
-    // Stub pino-pretty for both client and server to suppress the warning
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'pino-pretty': false,
-    };
-    return config;
   },
 };
 

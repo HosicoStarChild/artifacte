@@ -3,6 +3,24 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Application {
   id: string;
@@ -29,6 +47,12 @@ const CATEGORIES = [
   "Sports Cards",
   "Watches",
 ];
+
+const inputClassName =
+  "h-11 border-white/10 bg-dark-900/70 px-4 text-white placeholder:text-gray-500 shadow-none";
+
+const textareaClassName =
+  "min-h-[120px] border-white/10 bg-dark-900/70 px-4 py-3 text-white placeholder:text-gray-500 shadow-none";
 
 export default function ApplyPage() {
   const { publicKey, connected } = useWallet();
@@ -128,12 +152,12 @@ export default function ApplyPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
-        return "bg-green-900/30 border-green-500/30 text-green-400";
+        return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
       case "rejected":
-        return "bg-red-900/30 border-red-500/30 text-red-400";
+        return "border-red-400/30 bg-red-500/10 text-red-300";
       case "pending":
       default:
-        return "bg-gold-900/30 border-gold-500/30 text-gold-400";
+        return "border-gold-500/30 bg-gold-500/10 text-gold-500";
     }
   };
 
@@ -146,15 +170,17 @@ export default function ApplyPage() {
       <div className="pt-24 pb-20 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <div className="bg-dark-800 rounded-lg border border-white/5 p-12 text-center">
-              <div className="text-5xl mb-4">🔐</div>
-              <h2 className="font-serif text-2xl text-white mb-3">
-                Wallet Connection Required
-              </h2>
-              <p className="text-gray-400 text-base">
-                Connect your wallet to submit an application to the Artifacte platform.
-              </p>
-            </div>
+            <Card className="border border-white/8 bg-dark-800/90 py-0 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+              <CardContent className="p-12">
+                <div className="text-5xl mb-4">🔐</div>
+                <h2 className="font-serif text-2xl text-white mb-3">
+                  Wallet Connection Required
+                </h2>
+                <p className="text-gray-400 text-base">
+                  Connect your wallet to submit an application to the Artifacte platform.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -167,9 +193,12 @@ export default function ApplyPage() {
         {/* Header Section */}
         <div className="max-w-2xl mb-16">
           <Link href="/" className="text-gold-500 hover:text-gold-400 text-sm mb-4 inline-block">← Back to Home</Link>
-          <p className="text-gold-500 text-xs font-semibold tracking-widest uppercase mb-4">
+          <Badge
+            variant="outline"
+            className="mb-4 border-gold-500/30 bg-gold-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-500"
+          >
             Apply to Artifacte
-          </p>
+          </Badge>
           <h1 className="font-serif text-4xl md:text-5xl text-white mb-4">
             Apply Your Collection
           </h1>
@@ -181,31 +210,35 @@ export default function ApplyPage() {
         {/* Application Form */}
         {!submitted ? (
           <div className="max-w-2xl mb-16">
-            <div className="bg-dark-800 rounded-lg border border-white/5 p-8 md:p-10">
-              <h2 className="font-serif text-2xl text-white mb-8">
-                Collection Details
-              </h2>
+            <Card className="border border-white/8 bg-dark-800/90 py-0 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+              <CardHeader className="border-b border-white/5 px-8 pb-6 pt-8 md:px-10 md:pt-10">
+                <CardTitle className="font-serif text-2xl text-white">
+                  Collection Details
+                </CardTitle>
+                <CardDescription className="text-base text-gray-400">
+                  Share the core collection details, a concise pitch, and a few representative links for review.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-8 py-8 md:px-10">
+                {error && (
+                  <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-8">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
 
-              {error && (
-                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-8">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Collection Name */}
                 <div>
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Collection Name <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <Input
                     required
                     value={form.collectionName}
                     onChange={(e) =>
                       setForm({ ...form, collectionName: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
+                    className={inputClassName}
                     placeholder="My Amazing Collection"
                   />
                 </div>
@@ -215,14 +248,13 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Collection Address / Mint Authority <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <Input
                     required
                     value={form.collectionAddress}
                     onChange={(e) =>
                       setForm({ ...form, collectionAddress: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
+                    className={inputClassName}
                     placeholder="HZwXCVqDvBVGx8d7wFqkxHwvkU1gL3rDQHtPqDdKa6f"
                   />
                   <p className="text-gray-500 text-xs mt-1.5">
@@ -235,19 +267,23 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Category <span className="text-red-400">*</span>
                   </label>
-                  <select
+                  <Select
                     value={form.category}
-                    onChange={(e) =>
-                      setForm({ ...form, category: e.target.value })
+                    onValueChange={(value) =>
+                      value && setForm({ ...form, category: value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
                   >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-11 w-full border-white/10 bg-dark-900/70 px-4 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border border-white/10 bg-dark-800 text-white">
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Description */}
@@ -255,7 +291,7 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Description <span className="text-red-400">*</span>
                   </label>
-                  <textarea
+                  <Textarea
                     required
                     rows={3}
                     maxLength={500}
@@ -263,7 +299,7 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, description: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors resize-none"
+                    className={textareaClassName}
                     placeholder="Describe your collection, its history, and any relevant details..."
                   />
                   <p className="text-gray-500 text-xs mt-1.5">
@@ -276,7 +312,7 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Why it belongs on Artifacte <span className="text-red-400">*</span>
                   </label>
-                  <textarea
+                  <Textarea
                     required
                     rows={3}
                     maxLength={300}
@@ -284,7 +320,7 @@ export default function ApplyPage() {
                     onChange={(e) =>
                       setForm({ ...form, pitch: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors resize-none"
+                    className={textareaClassName}
                     placeholder="Explain what makes your collection unique and why it fits our platform..."
                   />
                   <p className="text-gray-500 text-xs mt-1.5">
@@ -298,17 +334,17 @@ export default function ApplyPage() {
                     Sample Image URLs (up to 3)
                   </label>
                   {form.sampleImages.map((img, index) => (
-                    <input
+                    <Input
                       key={index}
-                      type="url"
                       value={img}
                       onChange={(e) => {
                         const newImages = [...form.sampleImages];
                         newImages[index] = e.target.value;
                         setForm({ ...form, sampleImages: newImages });
                       }}
-                      className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors mb-2"
+                      className={`${inputClassName} mb-2`}
                       placeholder={`Image URL ${index + 1} (optional)`}
+                      type="url"
                     />
                   ))}
                 </div>
@@ -318,14 +354,14 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Website (optional)
                   </label>
-                  <input
-                    type="url"
+                  <Input
                     value={form.website}
                     onChange={(e) =>
                       setForm({ ...form, website: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
+                    className={inputClassName}
                     placeholder="https://example.com"
+                    type="url"
                   />
                 </div>
 
@@ -334,44 +370,49 @@ export default function ApplyPage() {
                   <label className="block text-sm text-gray-300 font-medium mb-2">
                     Twitter Handle (optional)
                   </label>
-                  <input
-                    type="text"
+                  <Input
                     value={form.twitter}
                     onChange={(e) =>
                       setForm({ ...form, twitter: e.target.value })
                     }
-                    className="w-full bg-dark-900 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-gold-500 transition-colors"
+                    className={inputClassName}
                     placeholder="@yourhandle"
+                    type="text"
                   />
                 </div>
 
-                <button
+                <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 disabled:cursor-not-allowed text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200 mt-4"
+                  size="lg"
+                  className="mt-4 h-12 w-full bg-gold-500 text-dark-900 hover:bg-gold-600"
                 >
                   {loading ? "Submitting..." : "Submit Application"}
-                </button>
-              </form>
-            </div>
+                </Button>
+                </form>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="max-w-2xl mb-16">
-            <div className="bg-dark-800 rounded-lg border border-white/5 p-12 text-center">
-              <div className="text-5xl mb-6">✅</div>
-              <h2 className="font-serif text-2xl text-white mb-3">
-                Application Submitted!
-              </h2>
-              <p className="text-gray-400 text-base mb-8">
-                We'll review your application within 48 hours. Check back soon for updates.
-              </p>
-              <button
-                onClick={() => setSubmitted(false)}
-                className="px-6 py-2.5 bg-dark-900 border border-white/10 rounded-lg text-white text-sm hover:bg-white/5 transition-colors duration-200"
-              >
-                Submit Another Application
-              </button>
-            </div>
+            <Card className="border border-white/8 bg-dark-800/90 py-0 text-center shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+              <CardContent className="p-12">
+                <div className="text-5xl mb-6">✅</div>
+                <h2 className="font-serif text-2xl text-white mb-3">
+                  Application Submitted!
+                </h2>
+                <p className="text-gray-400 text-base mb-8">
+                  We&apos;ll review your application within 48 hours. Check back soon for updates.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setSubmitted(false)}
+                  className="h-11 border-white/10 bg-dark-900 text-white hover:bg-white/5"
+                >
+                  Submit Another Application
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -383,53 +424,56 @@ export default function ApplyPage() {
             </h2>
             <div className="space-y-4">
               {userApplications.map((app) => (
-                <div
+                <Card
                   key={app.id}
-                  className="bg-dark-800 rounded-lg border border-white/5 p-6"
+                  className="border border-white/8 bg-dark-800/90 py-0 shadow-[0_16px_48px_rgba(0,0,0,0.24)]"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-white font-semibold text-lg">
-                        {app.collectionName}
-                      </h3>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {app.category}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(
-                        app.status
-                      )}`}
-                    >
-                      {getStatusLabel(app.status)}
-                    </span>
-                  </div>
-
-                  <p className="text-gray-400 text-sm mb-4">
-                    {app.description}
-                  </p>
-
-                  <div className="text-gray-500 text-xs space-y-1 mb-4">
-                    <p>
-                      <span className="text-gray-400">Submitted:</span>{" "}
-                      {new Date(app.submittedAt).toLocaleDateString()}
-                    </p>
-                    {app.reviewedAt && (
-                      <>
-                        <p>
-                          <span className="text-gray-400">Reviewed:</span>{" "}
-                          {new Date(app.reviewedAt).toLocaleDateString()}
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-white font-semibold text-lg">
+                          {app.collectionName}
+                        </h3>
+                        <p className="text-gray-500 text-xs mt-1">
+                          {app.category}
                         </p>
-                        {app.rejectionReason && (
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
+                          app.status
+                        )}`}
+                      >
+                        {getStatusLabel(app.status)}
+                      </Badge>
+                    </div>
+
+                    <p className="text-gray-400 text-sm mb-4">
+                      {app.description}
+                    </p>
+
+                    <div className="text-gray-500 text-xs space-y-1 mb-4">
+                      <p>
+                        <span className="text-gray-400">Submitted:</span>{" "}
+                        {new Date(app.submittedAt).toLocaleDateString()}
+                      </p>
+                      {app.reviewedAt && (
+                        <>
                           <p>
-                            <span className="text-gray-400">Reason:</span>{" "}
-                            {app.rejectionReason}
+                            <span className="text-gray-400">Reviewed:</span>{" "}
+                            {new Date(app.reviewedAt).toLocaleDateString()}
                           </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+                          {app.rejectionReason && (
+                            <p>
+                              <span className="text-gray-400">Reason:</span>{" "}
+                              {app.rejectionReason}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

@@ -1,9 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { WalletProviderWrapper } from "@/components/WalletProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ToastContainer } from "@/components/ToastContainer";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,8 +48,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased bg-dark-900 text-white">
+    <html
+      lang="en"
+      className={cn(inter.variable, playfairDisplay.variable, "dark theme")}
+    >
+      <body className="bg-background font-sans text-foreground antialiased">
         <WalletProviderWrapper>
           <Navbar />
           <main className="min-h-screen">{children}</main>

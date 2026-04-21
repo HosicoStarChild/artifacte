@@ -1,73 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Toast, ToastType } from "./Toast";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 
-export type ToastMessage = {
-  id: string;
-  message: string;
-  type: ToastType;
-  duration?: number;
-};
+export type ToastType = "success" | "error" | "info" | "warning";
 
-// Global toast state management
-let toastCallbacks: {
-  add: (toast: ToastMessage) => void;
-  remove: (id: string) => void;
-} | null = null;
+function notify(type: ToastType, message: string, duration = 5000) {
+  switch (type) {
+    case "success":
+      return toast.success(message, { duration });
+    case "error":
+      return toast.error(message, { duration });
+    case "warning":
+      return toast.warning(message, { duration });
+    case "info":
+    default:
+      return toast.info(message, { duration });
+  }
+}
 
 export function createToastManager() {
   return {
-    success: (message: string, duration = 5000) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      toastCallbacks?.add({ id, message, type: "success", duration });
-      return id;
-    },
-    error: (message: string, duration = 5000) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      toastCallbacks?.add({ id, message, type: "error", duration });
-      return id;
-    },
-    info: (message: string, duration = 5000) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      toastCallbacks?.add({ id, message, type: "info", duration });
-      return id;
-    },
-    warning: (message: string, duration = 5000) => {
-      const id = Math.random().toString(36).substr(2, 9);
-      toastCallbacks?.add({ id, message, type: "warning", duration });
-      return id;
-    },
+    success: (message: string, duration = 5000) =>
+      notify("success", message, duration),
+    error: (message: string, duration = 5000) =>
+      notify("error", message, duration),
+    info: (message: string, duration = 5000) =>
+      notify("info", message, duration),
+    warning: (message: string, duration = 5000) =>
+      notify("warning", message, duration),
   };
 }
 
 export const showToast = createToastManager();
 
 export function ToastContainer() {
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  useEffect(() => {
-    toastCallbacks = {
-      add: (toast: ToastMessage) => {
-        setToasts((prev) => [...prev, toast]);
-      },
-      remove: (id: string) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      },
-    };
-  }, []);
-
-  return (
-    <>
-      {toasts.map((toast) => (
-        <Toast
-          key={toast.id}
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onClose={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-        />
-      ))}
-    </>
-  );
+  return <Toaster closeButton position="top-right" richColors />;
 }

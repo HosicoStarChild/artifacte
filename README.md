@@ -16,21 +16,32 @@ Two Anchor programs in `/programs/`:
 
 2. **auction** — Timed auction system with escrow via PDAs. Place bids with SOL (must beat current), auto-refund previous bidder, settle after end time. Winner receives the full NFT.
 
-### Frontend (Next.js 14)
+### Frontend (Next.js 16)
 - **Homepage**: Portfolio grid, live auctions carousel, recent listings
 - **`/auctions`**: All live auctions grid
 - **`/auctions/[slug]`**: Bid history, price chart, countdown timer, place bid (on-chain)
 - Wallet connect (Phantom/Solflare) via `@solana/wallet-adapter`
-- Dark navy/black + gold accent luxury UI
+- Dark navy/black + gold accent luxury UI with shadcn/ui primitives
 - Responsive/mobile friendly
 
 ## Quick Start
 
 ### Frontend
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 # Open http://localhost:3000
+```
+
+Requirements:
+- Node.js 20.9+
+- pnpm 10+
+
+Useful commands:
+```bash
+pnpm build
+pnpm lint
+pnpm typecheck
 ```
 
 ### Smart Contracts (requires Rust + Anchor CLI)
@@ -42,7 +53,7 @@ anchor deploy --provider.cluster devnet
 ```
 
 ## Tech Stack
-- **Frontend**: Next.js 14, React 18, Tailwind CSS, TypeScript
+- **Frontend**: Next.js 16, React 19, Tailwind CSS, TypeScript, shadcn/ui
 - **Blockchain**: Solana (devnet), Anchor Framework
 - **Wallet**: @solana/wallet-adapter (Phantom, Solflare)
 - **Packages**: @coral-xyz/anchor, @solana/web3.js
@@ -57,7 +68,7 @@ anchor deploy --provider.cluster devnet
 ## Project Structure
 ```
 artifacte/
-├── app/                    # Next.js 14 app router
+├── app/                    # Next.js 16 app router
 │   ├── page.tsx           # Homepage
 │   ├── auctions/
 │   │   ├── page.tsx       # Auctions grid
@@ -65,6 +76,7 @@ artifacte/
 │   ├── layout.tsx
 │   └── globals.css
 ├── components/            # React components
+│   ├── ui/                # shadcn/ui primitives
 │   ├── WalletProvider.tsx
 │   ├── Navbar.tsx
 │   ├── Footer.tsx

@@ -18,7 +18,8 @@ const categoryDescs: Record<string, string> = {
   'digital-art': 'Browse digital collectibles and NFT art on Solana.',
 };
 
-export async function generateMetadata({ params }: { params: { category: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ category: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const name = categoryNames[params.category] || 'Collectibles';
   const desc = categoryDescs[params.category] || 'Browse tokenized collectibles on Solana.';
   return {

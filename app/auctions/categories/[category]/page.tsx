@@ -204,7 +204,7 @@ export default function CategoryAuctionsPage() {
       sessionStorage.setItem(`${storageKey}-search`, searchInput);
     } catch {}
   }, [filters, page, currencyFilter, sortBy, searchInput, storageKey]);
-  const searchTimer = useRef<NodeJS.Timeout>();
+  const searchTimer = useRef<NodeJS.Timeout>(undefined);
   const listingsRequestRef = useRef(0);
   const [meListings, setMeListings] = useState<any[]>([]);
   const [meLoading, setMeLoading] = useState(true);
