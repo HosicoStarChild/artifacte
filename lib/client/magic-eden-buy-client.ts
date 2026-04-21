@@ -2,6 +2,11 @@ import { createSolanaRpc, signature } from "@solana/kit";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 
 import type { AnchorWalletLike } from "@/hooks/useWalletCapabilities";
+import {
+  MAGIC_EDEN_M2_PROGRAM,
+  MAGIC_EDEN_M3_PROGRAM,
+  type MagicEdenBuyResponse,
+} from "@/lib/magic-eden-buy";
 import { formatHomeListingQuote } from "@/lib/home-tcg";
 
 type WalletSignTransaction = AnchorWalletLike["signTransaction"];
@@ -9,16 +14,6 @@ type WalletSignTransaction = AnchorWalletLike["signTransaction"];
 type ListingDisplayPrice = {
   amount: number;
   currency: string;
-};
-
-type MagicEdenBuildResponse = {
-  v0Tx?: string | null;
-  v0TxSigned?: string | null;
-  legacyTx?: string | null;
-  displayPrice?: number;
-  displayCurrency?: string;
-  platformFee?: number;
-  platformFeeCurrency?: string;
 };
 
 type RpcSignatureStatus = {
@@ -104,11 +99,13 @@ async function preSimulateTransaction(base64Transaction: string): Promise<void> 
 
 async function signVersionedTransaction(
   base64Transaction: string,
-  signTransaction: WalletSignTransaction
+  signTransaction: WalletSignTransaction,
+  buyer: string
 ): Promise<string> {
   await preSimulateTransaction(base64Transaction);
   const transactionBytes = decodeBase64Transaction(base64Transaction);
   const transaction = VersionedTransaction.deserialize(transactionBytes);
+  validateMagicEdenTransaction(transaction, buyer);
   const signedTransaction = await signTransaction(transaction);
   return sendViaProxy(signedTransaction.serialize());
 }
@@ -142,9 +139,28 @@ async function waitForTransactionConfirmation(signatureValue: string): Promise<b
   return false;
 }
 
-async function getBuildResponse(response: Response): Promise<MagicEdenBuildResponse> {
-  const buildResponse: MagicEdenBuildResponse = await response.json();
+async function getBuildResponse(response: Response): Promise<MagicEdenBuyResponse> {
+  const buildResponse: MagicEdenBuyResponse = await response.json();
   return buildResponse;
+}
+
+function validateMagicEdenTransaction(
+  transaction: VersionedTransaction,
+  buyer: string
+): void {
+  const feePayer = transaction.message.staticAccountKeys[0]?.toBase58() ?? null;
+  if (feePayer !== buyer) {
+    throw new Error("Transaction fee payer doesn't match connected wallet");
+  }
+
+  const hasMagicEdenProgram = transaction.message.staticAccountKeys.some((accountKey) => {
+    const address = accountKey.toBase58();
+    return address === MAGIC_EDEN_M2_PROGRAM || address === MAGIC_EDEN_M3_PROGRAM;
+  });
+
+  if (!hasMagicEdenProgram) {
+    throw new Error("Transaction doesn't interact with ME marketplace");
+  }
 }
 
 export async function executeMagicEdenBuy({
@@ -186,10 +202,10 @@ export async function executeMagicEdenBuy({
 
   let transactionSignature = "";
 
-  if (buildResult.v0TxSigned && buildResult.v0Tx) {
-    transactionSignature = await signVersionedTransaction(buildResult.v0TxSigned, signTransaction);
+  if (buildResult.v0TxSigned) {
+    transactionSignature = await signVersionedTransaction(buildResult.v0TxSigned, signTransaction, buyer);
   } else if (buildResult.v0Tx) {
-    transactionSignature = await signVersionedTransaction(buildResult.v0Tx, signTransaction);
+    transactionSignature = await signVersionedTransaction(buildResult.v0Tx, signTransaction, buyer);
   } else if (buildResult.legacyTx) {
     transactionSignature = await signLegacyTransaction(buildResult.legacyTx, signTransaction);
   } else {
