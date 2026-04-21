@@ -53,7 +53,7 @@ export default function TermsPage() {
             <li>Accuracy of price oracle data or market valuations</li>
             <li>Availability or uptime of the Platform</li>
             <li>That smart contracts are free from bugs or vulnerabilities</li>
-            <li>The authenticity of third-party listed items (Collector Crypt, BAXUS, etc.)</li>
+            <li>The authenticity of third-party listed items (Collector Crypt and other external sources)</li>
           </ul>
 
           <h2 className="font-serif text-xl text-white mt-8">9. Limitation of Liability</h2>

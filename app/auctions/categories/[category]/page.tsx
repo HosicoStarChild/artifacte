@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { auctions, listings as staticListings, categorySlugMap, categoryLabels, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
+import { auctions, listings as staticListings, categorySlugMap, categoryLabels, getListingPurchaseCurrency, resolveListingDisplayPrice } from "@/lib/data";
 import AuctionCard from "@/components/AuctionCard";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import dynamic from "next/dynamic";
@@ -143,7 +143,7 @@ function getListingHref(listing: any): string {
   if (listing.source === "collector-crypt") return `/auctions/cards/${listing.id}`;
   if (listing.source === "phygitals" && listing.nftAddress) return `/auctions/cards/${listing.id}`;
   if (listing.source === "artifacte" && listing.nftAddress) return `/auctions/cards/${listing.nftAddress}`;
-  if (listing.source === "baxus") return listing.externalUrl || `https://app.baxus.co/asset/${listing.nftAddress}`;
+  if (listing.externalUrl) return listing.externalUrl;
   return "#";
 }
 
@@ -561,7 +561,7 @@ function CategoryAuctionsPageContent() {
                       className="bg-dark-800 rounded-lg border border-white/5 overflow-hidden card-hover group flex flex-col h-full"
                     >
                       {/* Image */}
-                      <Link href={getListingHref(l)} target={l.source === 'baxus' ? '_blank' : undefined} rel={l.source === 'baxus' ? 'noopener noreferrer' : undefined} className="block">
+                      <Link href={getListingHref(l)} target={l.externalUrl ? '_blank' : undefined} rel={l.externalUrl ? 'noopener noreferrer' : undefined} className="block">
                       <div className="aspect-square overflow-hidden bg-dark-900 relative">
                         <img
                           src={l.image?.includes('arweave.net/') ? `/api/img-proxy?url=${encodeURIComponent(l.image)}` : l.image}
@@ -614,9 +614,6 @@ function CategoryAuctionsPageContent() {
                               <>
                                 <p className="text-white font-serif text-2xl">${formattedAmount}</p>
                                 <p className="text-gold-500 text-xs mt-1">{displayPrice.currency}</p>
-                                {BAXUS_SELLER_FEE_ENABLED && l.verifiedBy === "BAXUS" && (
-                                  <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
-                                )}
                               </>
                             )}
                           </div>

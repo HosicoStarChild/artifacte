@@ -304,15 +304,15 @@ export default function CategoryListingPurchaseAction({
     }
   }
 
-  if (listing.source === "baxus" && (listing.externalUrl || listing.nftAddress)) {
+  if (listing.externalUrl) {
     return (
       <a
-        href={listing.externalUrl || `https://app.baxus.co/asset/${listing.nftAddress}`}
+        href={listing.externalUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
       >
-        Buy on BAXUS
+        View Listing
       </a>
     );
   }
@@ -342,7 +342,7 @@ export default function CategoryListingPurchaseAction({
     }
 
     return (
-      <WalletMultiButton className="w-full !bg-gold-500 hover:!bg-gold-600 !text-dark-900 !rounded-lg !text-sm !font-semibold !h-10 !justify-center" />
+      <WalletMultiButton className="w-full bg-gold-500! hover:bg-gold-600! text-dark-900! rounded-lg! text-sm! font-semibold! h-10! justify-center!" />
     );
   }
 
@@ -369,5 +369,5 @@ export default function CategoryListingPurchaseAction({
     );
   }
 
-  return <WalletMultiButton className="!w-full !bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-sm !font-semibold" />;
+  return <WalletMultiButton className="w-full! bg-gold-500! hover:bg-gold-600! rounded-lg! h-10! text-sm! font-semibold!" />;
 }

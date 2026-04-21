@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { auctions, formatFullPrice, Bid, BAXUS_SELLER_FEE_ENABLED, BAXUS_SELLER_FEE_PERCENT } from "@/lib/data";
+import { auctions, formatFullPrice, Bid } from "@/lib/data";
 import Countdown from "@/components/Countdown";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PriceHistory from "@/components/PriceHistory";
@@ -189,9 +189,6 @@ function AuctionDetailContent() {
   const isSeller = connected && publicKey && publicKey.toBase58() === auction.description?.match(/Seller:\s(\w+)/)?.[1];
   const canCancel = isSeller && (allBids.length === 0);
 
-  // Check if this is a BAXUS listing by looking at the description or verifiedBy
-  const isBaxusFixedPrice = auction.verifiedBy === 'BAXUS' && !(auction as any).bids?.length;
-
   return (
     <div className="pt-24 pb-20">
       {/* Toast */}
@@ -222,142 +219,73 @@ function AuctionDetailContent() {
             <h1 className="font-serif text-3xl md:text-4xl text-white mb-4 leading-tight">{auction.name}</h1>
             <p className="text-gray-400 text-base mb-8 leading-relaxed">{auction.description}</p>
 
-            {/* BAXUS Bottle Details */}
-            {isBaxusFixedPrice && (auction as any).abv && (
-              <div className="bg-dark-800 rounded-lg border border-white/5 p-6 mb-8">
-                <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-4">Bottle Details</p>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {(auction as any).abv && (
-                    <div>
-                      <p className="text-gray-600 text-xs">ABV</p>
-                      <p className="text-white font-medium">{(auction as any).abv}%</p>
-                    </div>
-                  )}
-                  {(auction as any).age && (
-                    <div>
-                      <p className="text-gray-600 text-xs">Age</p>
-                      <p className="text-white font-medium">{(auction as any).age} Years</p>
-                    </div>
-                  )}
-                  {(auction as any).volume_ml && (
-                    <div>
-                      <p className="text-gray-600 text-xs">Volume</p>
-                      <p className="text-white font-medium">{(auction as any).volume_ml}ml</p>
-                    </div>
-                  )}
-                  {(auction as any).country && (
-                    <div>
-                      <p className="text-gray-600 text-xs">Country</p>
-                      <p className="text-white font-medium">{(auction as any).country}</p>
-                    </div>
-                  )}
-                  {(auction as any).region && (
-                    <div>
-                      <p className="text-gray-600 text-xs">Region</p>
-                      <p className="text-white font-medium">{(auction as any).region}</p>
-                    </div>
-                  )}
-                  {(auction as any).spirit_type && (
-                    <div>
-                      <p className="text-gray-600 text-xs">Spirit Type</p>
-                      <p className="text-white font-medium">{(auction as any).spirit_type}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Current Bid & Timer Box */}
             <div className="bg-dark-800 rounded-lg border border-white/5 p-8 mb-8">
               <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b border-white/5">
                 <div>
-                  <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">{isBaxusFixedPrice ? 'Price' : 'Current Bid'}</p>
+                  <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Current Bid</p>
                   <p className="font-serif text-3xl text-white">{isDigitalArt ? `◎ ${currentBid.toLocaleString()}` : formatFullPrice(currentBid)}</p>
                   <p className="text-gold-500 text-xs mt-2">{currentBid.toLocaleString()} {currencyLabel}</p>
-                  {BAXUS_SELLER_FEE_ENABLED && auction.verifiedBy === "BAXUS" && !isBaxusFixedPrice && (
-                    <p className="text-gray-500 text-xs mt-1">+ {BAXUS_SELLER_FEE_PERCENT}% seller fee</p>
-                  )}
                 </div>
-                {!isBaxusFixedPrice && (
-                  <div className="text-right">
-                    <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Ends In</p>
-                    <p className="font-serif text-3xl text-gold-500">
-                      <Countdown endTime={auction.end_time} />
-                    </p>
+                <div className="text-right">
+                  <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Ends In</p>
+                  <p className="font-serif text-3xl text-gold-500">
+                    <Countdown endTime={auction.end_time} />
+                  </p>
+                </div>
+              </div>
+
+              {/* Currency Toggle */}
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-gray-500 text-xs font-medium">Pay with:</span>
+                {isDigitalArt ? (
+                  <span className="text-white text-sm font-medium bg-dark-900 px-4 py-2 rounded-lg border border-white/5">◎ SOL</span>
+                ) : (
+                  <div className="flex gap-2 bg-dark-900 rounded-lg p-1 border border-white/5">
+                    {(["USD1", "USDC"] as const).map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setCurrency(c)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${
+                          currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* BAXUS Fixed Price - Buy Button */}
-              {isBaxusFixedPrice && (auction as any).externalUrl ? (
-                <div className="space-y-3">
-                  <a
-                    href={(auction as any).externalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full block text-center px-8 py-3 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg font-semibold text-sm transition-colors duration-200"
-                  >
-                    Buy on BAXUS →
-                  </a>
-                  <p className="text-gray-500 text-xs text-center">
-                    Complete purchase on BAXUS platform
-                  </p>
+              {/* Bid Input */}
+              <div className="space-y-3 mb-4">
+                <label className="text-gray-400 text-xs font-medium">
+                  Bid Amount ({currencyLabel}) — Minimum {minBid.toLocaleString()} {currencyLabel}
+                </label>
+                <div className="flex gap-3">
+                  <input
+                    type="number"
+                    step={isDigitalArt ? "0.01" : "1"}
+                    placeholder={`Min: ${minBid.toLocaleString()} ${currencyLabel}`}
+                    value={bidUsd1}
+                    onChange={(e) => setBidUsd1(e.target.value)}
+                    className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-hidden transition-colors"
+                  />
+                  {connected ? (
+                    <button
+                      onClick={handleBid}
+                      className="bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold px-8 py-3 rounded-lg text-sm transition-colors duration-200"
+                    >
+                      Place Bid
+                    </button>
+                  ) : (
+                    <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-auto !py-3 !px-8 !text-sm !font-semibold" />
+                  )}
                 </div>
-              ) : (
-                <>
-                  {/* Currency Toggle */}
-                  <div className="flex items-center gap-3 mb-6">
-                    <span className="text-gray-500 text-xs font-medium">Pay with:</span>
-                    {isDigitalArt ? (
-                      <span className="text-white text-sm font-medium bg-dark-900 px-4 py-2 rounded-lg border border-white/5">◎ SOL</span>
-                    ) : (
-                      <div className="flex gap-2 bg-dark-900 rounded-lg p-1 border border-white/5">
-                        {(["USD1", "USDC"] as const).map((c) => (
-                          <button
-                            key={c}
-                            onClick={() => setCurrency(c)}
-                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${
-                              currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            {c}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bid Input */}
-                  <div className="space-y-3 mb-4">
-                    <label className="text-gray-400 text-xs font-medium">
-                      Bid Amount ({currencyLabel}) — Minimum {minBid.toLocaleString()} {currencyLabel}
-                    </label>
-                    <div className="flex gap-3">
-                      <input
-                        type="number"
-                        step={isDigitalArt ? "0.01" : "1"}
-                        placeholder={`Min: ${minBid.toLocaleString()} ${currencyLabel}`}
-                        value={bidUsd1}
-                        onChange={(e) => setBidUsd1(e.target.value)}
-                        className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-hidden transition-colors"
-                      />
-                      {connected ? (
-                        <button
-                          onClick={handleBid}
-                          className="bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold px-8 py-3 rounded-lg text-sm transition-colors duration-200"
-                        >
-                          Place Bid
-                        </button>
-                      ) : (
-                        <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-auto !py-3 !px-8 !text-sm !font-semibold" />
-                      )}
-                    </div>
-                    {bidStatus && (
-                      <p className="text-xs text-gray-400">{bidStatus}</p>
-                    )}
-                  </div>
-                </>
-              )}
+                {bidStatus && (
+                  <p className="text-xs text-gray-400">{bidStatus}</p>
+                )}
+              </div>
 
               {/* Cancel Listing Button */}
               {canCancel && (

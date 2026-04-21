@@ -28,7 +28,7 @@ The repo still contains Token Metadata / pNFT-specific auction flows. Those shou
 | `description` | string | Item description |
 | `image` | string (URI) | Primary photo |
 | `category` | enum | `DigitalArt` / `Spirits` / `TCGCards` / `SportsCards` / `Watches` |
-| `verifiedBy` | string | Verification source: `BAXUS` / `PSA` / `BGS` / `CGC` / `Chrono24` / `Metaplex` |
+| `verifiedBy` | string | Verification source: `PSA` / `BGS` / `CGC` / `Chrono24` / `Metaplex` |
 | `verificationId` | string | Cert number or authentication ID |
 | `appraisedValue` | u64 | Oracle market price in USD (6 decimals) |
 | `condition` | string (32) | Grade or condition |

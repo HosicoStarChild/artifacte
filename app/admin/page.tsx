@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useEffect } from "react";
-import { BAXUS_SELLER_FEE_ENABLED, hasAdminAccess, isOwnerWallet, OWNER_WALLET } from "@/lib/data";
+import { hasAdminAccess, isOwnerWallet, OWNER_WALLET } from "@/lib/data";
 import {
   ADMIN_CORE_ROYALTY_BASIS_POINTS,
   buildMetaplexCompatibleMetadata,
@@ -95,7 +95,6 @@ export default function AdminPage() {
     completedListings: 0,
     totalVolume: 0,
   });
-  const [baxusFeesEnabled, setBaxusFeesEnabled] = useState(BAXUS_SELLER_FEE_ENABLED);
   const [activeTab, setActiveTab] = useState<"overview" | "listings" | "whitelist" | "settings" | "submissions" | "mint">("overview");
   const [whitelistedWallets, setWhitelistedWallets] = useState<any[]>([]);
   const [newWalletAddr, setNewWalletAddr] = useState("");
@@ -334,16 +333,6 @@ export default function AdminPage() {
     }
   }
 
-  async function toggleBaxusFee() {
-    try {
-      setBaxusFeesEnabled(!baxusFeesEnabled);
-      // In production, this would call an API to persist the setting
-      alert(`BAXUS fees ${!baxusFeesEnabled ? "enabled" : "disabled"}`);
-    } catch (err: any) {
-      setError("Failed to toggle BAXUS fees");
-    }
-  }
-
   if (!connected) {
     return (
       <main className="min-h-screen bg-dark-900 pt-32 pb-20">
@@ -443,15 +432,12 @@ export default function AdminPage() {
             {/* Quick Actions */}
             <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
               <h2 className="font-serif text-2xl font-bold text-white mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:max-w-sm">
                 <button
-                  onClick={toggleBaxusFee}
+                  onClick={() => setActiveTab("settings")}
                   className="px-6 py-3 rounded-lg bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold transition-all"
                 >
-                  {baxusFeesEnabled ? "Disable BAXUS Fees" : "Enable BAXUS Fees"}
-                </button>
-                <button className="px-6 py-3 rounded-lg border border-white/10 text-white hover:bg-dark-700 font-semibold transition-all">
-                  Manage Categories
+                  Review Platform Settings
                 </button>
               </div>
             </div>
@@ -1012,41 +998,7 @@ export default function AdminPage() {
         )}
 
         {!loading && activeTab === "settings" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* BAXUS Fees Setting */}
-            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
-              <h3 className="font-serif text-xl font-bold text-white mb-6">BAXUS Seller Fees</h3>
-              <p className="text-gray-400 mb-6">
-                Control whether BAXUS verified NFTs incur a 10% seller fee on transaction completion.
-              </p>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-dark-700 rounded-lg border border-white/10">
-                  <div>
-                    <p className="font-semibold text-white">Fee Status</p>
-                    <p className="text-sm text-gray-500">Currently {baxusFeesEnabled ? "enabled" : "disabled"}</p>
-                  </div>
-                  <button
-                    onClick={toggleBaxusFee}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                      baxusFeesEnabled
-                        ? "bg-red-900/40 text-red-400 border border-red-700 hover:bg-red-900/60"
-                        : "bg-green-900/40 text-green-400 border border-green-700 hover:bg-green-900/60"
-                    }`}
-                  >
-                    {baxusFeesEnabled ? "Disable" : "Enable"}
-                  </button>
-                </div>
-                <div className="text-sm text-gray-500 bg-dark-700 rounded-lg p-4 border border-white/10">
-                  <p className="font-semibold text-white mb-2">Fee Details</p>
-                  <ul className="space-y-1">
-                    <li>• Rate: 10% of sale price</li>
-                    <li>• Applies to: BAXUS verified NFTs only</li>
-                    <li>• Collected to: Treasury wallet</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 gap-8">
             {/* Platform Settings */}
             <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
               <h3 className="font-serif text-xl font-bold text-white mb-6">Platform Settings</h3>
@@ -1089,7 +1041,7 @@ export default function AdminPage() {
             </div>
 
             {/* Categories */}
-            <div className="bg-dark-800 border border-white/10 rounded-xl p-8 lg:col-span-2">
+            <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
               <h3 className="font-serif text-xl font-bold text-white mb-6">Manage Categories</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {["Digital Art", "Spirits", "TCG Cards", "Sports Cards", "Watches", "Watches", "Real Estate", "Aviation"].map(
