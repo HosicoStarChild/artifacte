@@ -9,6 +9,7 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { hasAdminAccess } from "@/lib/data";
+import { ALLOWLIST_QUERY_KEY } from "@/lib/allowlist";
 
 interface Application {
   id: string;
@@ -84,7 +85,10 @@ export default function AdminApplicationsPage() {
   const reviewMutation = useMutation({
     mutationFn: reviewApplication,
     onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-applications"] }),
+        queryClient.invalidateQueries({ queryKey: ALLOWLIST_QUERY_KEY }),
+      ]);
       setReviewingId(null);
       if (variables.action === "reject") {
         setRejectionReason("");

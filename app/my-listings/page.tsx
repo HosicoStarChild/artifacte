@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PublicKey, Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@solana/spl-token";
 import { AuctionProgram } from "@/lib/auction-program";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
-import { fetchAllowlist } from "@/lib/allowlist";
+import { getAllowlistQueryOptions } from "@/hooks/useAllowlist";
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
@@ -47,6 +48,7 @@ interface MyListing {
 
 export default function MyListingsPage() {
   const { publicKey, connected, sendTransaction, signTransaction, connection, anchorWallet } = useWalletCapabilities();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>("active");
   const [myListings, setMyListings] = useState<MyListing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -146,7 +148,7 @@ export default function MyListingsPage() {
       const [allListings, tensorListings, allowlist, allCoreListings] = await Promise.all([
         program.fetchAllListings(),
         fetchTensorListings(publicKey, connection),
-        fetchAllowlist(),
+        queryClient.ensureQueryData(getAllowlistQueryOptions()),
         program.fetchAllCoreListings(),
       ]);
 

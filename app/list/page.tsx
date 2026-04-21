@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccountInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Transaction } from "@solana/web3.js";
@@ -9,6 +9,8 @@ import { AuctionProgram, ListingType, ItemCategory } from "@/lib/auction-program
 import { isOwnerWallet } from "@/lib/admin";
 import { showToast } from "@/components/ToastContainer";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import { useAllowlist } from "@/hooks/useAllowlist";
+import { createAllowlistIdentifierMap } from "@/lib/allowlist";
 
 interface NFTAsset {
   id: string;
@@ -33,6 +35,7 @@ const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 
 export default function ListNFTPage() {
   const { publicKey, connected, sendTransaction, signTransaction, connection, anchorWallet } = useWalletCapabilities();
+  const { data: allowlist = [] } = useAllowlist();
   const [whitelistStatus, setWhitelistStatus] = useState<WhitelistStatus>({ walletOk: false, loading: true });
   const [nfts, setNfts] = useState<NFTAsset[]>([]);
   const [loadingNfts, setLoadingNfts] = useState(false);
@@ -44,9 +47,16 @@ export default function ListNFTPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const [allowedCollections, setAllowedCollections] = useState<Record<string, string>>({});
   const [royaltyBps, setRoyaltyBps] = useState<number>(0);
   const [loadingRoyalty, setLoadingRoyalty] = useState(false);
+  const allowedCollections = useMemo(
+    () => createAllowlistIdentifierMap(allowlist),
+    [allowlist]
+  );
+  const allowedCollectionNames = useMemo(
+    () => Array.from(new Set(allowlist.map((entry) => entry.name))).sort(),
+    [allowlist]
+  );
 
   // Digital Art = collection gate only, no wallet whitelist needed
   useEffect(() => {
@@ -56,22 +66,8 @@ export default function ListNFTPage() {
     }
     // For digital collectibles, anyone with an approved collection NFT can list
     setWhitelistStatus({ walletOk: true, loading: false });
-    loadAllowedCollections();
     loadNFTs();
   }, [connected, publicKey]);
-
-  async function loadAllowedCollections() {
-    try {
-      const res = await fetch("/api/admin/allowlist");
-      const data = await res.json();
-      const map: Record<string, string> = {};
-      for (const c of data.collections || []) {
-        if (c.collectionAddress) map[c.collectionAddress] = c.name;
-        if (c.mintAuthority) map[c.mintAuthority] = c.name;
-      }
-      setAllowedCollections(map);
-    } catch {}
-  }
 
   async function loadNFTs() {
     if (!publicKey) return;
@@ -515,7 +511,7 @@ export default function ListNFTPage() {
                 <div className="text-4xl mb-4">📭</div>
                 <p className="text-gray-400 mb-2">No eligible items found</p>
                 <p className="text-gray-500 text-sm">
-                  You need NFTs from an approved collection. Currently approved: {Object.values(allowedCollections).join(", ") || "None"}.
+                  You need NFTs from an approved collection. Currently approved: {allowedCollectionNames.join(", ") || "None"}.
                 </p>
               </div>
             ) : (

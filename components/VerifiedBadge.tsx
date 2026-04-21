@@ -1,8 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { fetchAllowlist } from "@/lib/allowlist";
-
 interface VerifiedBadgeProps {
   collectionName?: string;
   mintAuthority?: string;
@@ -11,49 +8,10 @@ interface VerifiedBadgeProps {
 }
 
 export default function VerifiedBadge({
-  collectionName,
-  mintAuthority,
   showLabel = false,
   verifiedBy,
 }: VerifiedBadgeProps) {
-  const [isVerified, setIsVerified] = useState(false);
-  const [collectionInfo, setCollectionInfo] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function checkVerification() {
-      const allowlist = await fetchAllowlist();
-      
-      // Check by mint authority first
-      if (mintAuthority) {
-        const found = allowlist.find(
-          (entry) => entry.mintAuthority === mintAuthority
-        );
-        if (found) {
-          setIsVerified(true);
-          setCollectionInfo(found.name);
-          return;
-        }
-      }
-
-      // Check by collection name as fallback
-      if (collectionName) {
-        const found = allowlist.find(
-          (entry) =>
-            entry.name.toLowerCase() === collectionName.toLowerCase() ||
-            entry.name.toLowerCase().includes(collectionName.toLowerCase())
-        );
-        if (found) {
-          setIsVerified(true);
-          setCollectionInfo(found.name);
-          return;
-        }
-      }
-    }
-
-    checkVerification();
-  }, [collectionName, mintAuthority]);
-
-  if (!isVerified && !verifiedBy) return null;
+  if (!verifiedBy) return null;
 
   return (
     <div className="flex items-center gap-1 text-gold-500">

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AuctionProgram } from "@/lib/auction-program";
 import { AuctionCountdownTimer } from "@/components/AuctionCountdownTimer";
+import { useAllowlist } from "@/hooks/useAllowlist";
+import { getAllowlistIdentifier } from "@/lib/allowlist";
 
 interface Collection {
   collectionAddress: string;
@@ -25,35 +27,38 @@ interface ActiveListing {
   currentBid?: number;
 }
 
+const HIDDEN_COLLECTIONS = new Set([
+  "Collectors Crypt",
+  "Collector Crypt",
+  "Phygitals",
+  "phygitals",
+]);
+
 export default function DigitalArtPage() {
   const { connection } = useConnection();
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const { data: allowlist = [], isLoading: loading } = useAllowlist();
   const [activeListings, setActiveListings] = useState<ActiveListing[]>([]);
-  const [loading, setLoading] = useState(true);
   const [loadingListings, setLoadingListings] = useState(true);
+  const collections = useMemo<Collection[]>(() => {
+    const seen = new Map<string, Collection>();
 
-  useEffect(() => {
-    const fetchCollections = async () => {
-      try {
-        const res = await fetch("/api/admin/allowlist");
-        const data = await res.json();
-        // Deduplicate by name (e.g. Quekz has old collection + new WNS authority)
-        // Hide collections that have their own category pages (TCG Cards, etc.)
-        const HIDDEN_COLLECTIONS = ['Collectors Crypt', 'Collector Crypt', 'Phygitals', 'phygitals'];
-        const seen = new Map<string, Collection>();
-        for (const c of (data.collections || [])) {
-          if (!seen.has(c.name) && !HIDDEN_COLLECTIONS.includes(c.name)) seen.set(c.name, c);
-        }
-        setCollections(Array.from(seen.values()));
-      } catch (err) {
-        console.error("Failed to fetch collections:", err);
-      } finally {
-        setLoading(false);
+    for (const entry of allowlist) {
+      const identifier = getAllowlistIdentifier(entry);
+
+      if (!identifier || seen.has(entry.name) || HIDDEN_COLLECTIONS.has(entry.name)) {
+        continue;
       }
-    };
 
-    fetchCollections();
-  }, []);
+      seen.set(entry.name, {
+        collectionAddress: identifier,
+        name: entry.name,
+        image: entry.image || "/placeholder.png",
+        supply: entry.supply,
+      });
+    }
+
+    return Array.from(seen.values());
+  }, [allowlist]);
 
   useEffect(() => {
     const fetchListings = async () => {

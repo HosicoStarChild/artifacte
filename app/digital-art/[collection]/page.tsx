@@ -1,33 +1,23 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { isArtifacteExternalFeeExempt } from "@/lib/external-purchase-fees";
+import { useAllowlist } from "@/hooks/useAllowlist";
+import {
+  getAllowlistIdentifier,
+  matchesAllowlistIdentifier,
+  type AllowlistEntry,
+} from "@/lib/allowlist";
 
 type MarketplaceSource = "magiceden" | "tensor";
 
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='48' fill='%23444'%3E%3F%3C/text%3E%3C/svg%3E";
 
-interface CollectionInfo {
-  collectionAddress: string;
-  name: string;
-  image: string;
-  supply?: number;
-  description?: string;
-  links?: {
-    website?: string;
-    twitter?: string;
-    discord?: string;
-  };
-  marketplaces?: {
-    magicEden?: { symbol: string };
-    tensor?: { slug: string };
-    order?: Array<"artifacte" | "magiceden" | "tensor">;
-  };
-}
+type CollectionInfo = AllowlistEntry;
 
 interface ListedNFT {
   id: string;
@@ -110,13 +100,13 @@ function CollectionPageContent() {
   const params = useParams();
   const collectionAddress = params.collection as string;
   const { publicKey } = useWallet();
+  const { data: allowlist = [], isLoading: allowlistLoading } = useAllowlist();
 
   const dataRequestRef = useRef(0);
   const marketplaceRequestRef = useRef(0);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const [collection, setCollection] = useState<CollectionInfo | null>(null);
   const [listings, setListings] = useState<ListedNFT[]>([]);
   const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
   const [marketplaceListings, setMarketplaceListings] = useState<
@@ -135,6 +125,22 @@ function CollectionPageContent() {
   const [sortOpen, setSortOpen] = useState(false);
 
   const walletAddress = publicKey?.toBase58();
+  const collection = useMemo<CollectionInfo | null>(
+    () => allowlist.find((item) => matchesAllowlistIdentifier(item, collectionAddress)) || null,
+    [allowlist, collectionAddress]
+  );
+  const targetAddresses = useMemo(() => {
+    if (!collection) {
+      return [collectionAddress];
+    }
+
+    const siblingAddresses = allowlist
+      .filter((item) => item.name === collection.name)
+      .map((item) => getAllowlistIdentifier(item))
+      .filter((value): value is string => Boolean(value));
+
+    return siblingAddresses.length ? Array.from(new Set(siblingAddresses)) : [collectionAddress];
+  }, [allowlist, collection, collectionAddress]);
   const collectionIsFeeExempt = isArtifacteExternalFeeExempt({
     collectionAddress,
     collectionName: collection?.name,
@@ -239,6 +245,11 @@ function CollectionPageContent() {
   }
 
   useEffect(() => {
+    if (allowlistLoading) {
+      setLoading(true);
+      return;
+    }
+
     const requestId = ++dataRequestRef.current;
 
     async function loadData() {
@@ -252,36 +263,15 @@ function CollectionPageContent() {
       setLoadingMoreMarketplace(false);
 
       try {
-        const allowlistResponse = await fetch("/api/admin/allowlist");
-        const allowlistPayload = await allowlistResponse.json();
-        const collections = Array.isArray(allowlistPayload.collections)
-          ? allowlistPayload.collections
-          : [];
-
-        const selectedCollection =
-          collections.find((item: any) => item.collectionAddress === collectionAddress) ||
-          null;
-
         if (dataRequestRef.current !== requestId) {
           return;
         }
 
-        setCollection(selectedCollection);
-
-        if (!selectedCollection) {
+        if (!collection) {
           setListings([]);
           setUserNFTs([]);
           return;
         }
-
-        const siblingAddresses: string[] = collections
-          .filter((item: any) => item.name === selectedCollection.name)
-          .map((item: any) => item.collectionAddress)
-          .filter(Boolean);
-
-        const targetAddresses = siblingAddresses.length
-          ? siblingAddresses
-          : [collectionAddress];
 
         const nativeListingsPromise = Promise.all(
           targetAddresses.map((address) =>
@@ -316,8 +306,8 @@ function CollectionPageContent() {
         setUserNFTs(walletAddress ? (ownedNfts as UserNFT[][]).flat() : []);
 
         if (
-          selectedCollection.marketplaces?.magicEden?.symbol ||
-          selectedCollection.marketplaces?.tensor?.slug
+          collection.marketplaces?.magicEden?.symbol ||
+          collection.marketplaces?.tensor?.slug
         ) {
           void loadMarketplaceListings(collectionAddress, true);
         }
@@ -331,7 +321,7 @@ function CollectionPageContent() {
     }
 
     void loadData();
-  }, [collectionAddress, walletAddress]);
+  }, [allowlistLoading, collection, collectionAddress, targetAddresses, walletAddress]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
