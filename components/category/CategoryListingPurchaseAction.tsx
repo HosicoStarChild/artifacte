@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -17,11 +16,6 @@ import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { showToast } from "@/components/ToastContainer";
 
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((module) => module.WalletMultiButton),
-  { ssr: false }
-);
-
 const TOKENS: Record<"USD1" | "USDC", { mint: PublicKey; decimals: number; label: string }> = {
   USD1: { mint: new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"), decimals: 6, label: "USD1" },
   USDC: { mint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), decimals: 6, label: "USDC" },
@@ -33,6 +27,12 @@ type CategoryListingPurchaseActionProps = {
   isDigitalArt?: boolean;
   onPurchased?: (listingId: string, nftAddress?: string) => void;
 };
+
+const primaryButtonClassName =
+  "h-10 w-full rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-dark-900 transition-colors duration-200 hover:bg-gold-600 disabled:opacity-50";
+
+const disabledButtonClassName =
+  "h-10 w-full cursor-not-allowed rounded-lg bg-gray-600/50 px-4 py-2.5 text-sm font-semibold text-gray-400";
 
 function formatListingQuote(amount: number, currency: string): string {
   const formattedAmount = amount.toLocaleString(
@@ -233,7 +233,7 @@ export default function CategoryListingPurchaseAction({
         <button
           onClick={handleBuyNow}
           disabled={buyingId === listing.id}
-          className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
+          className={primaryButtonClassName}
         >
           {buyingId === listing.id ? "Processing..." : "Buy Now"}
         </button>
@@ -241,7 +241,9 @@ export default function CategoryListingPurchaseAction({
     }
 
     return (
-      <WalletMultiButton className="w-full bg-gold-500! hover:bg-gold-600! text-dark-900! rounded-lg! text-sm! font-semibold! h-10! justify-center!" />
+      <button type="button" disabled className={disabledButtonClassName}>
+        Buy Now
+      </button>
     );
   }
 
@@ -261,12 +263,16 @@ export default function CategoryListingPurchaseAction({
       <button
         onClick={handleBuyNow}
         disabled={buyingId === listing.id}
-        className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 disabled:opacity-50 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200"
+        className={primaryButtonClassName}
       >
         {buyingId === listing.id ? "Processing..." : "Buy Now"}
       </button>
     );
   }
 
-  return <WalletMultiButton className="w-full! bg-gold-500! hover:bg-gold-600! rounded-lg! h-10! text-sm! font-semibold!" />;
+  return (
+    <button type="button" disabled className={disabledButtonClassName}>
+      Buy Now
+    </button>
+  );
 }
