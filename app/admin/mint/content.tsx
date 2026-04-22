@@ -1,1 +1,0 @@
-export { MintFormContent } from "./_components/mint-form-content";

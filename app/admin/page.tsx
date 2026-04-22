@@ -30,7 +30,7 @@ import {
   AdminDashboardView,
   type NewWhitelistEntryInput,
 } from "./_components/admin-dashboard-view"
-import { MintFormContent } from "./mint/content"
+import { MintFormContent } from "./_components/mint-form-content"
 
 function getErrorMessage(error: Error) {
   return error.message || "Request failed"
