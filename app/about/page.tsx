@@ -87,19 +87,6 @@ export default function AboutPage() {
           >
             <div className="space-y-8">
               <MetricsGrid metrics={aboutMetrics} />
-
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/apply"
-                  className={cn(
-                    buttonVariants({ size: "lg" }),
-                    "bg-gold-500 px-6 text-dark-900 hover:bg-gold-400"
-                  )}
-                >
-                  Apply to List
-                </Link>
-                
-              </div>
             </div>
           </AboutSection>
         </div>

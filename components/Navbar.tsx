@@ -23,7 +23,6 @@ const navigationLinks = [
   { href: "/my-listings", label: "My Listings", requiresWallet: true },
   { href: "/list", label: "List Item", requiresWallet: true },
   { href: "/agents", label: "Agent Dashboard" },
-  { href: "/apply", label: "Apply to List" },
   { href: "/about", label: "About" },
 ];
 

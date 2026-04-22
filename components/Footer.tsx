@@ -29,7 +29,6 @@ const footerSections: FooterSection[] = [
     title: "Explore",
     links: [
       { href: "/digital-art", label: "Digital Art" },
-      { href: "/apply", label: "Apply to List" },
       {
         href: "https://github.com/HosicoStarChild",
         label: "GitHub",

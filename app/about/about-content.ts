@@ -52,10 +52,6 @@ export const aboutHeroContent = {
     href: "/",
     label: "Back to Home",
   },
-  primaryCta: {
-    href: "/apply",
-    label: "Apply to List",
-  },
   image: {
     src: "/images/digital-collectibles-collage.jpg",
     alt: "Curated collectible assets presented as a premium Artifacte marketplace collage.",
