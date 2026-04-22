@@ -814,7 +814,7 @@ export function AdminDashboardView({
                 value={mintForm.nftName}
               />
               <p className="text-xs text-muted-foreground">
-                {mintNameStatus.byteLength}/{METADATA_BYTE_LIMITS.name} bytes
+                {mintNameStatus.bytes}/{METADATA_BYTE_LIMITS.name} bytes
               </p>
             </div>
 
@@ -827,7 +827,7 @@ export function AdminDashboardView({
                 value={mintForm.nftSymbol}
               />
               <p className="text-xs text-muted-foreground">
-                {mintSymbolStatus.byteLength}/{METADATA_BYTE_LIMITS.symbol} bytes
+                {mintSymbolStatus.bytes}/{METADATA_BYTE_LIMITS.symbol} bytes
               </p>
             </div>
 
