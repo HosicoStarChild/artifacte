@@ -12,44 +12,65 @@ import {
   normalizeMetadataUri,
   sanitizeMetadataSymbol,
 } from "@/lib/nft-metadata";
+import {
+  isSubmissionCategory,
+  isSubmissionStatus,
+  normalizeOptionalSellerWallet,
+  normalizePhotoUrls,
+  normalizeSubmissionText,
+  type Submission,
+  type SubmissionMetadataObject,
+  validateSubmissionFields,
+} from "@/lib/submissions";
 
 const SUBMISSIONS_FILE = path.join(process.cwd(), "data", "submissions.json");
-
-export interface Submission {
-  id: string;
-  name: string;
-  category: "TCG Cards" | "Sports Cards" | "Watches" | "Spirits" | "Digital Art" | "Sealed Product" | "Merchandise";
-  description: string;
-  photos: string[]; // URLs
-  sellerWallet: string;
-  contact: string; // email or telegram
-  status: "pending" | "approved" | "rejected" | "minted" | "delivered";
-  adminNotes?: string;
-  submittedAt: number;
-  reviewedAt?: number;
-  // Minting fields
-  nftName?: string;
-  nftSymbol?: string;
-  nftImageUri?: string;
-  nftMetadata?: Record<string, any>;
-  mintedAt?: number;
-}
 
 interface SubmissionsData {
   submissions: Submission[];
 }
 
-function extractMetadataAttributes(metadata?: Record<string, any>) {
+interface SubmissionRequestBody {
+  name?: string;
+  category?: string;
+  description?: string;
+  photos?: string[];
+  sellerWallet?: string | null;
+  contact?: string;
+}
+
+interface SubmissionPatchBody {
+  id?: string;
+  status?: string;
+  adminNotes?: string;
+  nftName?: string;
+  nftSymbol?: string;
+  nftImageUri?: string;
+  nftMetadata?: SubmissionMetadataObject;
+}
+
+function isMetadataObject(
+  value?: SubmissionMetadataObject[keyof SubmissionMetadataObject] | SubmissionMetadataObject | null
+): value is SubmissionMetadataObject {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function extractMetadataAttributes(metadata?: SubmissionMetadataObject) {
   if (!metadata) {
     return [];
   }
 
   if (Array.isArray(metadata.attributes)) {
     return metadata.attributes
-      .map((attribute: any) => ({
-        trait_type: normalizeMetadataText(attribute?.trait_type),
-        value: normalizeMetadataText(String(attribute?.value ?? "")),
-      }))
+      .flatMap((attribute) => {
+        if (!isMetadataObject(attribute)) {
+          return [];
+        }
+
+        const traitType = normalizeMetadataText(String(attribute.trait_type ?? ""));
+        const value = normalizeMetadataText(String(attribute.value ?? ""));
+
+        return traitType && value ? [{ trait_type: traitType, value }] : [];
+      })
       .filter((attribute) => attribute.trait_type && attribute.value);
   }
 
@@ -112,31 +133,51 @@ export async function GET(req: NextRequest) {
 
 // POST — submit new submission (public)
 export async function POST(req: NextRequest) {
+  let body: SubmissionRequestBody;
+
   try {
-    const body = await req.json();
-    const { name, category, description, photos, sellerWallet, contact } = body;
+    body = (await req.json()) as SubmissionRequestBody;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-    // Validate required fields
-    if (!name || !category || !description || !sellerWallet || !contact) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  try {
+    const name = typeof body.name === "string" ? normalizeSubmissionText(body.name) : "";
+    const category = typeof body.category === "string" ? body.category : "";
+    const description =
+      typeof body.description === "string"
+        ? normalizeSubmissionText(body.description)
+        : "";
+    const photos = Array.isArray(body.photos)
+      ? normalizePhotoUrls(body.photos.filter((photo) => typeof photo === "string"))
+      : [];
+    const sellerWallet =
+      typeof body.sellerWallet === "string"
+        ? normalizeOptionalSellerWallet(body.sellerWallet)
+        : null;
+    const contact =
+      typeof body.contact === "string" ? normalizeSubmissionText(body.contact) : "";
+
+    const validationMessage = validateSubmissionFields({
+      name,
+      category,
+      description,
+      photos,
+      contact,
+    });
+
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
-    // Validate category
-    const validCategories = ["TCG Cards", "Sports Cards", "Watches", "Spirits", "Digital Art", "Sealed Product", "Merchandise"];
-    if (!validCategories.includes(category)) {
+    if (!isSubmissionCategory(category)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400 });
-    }
-
-    // Validate photos array
-    if (!Array.isArray(photos) || photos.length === 0 || photos.length > 5) {
-      return NextResponse.json({ error: "Please provide 1-5 photo URLs" }, { status: 400 });
     }
 
     const data = await readSubmissions();
 
-    // Create submission
     const submission: Submission = {
-      id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `sub-${crypto.randomUUID()}`,
       name,
       category,
       description,
@@ -151,13 +192,24 @@ export async function POST(req: NextRequest) {
     await writeSubmissions(data);
 
     return NextResponse.json({ ok: true, submission }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Submission failed" },
+      { status: 500 }
+    );
   }
 }
 
 // PATCH — update submission status (admin only)
 export async function PATCH(req: NextRequest) {
+  let body: SubmissionPatchBody;
+
+  try {
+    body = (await req.json()) as SubmissionPatchBody;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   try {
     const adminWallet = req.headers.get("x-admin-wallet") || undefined;
     const adminSecretHeader = req.headers.get("x-admin-secret") || undefined;
@@ -166,15 +218,19 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { id, status, adminNotes, nftName, nftSymbol, nftImageUri, nftMetadata } = body;
+    const id = typeof body.id === "string" ? body.id : "";
+    const status = typeof body.status === "string" ? body.status : "";
+    const adminNotes = typeof body.adminNotes === "string" ? body.adminNotes : undefined;
+    const nftName = typeof body.nftName === "string" ? body.nftName : undefined;
+    const nftSymbol = typeof body.nftSymbol === "string" ? body.nftSymbol : undefined;
+    const nftImageUri = typeof body.nftImageUri === "string" ? body.nftImageUri : undefined;
+    const nftMetadata = body.nftMetadata;
 
     if (!id || !status) {
       return NextResponse.json({ error: "Missing id or status" }, { status: 400 });
     }
 
-    const validStatuses = ["pending", "approved", "rejected", "minted", "delivered"];
-    if (!validStatuses.includes(status)) {
+    if (!isSubmissionStatus(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
@@ -186,7 +242,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Update submission
-    submission.status = status as any;
+    submission.status = status;
     submission.reviewedAt = Date.now();
 
     if (adminNotes) {
@@ -206,13 +262,26 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: `NFT symbol must fit within ${METADATA_BYTE_LIMITS.symbol} UTF-8 bytes` }, { status: 400 });
       }
 
-      const nextImageUri = normalizeMetadataUri(nftImageUri || nftMetadata?.image || "");
+      const metadataImage = typeof nftMetadata?.image === "string" ? nftMetadata.image : "";
+      const metadataDescriptionSource =
+        typeof nftMetadata?.description === "string"
+          ? nftMetadata.description
+          : `${submission.category} minted on Artifacte`;
+      const properties = isMetadataObject(nftMetadata?.properties)
+        ? nftMetadata.properties
+        : undefined;
+      const creators = Array.isArray(properties?.creators) ? properties.creators : [];
+      const firstCreator = creators[0];
+
+      const nextImageUri = normalizeMetadataUri(nftImageUri || metadataImage || "");
       const metadataDescription = normalizeMetadataText(
-        String(nftMetadata?.description || `${submission.category} minted on Artifacte`)
+        metadataDescriptionSource
       );
-      const creatorAddress = Array.isArray(nftMetadata?.properties?.creators)
-        ? normalizeMetadataText(String(nftMetadata.properties.creators[0]?.address || ""))
+      const creatorAddress = isMetadataObject(firstCreator)
+        ? normalizeMetadataText(String(firstCreator.address ?? ""))
         : "";
+      const externalUrl =
+        typeof nftMetadata?.external_url === "string" ? nftMetadata.external_url : undefined;
 
       submission.nftName = nextName.value;
       submission.nftSymbol = sanitizeMetadataSymbol(nextSymbolInput);
@@ -224,7 +293,7 @@ export async function PATCH(req: NextRequest) {
         image: nextImageUri,
         attributes: extractMetadataAttributes(nftMetadata),
         creatorAddress,
-        externalUrl: typeof nftMetadata?.external_url === "string" ? nftMetadata.external_url : undefined,
+        externalUrl,
         sellerFeeBasisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
       });
       submission.mintedAt = Date.now();
@@ -233,7 +302,10 @@ export async function PATCH(req: NextRequest) {
     await writeSubmissions(data);
 
     return NextResponse.json({ ok: true, submission });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update submission" },
+      { status: 500 }
+    );
   }
 }
