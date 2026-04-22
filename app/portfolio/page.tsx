@@ -2,10 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, RefreshCcw, Wallet2 } from "lucide-react";
 
+import { NavbarWalletButton } from "@/components/NavbarWalletButton";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,11 +15,6 @@ import { cn } from "@/lib/utils";
 
 import { PortfolioSection } from "./_components/portfolio-section";
 import { PortfolioSummary } from "./_components/portfolio-summary";
-
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
-);
 
 async function fetchPortfolio(wallet: string): Promise<PortfolioPageData> {
   const response = await fetch(`/api/portfolio?wallet=${encodeURIComponent(wallet)}`);
@@ -74,7 +69,7 @@ function PortfolioDisconnectedState() {
             Connect your Solana wallet to view your RWAs and curated digital collectibles.
           </p>
         </div>
-        <WalletMultiButton className="h-11! rounded-lg! bg-gold-500! px-5! text-sm! font-medium! hover:bg-gold-600!" />
+        <NavbarWalletButton />
       </CardContent>
     </Card>
   );
