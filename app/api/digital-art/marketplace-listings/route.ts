@@ -1,38 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
+import { address } from "@solana/kit";
+
 import { getCuratedMarketplaceListings } from "@/app/lib/digital-art-marketplaces";
+
+function parseCollectionAddress(value: string | null): string {
+  if (!value?.trim()) {
+    throw new Error("Missing collection");
+  }
+
+  return `${address(value.trim())}`;
+}
+
+function parseLimit(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error("Invalid limit");
+  }
+
+  return parsed;
+}
 
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const collectionAddress = searchParams.get("collection");
+    const collectionAddress = parseCollectionAddress(searchParams.get("collection"));
     const cursor = searchParams.get("cursor");
-    const limitParam = searchParams.get("limit");
-
-    if (!collectionAddress) {
-      return NextResponse.json(
-        { ok: false, error: "Missing collection" },
-        { status: 400 }
-      );
-    }
-
-    const limit = limitParam ? Number(limitParam) : undefined;
+    const limit = parseLimit(searchParams.get("limit"));
     const result = await getCuratedMarketplaceListings({
       collectionAddress,
       cursor,
-      limit: Number.isFinite(limit) ? limit : undefined,
+      limit,
     });
 
     return NextResponse.json({
       ok: true,
       ...result,
     });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch marketplace listings";
+    const status = message.startsWith("Missing") || message.startsWith("Invalid") ? 400 : 500;
+
     return NextResponse.json(
       {
         ok: false,
-        error: error?.message || "Failed to fetch marketplace listings",
+        error: message,
       },
-      { status: 500 }
+      { status }
     );
   }
 }

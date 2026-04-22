@@ -1,0 +1,416 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+
+import { HomeImage } from "@/components/home/HomeImage";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { DigitalArtCollectionDetails } from "@/app/digital-art/_lib/server-data";
+import type {
+  ExternalMarketplaceListing,
+  MarketplaceSource,
+} from "@/app/lib/digital-art-marketplaces";
+
+type MarketplaceSortOrder =
+  | "price_asc"
+  | "price_desc"
+  | "recently_listed"
+  | "common_to_rare"
+  | "rare_to_common";
+
+interface MarketplaceSourceCounts {
+  magiceden: number | null;
+  tensor: number | null;
+}
+
+interface MarketplaceListingsResponse {
+  error?: string;
+  hasMore: boolean;
+  listings: ExternalMarketplaceListing[];
+  nextCursor: string | null;
+  ok: boolean;
+  sourceCounts?: MarketplaceSourceCounts;
+}
+
+interface CollectionMarketplaceSectionProps {
+  collection: DigitalArtCollectionDetails;
+  initialHasMore: boolean;
+  initialListings: ExternalMarketplaceListing[];
+  initialNextCursor: string | null;
+  initialSourceCounts: MarketplaceSourceCounts | null;
+}
+
+const SORT_LABELS: Record<MarketplaceSortOrder, string> = {
+  common_to_rare: "Common to Rare",
+  price_asc: "Price: Low to High",
+  price_desc: "Price: High to Low",
+  rare_to_common: "Rare to Common",
+  recently_listed: "Recently Listed",
+};
+
+function dedupeListings(
+  listings: readonly ExternalMarketplaceListing[]
+): ExternalMarketplaceListing[] {
+  const seenIds = new Set<string>();
+
+  return listings.filter((listing) => {
+    if (seenIds.has(listing.id)) {
+      return false;
+    }
+
+    seenIds.add(listing.id);
+    return true;
+  });
+}
+
+function formatMarketplaceSource(source: MarketplaceSource): string {
+  return source === "magiceden" ? "Magic Eden" : "Tensor";
+}
+
+function formatMarketplacePrice(
+  price: number,
+  currencySymbol: string
+): string {
+  if (currencySymbol === "SOL") {
+    return `◎ ${price.toLocaleString(undefined, {
+      maximumFractionDigits: 4,
+      minimumFractionDigits: price < 1 ? 2 : 0,
+    })}`;
+  }
+
+  return `${price.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  })} ${currencySymbol}`;
+}
+
+function formatListedAt(listedAt?: number): string | null {
+  if (!listedAt) {
+    return null;
+  }
+
+  const diff = Date.now() - listedAt;
+  if (diff < 60_000) {
+    return "just now";
+  }
+  if (diff < 3_600_000) {
+    return `${Math.floor(diff / 60_000)}m ago`;
+  }
+  if (diff < 86_400_000) {
+    return `${Math.floor(diff / 3_600_000)}h ago`;
+  }
+
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+function isMarketplaceSortOrder(value: string): value is MarketplaceSortOrder {
+  return value in SORT_LABELS;
+}
+
+function MarketplaceEmptyState({ message, title }: { message: string; title: string }) {
+  return (
+    <Card className="border-white/10 bg-dark-800/85 py-0">
+      <CardContent className="px-6 py-14 text-center">
+        <h3 className="font-serif text-xl text-white">{title}</h3>
+        <p className="mx-auto mt-3 max-w-md text-sm text-white/55">{message}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MarketplaceLoadingGrid() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+      {Array.from({ length: 16 }).map((_, index) => (
+        <Skeleton key={index} className="aspect-4/5 rounded-xl bg-white/8" />
+      ))}
+    </div>
+  );
+}
+
+export function CollectionMarketplaceSection({
+  collection,
+  initialHasMore,
+  initialListings,
+  initialNextCursor,
+  initialSourceCounts,
+}: CollectionMarketplaceSectionProps) {
+  const availableSources: MarketplaceSource[] = [
+    ...(collection.hasTensor ? (["tensor"] as const) : []),
+    ...(collection.hasMagicEden ? (["magiceden"] as const) : []),
+  ];
+  const defaultSource = availableSources[0] ?? "tensor";
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const [marketplaceListings, setMarketplaceListings] = useState(initialListings);
+  const [marketplaceNextCursor, setMarketplaceNextCursor] = useState(initialNextCursor);
+  const [hasMoreMarketplace, setHasMoreMarketplace] = useState(initialHasMore);
+  const [marketplaceSourceCounts, setMarketplaceSourceCounts] = useState(initialSourceCounts);
+  const [marketplaceError, setMarketplaceError] = useState("");
+  const [loadingMarketplace, setLoadingMarketplace] = useState(false);
+  const [loadingMoreMarketplace, setLoadingMoreMarketplace] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<MarketplaceSource>(defaultSource);
+  const [sortOrder, setSortOrder] = useState<MarketplaceSortOrder>("price_asc");
+
+  const filteredListings = useMemo(() => {
+    const baseListings = marketplaceListings
+      .filter((listing) => listing.source === sourceFilter)
+      .filter((listing) => listing.price > 0);
+
+    return [...baseListings].sort((left, right) => {
+      switch (sortOrder) {
+        case "price_asc":
+          return left.price - right.price;
+        case "price_desc":
+          return right.price - left.price;
+        case "recently_listed":
+          return (right.listedAt ?? 0) - (left.listedAt ?? 0);
+        case "common_to_rare":
+          return left.price - right.price;
+        case "rare_to_common":
+          return right.price - left.price;
+      }
+    });
+  }, [marketplaceListings, sortOrder, sourceFilter]);
+
+  async function loadMarketplaceListings(reset: boolean): Promise<void> {
+    if (reset) {
+      setMarketplaceError("");
+      setLoadingMarketplace(true);
+    } else {
+      setLoadingMoreMarketplace(true);
+    }
+
+    try {
+      const searchParams = new URLSearchParams({
+        collection: collection.collectionAddress,
+        limit: "32",
+      });
+
+      const cursor = reset ? null : marketplaceNextCursor;
+      if (cursor) {
+        searchParams.set("cursor", cursor);
+      }
+
+      const response = await fetch(
+        `/api/digital-art/marketplace-listings?${searchParams.toString()}`
+      );
+      const payload = (await response.json()) as MarketplaceListingsResponse;
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Failed to load marketplace listings");
+      }
+
+      const nextListings = Array.isArray(payload.listings) ? payload.listings : [];
+
+      setMarketplaceListings((previous) =>
+        dedupeListings(reset ? nextListings : [...previous, ...nextListings])
+      );
+      setMarketplaceNextCursor(payload.nextCursor ?? null);
+      setHasMoreMarketplace(payload.hasMore);
+      if (payload.sourceCounts) {
+        setMarketplaceSourceCounts(payload.sourceCounts);
+      }
+    } catch (error) {
+      setMarketplaceError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load marketplace listings"
+      );
+    } finally {
+      setLoadingMarketplace(false);
+      setLoadingMoreMarketplace(false);
+    }
+  }
+
+  const loadMoreMarketplaceListings = useEffectEvent(async () => {
+    await loadMarketplaceListings(false);
+  });
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMoreMarketplace || loadingMoreMarketplace) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMoreMarketplaceListings();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreMarketplace, loadingMoreMarketplace]);
+
+  if (!collection.hasMarketplaceConfig) {
+    return (
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="font-serif text-2xl text-white">Marketplace Listings</h2>
+          <p className="max-w-2xl text-sm text-white/55">
+            Curated external listings from Tensor and Magic Eden for this collection.
+          </p>
+        </div>
+        <MarketplaceEmptyState
+          title="Marketplace support coming soon"
+          message="This curated collection is visible on Artifacte, but external marketplace identifiers are not configured yet."
+        />
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <h2 className="font-serif text-2xl text-white">Marketplace Listings</h2>
+          <p className="max-w-2xl text-sm text-white/55">
+            Curated external listings from Tensor and Magic Eden for this collection.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-wrap gap-2">
+            {availableSources.map((source) => (
+              <Button
+                key={source}
+                onClick={() => setSourceFilter(source)}
+                size="sm"
+                variant={sourceFilter === source ? "secondary" : "outline"}
+                className={
+                  sourceFilter === source
+                    ? "bg-gold-500 text-dark-900 hover:bg-gold-500/90"
+                    : "border-white/15 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+                }
+              >
+                {formatMarketplaceSource(source)}
+                {marketplaceSourceCounts?.[source] ? ` (${marketplaceSourceCounts[source]})` : ""}
+              </Button>
+            ))}
+          </div>
+
+          <Select
+            onValueChange={(value) => {
+              if (value && isMarketplaceSortOrder(value)) {
+                setSortOrder(value);
+              }
+            }}
+            value={sortOrder}
+          >
+            <SelectTrigger className="border-white/15 bg-dark-800 text-white" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="border border-white/10 bg-dark-800 text-white">
+              {Object.entries(SORT_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {loadingMarketplace && marketplaceListings.length === 0 ? <MarketplaceLoadingGrid /> : null}
+
+      {marketplaceError && marketplaceListings.length === 0 ? (
+        <Card className="border-red-500/20 bg-dark-800/85 py-0">
+          <CardContent className="space-y-4 px-6 py-8 text-center">
+            <div className="space-y-2">
+              <h3 className="font-serif text-xl text-white">Marketplace listings unavailable</h3>
+              <p className="text-sm text-red-200/80">{marketplaceError}</p>
+            </div>
+            <Button
+              onClick={() => {
+                void loadMarketplaceListings(true);
+              }}
+              className="bg-gold-500 text-dark-900 hover:bg-gold-500/90"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!loadingMarketplace && !marketplaceError && filteredListings.length === 0 ? (
+        <MarketplaceEmptyState
+          title="No external listings right now"
+          message={`No listings found on ${formatMarketplaceSource(sourceFilter)} for this collection.`}
+        />
+      ) : null}
+
+      {filteredListings.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+            {filteredListings.map((listing) => {
+              const listedAt = formatListedAt(listing.listedAt);
+
+              return (
+                <Link
+                  key={listing.id}
+                  href={`/digital-art/auction/${listing.mint}?source=${listing.source}&collection=${collection.collectionAddress}`}
+                  className="group block h-full"
+                >
+                  <Card className="h-full gap-0 overflow-hidden border-white/5 bg-dark-800/90 py-0 transition duration-200 hover:border-gold-500/30 hover:bg-dark-800">
+                    <div className="relative aspect-square overflow-hidden bg-dark-900">
+                      <HomeImage
+                        src={listing.image}
+                        alt={listing.name}
+                        sizes="(max-width: 768px) 50vw, (max-width: 1280px) 20vw, 12vw"
+                        className="group-hover:scale-105"
+                      />
+                      <Badge className="absolute left-2 top-2 border-white/10 bg-dark-900/90 text-white">
+                        {formatMarketplaceSource(listing.source)}
+                      </Badge>
+                      <Badge className="absolute right-2 top-2 border-emerald-500/20 bg-emerald-500/15 text-emerald-200">
+                        Buy Now
+                      </Badge>
+                    </div>
+
+                    <CardContent className="space-y-2 px-3 py-3">
+                      <p className="truncate text-sm font-semibold text-white">{listing.name}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/40">Price</p>
+                          <p className="mt-1 text-sm font-semibold text-white">
+                            {formatMarketplacePrice(listing.price, listing.currencySymbol)}
+                          </p>
+                        </div>
+                        <Badge className="border-white/10 bg-white/5 text-white/75">
+                          {listing.currencySymbol}
+                        </Badge>
+                      </div>
+                      {listedAt ? (
+                        <p className="text-xs text-white/40">Listed {listedAt}</p>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+
+          <div ref={sentinelRef} className="flex justify-center pt-2">
+            {loadingMoreMarketplace ? (
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-gold-500" />
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
