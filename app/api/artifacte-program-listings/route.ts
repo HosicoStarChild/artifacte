@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { loadActiveArtifacteFixedPriceListings } from "@/lib/artifacte-listings";
 
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=120" },
     });
   } catch (error) {
+    unstable_rethrow(error);
     console.error("[artifacte-program-listings] error:", error);
     return NextResponse.json({ listings: [], total: 0, error: "Failed to fetch listings" }, { status: 500 });
   }

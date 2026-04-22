@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 import { address } from "@solana/kit";
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
+    unstable_rethrow(error);
     const message = error instanceof Error ? error.message : "Failed to fetch NFTs";
     const status = message.startsWith("Missing") || message.startsWith("Invalid") ? 400 : 500;
 

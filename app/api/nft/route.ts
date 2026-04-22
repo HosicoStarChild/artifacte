@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    unstable_rethrow(error);
     const message = error instanceof Error ? error.message : "Failed to fetch NFT metadata.";
     console.error("[nft]", message);
     return jsonError(message, 500);

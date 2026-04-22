@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 import { address } from "@solana/kit";
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
       total: listings.length,
     });
   } catch (error) {
+    unstable_rethrow(error);
     const message = error instanceof Error ? error.message : "Failed to fetch listings";
     const status = message.startsWith("Invalid") ? 400 : 500;
 

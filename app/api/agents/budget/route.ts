@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { getTypedBudgetStatus } from "@/app/lib/api-keys";
 import {
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
       ...status,
     });
   } catch (error) {
+    unstable_rethrow(error)
     console.error("Failed to get budget status:", error);
     return toAgentOwnerRequestErrorResponse(error as Error, "Failed to get budget status")
   }
