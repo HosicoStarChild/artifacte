@@ -1,37 +1,6 @@
-export type TermsBlock =
-  | {
-      readonly type: "paragraph";
-      readonly text: string;
-    }
-  | {
-      readonly type: "list";
-      readonly intro?: string;
-      readonly items: readonly string[];
-    }
-  | {
-      readonly type: "callout";
-      readonly title: string;
-      readonly text: string;
-      readonly tone: "accent";
-    }
-  | {
-      readonly type: "emphasis";
-      readonly text: string;
-    }
-  | {
-      readonly type: "externalLink";
-      readonly text: string;
-      readonly href: string;
-      readonly label: string;
-      readonly suffix?: string;
-    };
+import type { LegalPageContent, LegalSection } from "@/app/legal/legal-types";
 
-export interface TermsSection {
-  readonly id: string;
-  readonly number: number;
-  readonly title: string;
-  readonly blocks: readonly TermsBlock[];
-}
+export type TermsSection = LegalSection;
 
 export const TERMS_LAST_UPDATED = "April 14, 2026";
 
@@ -215,3 +184,23 @@ export const TERMS_SECTIONS = [
     ],
   },
 ] as const satisfies readonly TermsSection[];
+
+export const TERMS_PAGE_CONTENT = {
+  title: "Terms of Service",
+  summary:
+    "Review the terms that govern access to Artifacte, wallet usage, listings, fees, and trading activity across tokenized real-world assets on Solana.",
+  highlights: TERMS_HIGHLIGHTS,
+  lastUpdated: TERMS_LAST_UPDATED,
+  overviewTitle: "Platform Terms",
+  overviewDescription:
+    "These terms describe your responsibilities when using Artifacte, especially when connecting a wallet, listing or purchasing assets, and relying on marketplace information.",
+  sectionsNavLabel: "Terms of service sections",
+  sectionsNavDescription: "Jump directly to a section of the terms.",
+  companionLink: {
+    href: "/privacy",
+    label: "Privacy Policy",
+  },
+  footerNote:
+    "Continued use of Artifacte after terms updates constitutes acceptance of the revised terms.",
+  sections: TERMS_SECTIONS,
+} as const satisfies LegalPageContent;
