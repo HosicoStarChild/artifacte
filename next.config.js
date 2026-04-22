@@ -20,6 +20,18 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'picsum.photos',
       },
+      {
+        protocol: 'https',
+        hostname: 'arweave.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'gateway.irys.xyz',
+      },
+      {
+        protocol: 'https',
+        hostname: 'd1xpxki1g4htqu.cloudfront.net',
+      },
     ],
   },
   async headers() {

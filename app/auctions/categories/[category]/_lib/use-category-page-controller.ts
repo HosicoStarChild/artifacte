@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   auctions,
@@ -71,10 +71,56 @@ type CategoryPageController = {
 type CategoryPageInitialState = {
   currencyFilter: CategoryCurrencyFilter;
   filters: CategoryFilters;
+  loaded: boolean;
   page: number;
   searchInput: string;
   sortBy: CategorySort;
 };
+
+type CategoryPageStateStore = {
+  getSnapshot: () => CategoryPageInitialState;
+  setState: (
+    nextState:
+      | CategoryPageInitialState
+      | ((currentState: CategoryPageInitialState) => CategoryPageInitialState)
+  ) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+function getDefaultControllerState(initialCcCategoryParam: string | null): CategoryPageInitialState {
+  return {
+    currencyFilter: "All",
+    filters: initialCcCategoryParam
+      ? { tcg: mapCcCategoryToFilterValue(initialCcCategoryParam) }
+      : {},
+    loaded: false,
+    page: 1,
+    searchInput: "",
+    sortBy: "default",
+  };
+}
+
+function createCategoryPageStateStore(initialState: CategoryPageInitialState): CategoryPageStateStore {
+  let state = initialState;
+  const listeners = new Set<() => void>();
+
+  return {
+    getSnapshot() {
+      return state;
+    },
+    setState(nextState) {
+      state = typeof nextState === "function" ? nextState(state) : nextState;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
 
 function applyClientSideListingFilters(
   listings: CategoryMarketplaceListing[],
@@ -190,6 +236,7 @@ function readInitialControllerState(
   return {
     currencyFilter: normalizeCategoryCurrencyFilter(storage?.getItem(`${storageKey}-currency`) ?? null),
     filters,
+    loaded: true,
     page,
     searchInput: storage?.getItem(`${storageKey}-search`) ?? "",
     sortBy: normalizeCategorySort(storage?.getItem(`${storageKey}-sort`) ?? null),
@@ -204,28 +251,35 @@ export function useCategoryPageController(
   const storageKey = `artifacte-filters-${categorySlug}`;
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listingsRequestRef = useRef(0);
-  const initialState = readInitialControllerState(storageKey, initialCcCategoryParam);
+  const defaultState = getDefaultControllerState(initialCcCategoryParam);
+  const [controllerStateStore] = useState(() => createCategoryPageStateStore(defaultState));
+  const { currencyFilter, filters, loaded, page, searchInput, sortBy } = useSyncExternalStore(
+    controllerStateStore.subscribe,
+    controllerStateStore.getSnapshot,
+    controllerStateStore.getSnapshot,
+  );
 
   const [tab, setTab] = useState<CategoryRouteTab>("fixed");
-  const [filters, setFilters] = useState<CategoryFilters>(() => initialState.filters);
-  const [page, setPage] = useState(() => initialState.page);
-  const [currencyFilter, setCurrencyFilter] = useState<CategoryCurrencyFilter>(() => initialState.currencyFilter);
-  const [sortBy, setSortBy] = useState<CategorySort>(() => initialState.sortBy);
-  const [searchInput, setSearchInput] = useState(() => initialState.searchInput);
   const [marketplaceListings, setMarketplaceListings] = useState<CategoryMarketplaceListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [listingsFilterLoading, setListingsFilterLoading] = useState(false);
   const [marketplaceTotal, setMarketplaceTotal] = useState(0);
 
-  const hydrated = true;
-
   useEffect(() => {
+    if (!loaded) {
+      return;
+    }
+
     sessionStorage.setItem(storageKey, JSON.stringify(filters));
     sessionStorage.setItem(`${storageKey}-page`, String(page));
     sessionStorage.setItem(`${storageKey}-currency`, currencyFilter);
     sessionStorage.setItem(`${storageKey}-sort`, sortBy);
     sessionStorage.setItem(`${storageKey}-search`, searchInput);
-  }, [currencyFilter, filters, page, searchInput, sortBy, storageKey]);
+  }, [currencyFilter, filters, loaded, page, searchInput, sortBy, storageKey]);
+
+  useEffect(() => {
+    controllerStateStore.setState(readInitialControllerState(storageKey, initialCcCategoryParam));
+  }, [controllerStateStore, initialCcCategoryParam, storageKey]);
 
   useEffect(() => {
     return () => {
@@ -353,21 +407,30 @@ export function useCategoryPageController(
 
   function clearFilters() {
     beginListingsRefresh();
-    setFilters({});
-    setSearchInput("");
-    setPage(1);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      filters: {},
+      page: 1,
+      searchInput: "",
+    }));
   }
 
   function onCurrencyFilterChange(value: CategoryCurrencyFilter) {
     beginListingsRefresh();
-    setCurrencyFilter(value);
-    setPage(1);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      currencyFilter: value,
+      page: 1,
+    }));
   }
 
   function onFilterChange(key: CategorySelectableFilterKey, value: string) {
     beginListingsRefresh();
-    setFilters((currentFilters) => setFilterValue(currentFilters, key, value));
-    setPage(1);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      filters: setFilterValue(currentState.filters, key, value),
+      page: 1,
+    }));
   }
 
   function onListingPurchased(listingId: string, nftAddress?: string) {
@@ -383,11 +446,17 @@ export function useCategoryPageController(
 
   function onPageChange(nextPage: number) {
     beginListingsRefresh();
-    setPage(nextPage);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      page: nextPage,
+    }));
   }
 
   function onSearchChange(value: string) {
-    setSearchInput(value);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      searchInput: value,
+    }));
 
     if (searchTimer.current) {
       clearTimeout(searchTimer.current);
@@ -395,15 +464,21 @@ export function useCategoryPageController(
 
     searchTimer.current = setTimeout(() => {
       beginListingsRefresh();
-      setFilters((currentFilters) => setFilterValue(currentFilters, "search", value));
-      setPage(1);
+      controllerStateStore.setState((currentState) => ({
+        ...currentState,
+        filters: setFilterValue(currentState.filters, "search", value),
+        page: 1,
+      }));
     }, 400);
   }
 
   function onSortChange(value: CategorySort) {
     beginListingsRefresh();
-    setSortBy(value);
-    setPage(1);
+    controllerStateStore.setState((currentState) => ({
+      ...currentState,
+      page: 1,
+      sortBy: value,
+    }));
   }
 
   function onTabChange(nextTab: CategoryRouteTab) {
@@ -420,7 +495,7 @@ export function useCategoryPageController(
     filters,
     fixedListings,
     hasActiveFilters,
-    hydrated,
+    hydrated: loaded,
     isDigitalArt,
     listingsFilterLoading,
     listingsLoading,

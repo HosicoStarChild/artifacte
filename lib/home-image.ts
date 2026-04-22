@@ -1,4 +1,10 @@
-const DIRECT_IMAGE_HOSTS = new Set(["images.unsplash.com", "picsum.photos"]);
+const DIRECT_IMAGE_HOSTS = new Set([
+  "images.unsplash.com",
+  "picsum.photos",
+  "arweave.net",
+  "gateway.irys.xyz",
+  "d1xpxki1g4htqu.cloudfront.net",
+]);
 
 export function resolveHomeImageSrc(src: string | undefined): string | null {
   if (!src) {

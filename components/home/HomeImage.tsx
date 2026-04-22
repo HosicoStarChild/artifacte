@@ -26,12 +26,15 @@ export function HomeImage({
     return <div className="absolute inset-0 bg-dark-900" aria-hidden="true" />;
   }
 
+  const unoptimized = resolvedSrc.startsWith("http://") || resolvedSrc.startsWith("https://");
+
   return (
     <Image
       src={resolvedSrc}
       alt={alt}
       fill
       priority={priority}
+      unoptimized={unoptimized}
       sizes={sizes}
       className={cn(
         "absolute inset-0 h-full w-full transition-transform duration-500",

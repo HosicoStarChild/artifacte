@@ -28,6 +28,7 @@ type MarketplaceListingCardProps = {
   sourceBadge?: MarketplaceListingCardBadge;
   action?: ReactNode;
   imageFit?: "contain" | "cover";
+  imageLoading?: "lazy" | "eager";
   imageSizes?: string;
   className?: string;
 };
@@ -47,10 +48,12 @@ export function MarketplaceListingCard({
   sourceBadge,
   action,
   imageFit = "cover",
+  imageLoading = "lazy",
   imageSizes = "(max-width: 768px) 100vw, 288px",
   className,
 }: MarketplaceListingCardProps) {
   const resolvedImageSrc = resolveHomeImageSrc(imageSrc) ?? "/placeholder-card.svg";
+  const unoptimized = resolvedImageSrc.startsWith("http://") || resolvedImageSrc.startsWith("https://");
 
   const content = (
     <>
@@ -59,6 +62,8 @@ export function MarketplaceListingCard({
           src={resolvedImageSrc}
           alt={imageAlt}
           fill
+          loading={imageLoading}
+          unoptimized={unoptimized}
           sizes={imageSizes}
           className={cn(
             "absolute inset-0 h-full w-full transition-transform duration-500 group-hover:scale-105",

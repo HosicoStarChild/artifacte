@@ -185,7 +185,7 @@ export function CategoryListingsSection({
       />
 
       <div className={`grid grid-cols-1 gap-8 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3 ${listingsFilterLoading ? "opacity-40" : "opacity-100"}`}>
-        {fixedListings.map((listing) => {
+        {fixedListings.map((listing, index) => {
           const purchaseCurrency = getListingPurchaseCurrency(listing);
           const displayPrice = resolveListingDisplayPrice(listing);
           const totalDisplayPrice = getExternalMarketplaceTotalPrice(displayPrice.amount, {
@@ -216,6 +216,7 @@ export function CategoryListingsSection({
               currencyLabel={isDigitalArt ? "SOL" : displayPrice.currency}
               sourceBadge={getListingSourceBadge(listing)}
               imageFit={getListingImageFit(listing)}
+              imageLoading={index < 3 ? "eager" : "lazy"}
               imageSizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               action={
                 <CategoryListingPurchaseAction
