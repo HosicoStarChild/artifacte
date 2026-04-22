@@ -21,7 +21,6 @@ const footerSections: FooterSection[] = [
   {
     title: "Platform",
     links: [
-      { href: "/auctions", label: "Auctions" },
       { href: "/about", label: "About" },
       { href: "/agents", label: "Agents" },
     ],

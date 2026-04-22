@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 const popularLinks = [
-  { href: "/auctions", label: "Auctions" },
   { href: "/digital-art", label: "Digital Art" },
   { href: "/about", label: "About" },
   { href: "/portfolio", label: "Portfolio" },
@@ -52,15 +51,6 @@ export default function NotFound() {
               )}
             >
               Back to Home
-            </Link>
-            <Link
-              href="/auctions"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "border-gold-500/30 bg-transparent px-8 text-gold-500 hover:bg-gold-500/10 hover:text-gold-400 dark:border-gold-500/30 dark:bg-transparent dark:hover:bg-gold-500/10"
-              )}
-            >
-              Browse Marketplace
             </Link>
           </div>
 
