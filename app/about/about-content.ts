@@ -15,6 +15,25 @@ export type AboutHeroHighlight = Readonly<{
   description: string
 }>
 
+export type AboutHeroLink = Readonly<{
+  href: string
+  label: string
+}>
+
+export type AboutHeroImage = Readonly<{
+  src: string
+  alt: string
+}>
+
+export type AboutHeroContent = Readonly<{
+  eyebrow: string
+  title: string
+  description: string
+  backLink: AboutHeroLink
+  primaryCta?: AboutHeroLink
+  image: AboutHeroImage
+}>
+
 export type MissionPoint = Readonly<{
   id: string
   title: string
@@ -43,7 +62,7 @@ export type PlatformMetric = Readonly<{
   description: string
 }>
 
-export const aboutHeroContent = {
+export const aboutHeroContent: AboutHeroContent = {
   eyebrow: "About Artifacte",
   title: "Curating authenticated assets for transparent digital ownership.",
   description:
@@ -56,7 +75,7 @@ export const aboutHeroContent = {
     src: "/images/digital-collectibles-collage.jpg",
     alt: "Curated collectible assets presented as a premium Artifacte marketplace collage.",
   },
-} as const
+}
 
 export const aboutHeroHighlights: readonly AboutHeroHighlight[] = [
   {

@@ -45,16 +45,18 @@ export function AboutHero() {
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 {aboutHeroContent.backLink.label}
               </Link>
-              <Link
-                href={aboutHeroContent.primaryCta.href}
-                className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "bg-gold-500 px-6 text-dark-900 hover:bg-gold-400"
-                )}
-              >
-                {aboutHeroContent.primaryCta.label}
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
+              {aboutHeroContent.primaryCta ? (
+                <Link
+                  href={aboutHeroContent.primaryCta.href}
+                  className={cn(
+                    buttonVariants({ size: "lg" }),
+                    "bg-gold-500 px-6 text-dark-900 hover:bg-gold-400"
+                  )}
+                >
+                  {aboutHeroContent.primaryCta.label}
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              ) : null}
             </div>
           </div>
 
