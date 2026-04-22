@@ -1,36 +1,84 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+import {
+  createBase64VersionedTransaction,
+  createTensorPseudoSigner,
+  ensureHeliusRpcUrl,
+  parseTensorBuildRequest,
+  reinterpret,
+  waitForWeb3Confirmation,
+  type TensorBuildRequestBody,
+  type TensorInstructionLike,
+} from '@/app/api/_lib/list-route-utils';
+
+interface TensorCompressedInstructionInput {
+  amount: bigint;
+  canopyDepth: number;
+  creatorHash: Uint8Array;
+  currency?: string;
+  dataHash: Uint8Array;
+  index: number;
+  listState: string;
+  merkleTree: string;
+  owner: ReturnType<typeof createTensorPseudoSigner>;
+  proof: string[];
+  rentPayer: ReturnType<typeof createTensorPseudoSigner>;
+  root: Uint8Array;
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const { mint, owner, amount, currency } = await request.json();
-    if (!mint || !owner || !amount) {
-      return NextResponse.json({ error: 'Missing mint, owner, or amount' }, { status: 400 });
-    }
+    const { amount, currency, mint, owner } = parseTensorBuildRequest(
+      (await request.json()) as Partial<TensorBuildRequestBody>
+    );
 
-    const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+    const heliusRpc = ensureHeliusRpcUrl();
     const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
     // Dynamic imports for Tensor SDK (uses @solana/web3.js v2 internally)
-    const { getListCompressedInstructionAsync, findListStatePda } = await import('@tensor-foundation/marketplace');
-    const { retrieveAssetFields, retrieveProofFields, getCNFTArgs } = await import('@tensor-foundation/common-helpers');
+    const marketplace = await import('@tensor-foundation/marketplace');
+    const { findListStatePda } = marketplace;
+    const getListCompressedInstructionAsync = reinterpret<
+      (input: TensorCompressedInstructionInput) => Promise<TensorInstructionLike>,
+      typeof marketplace.getListCompressedInstructionAsync
+    >(marketplace.getListCompressedInstructionAsync);
+    const commonHelpers = await import('@tensor-foundation/common-helpers');
+    const { retrieveAssetFields, retrieveProofFields } = commonHelpers;
+    const getCNFTArgs = reinterpret<(
+      rpc: ReturnType<typeof createSolanaRpc>,
+      mintAddress: string,
+      assetFields: Awaited<ReturnType<typeof retrieveAssetFields>>,
+      proofFields: Awaited<ReturnType<typeof retrieveProofFields>>
+    ) => Promise<{
+      creatorHash: Uint8Array;
+      dataHash: Uint8Array;
+      index: number;
+      merkleTree: string;
+      root: Uint8Array;
+    }>, typeof commonHelpers.getCNFTArgs>(commonHelpers.getCNFTArgs);
     const { createSolanaRpc, address } = await import('@solana/kit');
 
-    const rpc = createSolanaRpc(HELIUS_RPC) as any;
+    const rpc = reinterpret<Parameters<typeof getCNFTArgs>[0], ReturnType<typeof createSolanaRpc>>(
+      createSolanaRpc(heliusRpc)
+    );
 
-    const ownerAddress = address(owner);
-    const fakeSigner = { address: ownerAddress, signTransactions: async () => [] };
+    const fakeSigner = createTensorPseudoSigner(owner);
 
     const [assetFields, proofFields] = await Promise.all([
-      retrieveAssetFields(HELIUS_RPC, mint),
-      retrieveProofFields(HELIUS_RPC, mint),
+      retrieveAssetFields(heliusRpc, mint),
+      retrieveProofFields(heliusRpc, mint),
     ]);
 
     const cnftArgs = await getCNFTArgs(rpc, mint, assetFields, proofFields);
-    const [listStatePda] = await findListStatePda({ mint: address(mint) });
+    const [listStatePda] = await findListStatePda({
+      mint: reinterpret<Parameters<typeof findListStatePda>[0]["mint"], ReturnType<typeof address>>(
+        address(mint)
+      ),
+    });
 
     const trimmedProof = proofFields.proof.map((p: string) => address(p));
 
-    const listIx = await (getListCompressedInstructionAsync as any)({
+    const listIx = await getListCompressedInstructionAsync({
       merkleTree: cnftArgs.merkleTree,
       listState: listStatePda,
       owner: fakeSigner,
@@ -45,30 +93,10 @@ export async function POST(request: Request) {
       canopyDepth: 0,
     });
 
-    const {
-      PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
-      ComputeBudgetProgram, Connection: SolConnection,
-      AddressLookupTableProgram, Transaction, Keypair,
-    } = await import('@solana/web3.js');
+    const { PublicKey, Connection: SolConnection, AddressLookupTableProgram, Transaction, Keypair } = await import('@solana/web3.js');
 
-    const conn = new SolConnection(HELIUS_RPC, 'confirmed');
+    const conn = new SolConnection(heliusRpc, 'confirmed');
     const ownerPk = new PublicKey(owner);
-
-    const v1Keys = listIx.accounts.map((acct: any) => {
-      const addr = typeof acct.address === 'object' && acct.address.address
-        ? acct.address.address : String(acct.address);
-      return {
-        pubkey: new PublicKey(addr),
-        isSigner: acct.role >= 2,
-        isWritable: acct.role === 1 || acct.role === 3,
-      };
-    });
-
-    const v1Ix = new TransactionInstruction({
-      programId: new PublicKey(listIx.programAddress),
-      keys: v1Keys,
-      data: Buffer.from(listIx.data),
-    });
 
     // Phygitals' program ALT (covers all Tensor/Bubblegum/compression programs)
     const PROGRAM_ALT = new PublicKey('4NYENhRXdSq1ek7mvJyzMUvdn2aN3JeAr6huzfL7869j');
@@ -103,12 +131,7 @@ export async function POST(request: Request) {
     altTx.sign(authority);
     const altSig = await conn.sendRawTransaction(altTx.serialize(), { skipPreflight: true });
 
-    // Poll for ALT tx confirmation (avoids WebSocket issues in Next.js server)
-    for (let i = 0; i < 30; i++) {
-      const status = await conn.getSignatureStatuses([altSig]);
-      if (status.value[0]?.confirmationStatus === 'confirmed' || status.value[0]?.confirmationStatus === 'finalized') break;
-      await new Promise(r => setTimeout(r, 500));
-    }
+    await waitForWeb3Confirmation(conn, altSig);
 
     // Wait for ALT to activate (~800ms)
     await new Promise(r => setTimeout(r, 800));
@@ -120,28 +143,28 @@ export async function POST(request: Request) {
       conn.getLatestBlockhash('confirmed'),
     ]);
 
-    const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
-    const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
-    const msg = new TransactionMessage({
-      payerKey: ownerPk,
-      recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix],
-    }).compileToV0Message(alts);
-
-    const tx = new VersionedTransaction(msg);
-    const size = tx.serialize().length;
+    const alts = [programAlt.value, proofAlt.value].filter((value): value is NonNullable<typeof value> => value !== null);
+    const tx = await createBase64VersionedTransaction({
+      connection: {
+        ...conn,
+        getLatestBlockhash: async () => bh,
+      } as typeof conn,
+      instruction: listIx,
+      lookupTables: alts,
+      payer: ownerPk.toBase58(),
+    });
+    const size = Buffer.from(tx, 'base64').length;
     console.log(`[tensor-list] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()})`);
 
-    const txBase64 = Buffer.from(tx.serialize()).toString('base64');
-
     return NextResponse.json({
-      tx: txBase64,
+      tx,
       mint,
     });
 
-  } catch (err: any) {
-    console.error('[tensor-list] Error:', err);
-    return NextResponse.json({ error: err.message || 'Failed to build Tensor list tx' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to build Tensor list tx';
+    console.error('[tensor-list] Error:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

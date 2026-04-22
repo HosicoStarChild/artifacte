@@ -1,25 +1,44 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+import {
+  createBase64VersionedTransaction,
+  createTensorPseudoSigner,
+  ensureHeliusRpcUrl,
+  parseTensorBuildRequest,
+  type TensorBuildRequestBody,
+  type TensorInstructionLike,
+} from '@/app/api/_lib/list-route-utils';
+
+interface TensorLegacyInstructionInput {
+  amount: bigint;
+  authorizationRules?: string;
+  currency?: string;
+  mint: string;
+  owner: ReturnType<typeof createTensorPseudoSigner>;
+  tokenStandard?: number;
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const { mint, owner, amount, currency } = await request.json();
-    if (!mint || !owner || !amount) {
-      return NextResponse.json({ error: 'Missing mint, owner, or amount' }, { status: 400 });
-    }
+    const { amount, currency, mint, owner } = parseTensorBuildRequest(
+      (await request.json()) as Partial<TensorBuildRequestBody>
+    );
 
-    const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+    const heliusRpc = ensureHeliusRpcUrl();
     const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
     const TOKEN_METADATA_PROGRAM_ID = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
 
-    const { getListLegacyInstructionAsync, findListStatePda } = await import('@tensor-foundation/marketplace');
+    const { getListLegacyInstructionAsync } = (await import('@tensor-foundation/marketplace')) as {
+      getListLegacyInstructionAsync: (input: TensorLegacyInstructionInput) => Promise<TensorInstructionLike>;
+    };
     const { address } = await import('@solana/kit');
 
-    const ownerAddress = address(owner);
-    const fakeSigner = { address: ownerAddress, signTransactions: async () => [] };
+    const ownerAddress = `${address(owner)}`;
+    const fakeSigner = createTensorPseudoSigner(ownerAddress);
 
     // Read on-chain metadata account to detect pNFT + extract authorization rules
     const { PublicKey: PK, Connection: SolConn } = await import('@solana/web3.js');
-    const tmpConn = new SolConn(HELIUS_RPC, 'confirmed');
+    const tmpConn = new SolConn(heliusRpc, 'confirmed');
     const mintPk = new PK(mint);
     const metaProgramPk = new PK(TOKEN_METADATA_PROGRAM_ID);
     const [metaPda] = PK.findProgramAddressSync(
@@ -61,7 +80,7 @@ export async function POST(request: Request) {
       console.log(`[tensor-list-legacy] tokenStandard=${tokenStandard} isPnft=${isPnft} ruleSet=${ruleSet}`);
     }
 
-    const listInput: any = {
+    const listInput: TensorLegacyInstructionInput = {
       owner: fakeSigner,
       mint: address(mint),
       amount: BigInt(amount),
@@ -78,51 +97,26 @@ export async function POST(request: Request) {
       console.log(`[tensor-list-legacy] Standard NFT (non-pNFT)`);
     }
 
-    const listIx = await (getListLegacyInstructionAsync as any)(listInput);
+    const listIx = await getListLegacyInstructionAsync(listInput);
 
-    const {
-      PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
-      ComputeBudgetProgram, Connection: SolConnection,
-    } = await import('@solana/web3.js');
-
-    const conn = new SolConnection(HELIUS_RPC, 'confirmed');
-    const ownerPk = new PublicKey(owner);
-
-    const v1Keys = listIx.accounts.map((acct: any) => {
-      const addr = typeof acct.address === 'object' && acct.address.address
-        ? acct.address.address : String(acct.address);
-      return {
-        pubkey: new PublicKey(addr),
-        isSigner: acct.role >= 2,
-        isWritable: acct.role === 1 || acct.role === 3,
-      };
+    const { Connection: SolConnection } = await import('@solana/web3.js');
+    const conn = new SolConnection(heliusRpc, 'confirmed');
+    const tx = await createBase64VersionedTransaction({
+      connection: conn,
+      instruction: listIx,
+      payer: owner,
     });
-
-    const v1Ix = new TransactionInstruction({
-      programId: new PublicKey(listIx.programAddress),
-      keys: v1Keys,
-      data: Buffer.from(listIx.data),
-    });
-
-    const bh = await conn.getLatestBlockhash('confirmed');
-    const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
-    const msg = new TransactionMessage({
-      payerKey: ownerPk,
-      recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix],
-    }).compileToV0Message();
-
-    const tx = new VersionedTransaction(msg);
-    console.log(`[tensor-list-legacy] tx size: ${tx.serialize().length} bytes, mint: ${mint}`);
+    console.log(`[tensor-list-legacy] built v0 tx, mint: ${mint}`);
 
     return NextResponse.json({
-      tx: Buffer.from(tx.serialize()).toString('base64'),
+      tx,
       mint,
     });
 
-  } catch (err: any) {
-    console.error('[tensor-list-legacy] Error:', err);
-    return NextResponse.json({ error: err.message || 'Failed to build Tensor list tx' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to build Tensor list tx';
+    console.error('[tensor-list-legacy] Error:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

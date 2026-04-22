@@ -1,75 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
-if (!process.env.HELIUS_API_KEY) console.warn("[nft] HELIUS_API_KEY not set");
+import {
+  buildNftLookupResponse,
+  createRateLimiter,
+  ensureHeliusRpcUrl,
+  fetchHeliusRpc,
+  getRequestIp,
+  jsonError,
+  parseMintAddress,
+  type HeliusAssetResponse,
+} from "@/app/api/_lib/list-route-utils";
 
-// Rate limit: 30 requests per minute per IP
-const rateMap = new Map<string, { count: number; reset: number }>();
-function checkRate(ip: string): boolean {
-  const now = Date.now();
-  const e = rateMap.get(ip);
-  if (!e || now > e.reset) { rateMap.set(ip, { count: 1, reset: now + 60000 }); return true; }
-  if (e.count >= 30) return false;
-  e.count++;
-  return true;
-}
+const NFT_LOOKUP_RATE_LIMIT = createRateLimiter(30);
 
 export async function GET(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    if (!checkRate(ip)) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
-
-    const mint = request.nextUrl.searchParams.get("mint");
-    if (!mint) {
-      return NextResponse.json({ error: "Missing mint parameter" }, { status: 400 });
+    const ip = getRequestIp(request.headers);
+    if (!NFT_LOOKUP_RATE_LIMIT(ip)) {
+      return jsonError("Rate limit exceeded.", 429);
     }
 
-    const res = await fetch(HELIUS_RPC, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "nft-meta",
-        method: "getAsset",
-        params: { id: mint },
-      }),
+    const mint = parseMintAddress(request.nextUrl.searchParams.get("mint"));
+    const rpcUrl = ensureHeliusRpcUrl();
+    const payload = await fetchHeliusRpc<HeliusAssetResponse>(rpcUrl, {
+      id: "nft-meta",
+      jsonrpc: "2.0",
+      method: "getAsset",
+      params: { id: mint },
     });
 
-    if (!res.ok) throw new Error(`Helius error: ${res.status}`);
-    const data = await res.json();
-    const asset = data.result;
-
-    if (!asset) {
-      return NextResponse.json({
-        nft: { mint, name: "NFT", image: "/placeholder.png", collection: "Unknown", description: "", symbol: "" },
-      });
-    }
-
-    const content = asset.content || {};
-    const metadata = content.metadata || {};
-    const files = content.files || [];
-    const links = content.links || {};
-    const grouping = asset.grouping || [];
-    const collection = grouping.find((g: any) => g.group_key === "collection");
-
-    return NextResponse.json({
-      nft: {
-        mint,
-        name: metadata.name || "Untitled",
-        image: links.image || files[0]?.uri || "/placeholder.png",
-        collection: collection?.group_value || metadata.symbol || "Unknown",
-        description: metadata.description || "",
-        symbol: metadata.symbol || "",
-        royalty: asset.royalty || {},
-        creators: asset.creators || [],
-        mint_extensions: asset.mint_extensions || null,
-        authorities: asset.authorities || [],
-        attributes: metadata.attributes || [],
+    return NextResponse.json(buildNftLookupResponse(payload.result, mint), {
+      headers: {
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
       },
-      result: asset, // Raw Helius response for detailed lookups
     });
   } catch (error) {
-    console.error("Error fetching NFT:", error);
-    return NextResponse.json({ error: "Failed to fetch NFT metadata" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to fetch NFT metadata.";
+    console.error("[nft]", message);
+    return jsonError(message, 500);
   }
 }
