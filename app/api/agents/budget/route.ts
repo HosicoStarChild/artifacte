@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBudgetStatus } from "@/app/lib/api-keys";
+import { getTypedBudgetStatus } from "@/app/lib/api-keys";
+import {
+  assertSignedAgentOwnerRequest,
+  toAgentOwnerRequestErrorResponse,
+} from "@/lib/server/agent-owner-request";
 
 /**
  * GET /api/agents/budget?address=<wallet_address>
@@ -7,17 +11,15 @@ import { getBudgetStatus } from "@/app/lib/api-keys";
  */
 export async function GET(req: NextRequest) {
   try {
+    const context = await assertSignedAgentOwnerRequest(req)
     const searchParams = req.nextUrl.searchParams;
-    const address = searchParams.get("address");
+    const address = searchParams.get("address")?.trim() || context.walletAddress;
 
-    if (!address) {
-      return NextResponse.json(
-        { error: "Missing address parameter" },
-        { status: 400 }
-      );
+    if (address !== context.walletAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
-    const status = getBudgetStatus(address);
+    const status = getTypedBudgetStatus(address);
 
     if (!status) {
       return NextResponse.json(
@@ -29,14 +31,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       address,
-      limits: status.limits,
-      progress: status.progress,
+      ...status,
     });
   } catch (error) {
     console.error("Failed to get budget status:", error);
-    return NextResponse.json(
-      { error: "Failed to get budget status" },
-      { status: 500 }
-    );
+    return toAgentOwnerRequestErrorResponse(error as Error, "Failed to get budget status")
   }
 }

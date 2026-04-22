@@ -52,7 +52,7 @@ export function bytesToHex(value: ArrayBuffer | Uint8Array): string {
 }
 
 export async function hashAdminRequestBody(body = ""): Promise<string> {
-  const payload = textEncoder.encode(body)
+  const payload = Uint8Array.from(textEncoder.encode(body))
   const digest = await crypto.subtle.digest("SHA-256", payload)
 
   return bytesToHex(digest)

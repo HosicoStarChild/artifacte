@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { recordSpend } from "@/app/lib/api-keys";
+import { getAgentByApiKey, recordSpend } from "@/app/lib/api-keys";
+
+interface RecordSpendRequestBody {
+  amount: number
+  apiKey: string
+  currency: "SOL" | "USD1"
+}
 
 /**
  * POST /api/agents/spend
@@ -7,12 +13,12 @@ import { recordSpend } from "@/app/lib/api-keys";
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { walletAddress, amount, currency } = body;
+    const body = (await req.json()) as RecordSpendRequestBody;
+    const { amount, apiKey, currency } = body;
 
-    if (!walletAddress || amount === undefined || !currency) {
+    if (!apiKey || amount === undefined || !currency) {
       return NextResponse.json(
-        { error: "Missing required fields: walletAddress, amount, currency" },
+        { error: "Missing required fields: apiKey, amount, currency" },
         { status: 400 }
       );
     }
@@ -31,7 +37,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = recordSpend(walletAddress, amount, currency);
+    const agent = getAgentByApiKey(apiKey)
+
+    if (!agent) {
+      return NextResponse.json({ error: "Invalid API key" }, { status: 401 })
+    }
+
+    const result = recordSpend(agent.walletAddress, amount, currency);
 
     // Return 403 if over budget
     const statusCode = result.success ? 200 : 403;
@@ -42,6 +54,7 @@ export async function POST(req: NextRequest) {
         message: result.message,
         exceeded: result.exceeded,
         remaining: result.remaining,
+        walletAddress: agent.walletAddress,
       },
       { status: statusCode }
     );
