@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { ChevronDown } from "lucide-react";
@@ -17,6 +17,18 @@ export function NavbarWalletButton({ mobile = false }: NavbarWalletButtonProps) 
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const isMounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
+  const resolvedWallet = isMounted ? wallet : null;
+  const resolvedPublicKey = isMounted ? publicKey : null;
+  const resolvedConnected = isMounted ? connected : false;
+  const resolvedConnecting = isMounted ? connecting : false;
+  const resolvedDisconnecting = isMounted ? disconnecting : false;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -36,18 +48,18 @@ export function NavbarWalletButton({ mobile = false }: NavbarWalletButtonProps) 
     };
   }, [menuOpen]);
 
-  const buttonState = connecting
+  const buttonState = resolvedConnecting
     ? "connecting"
-    : disconnecting
+    : resolvedDisconnecting
       ? "disconnecting"
-      : connected && publicKey
+      : resolvedConnected && resolvedPublicKey
         ? "connected"
-        : wallet
+        : resolvedWallet
           ? "has-wallet"
           : "no-wallet";
 
-  const label = publicKey
-    ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`
+  const label = resolvedPublicKey
+    ? `${resolvedPublicKey.toBase58().slice(0, 4)}...${resolvedPublicKey.toBase58().slice(-4)}`
     : buttonState === "connecting"
       ? "Connecting..."
       : buttonState === "disconnecting"
@@ -73,10 +85,10 @@ export function NavbarWalletButton({ mobile = false }: NavbarWalletButtonProps) 
   };
 
   const handleCopyAddress = async () => {
-    if (!publicKey) return;
+    if (!resolvedPublicKey) return;
 
     try {
-      await navigator.clipboard.writeText(publicKey.toBase58());
+      await navigator.clipboard.writeText(resolvedPublicKey.toBase58());
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -84,9 +96,9 @@ export function NavbarWalletButton({ mobile = false }: NavbarWalletButtonProps) 
     }
   };
 
-  const walletIconStyle = wallet?.adapter.icon
+  const walletIconStyle = resolvedWallet?.adapter.icon
     ? {
-        backgroundImage: `url(${wallet.adapter.icon})`,
+        backgroundImage: `url(${resolvedWallet.adapter.icon})`,
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundSize: "contain",
