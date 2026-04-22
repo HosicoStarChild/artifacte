@@ -346,7 +346,10 @@ export function useCategoryPageController(
         const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
         if (total > 0 && requestedPage > totalPages) {
           setMarketplaceTotal(total);
-          setPage(totalPages);
+          controllerStateStore.setState((currentState) => ({
+            ...currentState,
+            page: totalPages,
+          }));
           return;
         }
 

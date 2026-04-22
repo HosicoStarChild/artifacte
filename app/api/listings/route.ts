@@ -7,7 +7,6 @@ import {
   toAdminRequestErrorResponse,
 } from "@/lib/server/admin-request";
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
-const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
 const BUNDLED_COLLECTIONS = [
@@ -56,10 +55,6 @@ interface ListingRequestBody {
 interface ListingPatchBody {
   action?: "approve" | "reject";
   id?: string;
-}
-
-interface WalletWhitelistData {
-  wallets: Array<{ address: string; enabled: boolean }>;
 }
 
 interface AllowlistData {
@@ -133,6 +128,13 @@ export async function POST(req: NextRequest) {
     // No wallet whitelist — anyone with an approved collection NFT can submit
     // Admin approval queue is the final gate
 
+    const normalizedPrice =
+      typeof price === "number" ? price : Number.parseFloat(price);
+
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 });
+    }
+
     const data = await readListings();
     
     // Check for duplicate
@@ -148,7 +150,7 @@ export async function POST(req: NextRequest) {
       collectionName: collectionName || "Unknown Collection",
       collectionAddress,
       seller,
-      price: parseFloat(price),
+      price: normalizedPrice,
       currency: "SOL",
       listingType: listingType || "fixed",
       auctionDuration: listingType === "auction" ? (auctionDuration || 72) : undefined,

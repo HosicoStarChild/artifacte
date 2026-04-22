@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { Suspense } from "react"
 
 import { HomeImage } from "@/components/home/HomeImage"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +44,24 @@ function AgentProfileImage({ agent }: { agent: PublicAgentRecord }) {
 }
 
 export default async function AgentProfilePage({ params }: AgentProfilePageProps) {
+  return (
+    <Suspense fallback={<AgentProfilePageFallback />}>
+      <AgentProfilePageContent params={params} />
+    </Suspense>
+  )
+}
+
+function AgentProfilePageFallback() {
+  return (
+    <main className="min-h-screen bg-dark-900 pb-20 pt-24">
+      <div className="mx-auto max-w-6xl px-4 py-20 text-center text-white/55 sm:px-6 lg:px-8">
+        Loading agent...
+      </div>
+    </main>
+  )
+}
+
+async function AgentProfilePageContent({ params }: AgentProfilePageProps) {
   const { address } = await params
   const agent = getAgentByIdentifier(address)
 
