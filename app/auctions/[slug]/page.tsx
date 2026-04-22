@@ -2,15 +2,22 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { auctions, formatFullPrice, Bid } from "@/lib/data";
+
+import { HomeImage } from "@/components/home/HomeImage";
 import Countdown from "@/components/Countdown";
+import { showToast } from "@/components/ToastContainer";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import PriceHistory from "@/components/PriceHistory";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import dynamic from "next/dynamic";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import { auctions, formatFullPrice, type Auction, type Bid } from "@/lib/data";
 
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
@@ -23,27 +30,69 @@ const TOKENS: Record<string, { mint: PublicKey; decimals: number }> = {
   USDC: { mint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), decimals: 6 },
 };
 
+type StoredBid = Bid & {
+  txSignature?: string;
+};
+
+type AuctionWithMint = Auction & {
+  nftMint?: string;
+};
+
+function parseStoredBids(serializedBids: string | null): StoredBid[] {
+  if (!serializedBids) {
+    return [];
+  }
+
+  try {
+    const parsedBids = JSON.parse(serializedBids) as Array<Partial<StoredBid>>;
+    return parsedBids.flatMap((bid) => {
+      if (typeof bid.bidder !== "string" || typeof bid.time !== "string") {
+        return [];
+      }
+
+      const amount = Number(bid.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return [];
+      }
+
+      return [{
+        bidder: bid.bidder,
+        amount,
+        time: bid.time,
+        txSignature: typeof bid.txSignature === "string" ? bid.txSignature : undefined,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function getAuctionNftMint(auction: Auction): string | null {
+  const auctionWithMint = auction as AuctionWithMint;
+  return typeof auctionWithMint.nftMint === "string" ? auctionWithMint.nftMint : null;
+}
+
+function getAuctionSeller(description: string): string | null {
+  const match = description.match(/Seller:\s(\w+)/);
+  return match?.[1] || null;
+}
+
 function AuctionDetailContent() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const auction = auctions.find((a) => a.slug === slug);
   const { connection } = useConnection();
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const { publicKey, sendTransaction, connected } = useWalletCapabilities();
   const auctionProgram = useAuctionProgram();
   const [bidUsd1, setBidUsd1] = useState("");
   const [currency, setCurrency] = useState<"USD1" | "USDC">("USD1");
   const [bidStatus, setBidStatus] = useState<string | null>(null);
-  const [localBids, setLocalBids] = useState<Bid[]>([]);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
-  // Load bids from localStorage
-  useEffect(() => {
-    if (slug) {
-      try {
-        const stored = localStorage.getItem(`bids-${slug}`);
-        if (stored) setLocalBids(JSON.parse(stored));
-      } catch {}
+  const [localBids, setLocalBids] = useState<StoredBid[]>(() => {
+    if (typeof window === "undefined" || !slug) {
+      return [];
     }
-  }, [slug]);
+
+    return parseStoredBids(localStorage.getItem(`bids-${slug}`));
+  });
 
   // Save bids to localStorage
   useEffect(() => {
@@ -52,21 +101,22 @@ function AuctionDetailContent() {
     }
   }, [localBids, slug]);
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
-
   if (!auction) {
     return (
-      <div className="pt-24 pb-20 text-center">
-        <p className="text-gray-400">Auction not found</p>
+      <div className="pt-24 pb-20">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <Card className="border-white/5 bg-dark-800/70 py-0">
+            <CardContent className="px-6 py-14 text-center">
+              <p className="text-gray-400">Auction not found</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   const isDigitalArt = auction.category === "DIGITAL_ART";
-  const allBids = [...localBids, ...auction.bids].sort((a, b) => b.amount - a.amount);
+  const allBids: StoredBid[] = [...localBids, ...auction.bids].sort((a, b) => b.amount - a.amount);
   const currentBid = allBids[0]?.amount ?? auction.start_price;
   const minBid = currentBid + (isDigitalArt ? 1 : 100);
   const currencyLabel = isDigitalArt ? "SOL" : currency;
@@ -91,10 +141,10 @@ function AuctionDetailContent() {
     try {
       setBidStatus("Submitting bid on-chain...");
 
-      let txSignature: string = "";
+      let txSignature = "";
       
       // Use AuctionProgram if auction has nftMint (real on-chain listing)
-      const nftMint = (auction as any)?.nftMint;
+      const nftMint = getAuctionNftMint(auction);
       if (nftMint && auctionProgram) {
         try {
           const nftMintPubkey = new PublicKey(nftMint);
@@ -115,13 +165,18 @@ function AuctionDetailContent() {
             token.mint,
             previousBidderAccount
           );
-        } catch (programErr: any) {
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "On-chain bid failed";
           // Fall back to direct transfer if program call fails
-          console.warn("AuctionProgram.placeBid failed, falling back to direct transfer:", programErr);
-          throw new Error(`On-chain bid failed: ${programErr.message?.slice(0, 50)}`);
+          console.warn("AuctionProgram.placeBid failed, falling back to direct transfer:", error);
+          throw new Error(`On-chain bid failed: ${message.slice(0, 50)}`);
         }
       } else {
         // Mock listing: use direct transfer for confirmation
+        if (!sendTransaction) {
+          throw new Error("Wallet does not support sending transactions");
+        }
+
         let tx: Transaction;
         if (isDigitalArt) {
           const lamports = Math.round(usd1Amount * LAMPORTS_PER_SOL);
@@ -145,17 +200,17 @@ function AuctionDetailContent() {
       }
 
       const shortKey = `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`;
-      const newBid: Bid & { txSignature?: string } = {
+      const newBid: StoredBid = {
         bidder: shortKey,
         amount: usd1Amount,
         time: new Date().toISOString(),
         txSignature,
       };
 
-      setLocalBids((prev) => [newBid as Bid, ...prev]);
+      setLocalBids((prevBids) => [newBid, ...prevBids]);
       setBidStatus(null);
       setBidUsd1("");
-      showToast(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${txSignature.slice(0, 12)}...`, "success");
+      showToast.success(`✓ Bid of ${usd1Amount.toLocaleString()} ${currencyLabel} placed! TX: ${txSignature.slice(0, 12)}...`);
 
       // Notify listings bot
       fetch("/api/listing-event", {
@@ -166,47 +221,48 @@ function AuctionDetailContent() {
           payload: { name: auction.name, category: auction.category, price: usd1Amount.toLocaleString(), currency, link: `https://artifacte-five.vercel.app/auctions/${slug}` },
         }),
       }).catch(() => {});
-    } catch (err: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Bid failed";
       setBidStatus(null);
-      showToast(`Error: ${err.message?.slice(0, 60)}`, "error");
+      showToast.error(`Error: ${message.slice(0, 60)}`);
     }
   };
 
   const handleCancelListing = async () => {
     if (!publicKey) return;
     if (allBids.length > 0) {
-      showToast("Cannot cancel: auction has bids", "error");
+      showToast.error("Cannot cancel: auction has bids");
       return;
     }
     try {
       // Call cancel_listing instruction
-      showToast("Listing cancelled successfully", "success");
-    } catch (err: any) {
-      showToast(`Error: ${err.message?.slice(0, 60)}`, "error");
+      showToast.success("Listing cancelled successfully");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cancel listing failed";
+      showToast.error(`Error: ${message.slice(0, 60)}`);
     }
   };
 
-  const isSeller = connected && publicKey && publicKey.toBase58() === auction.description?.match(/Seller:\s(\w+)/)?.[1];
+  const isSeller = connected && publicKey && publicKey.toBase58() === getAuctionSeller(auction.description);
   const canCancel = isSeller && (allBids.length === 0);
 
   return (
     <div className="pt-24 pb-20">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-20 right-4 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium ${
-          toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
-        }`}>
-          {toast.message}
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Image */}
           <div className="lg:col-span-2">
-            <div className="rounded-lg overflow-hidden border border-white/5 bg-dark-800">
-              <img src={auction.image} alt={auction.name} className="w-full h-[500px] object-contain bg-dark-900" />
-            </div>
+            <Card className="overflow-hidden border-white/5 bg-dark-800 py-0">
+              <div className="relative h-125 bg-dark-900">
+                <HomeImage
+                  src={auction.image}
+                  alt={auction.name}
+                  sizes="(max-width: 1024px) 100vw, 66vw"
+                  contain
+                  className="p-6"
+                />
+              </div>
+            </Card>
           </div>
 
           {/* Details */}
@@ -220,7 +276,8 @@ function AuctionDetailContent() {
             <p className="text-gray-400 text-base mb-8 leading-relaxed">{auction.description}</p>
 
             {/* Current Bid & Timer Box */}
-            <div className="bg-dark-800 rounded-lg border border-white/5 p-8 mb-8">
+            <Card className="mb-8 border-white/5 bg-dark-800 py-0">
+              <CardContent className="px-8 py-8">
               <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b border-white/5">
                 <div>
                   <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-3">Current Bid</p>
@@ -243,15 +300,18 @@ function AuctionDetailContent() {
                 ) : (
                   <div className="flex gap-2 bg-dark-900 rounded-lg p-1 border border-white/5">
                     {(["USD1", "USDC"] as const).map((c) => (
-                      <button
+                      <Button
                         key={c}
+                        type="button"
                         onClick={() => setCurrency(c)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 ${
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-200 ${
                           currency === c ? "bg-gold-500 text-dark-900" : "text-gray-400 hover:text-white"
                         }`}
                       >
                         {c}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -263,23 +323,24 @@ function AuctionDetailContent() {
                   Bid Amount ({currencyLabel}) — Minimum {minBid.toLocaleString()} {currencyLabel}
                 </label>
                 <div className="flex gap-3">
-                  <input
+                  <Input
                     type="number"
                     step={isDigitalArt ? "0.01" : "1"}
                     placeholder={`Min: ${minBid.toLocaleString()} ${currencyLabel}`}
                     value={bidUsd1}
                     onChange={(e) => setBidUsd1(e.target.value)}
-                    className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:border-gold-500 focus:outline-hidden transition-colors"
+                    className="h-12 flex-1 border-white/10 bg-dark-900 text-white"
                   />
                   {connected ? (
-                    <button
+                    <Button
+                      type="button"
                       onClick={handleBid}
-                      className="bg-gold-500 hover:bg-gold-600 text-dark-900 font-semibold px-8 py-3 rounded-lg text-sm transition-colors duration-200"
+                      className="h-12 bg-gold-500 px-8 text-sm font-semibold text-dark-900 hover:bg-gold-600"
                     >
                       Place Bid
-                    </button>
+                    </Button>
                   ) : (
-                    <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-auto !py-3 !px-8 !text-sm !font-semibold" />
+                    <WalletMultiButton className="h-auto! rounded-lg! bg-gold-500! px-8! py-3! text-sm! font-semibold! hover:bg-gold-600!" />
                   )}
                 </div>
                 {bidStatus && (
@@ -289,14 +350,16 @@ function AuctionDetailContent() {
 
               {/* Cancel Listing Button */}
               {canCancel && (
-                <button
+                <Button
+                  type="button"
                   onClick={handleCancelListing}
-                  className="w-full bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-700 font-semibold px-6 py-3 rounded-lg text-sm transition-colors duration-200"
+                  className="w-full border border-red-700 bg-red-900/40 px-6 py-3 text-sm font-semibold text-red-400 hover:bg-red-900/60"
                 >
                   Cancel Listing
-                </button>
+                </Button>
               )}
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Price History Chart (TCG Cards & Watches only) */}
             <PriceHistory
@@ -305,47 +368,46 @@ function AuctionDetailContent() {
             />
 
             {/* Bid History */}
-            <div className="bg-dark-800 rounded-lg border border-white/5 p-8">
-              <p className="text-gray-500 text-xs font-semibold tracking-widest uppercase mb-6">Bid History</p>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {allBids.length === 0 ? (
-                  <p className="text-gray-600 text-xs">No bids yet. Be the first to bid!</p>
-                ) : (
-                  allBids.map((b, i) => {
-                    const bidWithTx = b as Bid & { txSignature?: string };
-                    return (
-                      <div key={i} className="flex justify-between items-start pb-4 border-b border-white/5 last:border-b-0 last:pb-0">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="w-8 h-8 rounded-full bg-dark-900 border border-white/5 flex items-center justify-center text-xs text-gray-400 font-medium shrink-0">
+            <Card className="border-white/5 bg-dark-800 py-0">
+              <CardContent className="px-8 py-8">
+                <p className="mb-6 text-gray-500 text-xs font-semibold tracking-widest uppercase">Bid History</p>
+                <div className="max-h-96 space-y-4 overflow-y-auto">
+                  {allBids.length === 0 ? (
+                    <p className="text-gray-600 text-xs">No bids yet. Be the first to bid!</p>
+                  ) : (
+                    allBids.map((b, i) => (
+                      <div key={`${b.bidder}-${b.time}-${i}`} className="flex items-start justify-between border-b border-white/5 pb-4 last:border-b-0 last:pb-0">
+                        <div className="flex flex-1 items-center gap-4">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/5 bg-dark-900 text-xs font-medium text-gray-400">
                             {i + 1}
                           </div>
                           <div>
-                            <p className="text-gray-300 font-mono text-xs">{b.bidder}</p>
-                            <p className="text-gray-600 text-xs mt-1">
+                            <p className="font-mono text-xs text-gray-300">{b.bidder}</p>
+                            <p className="mt-1 text-xs text-gray-600">
                               {new Date(b.time).toLocaleDateString()} at {new Date(b.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </p>
-                            {bidWithTx.txSignature && (
+                            {b.txSignature ? (
                               <a
-                                href={`https://solscan.io/tx/${bidWithTx.txSignature}`}
+                                href={`https://solscan.io/tx/${b.txSignature}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-gold-500 hover:text-gold-400 text-xs mt-1 inline-flex items-center gap-1"
+                                className="mt-1 inline-flex items-center gap-1 text-xs text-gold-500 hover:text-gold-400"
                               >
                                 View on Solana Explorer →
                               </a>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-white font-semibold">{isDigitalArt ? `◎ ${b.amount.toLocaleString()}` : formatFullPrice(b.amount)}</p>
-                          <p className="text-gold-500 text-xs mt-1">{b.amount.toLocaleString()} {isDigitalArt ? "SOL" : "USD1"}</p>
+                          <p className="font-semibold text-white">{isDigitalArt ? `◎ ${b.amount.toLocaleString()}` : formatFullPrice(b.amount)}</p>
+                          <p className="mt-1 text-xs text-gold-500">{b.amount.toLocaleString()} {isDigitalArt ? "SOL" : "USD1"}</p>
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

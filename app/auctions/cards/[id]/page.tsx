@@ -3,11 +3,15 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+
+import { HomeImage } from "@/components/home/HomeImage";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, VersionedTransaction, Connection } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
+import { Card } from "@/components/ui/card";
+import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import {
   getTransactionErrorMessage,
@@ -21,455 +25,64 @@ import {
 } from "@/lib/external-purchase-fees";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
+import { ArtifactePriceSection, TcgPlayerPriceBox } from "./_components/card-price-sections";
+import { CardDetailLoadingState, CardDetailNotFoundState } from "./_components/card-detail-states";
+import {
+  fetchAuctionListing,
+  formatListingQuote,
+  getCardBackHref,
+  getCardBackLabel,
+  loadCardDetail,
+  resolveCardImageSrc,
+  type CardDetail,
+} from "./_lib/card-detail";
+
 const WalletMultiButton = dynamic(
   () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
   { ssr: false }
 );
 
-const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
-const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
-const SOL_MINT = "So11111111111111111111111111111111111111112";
-const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
-
-async function fetchTensorPrice(conn: Connection, mint: string): Promise<{ usdcPrice: number | null; solPrice: number | null; seller: string | null } | null> {
-  try {
-    const [listStatePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("list_state"), new PublicKey(mint).toBuffer()],
-      TENSOR_MARKETPLACE
-    );
-    const info = await conn.getAccountInfo(listStatePda);
-    if (!info || info.data.length < 82) return null;
-    const owner = new PublicKey(info.data.subarray(10, 42)).toBase58();
-    const amount = Number(info.data.readBigUInt64LE(74));
-    const hasCurrency = info.data[82] === 1;
-    const currencyAddr = hasCurrency ? new PublicKey(info.data.subarray(83, 115)).toBase58() : null;
-    if (currencyAddr === USDC_MINT) {
-      return { usdcPrice: amount / 1e6, solPrice: null, seller: owner };
-    }
-    return { usdcPrice: null, solPrice: amount / 1e9, seller: owner };
-  } catch {
-    return null;
-  }
-}
-
-interface AuctionListing {
-  price: number;
-  currency: string;
-  seller: string;
-  listingType: 'fixedPrice' | 'auction';
-  startTime: number;
-  endTime: number;
-  currentBid: number;
-  highestBidder: string | null;
-  status: 'active' | 'settled' | 'cancelled';
-}
-
-async function fetchAuctionListing(conn: Connection, mint: string): Promise<AuctionListing | null> {
-  try {
-    const nftMint = new PublicKey(mint);
-    const [listingPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("listing"), nftMint.toBuffer()],
-      AUCTION_PROGRAM_ID
-    );
-    const [escrowNftPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("escrow_nft"), nftMint.toBuffer()],
-      AUCTION_PROGRAM_ID
-    );
-    // Fetch listing PDA and escrow account in parallel
-    const [info, escrowInfo] = await Promise.all([
-      conn.getAccountInfo(listingPda),
-      conn.getAccountInfo(escrowNftPda),
-    ]);
-    if (!info || info.data.length < 140) return null;
-    // Verify it belongs to our program
-    if (!info.owner.equals(AUCTION_PROGRAM_ID)) return null;
-    // Verify the escrow actually holds the NFT — if not, listing is stale
-    if (!escrowInfo || escrowInfo.data.length === 0) {
-      // Return a special stale marker so the owner can clean it up
-      const data = info.data;
-      const seller = new PublicKey(data.subarray(8, 40)).toBase58();
-      const status = data[130];
-      if (status === 0) {
-        return {
-          price: 0, currency: 'USDC', seller,
-          listingType: 'fixedPrice', startTime: 0, endTime: 0,
-          currentBid: 0, highestBidder: null, status: 'active',
-          stale: true,
-        } as AuctionListing & { stale: boolean };
-      }
-      return null;
-    }
-
-    const data = info.data;
-    const seller = new PublicKey(data.subarray(8, 40)).toBase58();
-    const paymentMint = new PublicKey(data.subarray(72, 104)).toBase58();
-    const price = Number(data.readBigUInt64LE(104));
-    const listingType = data[112]; // 0=FixedPrice, 1=Auction
-    const startTime = Number(data.readBigInt64LE(114));
-    const endTime = Number(data.readBigInt64LE(122));
-    const status = data[130]; // 0=Active, 1=Settled, 2=Cancelled
-
-    if (status !== 0) return null; // Only return active listings
-
-    const currentBid = Number(data.readBigUInt64LE(174));
-    const highestBidder = new PublicKey(data.subarray(182, 214)).toBase58();
-    const defaultKey = PublicKey.default.toBase58();
-
-    const currency = paymentMint === SOL_MINT ? 'SOL'
-      : paymentMint === USD1_MINT ? 'USD1'
-      : 'USDC';
-    const decimals = currency === 'SOL' ? 9 : 6;
-
-    return {
-      price: price / Math.pow(10, decimals),
-      currency,
-      seller,
-      listingType: listingType === 0 ? 'fixedPrice' : 'auction',
-      startTime: startTime * 1000,
-      endTime: endTime * 1000,
-      currentBid: currentBid / Math.pow(10, decimals),
-      highestBidder: highestBidder !== defaultKey ? highestBidder : null,
-      status: 'active',
-    };
-  } catch {
-    return null;
-  }
-}
-
-function formatFeeDisplay(amount: number, currency: string): string {
-  if (currency === 'SOL') {
-    return `◎ ${amount.toLocaleString(undefined, {
-      minimumFractionDigits: amount < 1 ? 2 : 0,
-      maximumFractionDigits: 4,
-    })}`;
-  }
-
-  return `$${amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function getPositiveNumber(value: unknown): number | null {
-  const amount = Number(value);
-  return Number.isFinite(amount) && amount > 0 ? amount : null;
-}
-
-function getRawListingPriceForCurrency(listing: { price?: unknown; currency?: unknown } | null | undefined, currency: 'SOL' | 'USDC'): number | null {
-  const rawPrice = getPositiveNumber(listing?.price);
-  const rawCurrency = typeof listing?.currency === 'string' ? listing.currency.toUpperCase() : null;
-  return rawPrice && rawCurrency === currency ? rawPrice : null;
-}
-
-function getFirstPositivePrice(...candidates: Array<unknown>): number {
-  for (const candidate of candidates) {
-    const amount = getPositiveNumber(candidate);
-    if (amount) return amount;
-  }
-
-  return 0;
-}
-
-function getFirstPositiveNullable(...candidates: Array<unknown>): number | null {
-  for (const candidate of candidates) {
-    const amount = getPositiveNumber(candidate);
-    if (amount) return amount;
-  }
-
-  return null;
-}
-
-function formatListingQuote(amount: number, currency: string): string {
-  const formattedAmount = amount.toLocaleString(
-    undefined,
-    currency === 'SOL' ? { maximumFractionDigits: 4 } : undefined
-  );
-
-  return currency === 'SOL'
-    ? `◎ ${formattedAmount} SOL`
-    : `$${formattedAmount} ${currency}`;
-}
-
 function CardDetailPageContent() {
-  const params = useParams();
-  const cardId = params.id as string;
-  const [card, setCard] = useState<any>(null);
+  const params = useParams<{ id: string }>();
+  const cardId = params.id;
+  const [card, setCard] = useState<CardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [unlisting, setUnlisting] = useState(false);
-  const { publicKey, signTransaction, signAllTransactions, sendTransaction, connected, walletName } = useWalletCapabilities();
+  const { publicKey, signTransaction, sendTransaction, connected, walletName } = useWalletCapabilities();
   const { connection } = useConnection();
+  const auctionProgram = useAuctionProgram();
 
   useEffect(() => {
-    if (!cardId) return;
-    
-    async function loadCard() {
-      // Phygital cards: load directly from Helius
-      if (cardId.startsWith('phyg-')) {
-        const mint = cardId.replace('phyg-', '');
-        try {
-          // Search oracle for this specific card by name/mint
-          const searchRes = await fetch(`/api/me-listings?category=TCG_CARDS&q=${encodeURIComponent(mint)}&perPage=1`);
-          const searchData = searchRes.ok ? await searchRes.json() : null;
-          const oracleListing = searchData?.listings?.find((l: any) => l.id === cardId || l.nftAddress === mint);
-          
-          // Fetch Helius metadata and Tensor listing price and Anchor auction listing in parallel
-          const [assetRes, tensorPrice, auctionListing] = await Promise.all([
-            fetch(`/api/nft?mint=${mint}`),
-            fetchTensorPrice(connection, mint),
-            fetchAuctionListing(connection, mint),
-          ]);
-          const assetData = assetRes.ok ? await assetRes.json() : null;
-          const nft = assetData?.nft || assetData || {};
-          const attrs = nft?.content?.metadata?.attributes || nft?.attributes || [];
-          const getAttr = (name: string) => attrs.find((a: any) => a.trait_type?.toLowerCase() === name.toLowerCase())?.value;
-
-          const tcgPlayerId = getAttr('TCGPlayer ID') || getAttr('TCGplayer Product ID') || oracleListing?.tcgPlayerId || '';
-
-          // Merge prices: oracle has SOL price from ME, Tensor may have USDC price, Anchor may have auction listing
-          const oracleSolPrice = getRawListingPriceForCurrency(oracleListing, 'SOL');
-          const oracleUsdcPrice = getRawListingPriceForCurrency(oracleListing, 'USDC');
-          const solPrice = getFirstPositivePrice(
-            auctionListing?.currency === 'SOL' ? auctionListing.price : null,
-            oracleListing?.solPrice,
-            oracleSolPrice,
-            tensorPrice?.solPrice
-          );
-          const usdcPrice = getFirstPositiveNullable(
-            auctionListing?.currency === 'USDC' ? auctionListing.price : null,
-            tensorPrice?.usdcPrice,
-            oracleUsdcPrice,
-            oracleListing?.usdcPrice
-          );
-          const listingCurrency = auctionListing?.currency || (usdcPrice ? 'USDC' : (oracleListing?.currency || 'SOL'));
-          const listingPrice = auctionListing?.price || getFirstPositivePrice(
-            listingCurrency === 'USDC' ? usdcPrice : solPrice,
-            usdcPrice,
-            solPrice
-          );
-
-          setCard({
-            id: cardId,
-            name: oracleListing?.name || nft.name || mint.slice(0, 12),
-            subtitle: (() => {
-              const parts = [getAttr('TCG') || getAttr('Category'), getAttr('Set'), getAttr('Rarity'), '• Phygital'].filter(Boolean);
-              return parts.length > 1 ? parts.join(' • ') : (oracleListing?.subtitle || '• Phygital');
-            })(),
-            image: oracleListing?.image || nft.image || '',
-            nftAddress: mint,
-            source: 'phygitals',
-            currency: listingCurrency,
-            category: 'TCG_CARDS',
-            price: listingPrice,
-            solPrice,
-            usdcPrice,
-            auctionListing,
-            seller: auctionListing?.seller || oracleListing?.seller || tensorPrice?.seller || '',
-            grade: oracleListing?.grade || getAttr('Grade') || 'Ungraded',
-            gradingCompany: oracleListing?.gradingCompany || (() => {
-              const g = (getAttr('Grade') || '').match(/^(PSA|BGS|CGC|SGC)\s/i);
-              return g ? g[1].toUpperCase() : (getAttr('Grader') || null);
-            })(),
-            gradeNum: oracleListing?.gradeNum || (() => {
-              const g = (getAttr('Grade') || '').match(/^(?:PSA|BGS|CGC|SGC)\s+(.+)$/i);
-              return g ? g[1] : null;
-            })(),
-            gradingId: getAttr('Cert Number') || getAttr('Grading ID') || null,
-            tcg: oracleListing?.tcg || getAttr('TCG') || '',
-            rarity: oracleListing?.rarity || getAttr('Rarity') || '',
-            set: oracleListing?.set || getAttr('Set') || '',
-            cardNumber: oracleListing?.cardNumber || getAttr('Card Number') || '',
-            year: oracleListing?.year || getAttr('Year') || '',
-            tcgPlayerId,
-            priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
-            priceSourceId: tcgPlayerId || undefined,
-            verifiedBy: (getAttr('Cert Number') || getAttr('Grading ID')) ? (getAttr('Grader') || 'Graded') : (tcgPlayerId ? 'TCGplayer' : 'Phygitals'),
-          });
-          setLoading(false);
-          return;
-        } catch (e) {
-          console.error('[phyg] loadCard error:', e);
-        }
-      }
-
-      // First try: search oracle by card ID
-      try {
-        const ccId = cardId.replace('cc-', '');
-        const listRes = await fetch(`/api/me-listings?q=${encodeURIComponent(ccId)}&perPage=5`);
-        const data = await listRes.json();
-        const found = (data.listings || []).find((l: any) => l.id === cardId || l.nftAddress === cardId || l.ccId === ccId);
-        if (found) {
-          // Also check Tensor for a USDC listing price
-          const mint = found.nftAddress || cardId;
-          const rawFoundSolPrice = getRawListingPriceForCurrency(found, 'SOL');
-          const rawFoundUsdcPrice = getRawListingPriceForCurrency(found, 'USDC');
-          if (!found.solPrice && rawFoundSolPrice) found.solPrice = rawFoundSolPrice;
-          if (!found.usdcPrice && rawFoundUsdcPrice) found.usdcPrice = rawFoundUsdcPrice;
-          const tp = await fetchTensorPrice(connection, mint);
-          if (tp?.usdcPrice) {
-            found.usdcPrice = tp.usdcPrice;
-            if (!found.solPrice && tp.solPrice) found.solPrice = tp.solPrice;
-            found.currency = 'USDC';
-            found.price = tp.usdcPrice;
-            if (tp.seller) found.seller = tp.seller;
-          } else if (tp?.solPrice && !found.solPrice) {
-            found.solPrice = tp.solPrice;
-          }
-          if (tp?.seller && !found.seller) found.seller = tp.seller;
-          setCard(found);
-          setLoading(false);
-          return;
-        }
-      } catch {}
-
-      // Second try: direct Helius lookup (Artifacte-minted cards)
-      try {
-        const nftRes = await fetch(`/api/nft?mint=${cardId}`);
-        if (nftRes.ok) {
-          const nftData = await nftRes.json();
-          const asset = nftData.result || nftData.nft;
-          if (asset) {
-            const attrs = asset.content?.metadata?.attributes || asset.attributes || [];
-            const getAttr = (key: string) => attrs.find((a: any) => a.trait_type === key)?.value || "";
-            const isArtifacte = asset.authorities?.some((a: any) => a.address === "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
-            const ccCollection = asset.grouping?.find((g: any) => g.group_value === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf") || 
-                                 asset.collection === "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
-            const isCC = !!ccCollection;
-            const isPhygital = asset.grouping?.some((g: any) => g.group_value === "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM");
-            
-            if (isPhygital) {
-              const phygAttrs = asset.content?.metadata?.attributes || [];
-              const getPhygAttr = (key: string) => phygAttrs.find((a: any) => a.trait_type === key)?.value || "";
-              const tcgPlayerId = getPhygAttr('TCGPlayer ID') || getPhygAttr('TCGplayer Product ID') || '';
-              // Parse grade into company + number (e.g. "PSA 10" → PSA + 10)
-              const gradeRaw = getPhygAttr('Grade') || 'Ungraded';
-              const gradeMatch = gradeRaw.match(/^(PSA|BGS|CGC|SGC)\s+(.+)$/i);
-              const phygGradingCompany = gradeMatch ? gradeMatch[1].toUpperCase() : (getPhygAttr('Grader') || null);
-              const phygGradeNum = gradeMatch ? gradeMatch[2] : null;
-              const phygGradingId = getPhygAttr('Cert Number') || getPhygAttr('Grading ID') || null;
-              // Check Tensor for listing price
-              const tp = await fetchTensorPrice(connection, asset.id || cardId);
-
-              setCard({
-                id: asset.id || cardId,
-                name: asset.content?.metadata?.name || "Unknown",
-                subtitle: [getPhygAttr('TCG'), getPhygAttr('Set'), getPhygAttr('Rarity'), '• Phygital'].filter(Boolean).join(' • '),
-                image: asset.content?.links?.image || asset.content?.links?.animation_url || "",
-                nftAddress: asset.id || cardId,
-                source: 'phygitals',
-                currency: tp?.usdcPrice ? 'USDC' : 'SOL',
-                category: 'TCG_CARDS',
-                price: tp?.usdcPrice || tp?.solPrice || 0,
-                solPrice: tp?.solPrice || 0,
-                usdcPrice: tp?.usdcPrice || null,
-                grade: gradeRaw,
-                gradeNum: phygGradeNum,
-                gradingCompany: phygGradingCompany,
-                gradingId: phygGradingId,
-                tcg: getPhygAttr('TCG') || '',
-                rarity: getPhygAttr('Rarity') || '',
-                set: getPhygAttr('Set') || '',
-                cardNumber: getPhygAttr('Card Number') || '',
-                year: getPhygAttr('Year') || '',
-                tcgPlayerId,
-                priceSource: tcgPlayerId ? 'TCGplayer' : undefined,
-                priceSourceId: tcgPlayerId || undefined,
-                verifiedBy: 'TCGplayer',
-                seller: tp?.seller || asset.ownership?.owner || '',
-              });
-              setLoading(false);
-              return;
-            }
-
-            if (isArtifacte) {
-              const mintAddr = asset.id || asset.mint || cardId;
-              const [tp, auctionListing] = await Promise.all([
-                fetchTensorPrice(connection, mintAddr),
-                fetchAuctionListing(connection, mintAddr),
-              ]);
-              const listingPrice = auctionListing?.price || tp?.usdcPrice || tp?.solPrice || 0;
-              const listingCurrency = auctionListing?.currency || (tp?.usdcPrice ? 'USDC' : (tp?.solPrice ? 'SOL' : 'SOL'));
-              setCard({
-                id: mintAddr,
-                name: asset.content?.metadata?.name || asset.name || "Unknown",
-                image: asset.content?.links?.image || asset.image || "",
-                nftAddress: mintAddr,
-                category: "TCG_CARDS",
-                source: "artifacte",
-                collection: "Artifacte",
-                currency: listingCurrency,
-                price: listingPrice,
-                solPrice: tp?.solPrice || 0,
-                usdcPrice: tp?.usdcPrice || null,
-                auctionListing,
-                grade: getAttr("Condition") === "Graded" ? `${getAttr("Grading Company")} ${getAttr("Grade")}` : getAttr("Condition"),
-                gradeNum: getAttr("Grade") || null,
-                gradingCompany: getAttr("Grading Company") || null,
-                gradingId: getAttr("Grading ID") || null,
-                year: getAttr("Year"),
-                ccCategory: getAttr("TCG"),
-                variant: getAttr("Variant"),
-                language: getAttr("Language"),
-                cardName: getAttr("Card Name"),
-                set: getAttr("Set"),
-                cardNumber: getAttr("Card Number"),
-                priceSource: getAttr("Price Source"),
-                priceSourceId: getAttr("Price Source ID"),
-                seller: auctionListing?.seller || tp?.seller || asset.ownership?.owner,
-                insuredValue: null,
-                vault: null,
-              });
-              setLoading(false);
-              return;
-            }
-
-            if (isCC) {
-              const ccName = asset.content?.metadata?.name || asset.name || "Unknown";
-              const mintAddr = asset.id || asset.mint || cardId;
-              const [tp, auctionListing] = await Promise.all([
-                fetchTensorPrice(connection, mintAddr),
-                fetchAuctionListing(connection, mintAddr),
-              ]);
-              const listingPrice = auctionListing?.price || tp?.usdcPrice || tp?.solPrice || 0;
-              const listingCurrency = auctionListing?.currency || (tp?.usdcPrice ? 'USDC' : (tp?.solPrice ? 'SOL' : 'SOL'));
-              setCard({
-                id: mintAddr,
-                name: ccName,
-                image: asset.content?.links?.image || asset.image || "",
-                nftAddress: mintAddr,
-                category: "TCG_CARDS",
-                source: "collector-crypt",
-                collection: "Collectors Crypt",
-                marketplace: !auctionListing && (tp?.usdcPrice || tp?.solPrice) ? 'tensor' : undefined,
-                currency: listingCurrency,
-                price: listingPrice,
-                solPrice: tp?.solPrice || 0,
-                usdcPrice: tp?.usdcPrice || null,
-                auctionListing,
-                grade: `${getAttr("Grading Company")} ${getAttr("The Grade") || getAttr("GradeNum")}`.trim(),
-                gradeNum: getAttr("GradeNum") || null,
-                gradingCompany: getAttr("Grading Company") || null,
-                gradingId: getAttr("Grading ID") || null,
-                year: getAttr("Year"),
-                ccCategory: getAttr("Category"),
-                insuredValue: getAttr("Insured Value") ? parseInt(getAttr("Insured Value")) : null,
-                vault: getAttr("Vault"),
-                seller: auctionListing?.seller || tp?.seller || asset.ownership?.owner || (asset as any).owner,
-                subtitle: `${getAttr("Category")} • ${getAttr("Grading Company")} ${getAttr("GradeNum")} • ${getAttr("Vault") || "Vault"}`,
-              });
-              setLoading(false);
-              return;
-            }
-          }
-        }
-      } catch {}
-
-      setLoading(false);
+    if (!cardId) {
+      return;
     }
-    
-    loadCard();
-  }, [cardId]);
+
+    let cancelled = false;
+
+    void loadCardDetail(cardId, connection)
+      .then((nextCard) => {
+        if (cancelled) {
+          return;
+        }
+
+        setCard(nextCard);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("[card-detail] Failed to load card", error);
+        if (cancelled) {
+          return;
+        }
+
+        setCard(null);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId, connection]);
 
   const handleBuy = async () => {
     if (!connected || !publicKey || !card) return;
@@ -486,9 +99,8 @@ function CardDetailPageContent() {
       // Anchor auction program listings: buy directly via on-chain program
       if (card.auctionListing) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
-        const { AuctionProgram } = await import('@/lib/auction-program');
+        if (!auctionProgram) throw new Error("Auction program unavailable");
         const { getAssociatedTokenAddress } = await import('@solana/spl-token');
-        const auctionProgram = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
         const nftMintPk = new PublicKey(card.nftAddress);
         const paymentMintPk = new PublicKey(
           card.auctionListing.currency === 'SOL' ? 'So11111111111111111111111111111111111111112'
@@ -507,7 +119,7 @@ function CardDetailPageContent() {
           buyerNftAccount, priceInUnits, paymentMintPk
         );
         showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
-        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
+        setCard((prevCard) => prevCard ? { ...prevCard, sold: true } : prevCard);
         setBuying(false);
         return;
       }
@@ -535,7 +147,7 @@ function CardDetailPageContent() {
         } else {
           showToast.info(`Transaction sent but not confirmed yet. Check Solscan.`);
         }
-        setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
+        setCard((prevCard) => prevCard ? { ...prevCard, sold: true } : prevCard);
         setBuying(false);
         return;
       }
@@ -558,7 +170,7 @@ function CardDetailPageContent() {
       } else {
         showToast.info(`⏳ TX sent: ${result.sig.slice(0, 8)}... — check your wallet in a moment`);
       }
-      setCard((prev: any) => prev ? { ...prev, sold: true } : prev);
+      setCard((prevCard) => prevCard ? { ...prevCard, sold: true } : prevCard);
     } catch (error) {
       const message = getTransactionErrorMessage(error, "");
       const lowerMessage = message.toLowerCase();
@@ -592,13 +204,12 @@ function CardDetailPageContent() {
       const auctionListing = await fetchAuctionListing(connection, card.nftAddress);
       if (auctionListing) {
         // Cancel via Anchor auction program
-        const { AuctionProgram } = await import('@/lib/auction-program');
-        const auctionProgram = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
+        if (!auctionProgram) throw new Error("Auction program unavailable");
         const { getAssociatedTokenAddress } = await import('@solana/spl-token');
         const sellerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
         const sig = await auctionProgram.cancelListing(nftMintPk, sellerNftAccount);
         showToast.success(`NFT unlisted successfully! TX: ${sig.slice(0, 12)}...`);
-        setCard((prev: any) => prev ? { ...prev, price: 0, usdcPrice: null, solPrice: 0, auctionListing: null } : prev);
+        setCard((prevCard) => prevCard ? { ...prevCard, price: 0, usdcPrice: null, solPrice: 0, auctionListing: null } : prevCard);
         setUnlisting(false);
         return;
       }
@@ -652,40 +263,22 @@ function CardDetailPageContent() {
       }
 
       showToast.success("NFT unlisted successfully!");
-      setCard((prev: any) => prev ? { ...prev, price: 0, usdcPrice: null, solPrice: 0 } : prev);
-    } catch (err: any) {
-      console.error("Unlist failed:", err);
-      showToast.error(err.message || "Failed to unlist");
+      setCard((prevCard) => prevCard ? { ...prevCard, price: 0, usdcPrice: null, solPrice: 0 } : prevCard);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to unlist";
+      console.error("Unlist failed:", error);
+      showToast.error(message);
     } finally {
       setUnlisting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="pt-24 pb-20 min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gold-500 border-t-transparent mb-4"></div>
-            <p className="text-gray-400">Loading card details...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <CardDetailLoadingState />;
   }
 
   if (!card) {
-    return (
-      <div className="pt-24 pb-20 min-h-screen">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
-          <h1 className="font-serif text-4xl text-white mb-4">Card Not Found</h1>
-          <p className="text-gray-400 mb-8">This listing may have been sold or removed.</p>
-          <Link href="/auctions/categories/tcg-cards" className="text-gold-500 hover:text-gold-400 font-medium">
-            ← Browse TCG Cards
-          </Link>
-        </div>
-      </div>
-    );
+    return <CardDetailNotFoundState backHref="/auctions/categories/tcg-cards" backLabel="TCG Cards" />;
   }
 
   const displayPrice = resolveListingDisplayPrice(card);
@@ -713,36 +306,33 @@ function CardDetailPageContent() {
     : isTensorMarketplaceListing(card)
       ? 'Powered by Tensor'
       : 'Powered by Magic Eden';
+  const backHref = getCardBackHref(card.category);
+  const backLabel = getCardBackLabel(card.category);
 
   return (
     <div className="pt-24 pb-20 min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="mb-8">
-          <button
-            onClick={() => window.history.back()}
-            className="text-gold-500 hover:text-gold-400 text-sm font-medium transition cursor-pointer"
-          >
-            ← Back to {card.category === 'MERCHANDISE' ? 'Merchandise' : card.category === 'SEALED' ? 'Sealed Product' : card.category === 'SPORTS_CARDS' ? 'Sports Cards' : 'TCG Cards'}
-          </button>
+          <Link href={backHref} className="text-gold-500 hover:text-gold-400 text-sm font-medium transition">
+            ← Back to {backLabel}
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Left: Image */}
-          <div className="bg-dark-800 rounded-xl border border-white/5 p-6 flex items-start justify-center self-start lg:sticky lg:top-28">
-            <img
-              src={(() => {
-                let u = card.image || '';
-                if (u.includes('arweave.net/') || u.includes('nftstorage.link/') || u.includes('/ipfs/') || u.startsWith('ipfs://')) {
-                  if (u.startsWith('ipfs://')) u = u.replace('ipfs://', 'https://nftstorage.link/ipfs/');
-                  return `/api/img-proxy?url=${encodeURIComponent(u)}`;
-                }
-                return u;
-              })()}
-              alt={card.name}
-              className="max-h-[500px] w-auto object-contain rounded-lg"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-card.svg'; }}
-            />
+          <div className="self-start lg:sticky lg:top-28">
+            <Card className="overflow-hidden border-white/5 bg-dark-800 py-0">
+              <div className="relative aspect-square bg-dark-900">
+                <HomeImage
+                  src={resolveCardImageSrc(card.image)}
+                  alt={card.name}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  contain
+                  className="p-6"
+                />
+              </div>
+            </Card>
           </div>
 
           {/* Right: Details */}
@@ -793,20 +383,20 @@ function CardDetailPageContent() {
                   <p className="text-white font-serif text-4xl mb-4">Unlisted</p>
                 )}
 
-                {!card.price && (card.auctionListing as any)?.stale && connected && publicKey && card.auctionListing?.seller === publicKey.toBase58() && (
+                {!card.price && card.auctionListing?.stale && connected && publicKey && card.auctionListing.seller === publicKey.toBase58() && (
                   <button
                     onClick={async () => {
                       if (!signTransaction || !card.nftAddress) return;
                       setUnlisting(true);
                       try {
                         showToast.info("Closing stale listing...");
-                        const { AuctionProgram } = await import('@/lib/auction-program');
-                        const ap = new AuctionProgram(connection, { publicKey, signTransaction, signAllTransactions } as any);
-                        const sig = await ap.closeStaleListing(new PublicKey(card.nftAddress));
+                        if (!auctionProgram) throw new Error("Auction program unavailable");
+                        const sig = await auctionProgram.closeStaleListing(new PublicKey(card.nftAddress));
                         showToast.success(`Stale listing closed! TX: ${sig.slice(0, 12)}...`);
-                        setCard((prev: any) => prev ? { ...prev, auctionListing: null } : prev);
-                      } catch (err: any) {
-                        showToast.error(err.message?.slice(0, 80) || "Failed to close listing");
+                        setCard((prevCard) => prevCard ? { ...prevCard, auctionListing: null } : prevCard);
+                      } catch (error) {
+                        const message = error instanceof Error ? error.message : "Failed to close listing";
+                        showToast.error(message.slice(0, 80));
                       } finally {
                         setUnlisting(false);
                       }
@@ -852,7 +442,7 @@ function CardDetailPageContent() {
                         {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                       </button>
                     ) : (
-                      <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
+                      <WalletMultiButton className="w-full bg-gold-500! text-dark-900! rounded-lg! text-base! font-semibold! py-3.5!" />
                     )
                   ) : connected ? (
                     <button
@@ -867,7 +457,7 @@ function CardDetailPageContent() {
                       {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                     </button>
                   ) : (
-                    <WalletMultiButton className="w-full !bg-gold-500 !text-dark-900 !rounded-lg !text-base !font-semibold !py-3.5" />
+                    <WalletMultiButton className="w-full bg-gold-500! text-dark-900! rounded-lg! text-base! font-semibold! py-3.5!" />
                   )
                 ) : (
                   <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
@@ -1004,12 +594,12 @@ function CardDetailPageContent() {
               cardName={card.name} 
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
-              year={card.year}
+              year={card.year ?? undefined}
               nftAddress={card.nftAddress}
               source={card.source}
               tcgPlayerId={card.tcgPlayerId || card.priceSourceId}
-              gradingId={card.gradingId}
-              gradingCompany={card.gradingCompany}
+              gradingId={card.gradingId || undefined}
+              gradingCompany={card.gradingCompany ?? undefined}
               priceSource={card.priceSource}
               priceSourceId={card.priceSourceId}
             />
@@ -1069,108 +659,5 @@ export default function CardDetailPage() {
     <Suspense fallback={<CardDetailPageFallback />}>
       <CardDetailPageContent />
     </Suspense>
-  );
-}
-
-function TcgPlayerPriceBox({ productId }: { productId: string }) {
-  const [price, setPrice] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch(`/api/tcgplayer-price?id=${productId}`)
-      .then(r => r.json())
-      .then(d => setPrice(d.marketPrice || d.listedMedianPrice || null))
-      .catch(() => {});
-  }, [productId]);
-
-  return (
-    <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-      <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">Market Price</h3>
-      <p className="text-white font-serif text-3xl font-bold mb-1">
-        {price ? `$${price.toFixed(2)}` : "Loading..."}
-      </p>
-      <p className="text-gray-500 text-xs">Current market price per TCGplayer</p>
-    </div>
-  );
-}
-
-function ArtifactePriceSection({ card }: { card: any }) {
-  const [marketPrice, setMarketPrice] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (card.priceSource === "TCGplayer" && card.priceSourceId) {
-      fetch(`/api/tcgplayer-price?id=${card.priceSourceId}`)
-        .then(r => r.json())
-        .then(d => setMarketPrice(d.marketPrice || d.listedMedianPrice || null))
-        .catch(() => {});
-    }
-  }, [card.priceSource, card.priceSourceId]);
-
-  const al = card.auctionListing as AuctionListing | null | undefined;
-  const hasListing = !!(al || card.price);
-
-  return (
-    <div className="bg-dark-800 rounded-xl border border-white/5 p-6 space-y-4">
-      {/* Auction / Fixed Price listing info */}
-      {hasListing && (
-        <div>
-          <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">
-            {al?.listingType === 'auction' ? 'Auction' : 'Price'}
-          </p>
-          <div className="flex items-baseline gap-3">
-            <p className="text-white font-serif text-4xl">
-              {al ? (
-                al.currency === 'SOL' ? `◎ ${al.price.toLocaleString()}` : `$${al.price.toLocaleString()}`
-              ) : (
-                card.usdcPrice ? `$${card.usdcPrice.toLocaleString()}` : `◎ ${card.price?.toLocaleString()}`
-              )}
-            </p>
-            <span className="text-gold-500 text-sm font-medium">{al?.currency || card.currency}</span>
-          </div>
-          {al?.listingType === 'auction' && al.currentBid > 0 && (
-            <p className="text-gold-400 text-sm mt-1">
-              Current bid: {al.currency === 'SOL' ? '◎ ' : '$'}{al.currentBid.toLocaleString()} {al.currency}
-            </p>
-          )}
-          {al?.listingType === 'auction' && al.endTime > 0 && (
-            <p className="text-gray-400 text-sm mt-1">
-              Ends: {new Date(al.endTime).toLocaleDateString()} {new Date(al.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          )}
-        </div>
-      )}
-
-      {!hasListing && (
-        <div>
-          <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Status</p>
-          <p className="text-white font-serif text-4xl">Unlisted</p>
-        </div>
-      )}
-
-      {/* Market Price from TCGplayer */}
-      <div>
-        <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">Market Price</p>
-        <div className="flex items-baseline gap-3 mb-2">
-          <p className="text-white font-serif text-2xl">
-            {marketPrice ? `$${marketPrice.toFixed(2)}` : "—"}
-          </p>
-          {card.priceSource && (
-            <span className="text-gold-500 text-xs font-medium">via {card.priceSource}</span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-        {card.variant && <span className="bg-dark-700 px-2 py-1 rounded">{card.variant}</span>}
-        {card.language && <span className="bg-dark-700 px-2 py-1 rounded">{card.language}</span>}
-        {card.grade && <span className="bg-dark-700 px-2 py-1 rounded">{card.grade}</span>}
-        <span className="bg-dark-700 px-2 py-1 rounded">Artifacte Collection</span>
-      </div>
-
-      {card.price && !card.auctionListing && (
-        <p className="text-emerald-300 text-sm">
-          Artifacte collection items do not incur the 2% external Artifacte fee.
-        </p>
-      )}
-    </div>
   );
 }
