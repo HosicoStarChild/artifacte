@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import { MarketplaceListingCard } from "@/components/MarketplaceListingCard";
@@ -17,11 +16,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import { HomeSectionHeading } from "./HomeSectionHeading";
-
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((module) => module.WalletMultiButton),
-  { ssr: false }
-);
 
 type HomeTCGCarouselProps = {
   title: string;
@@ -133,18 +127,14 @@ export function HomeTCGCarousel({
                               Purchased
                             </button>
                           ) : canBuyHere ? (
-                            connected ? (
-                              <button
-                                type="button"
-                                onClick={() => onBuyNow?.(listing)}
-                                disabled={buyingId === listing.id}
-                                className="h-10 w-full rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-dark-900 transition-colors duration-200 hover:bg-gold-600 disabled:opacity-50"
-                              >
-                                {buyingId === listing.id ? "Processing..." : "Buy Now"}
-                              </button>
-                            ) : (
-                              <WalletMultiButton className="h-10! w-full justify-center! rounded-lg! bg-gold-500! text-sm! font-semibold! text-dark-900! hover:bg-gold-600!" />
-                            )
+                            <button
+                              type="button"
+                              onClick={connected ? () => onBuyNow?.(listing) : undefined}
+                              disabled={!connected || buyingId === listing.id}
+                              className="h-10 w-full rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-dark-900 transition-colors duration-200 hover:bg-gold-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {buyingId === listing.id ? "Processing..." : "Buy Now"}
+                            </button>
                           ) : (
                             <Link
                               href={cardHref}
