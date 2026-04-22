@@ -643,7 +643,7 @@ function MintFormInner() {
                 {mintName.wasShortened ? " • auto-shortened to fit" : ""}
               </p>
               {mintName.wasShortened && mintName.sourceName && (
-                <p className="text-amber-400 break-words">Source name: {mintName.sourceName}</p>
+                <p className="text-amber-400 wrap-break-word">Source name: {mintName.sourceName}</p>
               )}
               {nameUsesMultibyte && (
                 <p className="text-gray-500">UTF-8 aware: emoji and accented characters consume multiple bytes.</p>
@@ -764,7 +764,7 @@ function MintFormInner() {
       {/* Metadata Preview */}
       <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
         <h3 className="font-serif text-xl font-bold text-white mb-6">Metadata Preview</h3>
-        <div className="bg-dark-700 rounded-lg p-4 border border-white/5 overflow-auto max-h-[600px]">
+        <div className="bg-dark-700 rounded-lg p-4 border border-white/5 overflow-auto max-h-150">
           <pre className="text-gray-300 text-xs whitespace-pre-wrap">{JSON.stringify(generateMetadata(), null, 2)}</pre>
         </div>
       </div>
@@ -1376,7 +1376,7 @@ export function MintContent() {
           <div className="bg-dark-800 border border-white/10 rounded-xl p-8">
             <h2 className="font-serif text-2xl font-bold text-white mb-6">Metadata Preview</h2>
             
-            <div className="bg-dark-700 rounded-lg p-4 border border-white/5 overflow-auto max-h-[600px]">
+            <div className="bg-dark-700 rounded-lg p-4 border border-white/5 overflow-auto max-h-150">
               <pre className="text-gray-300 text-sm whitespace-pre-wrap">
                 {JSON.stringify(generateMetadata(), null, 2)}
               </pre>

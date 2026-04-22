@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { hasAdminAccess } from "@/lib/admin";
+import { isAdminWallet, isOwnerWallet } from "@/lib/admin";
+import {
+  assertSignedAdminRequest,
+  readSignedAdminJson,
+  toAdminRequestErrorResponse,
+} from "@/lib/server/admin-request";
 import {
   ADMIN_CORE_ROYALTY_BASIS_POINTS,
   buildMetaplexCompatibleMetadata,
@@ -96,38 +101,25 @@ async function writeSubmissions(data: SubmissionsData): Promise<void> {
   await fs.writeFile(SUBMISSIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
-
-function isAdminWallet(wallet?: string, secret?: string): boolean {
-  if (hasAdminAccess(wallet)) return true;
-  // Also allow secret-based access if ADMIN_SECRET is configured
-  if (ADMIN_SECRET && secret === ADMIN_SECRET) return true;
-  return false;
-}
-
 // GET — list all submissions (admin only) or user's own submissions
 export async function GET(req: NextRequest) {
   try {
     const wallet = req.nextUrl.searchParams.get("wallet");
-    const adminWallet = req.headers.get("x-admin-wallet") || undefined;
-    const adminSecretHeader = req.headers.get("x-admin-secret") || undefined;
     const data = await readSubmissions();
 
-    // If requesting user's own submissions, no admin check needed
-    if (wallet && !isAdminWallet(adminWallet, adminSecretHeader)) {
-      const filtered = data.submissions.filter(s => s.sellerWallet === wallet);
+    if (wallet) {
+      const filtered = data.submissions.filter((submission) => submission.sellerWallet === wallet);
       return NextResponse.json({ ok: true, submissions: filtered });
     }
 
-    // If admin requesting all submissions
-    if (isAdminWallet(adminWallet, adminSecretHeader)) {
-      return NextResponse.json({ ok: true, submissions: data.submissions });
-    }
+    await assertSignedAdminRequest(req, "access");
 
-    // Otherwise, reject
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  } catch {
-    return NextResponse.json({ error: "Failed to read submissions" }, { status: 500 });
+    return NextResponse.json({ ok: true, submissions: data.submissions });
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to read submissions"),
+      "Failed to read submissions"
+    );
   }
 }
 
@@ -202,19 +194,15 @@ export async function POST(req: NextRequest) {
 
 // PATCH — update submission status (admin only)
 export async function PATCH(req: NextRequest) {
-  let body: SubmissionPatchBody;
-
   try {
-    body = (await req.json()) as SubmissionPatchBody;
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+    const { body, context } = await readSignedAdminJson<SubmissionPatchBody>(
+      req,
+      "access"
+    );
 
-  try {
-    const adminWallet = req.headers.get("x-admin-wallet") || undefined;
-    const adminSecretHeader = req.headers.get("x-admin-secret") || undefined;
+    const actingWallet = context.walletAddress;
 
-    if (!isAdminWallet(adminWallet, adminSecretHeader)) {
+    if (!isAdminWallet(actingWallet) && !isOwnerWallet(actingWallet)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -232,6 +220,20 @@ export async function PATCH(req: NextRequest) {
 
     if (!isSubmissionStatus(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    if (status === "minted" && !isOwnerWallet(actingWallet)) {
+      return NextResponse.json(
+        { error: "Only the owner wallet can mark submissions as minted" },
+        { status: 403 }
+      );
+    }
+
+    if (status !== "minted" && !isAdminWallet(actingWallet)) {
+      return NextResponse.json(
+        { error: "Only admin wallets can review submissions" },
+        { status: 403 }
+      );
     }
 
     const data = await readSubmissions();
@@ -303,9 +305,9 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, submission });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update submission" },
-      { status: 500 }
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to update submission"),
+      "Failed to update submission"
     );
   }
 }

@@ -1,43 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { v4 as uuidv4 } from "uuid";
-import { isAdminWallet } from "@/lib/admin";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+import type { AllowlistEntry } from "@/lib/allowlist";
+import { matchesAllowlistIdentifier } from "@/lib/allowlist";
+import {
+  normalizeApplicationSampleImages,
+  normalizeApplicationText,
+  normalizeOptionalApplicationUrl,
+  normalizeTwitterHandle,
+  type Application,
+  type ApplicationsData,
+  type CreateApplicationRequest,
+  type ReviewApplicationRequest,
+  isApplicationReviewAction,
+  validateApplicationFields,
+} from "@/lib/applications";
+import {
+  assertSignedAdminRequest,
+  readSignedAdminJson,
+  toAdminRequestErrorResponse,
+} from "@/lib/server/admin-request";
+
 const APPLICATIONS_FILE = path.join(process.cwd(), "data", "applications.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
-
-interface Application {
-  id: string;
-  walletAddress: string;
-  collectionName: string;
-  collectionAddress: string;
-  category: string;
-  description: string;
-  pitch: string;
-  sampleImages: string[];
-  website?: string;
-  twitter?: string;
-  status: "pending" | "approved" | "rejected";
-  submittedAt: number;
-  reviewedAt: null | number;
-  reviewedBy: null | string;
-  rejectionReason: null | string;
-}
-
-interface ApplicationsData {
-  applications: Application[];
-}
-
-interface AllowlistEntry {
-  mintAuthority: string;
-  name: string;
-  category: string;
-  addedAt: number;
-  addedBy: string;
-  verified: boolean;
-}
 
 interface AllowlistData {
   collections: AllowlistEntry[];
@@ -69,52 +55,36 @@ async function writeAllowlist(data: AllowlistData): Promise<void> {
   await fs.writeFile(ALLOWLIST_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function validateAdmin(adminWallet: string, secret?: string): boolean {
-  if (!ADMIN_SECRET) return false;
-  return isAdminWallet(adminWallet) && secret === ADMIN_SECRET;
-}
-
 /**
  * GET /api/applications
- * List applications. If admin=true in query, show all. Otherwise show only user's own.
+ * List applications. Admin reads require a signed wallet. Otherwise show only user's own.
  */
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const admin = searchParams.get("admin") === "true";
-    const walletAddress = searchParams.get("wallet");
-
     const data = await readApplications();
+    const walletAddress = req.nextUrl.searchParams.get("wallet")?.trim() ?? "";
 
-    if (admin) {
-      // Admin can see all applications
+    if (walletAddress) {
+      const userApplications = data.applications.filter(
+        (application) => application.walletAddress === walletAddress
+      );
+
       return NextResponse.json({
         success: true,
-        applications: data.applications,
+        applications: userApplications,
       });
     }
 
-    // Non-admin users only see their own applications
-    if (!walletAddress) {
-      return NextResponse.json(
-        { error: "Wallet address required for non-admin requests" },
-        { status: 400 }
-      );
-    }
-
-    const userApplications = data.applications.filter(
-      (app) => app.walletAddress === walletAddress
-    );
+    await assertSignedAdminRequest(req, "access");
 
     return NextResponse.json({
       success: true,
-      applications: userApplications,
+      applications: data.applications,
     });
   } catch (error) {
-    console.error("Failed to fetch applications:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch applications" },
-      { status: 500 }
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to fetch applications"),
+      "Failed to fetch applications"
     );
   }
 }
@@ -124,9 +94,44 @@ export async function GET(req: NextRequest) {
  * Submit a new application
  */
 export async function POST(req: NextRequest) {
+  let body: CreateApplicationRequest;
+
   try {
-    const body = await req.json();
-    const {
+    body = (await req.json()) as CreateApplicationRequest;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  try {
+    const walletAddress =
+      typeof body.walletAddress === "string" ? normalizeApplicationText(body.walletAddress) : "";
+    const collectionName =
+      typeof body.collectionName === "string"
+        ? normalizeApplicationText(body.collectionName)
+        : "";
+    const collectionAddress =
+      typeof body.collectionAddress === "string"
+        ? normalizeApplicationText(body.collectionAddress)
+        : "";
+    const category =
+      typeof body.category === "string" ? normalizeApplicationText(body.category) : "";
+    const description =
+      typeof body.description === "string"
+        ? normalizeApplicationText(body.description)
+        : "";
+    const pitch =
+      typeof body.pitch === "string" ? normalizeApplicationText(body.pitch) : "";
+    const sampleImages = Array.isArray(body.sampleImages)
+      ? normalizeApplicationSampleImages(
+          body.sampleImages.filter((sampleImage) => typeof sampleImage === "string")
+        )
+      : [];
+    const website =
+      typeof body.website === "string" ? normalizeOptionalApplicationUrl(body.website) : undefined;
+    const twitter =
+      typeof body.twitter === "string" ? normalizeTwitterHandle(body.twitter) : undefined;
+
+    const validationMessage = validateApplicationFields({
       walletAddress,
       collectionName,
       collectionAddress,
@@ -136,52 +141,16 @@ export async function POST(req: NextRequest) {
       sampleImages,
       website,
       twitter,
-    } = body;
+    });
 
-    // Validate required fields
-    if (
-      !walletAddress ||
-      !collectionName ||
-      !collectionAddress ||
-      !category ||
-      !description ||
-      !pitch
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: walletAddress, collectionName, collectionAddress, category, description, pitch",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate field lengths
-    if (description.length > 500) {
-      return NextResponse.json(
-        { error: "Description must be 500 characters or less" },
-        { status: 400 }
-      );
-    }
-
-    if (pitch.length > 300) {
-      return NextResponse.json(
-        { error: "Pitch must be 300 characters or less" },
-        { status: 400 }
-      );
-    }
-
-    if (sampleImages && sampleImages.length > 3) {
-      return NextResponse.json(
-        { error: "Maximum 3 sample images allowed" },
-        { status: 400 }
-      );
+    if (validationMessage) {
+      return NextResponse.json({ error: validationMessage }, { status: 400 });
     }
 
     const data = await readApplications();
 
     const newApplication: Application = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       walletAddress,
       collectionName,
       collectionAddress,
@@ -208,10 +177,11 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Failed to submit application:", error);
+  } catch (error) {
     return NextResponse.json(
-      { error: error.message || "Failed to submit application" },
+      {
+        error: error instanceof Error ? error.message : "Failed to submit application",
+      },
       { status: 500 }
     );
   }
@@ -223,17 +193,15 @@ export async function POST(req: NextRequest) {
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id, action, rejectionReason, adminWallet, adminSecret } = body;
+    const { body, context } = await readSignedAdminJson<ReviewApplicationRequest>(req, "admin");
+    const id = typeof body.id === "string" ? normalizeApplicationText(body.id) : "";
+    const action = typeof body.action === "string" ? body.action : "";
+    const rejectionReason =
+      typeof body.rejectionReason === "string"
+        ? normalizeApplicationText(body.rejectionReason)
+        : "";
 
-    if (!validateAdmin(adminWallet, adminSecret)) {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid admin wallet" },
-        { status: 403 }
-      );
-    }
-
-    if (!id || !action || (action !== "approve" && action !== "reject")) {
+    if (!id || !isApplicationReviewAction(action)) {
       return NextResponse.json(
         {
           error:
@@ -251,7 +219,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const data = await readApplications();
-    const applicationIndex = data.applications.findIndex((app) => app.id === id);
+    const applicationIndex = data.applications.findIndex((application) => application.id === id);
 
     if (applicationIndex === -1) {
       return NextResponse.json(
@@ -265,21 +233,23 @@ export async function PATCH(req: NextRequest) {
     if (action === "approve") {
       application.status = "approved";
       application.reviewedAt = Date.now();
-      application.reviewedBy = adminWallet;
+      application.reviewedBy = context.walletAddress;
+      application.rejectionReason = null;
 
       // Add to allowlist
       const allowlist = await readAllowlist();
       const alreadyInAllowlist = allowlist.collections.some(
-        (c) => c.mintAuthority === application.collectionAddress
+        (collection) => matchesAllowlistIdentifier(collection, application.collectionAddress)
       );
 
       if (!alreadyInAllowlist) {
         allowlist.collections.push({
+          collectionAddress: application.collectionAddress,
           mintAuthority: application.collectionAddress,
           name: application.collectionName,
           category: application.category,
           addedAt: Date.now(),
-          addedBy: adminWallet,
+          addedBy: context.walletAddress,
           verified: true,
         });
         await writeAllowlist(allowlist);
@@ -287,7 +257,7 @@ export async function PATCH(req: NextRequest) {
     } else if (action === "reject") {
       application.status = "rejected";
       application.reviewedAt = Date.now();
-      application.reviewedBy = adminWallet;
+      application.reviewedBy = context.walletAddress;
       application.rejectionReason = rejectionReason;
     }
 
@@ -297,11 +267,10 @@ export async function PATCH(req: NextRequest) {
       success: true,
       application,
     });
-  } catch (error: any) {
-    console.error("Failed to update application:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to update application" },
-      { status: 500 }
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to update application"),
+      "Failed to update application"
     );
   }
 }

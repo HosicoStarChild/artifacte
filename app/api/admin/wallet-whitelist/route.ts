@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { isAdminWallet } from "@/lib/admin";
-
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+import {
+  assertSignedAdminRequest,
+  readSignedAdminJson,
+  toAdminRequestErrorResponse,
+} from "@/lib/server/admin-request";
 const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 
 interface WalletEntry {
@@ -16,6 +18,12 @@ interface WalletEntry {
 
 interface WhitelistData {
   wallets: WalletEntry[];
+}
+
+interface WalletWhitelistMutationBody {
+  address?: string;
+  name?: string;
+  role?: WalletEntry["role"];
 }
 
 async function readWhitelist(): Promise<WhitelistData> {
@@ -31,23 +39,27 @@ async function writeWhitelist(data: WhitelistData): Promise<void> {
   await fs.writeFile(WHITELIST_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    await assertSignedAdminRequest(req, "admin");
     const data = await readWhitelist();
     return NextResponse.json({ ok: true, wallets: data.wallets });
-  } catch {
-    return NextResponse.json({ error: "Failed to read whitelist" }, { status: 500 });
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to read whitelist"),
+      "Failed to read whitelist"
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { address, name, role, adminWallet, adminSecret } = body;
+    const { body } = await readSignedAdminJson<WalletWhitelistMutationBody>(
+      req,
+      "admin"
+    );
+    const { address, name, role } = body;
 
-    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
     if (!address || !name) {
       return NextResponse.json({ error: "Missing address or name" }, { status: 400 });
     }
@@ -68,18 +80,24 @@ export async function POST(req: NextRequest) {
     await writeWhitelist(data);
 
     return NextResponse.json({ ok: true, wallet: entry });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to update whitelist"),
+      "Failed to update whitelist"
+    );
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { address, adminWallet, adminSecret } = body;
+    const { body } = await readSignedAdminJson<WalletWhitelistMutationBody>(
+      req,
+      "admin"
+    );
+    const { address } = body;
 
-    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!address) {
+      return NextResponse.json({ error: "Missing address" }, { status: 400 });
     }
 
     const data = await readWhitelist();
@@ -91,7 +109,10 @@ export async function DELETE(req: NextRequest) {
 
     await writeWhitelist(data);
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to update whitelist"),
+      "Failed to update whitelist"
+    );
   }
 }
