@@ -148,6 +148,12 @@ function getListingCurrencyDecimals(currency: string): 6 | 9 {
   return currency === 'USDC' ? 6 : 9;
 }
 
+function readTensorOptionValue<T>(
+  option: { __option?: string; value?: T } | null | undefined,
+): T | undefined {
+  return option?.__option === 'Some' ? option.value : undefined;
+}
+
 async function buildStandardTensorBuyResponse(input: {
   mint: string;
   buyer: string;
@@ -329,23 +335,24 @@ export async function POST(request: Request) {
     }
 
     // Dynamic imports for Tensor SDK (uses @solana/web3.js v2 internally)
-    const { getBuySplCompressedInstructionAsync, fetchListState, findListStatePda } = await import('@tensor-foundation/marketplace');
+    const {
+      getBuyCompressedInstructionAsync,
+      getBuySplCompressedInstructionAsync,
+      fetchListState,
+      findListStatePda,
+    } = await import('@tensor-foundation/marketplace');
     const { retrieveAssetFields, retrieveProofFields, getCNFTArgs } = await import('@tensor-foundation/common-helpers');
     const { createSolanaRpc, address } = await import('@solana/kit');
 
     const rpc = createSolanaRpc(HELIUS_RPC);
     type TensorCnftRpc = Parameters<typeof getCNFTArgs>[0];
     type TensorListStateRpc = Parameters<typeof fetchListState>[0];
-    type TensorCompressedBuyInput = Parameters<typeof getBuySplCompressedInstructionAsync>[0];
+    type TensorCompressedBuyInput = Parameters<typeof getBuyCompressedInstructionAsync>[0];
+    type TensorCompressedSplBuyInput = Parameters<typeof getBuySplCompressedInstructionAsync>[0];
     type TensorPayer = TensorCompressedBuyInput['payer'];
-    type TensorBuyer = TensorCompressedBuyInput['buyer'];
-    type TensorOwner = TensorCompressedBuyInput['owner'];
-    type TensorRentDestination = TensorCompressedBuyInput['rentDestination'];
-    type TensorCurrency = TensorCompressedBuyInput['currency'];
-    type TensorBroker = NonNullable<TensorCompressedBuyInput['takerBroker']>;
-    type TensorCreators = TensorCompressedBuyInput['creators'];
-    type TensorProof = TensorCompressedBuyInput['proof'];
-    type TensorBuyInstruction = Awaited<ReturnType<typeof getBuySplCompressedInstructionAsync>>;
+    type TensorBuyInstruction =
+      | Awaited<ReturnType<typeof getBuyCompressedInstructionAsync>>
+      | Awaited<ReturnType<typeof getBuySplCompressedInstructionAsync>>;
 
     const buyerAddress = address(buyer);
     const fakeSigner = {
@@ -369,43 +376,81 @@ export async function POST(request: Request) {
       asset: heliusAsset,
     });
 
-    const makerBroker = listState.data.makerBroker?.__option === 'Some'
-      ? listState.data.makerBroker.value : undefined;
+    const makerBrokerValue = readTensorOptionValue(listState.data.makerBroker);
+    const makerBroker = makerBrokerValue ? address(String(makerBrokerValue)) : undefined;
     const rentDest = listState.data.rentPayer || listState.data.owner;
     const creatorTuples = (cnftArgs.creators ?? []) as TensorCreatorTuple[];
-    const creatorAddresses = creatorTuples.map((creator) => address(creator[0])) as never as TensorCreators;
-    const trimmedProof = proofFields.proof.map((p: string) => address(p)) as never as TensorProof;
+    const creatorAddresses = creatorTuples.map((creator) => address(creator[0]));
+    const creatorPath = creatorTuples.map((creator) => [address(creator[0]), Number(creator[1] ?? 0)] as const);
+    const trimmedProof = proofFields.proof.map((p: string) => address(p));
+    const listCurrencyValue = readTensorOptionValue(listState.data.currency);
+    const listCurrencyMint = listCurrencyValue ? String(listCurrencyValue) : null;
 
-    const price = Number(listState.data.amount) / 1e6;
+    if (listCurrencyMint && listCurrencyMint !== USDC_MINT) {
+      throw new Error(`Unsupported Tensor compressed currency mint: ${listCurrencyMint}`);
+    }
+
+    const listingCurrency = listCurrencyMint === USDC_MINT ? 'USDC' : 'SOL';
+    const decimals = getListingCurrencyDecimals(listingCurrency);
+    const price = Number(listState.data.amount) / 10 ** decimals;
     const maxAmount = BigInt(listState.data.amount) * BigInt(105) / BigInt(100);
 
-    const compressedBuyInput: TensorCompressedBuyInput = {
-      merkleTree: cnftArgs.merkleTree,
-      listState: listStatePda,
-      payer: fakeSigner,
-      buyer: buyerAddress as never as TensorBuyer,
-      owner: listState.data.owner as never as TensorOwner,
-      rentDestination: rentDest as never as TensorRentDestination,
-      currency: address(USDC_MINT) as never as TensorCurrency,
-      makerBroker,
-      takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) as never as TensorBroker : undefined,
-      index: cnftArgs.index,
-      root: cnftArgs.root,
-      metaHash: cnftArgs.metaHash,
-      creatorShares: cnftArgs.creatorShares,
-      creatorVerified: cnftArgs.creatorVerified,
-      sellerFeeBasisPoints: cnftArgs.sellerFeeBasisPoints,
-      maxAmount,
-      optionalRoyaltyPct: 100,
-      creators: creatorAddresses,
-      proof: trimmedProof,
-      canopyDepth: 0,
-    };
-    const buyIx = await getBuySplCompressedInstructionAsync(compressedBuyInput);
+    let buyIx: TensorBuyInstruction;
+
+    if (listingCurrency === 'USDC') {
+      const compressedBuyInput: TensorCompressedSplBuyInput = {
+        merkleTree: cnftArgs.merkleTree,
+        listState: listStatePda,
+        payer: fakeSigner,
+        buyer: buyerAddress as never,
+        owner: listState.data.owner as never,
+        rentDestination: rentDest as never,
+        currency: address(USDC_MINT) as never,
+        makerBroker: makerBroker as never,
+        takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) as never : undefined,
+        index: cnftArgs.index,
+        root: cnftArgs.root,
+        metaHash: cnftArgs.metaHash,
+        creatorShares: cnftArgs.creatorShares,
+        creatorVerified: cnftArgs.creatorVerified,
+        sellerFeeBasisPoints: cnftArgs.sellerFeeBasisPoints,
+        maxAmount,
+        optionalRoyaltyPct: 100,
+        creators: creatorAddresses as never,
+        proof: trimmedProof as never,
+        canopyDepth: 0,
+      };
+
+      buyIx = await getBuySplCompressedInstructionAsync(compressedBuyInput);
+    } else {
+      const compressedBuyInput: TensorCompressedBuyInput = {
+        merkleTree: cnftArgs.merkleTree,
+        listState: listStatePda,
+        payer: fakeSigner,
+        buyer: buyerAddress as never,
+        owner: listState.data.owner as never,
+        rentDestination: rentDest as never,
+        makerBroker: makerBroker as never,
+        takerBroker: feeApplied ? address(EXTERNAL_MARKETPLACE_FEE_WALLET) as never : undefined,
+        index: cnftArgs.index,
+        root: cnftArgs.root,
+        metaHash: cnftArgs.metaHash,
+        creatorShares: cnftArgs.creatorShares,
+        creatorVerified: cnftArgs.creatorVerified,
+        sellerFeeBasisPoints: cnftArgs.sellerFeeBasisPoints,
+        maxAmount,
+        optionalRoyaltyPct: 100,
+        creators: creatorPath as never,
+        proof: trimmedProof as never,
+        canopyDepth: 0,
+      };
+
+      buyIx = await getBuyCompressedInstructionAsync(compressedBuyInput);
+    }
 
     const {
       PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
-      ComputeBudgetProgram, Connection: SolConnection,
+      ComputeBudgetProgram, Connection: SolConnection, SystemProgram,
       AddressLookupTableProgram, Transaction, Keypair,
     } = await import('@solana/web3.js');
 
@@ -482,11 +527,11 @@ export async function POST(request: Request) {
     const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
 
-    // 2% platform fee in USDC (charged to buyer, sent to the fee wallet)
+    // 2% platform fee in the listing currency (charged to buyer, sent to the fee wallet)
     const TREASURY = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
     const usdcMintPk = new PublicKey(USDC_MINT);
     const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
-    const platformFeeUsdc = feeApplied
+    const platformFeeAmount = feeApplied
       ? calculateExternalMarketplaceFeeAmount(Number(listState.data.amount))
       : 0;
     const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
@@ -499,10 +544,20 @@ export async function POST(request: Request) {
       preIxs.push(createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, TREASURY, usdcMintPk));
     }
 
-    if (feeApplied && platformFeeUsdc > 0) {
-      feeIxs.push(
-        createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeUsdc)
-      );
+    if (feeApplied && platformFeeAmount > 0) {
+      if (listingCurrency === 'USDC') {
+        feeIxs.push(
+          createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeAmount)
+        );
+      } else {
+        feeIxs.push(
+          SystemProgram.transfer({
+            fromPubkey: buyerPk,
+            toPubkey: TREASURY,
+            lamports: platformFeeAmount,
+          })
+        );
+      }
     }
 
     const msg = new TransactionMessage({
@@ -513,18 +568,18 @@ export async function POST(request: Request) {
 
     const tx = new VersionedTransaction(msg);
     const size = tx.serialize().length;
-    const platformFeeUsdc$ = platformFeeUsdc / 1e6;
-    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, platformFee: $${platformFeeUsdc$.toFixed(4)} USDC, feeApplied: ${feeApplied})`);
+    const platformFee = platformFeeAmount / 10 ** decimals;
+    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, currency: ${listingCurrency}, platformFee: ${platformFee.toFixed(6)} ${listingCurrency}, feeApplied: ${feeApplied})`);
 
     const txBase64 = Buffer.from(tx.serialize()).toString('base64');
 
     return NextResponse.json({
       tx: txBase64,
       price,
-      platformFee: platformFeeUsdc$,
-      platformFeeCurrency: 'USDC',
+      platformFee,
+      platformFeeCurrency: listingCurrency,
       feeApplied,
-      currency: 'USDC',
+      currency: listingCurrency,
       seller: String(listState.data.owner),
       mint,
     });

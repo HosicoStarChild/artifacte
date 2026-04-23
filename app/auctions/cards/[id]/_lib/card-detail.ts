@@ -353,9 +353,8 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       `/api/me-listings?category=TCG_CARDS&q=${encodeURIComponent(mint)}&perPage=1`,
     );
     const oracleListing = oracleListings.find((listing) => listing.id === cardId || listing.nftAddress === mint) || null;
-    const [asset, tensorPrice, auctionListing] = await Promise.all([
+    const [asset, auctionListing] = await Promise.all([
       fetchNftAsset(mint),
-      fetchTensorPrice(connection, mint),
       fetchAuctionListing(connection, mint),
     ]);
     const attributes = getAssetAttributes(asset);
@@ -369,11 +368,9 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       auctionListing?.currency === "SOL" ? auctionListing.price : null,
       oracleListing?.solPrice,
       oracleSolPrice,
-      tensorPrice?.solPrice,
     );
     const usdcPrice = getFirstPositiveNullable(
       auctionListing?.currency === "USDC" ? auctionListing.price : null,
-      tensorPrice?.usdcPrice,
       oracleUsdcPrice,
       oracleListing?.usdcPrice,
     );
@@ -404,7 +401,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       priceSource: tcgPlayerId ? "TCGplayer" : undefined,
       priceSourceId: tcgPlayerId || undefined,
       rarity: oracleListing?.rarity || getAttributeValue(attributes, "Rarity"),
-      seller: auctionListing?.seller || oracleListing?.seller || tensorPrice?.seller || "",
+      seller: auctionListing?.seller || oracleListing?.seller || "",
       set: oracleListing?.set || getAttributeValue(attributes, "Set"),
       solPrice,
       source: "phygitals",
@@ -458,23 +455,10 @@ async function loadOracleCard(cardId: string, connection: Connection): Promise<C
       card.usdcPrice = rawFoundUsdcPrice;
     }
 
-    const tensorPrice = await fetchTensorPrice(connection, card.nftAddress);
-    if (tensorPrice?.usdcPrice) {
-      card.usdcPrice = tensorPrice.usdcPrice;
-      if (!card.solPrice && tensorPrice.solPrice) {
-        card.solPrice = tensorPrice.solPrice;
-      }
-      card.currency = "USDC";
-      card.price = tensorPrice.usdcPrice;
-      if (tensorPrice.seller) {
-        card.seller = tensorPrice.seller;
-      }
-    } else if (tensorPrice?.solPrice && !card.solPrice) {
-      card.solPrice = tensorPrice.solPrice;
-    }
-
-    if (tensorPrice?.seller && !card.seller) {
-      card.seller = tensorPrice.seller;
+    if (card.currency === "USDC" && card.usdcPrice) {
+      card.price = card.usdcPrice;
+    } else if (card.currency === "SOL" && card.solPrice) {
+      card.price = card.solPrice;
     }
 
     return card;
@@ -497,35 +481,40 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
     const isPhygital = hasGrouping(asset, PHYGITALS_COLLECTION);
 
     if (isPhygital) {
+      const mintAddress = asset.id || asset.mint || cardId;
+      const oraclePhygitalCard = await loadPhygitalCard(`phyg-${mintAddress}`, connection);
+      if (oraclePhygitalCard) {
+        return oraclePhygitalCard;
+      }
+
       const grade = getAttr("Grade") || "Ungraded";
       const gradeMatch = grade.match(/^(PSA|BGS|CGC|SGC)\s+(.+)$/i);
       const tcgPlayerId = getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID") || "";
-      const tensorPrice = await fetchTensorPrice(connection, asset.id || cardId);
 
       return buildCardDetail({
         cardNumber: getAttr("Card Number"),
         category: "TCG_CARDS",
-        currency: tensorPrice?.usdcPrice ? "USDC" : "SOL",
+        currency: "SOL",
         grade,
         gradeNum: gradeMatch ? gradeMatch[2] : null,
         gradingCompany: gradeMatch ? gradeMatch[1].toUpperCase() : getAttr("Grader") || null,
         gradingId: getAttr("Cert Number") || getAttr("Grading ID") || null,
-        id: asset.id || cardId,
+        id: mintAddress,
         image: asset.content?.links?.image || asset.content?.links?.animation_url || "",
         name: asset.content?.metadata?.name || "Unknown",
-        nftAddress: asset.id || cardId,
-        price: tensorPrice?.usdcPrice || tensorPrice?.solPrice || 0,
+        nftAddress: mintAddress,
+        price: 0,
         priceSource: tcgPlayerId ? "TCGplayer" : undefined,
         priceSourceId: tcgPlayerId || undefined,
         rarity: getAttr("Rarity"),
-        seller: tensorPrice?.seller || asset.ownership?.owner || "",
+        seller: asset.ownership?.owner || "",
         set: getAttr("Set"),
-        solPrice: tensorPrice?.solPrice || 0,
+        solPrice: 0,
         source: "phygitals",
         subtitle: [getAttr("TCG"), getAttr("Set"), getAttr("Rarity"), "• Phygital"].filter(Boolean).join(" • "),
         tcg: getAttr("TCG"),
         tcgPlayerId,
-        usdcPrice: tensorPrice?.usdcPrice || null,
+        usdcPrice: null,
         verifiedBy: "TCGplayer",
         year: getAttr("Year"),
       });
