@@ -54,6 +54,12 @@ function getToggleButtonClassName(isActive: boolean): string {
     : "border-white/10 bg-dark-900/70 text-white/65 hover:bg-dark-900 hover:text-white";
 }
 
+function getCurrencyButtonClassName(isActive: boolean): string {
+  return isActive
+    ? "border-gold-400/45 bg-gold-500/12 text-gold-300 hover:bg-gold-500/18 hover:text-gold-200"
+    : "border-white/10 bg-dark-900/70 text-white/65 hover:bg-dark-900 hover:text-white";
+}
+
 export function CategoryControls({
   category,
   categoryFilterDefinitions,
@@ -118,7 +124,7 @@ export function CategoryControls({
                     size="sm"
                     variant="outline"
                     onClick={() => onCurrencyFilterChange(value)}
-                    className={getToggleButtonClassName(currencyFilter === value)}
+                    className={getCurrencyButtonClassName(currencyFilter === value)}
                   >
                     {value === "SOL" ? "◎ SOL" : value}
                   </Button>
@@ -133,54 +139,64 @@ export function CategoryControls({
         <Separator className="bg-white/5" />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/35" />
-            <Input
-              type="text"
-              value={searchInput}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search by name, set, number..."
-              className="h-11 border-white/10 bg-dark-900/70 pl-10 text-white placeholder:text-white/35"
-            />
+          <div className="space-y-2">
+            <span className="text-xs font-medium tracking-[0.2em] uppercase text-white/40">Search</span>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/35" />
+              <Input
+                type="text"
+                value={searchInput}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Search by name, set, number..."
+                className="h-11 border-white/10 bg-dark-900/70 pl-10 text-white placeholder:text-white/35"
+              />
+            </div>
           </div>
 
-          <Select value={sortBy} onValueChange={(value) => value && onSortChange(value as CategorySort)}>
-            <SelectTrigger className="h-11 w-full border-white/10 bg-dark-900/70 text-white" size="default">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="border border-white/10 bg-dark-800 text-white">
-              {SORT_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-2">
+            <span className="text-xs font-medium tracking-[0.2em] uppercase text-white/40">Sort By</span>
+            <Select value={sortBy} onValueChange={(value) => value && onSortChange(value as CategorySort)}>
+              <SelectTrigger className="h-11 w-full border-white/10 bg-dark-900/70 text-white" size="default">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border border-white/10 bg-dark-800 text-white">
+                {SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {categoryFilterDefinitions.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             {categoryFilterDefinitions.map((filterDefinition) => (
-              <Select
-                key={filterDefinition.key}
-                value={filters[filterDefinition.key] || "All"}
-                onValueChange={(value) => {
-                  if (value) {
-                    onFilterChange(filterDefinition.key, value);
-                  }
-                }}
-              >
-                <SelectTrigger className="h-10 min-w-44 border-white/10 bg-dark-900/70 text-white" size="default">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border border-white/10 bg-dark-800 text-white">
-                  {filterDefinition.options.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option === "All" ? `${filterDefinition.label}: All` : option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div key={filterDefinition.key} className="min-w-44 space-y-2">
+                <span className="text-xs font-medium tracking-[0.2em] uppercase text-white/40">
+                  {filterDefinition.label}
+                </span>
+                <Select
+                  value={filters[filterDefinition.key] || "All"}
+                  onValueChange={(value) => {
+                    if (value) {
+                      onFilterChange(filterDefinition.key, value);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-10 w-full border-white/10 bg-dark-900/70 text-white" size="default">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border border-white/10 bg-dark-800 text-white">
+                    {filterDefinition.options.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             ))}
 
             {hasActiveFilters ? (
