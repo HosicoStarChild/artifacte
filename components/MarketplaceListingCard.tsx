@@ -58,12 +58,10 @@ export function MarketplaceListingCard({
   const content = (
     <>
       <div className="relative aspect-square overflow-hidden bg-dark-900">
-        <Image
+        <img
           src={resolvedImageSrc}
           alt={imageAlt}
-          fill
           loading={imageLoading}
-          unoptimized={unoptimized}
           sizes={imageSizes}
           className={cn(
             "absolute inset-0 h-full w-full transition-transform duration-500 group-hover:scale-105",

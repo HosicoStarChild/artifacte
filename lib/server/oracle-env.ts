@@ -25,11 +25,11 @@ export function getServerSolanaCluster(): SolanaCluster {
 }
 
 export function getDefaultOracleApiUrl(cluster: SolanaCluster = getServerSolanaCluster()): string {
-  if (process.env.NODE_ENV === "development") {
-    return LOCAL_ORACLE_URL;
-  }
+  void cluster;
 
-  return cluster === "devnet" ? LOCAL_ORACLE_URL : PROD_ORACLE_URL;
+  // Keep the local oracle opt-in via explicit env vars instead of silently
+  // falling back to localhost for previews, custom domains, or local app runs.
+  return PROD_ORACLE_URL;
 }
 
 export function getOracleApiUrl(cluster: SolanaCluster = getServerSolanaCluster()): string {

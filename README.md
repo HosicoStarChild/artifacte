@@ -31,6 +31,10 @@ pnpm dev
 # Open http://localhost:3000
 ```
 
+Oracle data:
+- The frontend uses the hosted Artifacte oracle by default.
+- If you want to run against a local oracle from `../artifacte-oracle`, set `ORACLE_URL` and `NEXT_PUBLIC_ORACLE_URL` to `http://localhost:4567` before starting the app.
+
 Requirements:
 - Node.js 20.9+
 - pnpm 10+

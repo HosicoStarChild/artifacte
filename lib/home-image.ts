@@ -1,9 +1,13 @@
 const DIRECT_IMAGE_HOSTS = new Set([
   "images.unsplash.com",
   "picsum.photos",
+  "d1xpxki1g4htqu.cloudfront.net",
+]);
+
+const PROXIED_IMAGE_HOSTS = new Set([
   "arweave.net",
   "gateway.irys.xyz",
-  "d1xpxki1g4htqu.cloudfront.net",
+  "ar-io.dev",
 ]);
 
 export function resolveHomeImageSrc(src: string | undefined): string | null {
@@ -17,6 +21,10 @@ export function resolveHomeImageSrc(src: string | undefined): string | null {
 
   try {
     const parsedUrl = new URL(src);
+
+    if (PROXIED_IMAGE_HOSTS.has(parsedUrl.hostname) || parsedUrl.hostname.endsWith(".ar-io.dev")) {
+      return `/api/img-proxy?url=${encodeURIComponent(src)}`;
+    }
 
     if (DIRECT_IMAGE_HOSTS.has(parsedUrl.hostname)) {
       return src;

@@ -47,6 +47,33 @@ const FORWARDED_QUERY_KEYS = [
 
 let activeArtifacteMintSetCache: { ts: number; value: Set<string> } | null = null;
 
+function getOracleRequestErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const cause = error.cause;
+  const causeCode =
+    typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string'
+      ? cause.code
+      : null;
+
+  if (
+    error.name === 'AbortError' ||
+    error.name === 'TimeoutError' ||
+    causeCode === 'UND_ERR_CONNECT_TIMEOUT' ||
+    causeCode === 'UND_ERR_HEADERS_TIMEOUT'
+  ) {
+    return `oracle request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+  }
+
+  if (causeCode === 'ECONNREFUSED' || causeCode === 'ENOTFOUND' || causeCode === 'EHOSTUNREACH') {
+    return `oracle network failure (${causeCode})`;
+  }
+
+  return causeCode ? `${error.message} (${causeCode})` : error.message;
+}
+
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number.parseInt(value || '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -89,14 +116,25 @@ async function getCachedActiveArtifacteMintSet(): Promise<Set<string>> {
 }
 
 async function fetchOracleListings(params: URLSearchParams): Promise<OracleListingsResponse> {
-  const response = await fetch(`${ORACLE_API}/api/listings?${params.toString()}`, {
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    cache: 'no-store',
-  });
+  const upstreamUrl = `${ORACLE_API}/api/listings?${params.toString()}`;
+  let response: Response;
+
+  try {
+    response = await fetch(upstreamUrl, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      cache: 'no-store',
+    });
+  } catch (error: unknown) {
+    throw new Error(`Unable to reach oracle upstream: ${getOracleRequestErrorMessage(error)}`, {
+      cause: error,
+    });
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload?.error || payload?.message || `Oracle returned ${response.status}`);
+    throw new Error(
+      `Oracle responded with ${response.status}: ${payload?.error || payload?.message || 'unexpected response'}`
+    );
   }
 
   return payload as OracleListingsResponse;
@@ -265,7 +303,11 @@ export async function GET(request: Request) {
     return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Listings proxy error:', message);
+    console.error('[me-listings] Listings proxy error:', {
+      upstream: ORACLE_API,
+      query: params.toString(),
+      message,
+    });
     return NextResponse.json(
       { error: 'Failed to fetch listings', message },
       { status: 500 }
