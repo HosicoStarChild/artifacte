@@ -8,9 +8,8 @@ import {
   categorySlugMap,
   getListingPurchaseCurrency,
   listings as staticListings,
-  resolveListingDisplayPrice,
+  resolveListingPayablePrice,
 } from "@/lib/data";
-import { getExternalMarketplaceTotalPrice } from "@/lib/external-purchase-fees";
 
 import {
   buildListingsQueryParams,
@@ -178,12 +177,12 @@ function applyClientSideListingFilters(
       return purchaseCurrency === currencyFilter;
     })
     .sort((left, right) => {
-      const leftTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(left).amount, {
-        source: left.source,
-      });
-      const rightTotal = getExternalMarketplaceTotalPrice(resolveListingDisplayPrice(right).amount, {
-        source: right.source,
-      });
+      const leftTotal = resolveListingPayablePrice(left, {
+        collectionName: left.collection,
+      }).amount;
+      const rightTotal = resolveListingPayablePrice(right, {
+        collectionName: right.collection,
+      }).amount;
 
       if (sortBy === "price-high") {
         return rightTotal - leftTotal;

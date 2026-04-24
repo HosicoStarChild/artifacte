@@ -1,3 +1,9 @@
+import {
+  calculateExternalMarketplaceFee,
+  shouldApplyExternalMarketplaceFee,
+  type ExternalFeeContext,
+} from './external-purchase-fees';
+
 export type ListingPriceInput = {
   price: number;
   currency?: string | null;
@@ -8,6 +14,16 @@ export type ListingPriceInput = {
 };
 
 export type ListingPrimaryCurrency = 'SOL' | 'USDC' | 'USD1';
+
+export type ListingPayablePrice = {
+  amount: number;
+  currency: ListingPrimaryCurrency | string;
+  secondaryAmount?: number;
+  secondaryCurrency?: 'SOL';
+  baseAmount: number;
+  platformFeeAmount: number;
+  feeApplied: boolean;
+};
 
 export function getListingPurchaseCurrency(listing: ListingPriceInput): ListingPrimaryCurrency {
   const displayCurrency = typeof listing.currency === 'string' && listing.currency
@@ -61,5 +77,27 @@ export function resolveListingDisplayPrice(listing: ListingPriceInput): {
   return {
     amount,
     currency: displayCurrency,
+  };
+}
+
+export function resolveListingPayablePrice(
+  listing: ListingPriceInput,
+  feeContext?: ExternalFeeContext | null,
+): ListingPayablePrice {
+  const displayPrice = resolveListingDisplayPrice(listing);
+  const feeApplied = shouldApplyExternalMarketplaceFee({
+    source: listing.source,
+    ...feeContext,
+  });
+  const platformFeeAmount = feeApplied
+    ? calculateExternalMarketplaceFee(displayPrice.amount)
+    : 0;
+
+  return {
+    ...displayPrice,
+    amount: displayPrice.amount + platformFeeAmount,
+    baseAmount: displayPrice.amount,
+    platformFeeAmount,
+    feeApplied,
   };
 }

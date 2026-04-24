@@ -8,8 +8,7 @@ import { MarketplaceListingCard } from "@/components/MarketplaceListingCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getListingPurchaseCurrency, resolveListingDisplayPrice, type Auction } from "@/lib/data";
-import { getExternalMarketplaceTotalPrice } from "@/lib/external-purchase-fees";
+import { resolveListingPayablePrice, type Auction } from "@/lib/data";
 
 import {
   getListingHref,
@@ -186,14 +185,12 @@ export function CategoryListingsSection({
 
       <div className={`grid grid-cols-1 gap-8 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3 ${listingsFilterLoading ? "opacity-40" : "opacity-100"}`}>
         {fixedListings.map((listing, index) => {
-          const purchaseCurrency = getListingPurchaseCurrency(listing);
-          const displayPrice = resolveListingDisplayPrice(listing);
-          const totalDisplayPrice = getExternalMarketplaceTotalPrice(displayPrice.amount, {
-            source: listing.source,
+          const payablePrice = resolveListingPayablePrice(listing, {
+            collectionName: listing.collection,
           });
-          const formattedAmount = displayPrice.currency === "SOL"
-            ? totalDisplayPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
-            : totalDisplayPrice.toLocaleString();
+          const formattedAmount = payablePrice.currency === "SOL"
+            ? payablePrice.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
+            : payablePrice.amount.toLocaleString();
 
           return (
             <MarketplaceListingCard
@@ -209,11 +206,11 @@ export function CategoryListingsSection({
               priceLabel={
                 isDigitalArt
                   ? `◎ ${listing.price.toLocaleString()}`
-                  : purchaseCurrency === "SOL"
+                  : payablePrice.currency === "SOL"
                     ? `◎ ${formattedAmount}`
                     : `$${formattedAmount}`
               }
-              currencyLabel={isDigitalArt ? "SOL" : displayPrice.currency}
+              currencyLabel={isDigitalArt ? "SOL" : payablePrice.currency}
               sourceBadge={getListingSourceBadge(listing)}
               imageFit={getListingImageFit(listing)}
               imageLoading={index < 3 ? "eager" : "lazy"}

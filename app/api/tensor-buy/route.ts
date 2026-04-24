@@ -527,43 +527,16 @@ export async function POST(request: Request) {
     const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
     const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
 
-    // 2% platform fee in the listing currency (charged to buyer, sent to the fee wallet)
-    const TREASURY = new PublicKey(EXTERNAL_MARKETPLACE_FEE_WALLET);
-    const usdcMintPk = new PublicKey(USDC_MINT);
-    const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = await import('@solana/spl-token');
+    // Tensor applies the buyer-side broker fee through `takerBroker`; do not append
+    // a second transfer here or the buyer is charged twice.
     const platformFeeAmount = feeApplied
       ? calculateExternalMarketplaceFeeAmount(Number(listState.data.amount))
       : 0;
-    const buyerUsdcAta = await getAssociatedTokenAddress(usdcMintPk, buyerPk);
-    const treasuryUsdcAta = await getAssociatedTokenAddress(usdcMintPk, TREASURY);
-
-    const preIxs: InstanceType<typeof TransactionInstruction>[] = [];
-    const feeIxs: InstanceType<typeof TransactionInstruction>[] = [];
-    const treasuryAtaInfo = feeApplied ? await conn.getAccountInfo(treasuryUsdcAta) : null;
-    if (feeApplied && !treasuryAtaInfo) {
-      preIxs.push(createAssociatedTokenAccountInstruction(buyerPk, treasuryUsdcAta, TREASURY, usdcMintPk));
-    }
-
-    if (feeApplied && platformFeeAmount > 0) {
-      if (listingCurrency === 'USDC') {
-        feeIxs.push(
-          createTransferInstruction(buyerUsdcAta, treasuryUsdcAta, buyerPk, platformFeeAmount)
-        );
-      } else {
-        feeIxs.push(
-          SystemProgram.transfer({
-            fromPubkey: buyerPk,
-            toPubkey: TREASURY,
-            lamports: platformFeeAmount,
-          })
-        );
-      }
-    }
 
     const msg = new TransactionMessage({
       payerKey: buyerPk,
       recentBlockhash: bh.blockhash,
-      instructions: [cuIx, ...preIxs, v1Ix, ...feeIxs],
+      instructions: [cuIx, v1Ix],
     }).compileToV0Message(alts);
 
     const tx = new VersionedTransaction(msg);

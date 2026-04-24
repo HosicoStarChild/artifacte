@@ -18,7 +18,9 @@ export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export {
   getListingPurchaseCurrency,
   resolveListingDisplayPrice,
+  resolveListingPayablePrice,
   type ListingPriceInput,
+  type ListingPayablePrice,
   type ListingPrimaryCurrency,
 } from "./listing-price";
 
@@ -95,6 +97,7 @@ export interface Listing {
   buyKind?: string;
   solPrice?: number | null;
   usdcPrice?: number | null;
+  collection?: string | null;
 }
 
 const now = Date.now();

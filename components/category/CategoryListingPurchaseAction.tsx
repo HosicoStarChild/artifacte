@@ -11,7 +11,7 @@ import {
   isTransactionRequestRejected,
   TRANSACTION_REQUEST_REJECTED_MESSAGE,
 } from "@/lib/client/transaction-errors";
-import { resolveListingDisplayPrice, type Listing } from "@/lib/data";
+import { resolveListingDisplayPrice, resolveListingPayablePrice, type Listing } from "@/lib/data";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
 import { showToast } from "@/components/ToastContainer";
@@ -66,6 +66,9 @@ export default function CategoryListingPurchaseAction({
     const listingId = listing.id;
     const nftMint = listing?.nftAddress || listing?.nftMint;
     const listingDisplayPrice = resolveListingDisplayPrice(listing);
+    const listingPayablePrice = resolveListingPayablePrice(listing, {
+      collectionName: listing.collection,
+    });
 
     setBuyingId(listingId);
 
@@ -191,8 +194,8 @@ export default function CategoryListingPurchaseAction({
       } else if (lowerMessage.includes("insufficient")) {
         showToast.error(
           `Insufficient balance. Required: ${formatListingQuote(
-            listingDisplayPrice?.amount ?? listing.price,
-            listingDisplayPrice?.currency ?? (isDigitalArt ? "SOL" : currency)
+            listingPayablePrice.amount,
+            listingPayablePrice.currency ?? (isDigitalArt ? "SOL" : currency)
           )}`
         );
       } else {

@@ -19,10 +19,7 @@ import {
   TRANSACTION_REQUEST_REJECTED_MESSAGE,
 } from "@/lib/client/transaction-errors";
 import PriceHistory from "@/components/PriceHistory";
-import { resolveListingDisplayPrice } from "@/lib/data";
-import {
-  getExternalMarketplaceTotalPrice,
-} from "@/lib/external-purchase-fees";
+import { resolveListingDisplayPrice, resolveListingPayablePrice } from "@/lib/data";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
 import { ArtifactePriceSection, TcgPlayerPriceBox } from "./_components/card-price-sections";
@@ -92,6 +89,9 @@ function CardDetailPageContent() {
     }
     setBuying(true);
     const cardDisplayPrice = resolveListingDisplayPrice(card);
+    const cardPayablePrice = resolveListingPayablePrice(card, {
+      collectionName: card.collection,
+    });
 
     try {
       showToast.info("Building transaction...");
@@ -178,7 +178,9 @@ function CardDetailPageContent() {
       if (isTransactionRequestRejected(error)) {
         showToast.error(TRANSACTION_REQUEST_REJECTED_MESSAGE);
       } else if (lowerMessage.includes("insufficient")) {
-        showToast.error(`Insufficient balance. Required: ${formatListingQuote(cardDisplayPrice.amount, cardDisplayPrice.currency)}`);
+        const requiredAmount = card.auctionListing ? card.auctionListing.price : cardPayablePrice.amount;
+        const requiredCurrency = card.auctionListing ? card.auctionListing.currency : cardPayablePrice.currency;
+        showToast.error(`Insufficient balance. Required: ${formatListingQuote(requiredAmount, requiredCurrency)}`);
       } else if (lowerMessage.includes("no longer available") || lowerMessage.includes("already been sold")) {
         showToast.error("This item has already been sold");
       } else if (message.includes("No active listing")) {
@@ -281,22 +283,13 @@ function CardDetailPageContent() {
     return <CardDetailNotFoundState backHref="/auctions/categories/tcg-cards" backLabel="TCG Cards" />;
   }
 
-  const displayPrice = resolveListingDisplayPrice(card);
-  const isExternalMarketplaceCard = !card.auctionListing && (
-    card.source === 'collector-crypt'
-    || card.source === 'phygitals'
-    || card.buyKind === 'tensorCompressed'
-    || card.buyKind === 'tensorStandard'
-  );
-  const primaryPrice = isExternalMarketplaceCard
-    ? getExternalMarketplaceTotalPrice(displayPrice.amount, {
-        source: card.source,
-        collectionName: card.collection,
-      })
-    : displayPrice.amount;
-  const primaryCurrency = displayPrice.currency;
+  const payablePrice = resolveListingPayablePrice(card, {
+    collectionName: card.collection,
+  });
+  const primaryPrice = card.auctionListing ? card.auctionListing.price : payablePrice.amount;
+  const primaryCurrency = card.auctionListing ? card.auctionListing.currency : payablePrice.currency;
   const buyPrice = card.auctionListing ? card.auctionListing.price : primaryPrice;
-  const buyCurrency = card.auctionListing ? card.auctionListing.currency : displayPrice.currency;
+  const buyCurrency = primaryCurrency;
   const formattedPrimaryAmount = primaryCurrency === 'SOL'
     ? primaryPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })
     : primaryPrice.toLocaleString();
