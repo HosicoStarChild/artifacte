@@ -174,6 +174,27 @@ export interface GetCuratedMarketplaceListingInput {
   mint: string;
 }
 
+export interface MarketplaceListingsPageBatch {
+  hasMore: boolean;
+  listings: ExternalMarketplaceListing[];
+  nextCursor: MarketplaceCursor;
+  unavailableSources?: MarketplaceSource[];
+}
+
+export interface AccumulateMarketplaceListingsPagesInput {
+  initialCursor: MarketplaceCursor;
+  loadPage: (cursor: MarketplaceCursor) => Promise<MarketplaceListingsPageBatch>;
+  maxPasses?: number;
+  minListings?: number;
+}
+
+export interface AccumulateMarketplaceListingsPagesResult {
+  hasMore: boolean;
+  listings: ExternalMarketplaceListing[];
+  nextCursor: MarketplaceCursor | null;
+  unavailableSources: MarketplaceSource[];
+}
+
 interface CurrencyInfo {
   mint: string;
   symbol: string;
@@ -259,6 +280,67 @@ function uniqueMarketplaceSources(
   sources: readonly MarketplaceSource[]
 ): MarketplaceSource[] {
   return Array.from(new Set(sources));
+}
+
+export function hasMarketplaceCursorAdvanced(
+  previous: MarketplaceCursor,
+  next: MarketplaceCursor
+): boolean {
+  return (
+    previous.meOffset !== next.meOffset ||
+    previous.tensorCursor !== next.tensorCursor ||
+    previous.meDone !== next.meDone ||
+    previous.tensorDone !== next.tensorDone
+  );
+}
+
+export async function accumulateMarketplaceListingsPages({
+  initialCursor,
+  loadPage,
+  maxPasses = 1,
+  minListings = 1,
+}: AccumulateMarketplaceListingsPagesInput): Promise<AccumulateMarketplaceListingsPagesResult> {
+  const normalizedMaxPasses = Math.max(maxPasses, 1);
+  const normalizedMinListings = Math.max(minListings, 1);
+  const unavailableSources = new Set<MarketplaceSource>();
+  let accumulatedListings: ExternalMarketplaceListing[] = [];
+  let currentCursor = initialCursor;
+  let nextCursor: MarketplaceCursor | null = null;
+  let hasMore = false;
+
+  for (let pass = 0; pass < normalizedMaxPasses; pass += 1) {
+    const page = await loadPage(currentCursor);
+    const cursorAdvanced = hasMarketplaceCursorAdvanced(currentCursor, page.nextCursor);
+
+    accumulatedListings = dedupeMarketplaceListings(
+      sortMarketplaceListings([...accumulatedListings, ...page.listings])
+    );
+    hasMore = page.hasMore;
+    nextCursor = page.nextCursor;
+
+    for (const source of page.unavailableSources ?? []) {
+      unavailableSources.add(source);
+    }
+
+    if (!cursorAdvanced) {
+      hasMore = false;
+      nextCursor = null;
+      break;
+    }
+
+    if (accumulatedListings.length >= normalizedMinListings || !page.hasMore) {
+      break;
+    }
+
+    currentCursor = page.nextCursor;
+  }
+
+  return {
+    hasMore,
+    listings: accumulatedListings,
+    nextCursor: hasMore ? nextCursor : null,
+    unavailableSources: uniqueMarketplaceSources(Array.from(unavailableSources)),
+  };
 }
 
 function buildMarketplaceWarning(

@@ -1,17 +1,21 @@
 import assert from "node:assert";
 
 import {
+  accumulateMarketplaceListingsPages,
   buildMarketplaceState,
   createStaleMarketplaceResult,
   decodeCursor,
   dedupeMarketplaceListings,
   encodeCursor,
+  hasMarketplaceCursorAdvanced,
   normalizeMagicEdenListing,
   normalizeTensorListing,
   sortMarketplaceListings,
   type CuratedMarketplaceListingsResult,
   type ExternalMarketplaceListing,
   type HeliusAsset,
+  type MarketplaceListingsPageBatch,
+  type MarketplaceCursor,
 } from "../app/lib/digital-art-marketplaces.helpers.ts";
 
 const COLLECTION_ADDRESS = "Collection1111111111111111111111111111111111";
@@ -57,6 +61,16 @@ function createListing(
     listedAt,
     buyKind: "tensorStandard",
     marketplaceUrl: `https://example.com/${id}`,
+  };
+}
+
+function createCursor(overrides: Partial<MarketplaceCursor> = {}): MarketplaceCursor {
+  return {
+    meOffset: 0,
+    tensorCursor: null,
+    meDone: false,
+    tensorDone: false,
+    ...overrides,
   };
 }
 
@@ -170,5 +184,79 @@ describe("digital-art-marketplaces helpers", () => {
       ["listing-b", "listing-a"]
     );
     assert.equal(deduped[0]?.listedAt, 150);
+  });
+
+  it("detects when marketplace cursors advance", () => {
+    assert.equal(
+      hasMarketplaceCursorAdvanced(createCursor(), createCursor({ meOffset: 32 })),
+      true
+    );
+    assert.equal(
+      hasMarketplaceCursorAdvanced(
+        createCursor({ tensorCursor: "cursor-a" }),
+        createCursor({ tensorCursor: "cursor-a" })
+      ),
+      false
+    );
+  });
+
+  it("accumulates filtered empty pages until listings are available", async () => {
+    const seenCursors: MarketplaceCursor[] = [];
+
+    const result = await accumulateMarketplaceListingsPages({
+      initialCursor: createCursor(),
+      maxPasses: 3,
+      minListings: 1,
+      loadPage: async (cursor): Promise<MarketplaceListingsPageBatch> => {
+        seenCursors.push(cursor);
+
+        if (seenCursors.length === 1) {
+          return {
+            hasMore: true,
+            listings: [],
+            nextCursor: createCursor({ meOffset: 32 }),
+            unavailableSources: ["magiceden"],
+          };
+        }
+
+        return {
+          hasMore: false,
+          listings: [createListing("listing-c", 3_000_000_000, 200)],
+          nextCursor: createCursor({ meOffset: 64, meDone: true, tensorDone: true }),
+          unavailableSources: ["tensor"],
+        };
+      },
+    });
+
+    assert.deepEqual(seenCursors, [createCursor(), createCursor({ meOffset: 32 })]);
+    assert.equal(result.hasMore, false);
+    assert.equal(result.nextCursor, null);
+    assert.deepEqual(
+      result.listings.map((listing) => listing.id),
+      ["listing-c"]
+    );
+    assert.deepEqual(result.unavailableSources.sort(), ["magiceden", "tensor"]);
+  });
+
+  it("stops pagination when the upstream cursor does not advance", async () => {
+    const stagnantCursor = createCursor({ meOffset: 32, tensorCursor: "cursor-a" });
+
+    const result = await accumulateMarketplaceListingsPages({
+      initialCursor: stagnantCursor,
+      loadPage: async () => ({
+        hasMore: true,
+        listings: [createListing("listing-d", 4_000_000_000, 250)],
+        nextCursor: stagnantCursor,
+        unavailableSources: ["tensor"],
+      }),
+    });
+
+    assert.equal(result.hasMore, false);
+    assert.equal(result.nextCursor, null);
+    assert.deepEqual(
+      result.listings.map((listing) => listing.id),
+      ["listing-d"]
+    );
+    assert.deepEqual(result.unavailableSources, ["tensor"]);
   });
 });
