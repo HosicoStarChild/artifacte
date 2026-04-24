@@ -16,6 +16,7 @@ import {
   encodeCursor,
   extractMagicEdenMint,
   extractTensorMint,
+  getTensorCollectionPagination,
   getCollectionByAddress,
   getMarketplaceIds,
   getSiblingCollectionAddresses,
@@ -93,6 +94,10 @@ interface TensorCollectionListingsResponse {
   listings?: TensorListingRaw[] | null;
   nextCursor?: string | null;
   cursor?: string | null;
+  page?: {
+    endCursor?: string | null;
+    hasMore?: boolean | null;
+  } | null;
   pagination?: {
     nextCursor?: string | null;
   } | null;
@@ -397,17 +402,12 @@ async function fetchTensorCollectionListings(
     : Array.isArray(payload.listings)
       ? payload.listings
       : [];
-
-  const nextCursor =
-    payload.nextCursor ||
-    payload.cursor ||
-    payload.pagination?.nextCursor ||
-    null;
+  const { hasMore, nextCursor } = getTensorCollectionPagination(payload);
 
   return {
     listings,
     nextCursor,
-    hasMore: Boolean(nextCursor),
+    hasMore,
   };
 }
 
@@ -437,16 +437,18 @@ async function loadCuratedMarketplaceListingsFresh(
   const unavailableSources = new Set<MarketplaceSource>();
   const isFirstPage = !input.cursor;
   const initialCursor = decodeCursor(input.cursor);
+  const shouldIncludeMagicEden = input.source !== "tensor";
+  const shouldIncludeTensor = input.source !== "magiceden";
 
-  if (tensorIdentifier && !resolvedTensorCollId) {
+  if (shouldIncludeTensor && tensorIdentifier && !resolvedTensorCollId) {
     unavailableSources.add("tensor");
   }
 
   const [meCount, tensorCount] = await Promise.all([
-    isFirstPage && magicEdenSymbol
+    isFirstPage && !input.source && magicEdenSymbol
       ? fetchMagicEdenListedCount(magicEdenSymbol)
       : Promise.resolve(null),
-    isFirstPage && resolvedTensorCollId
+    isFirstPage && !input.source && resolvedTensorCollId
       ? fetchTensorListedCount(resolvedTensorCollId)
       : Promise.resolve(null),
   ] as const);
@@ -457,7 +459,7 @@ async function loadCuratedMarketplaceListingsFresh(
     minListings: 1,
     loadPage: async (cursor) => {
       const magicEdenRequest: Promise<MarketplaceFetchResult<MagicEdenPage>> =
-        magicEdenSymbol && !cursor.meDone
+        shouldIncludeMagicEden && magicEdenSymbol && !cursor.meDone
           ? fetchMagicEdenCollectionListings(magicEdenSymbol, cursor.meOffset, limit)
               .then((page) => ({ error: null, page }))
               .catch((error) => ({
@@ -473,7 +475,7 @@ async function loadCuratedMarketplaceListingsFresh(
             });
 
       const tensorRequest: Promise<MarketplaceFetchResult<TensorPage>> =
-        resolvedTensorCollId && !cursor.tensorDone
+        shouldIncludeTensor && resolvedTensorCollId && !cursor.tensorDone
           ? fetchTensorCollectionListings(
               resolvedTensorCollId,
               cursor.tensorCursor || null,
@@ -560,16 +562,28 @@ async function loadCuratedMarketplaceListingsFresh(
         `[marketplace] ME raw: ${magicEdenPage.listings.length}, verified: ${magicEdenListings.length}, Tensor raw: ${tensorPage.listings.length}, verified: ${tensorListings.length}, mints: ${mintCandidates.length}, assets: ${assetMap.size}`
       );
 
+      const scopedListings = input.source === "magiceden"
+        ? magicEdenListings
+        : input.source === "tensor"
+          ? tensorListings
+          : [...magicEdenListings, ...tensorListings];
+
+      const hasMore = input.source === "magiceden"
+        ? magicEdenPage.hasMore
+        : input.source === "tensor"
+          ? tensorPage.hasMore
+          : Boolean(magicEdenPage.hasMore || tensorPage.hasMore);
+
       return {
-        hasMore: Boolean(magicEdenPage.hasMore || tensorPage.hasMore),
-        listings: dedupeMarketplaceListings(
-          sortMarketplaceListings([...magicEdenListings, ...tensorListings])
-        ),
+        hasMore,
+        listings: dedupeMarketplaceListings(sortMarketplaceListings(scopedListings)),
         nextCursor: {
-          meOffset: magicEdenPage.nextOffset,
-          tensorCursor: tensorPage.nextCursor || null,
-          meDone: !magicEdenPage.hasMore,
-          tensorDone: !tensorPage.hasMore,
+          meOffset: shouldIncludeMagicEden ? magicEdenPage.nextOffset : cursor.meOffset,
+          tensorCursor: shouldIncludeTensor
+            ? tensorPage.nextCursor || null
+            : cursor.tensorCursor,
+          meDone: shouldIncludeMagicEden ? !magicEdenPage.hasMore : cursor.meDone,
+          tensorDone: shouldIncludeTensor ? !tensorPage.hasMore : cursor.tensorDone,
         },
         unavailableSources: Array.from(pageUnavailableSources),
       };
@@ -590,7 +604,7 @@ async function loadCuratedMarketplaceListingsFresh(
       : null,
     hasMore: accumulatedResult.hasMore,
     state,
-    ...(isFirstPage && {
+    ...(isFirstPage && !input.source && {
       sourceCounts: {
         magiceden:
           dedupedListings.filter((listing) => listing.source === "magiceden").length ||

@@ -3,10 +3,12 @@ import assert from "node:assert";
 import {
   accumulateMarketplaceListingsPages,
   buildMarketplaceState,
+  createMarketplaceListingsCacheKey,
   createStaleMarketplaceResult,
   decodeCursor,
   dedupeMarketplaceListings,
   encodeCursor,
+  getTensorCollectionPagination,
   hasMarketplaceCursorAdvanced,
   normalizeMagicEdenListing,
   normalizeTensorListing,
@@ -89,6 +91,57 @@ describe("digital-art-marketplaces helpers", () => {
       meDone: true,
       tensorDone: false,
     });
+  });
+
+  it("uses source in marketplace cache keys", () => {
+    const tensorKey = createMarketplaceListingsCacheKey(
+      {
+        collectionAddress: COLLECTION_ADDRESS,
+        cursor: "cursor-a",
+        source: "tensor",
+      },
+      32
+    );
+
+    const magicEdenKey = createMarketplaceListingsCacheKey(
+      {
+        collectionAddress: COLLECTION_ADDRESS,
+        cursor: "cursor-a",
+        source: "magiceden",
+      },
+      32
+    );
+
+    assert.notEqual(tensorKey, magicEdenKey);
+  });
+
+  it("reads Tensor collection pagination from page metadata", () => {
+    assert.deepEqual(
+      getTensorCollectionPagination({
+        page: {
+          endCursor: "cursor-page-2",
+          hasMore: true,
+        },
+      }),
+      {
+        hasMore: true,
+        nextCursor: "cursor-page-2",
+      }
+    );
+
+    assert.deepEqual(
+      getTensorCollectionPagination({
+        page: {
+          endCursor: null,
+          hasMore: false,
+        },
+        nextCursor: "legacy-cursor",
+      }),
+      {
+        hasMore: false,
+        nextCursor: "legacy-cursor",
+      }
+    );
   });
 
   it("merges unavailable sources when serving stale fallback results", () => {

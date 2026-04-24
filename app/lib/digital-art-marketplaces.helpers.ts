@@ -148,6 +148,18 @@ export interface TensorPage {
   hasMore: boolean;
 }
 
+export interface TensorCollectionPaginationLike {
+  cursor?: string | null;
+  nextCursor?: string | null;
+  pagination?: {
+    nextCursor?: string | null;
+  } | null;
+  page?: {
+    endCursor?: string | null;
+    hasMore?: boolean | null;
+  } | null;
+}
+
 export interface CuratedCollectionFile {
   collections: AllowlistEntry[];
 }
@@ -166,6 +178,7 @@ export interface GetCuratedMarketplaceListingsInput {
   collectionAddress: string;
   cursor?: string | null;
   limit?: number;
+  source?: MarketplaceSource;
 }
 
 export interface GetCuratedMarketplaceListingInput {
@@ -422,6 +435,7 @@ export function createMarketplaceListingsCacheKey(
     collectionAddress: input.collectionAddress,
     cursor: input.cursor || null,
     limit,
+    source: input.source || null,
   });
 }
 
@@ -429,6 +443,26 @@ export function createMarketplaceListingDetailCacheKey(
   input: GetCuratedMarketplaceListingInput
 ): string {
   return JSON.stringify(input);
+}
+
+export function getTensorCollectionPagination(
+  payload: TensorCollectionPaginationLike
+): { hasMore: boolean; nextCursor: string | null } {
+  const nextCursor =
+    payload.page?.endCursor ||
+    payload.nextCursor ||
+    payload.cursor ||
+    payload.pagination?.nextCursor ||
+    null;
+  const hasMore =
+    typeof payload.page?.hasMore === "boolean"
+      ? payload.page.hasMore
+      : Boolean(nextCursor);
+
+  return {
+    hasMore,
+    nextCursor,
+  };
 }
 
 export function shouldKeepMarketplaceFallback(

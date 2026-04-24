@@ -157,6 +157,16 @@ function MarketplaceLoadingGrid() {
   );
 }
 
+function createInitialHasMoreBySource(
+  availableSources: readonly MarketplaceSource[],
+  initialHasMore: boolean
+): Record<MarketplaceSource, boolean> {
+  return {
+    magiceden: availableSources.includes("magiceden") ? initialHasMore : false,
+    tensor: availableSources.includes("tensor") ? initialHasMore : false,
+  };
+}
+
 export function CollectionMarketplaceSection({
   collection,
   initialHasMore,
@@ -178,7 +188,9 @@ export function CollectionMarketplaceSection({
 
   const [marketplaceListings, setMarketplaceListings] = useState(initialListings);
   const [marketplaceNextCursor, setMarketplaceNextCursor] = useState(initialNextCursor);
-  const [hasMoreMarketplace, setHasMoreMarketplace] = useState(initialHasMore);
+  const [hasMoreBySource, setHasMoreBySource] = useState<Record<MarketplaceSource, boolean>>(
+    () => createInitialHasMoreBySource(availableSources, initialHasMore)
+  );
   const [marketplaceSourceCounts, setMarketplaceSourceCounts] = useState(initialSourceCounts);
   const [marketplaceState, setMarketplaceState] = useState(initialState);
   const [marketplaceError, setMarketplaceError] = useState("");
@@ -208,6 +220,8 @@ export function CollectionMarketplaceSection({
     });
   }, [marketplaceListings, sortOrder, sourceFilter]);
 
+  const hasMoreMarketplace = hasMoreBySource[sourceFilter];
+
   async function loadMarketplaceListings(reset: boolean): Promise<void> {
     if (reset) {
       setMarketplaceError("");
@@ -220,6 +234,7 @@ export function CollectionMarketplaceSection({
       const searchParams = new URLSearchParams({
         collection: collection.collectionAddress,
         limit: "32",
+        source: sourceFilter,
       });
 
       const cursor = reset ? null : marketplaceNextCursor;
@@ -243,7 +258,10 @@ export function CollectionMarketplaceSection({
       );
       setMarketplaceError("");
       setMarketplaceNextCursor(payload.nextCursor ?? null);
-      setHasMoreMarketplace(payload.hasMore);
+      setHasMoreBySource((previous) => ({
+        ...previous,
+        [sourceFilter]: payload.hasMore,
+      }));
       if (payload.sourceCounts) {
         setMarketplaceSourceCounts(payload.sourceCounts);
       }
@@ -263,6 +281,27 @@ export function CollectionMarketplaceSection({
   const loadMoreMarketplaceListings = useEffectEvent(async () => {
     await loadMarketplaceListings(false);
   });
+
+  useEffect(() => {
+    if (
+      filteredListings.length > 0 ||
+      !hasMoreMarketplace ||
+      loadingMarketplace ||
+      loadingMoreMarketplace ||
+      marketplaceError
+    ) {
+      return;
+    }
+
+    void loadMoreMarketplaceListings();
+  }, [
+    filteredListings.length,
+    hasMoreMarketplace,
+    loadingMarketplace,
+    loadingMoreMarketplace,
+    marketplaceError,
+    loadMoreMarketplaceListings,
+  ]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
