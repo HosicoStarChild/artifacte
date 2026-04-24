@@ -2,7 +2,7 @@
 
 This document explains how the admin mint flow currently works in Artifacte.
 
-It is based on the live implementation in [app/admin/mint/content.tsx](app/admin/mint/content.tsx), the metadata helpers in [lib/nft-metadata.ts](lib/nft-metadata.ts), the admin wallet definitions in [lib/admin.ts](lib/admin.ts), and the RPC proxy in [app/api/rpc/route.ts](app/api/rpc/route.ts).
+It is based on the live implementation in [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx), the metadata helpers in [lib/nft-metadata.ts](lib/nft-metadata.ts), the admin wallet definitions in [lib/admin.ts](lib/admin.ts), and the RPC proxy in [app/api/rpc/route.ts](app/api/rpc/route.ts).
 
 ## Overview
 
@@ -20,9 +20,9 @@ At a high level, the process is:
 
 ## Entry Point
 
-The active mint UI lives in [app/admin/mint/content.tsx](app/admin/mint/content.tsx).
+The active mint UI lives in [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx).
 
-The admin page imports and renders `MintFormContent`, which returns `MintFormInner`. That inner component owns:
+The admin page imports and renders `MintFormContent` from [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx), which returns `MintFormInner`. That inner component owns:
 
 - form state
 - collection authority checks
@@ -33,7 +33,7 @@ The admin page imports and renders `MintFormContent`, which returns `MintFormInn
 
 ## Access Model
 
-The UI checks wallet access using `hasAdminAccess()` from [lib/admin.ts](lib/admin.ts).
+The embedded mint tab is gated by `isOwnerWallet()` from [lib/admin.ts](lib/admin.ts).
 
 Current admin-related wallet sets are:
 
@@ -43,7 +43,7 @@ Current admin-related wallet sets are:
 
 Important distinction:
 
-- Being an admin wallet lets you access the admin mint interface.
+- Only the owner wallet can access the embedded admin mint interface.
 - It does **not** automatically mean you can mint into every Metaplex Core collection.
 
 Collection mint permission is controlled separately by the collection's **update authority** or **update delegate**.
@@ -170,7 +170,7 @@ The form currently prefills the collection field with the `ARTIFACTE_COLLECTION`
 
 ### Preflight collection validation
 
-Before minting, the UI runs `validateCollectionAccess()` inside [app/admin/mint/content.tsx](app/admin/mint/content.tsx).
+Before minting, the UI runs `validateCollectionAccess()` inside [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx).
 
 That function:
 
@@ -231,7 +231,7 @@ Current collection settings:
 
 ## Off-Chain Metadata Generation
 
-The off-chain metadata is built by `generateMetadata()` in [app/admin/mint/content.tsx](app/admin/mint/content.tsx), which delegates final JSON shaping to `buildMetaplexCompatibleMetadata()` in [lib/nft-metadata.ts](lib/nft-metadata.ts).
+The off-chain metadata is built by `generateMetadata()` in [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx), which delegates final JSON shaping to `buildMetaplexCompatibleMetadata()` in [lib/nft-metadata.ts](lib/nft-metadata.ts).
 
 ### Metadata structure
 
@@ -306,7 +306,7 @@ Only after all of that succeeds does the app proceed to the on-chain mint instru
 
 ## On-Chain Mint Transaction
 
-The actual mint happens in `handleMint()` in [app/admin/mint/content.tsx](app/admin/mint/content.tsx).
+The actual mint happens in `handleMint()` in [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx).
 
 ### What gets sent to Core
 
@@ -429,7 +429,7 @@ This is the real success path in order:
 
 Main implementation files:
 
-- [app/admin/mint/content.tsx](app/admin/mint/content.tsx)
+- [app/admin/_components/mint-form-content.tsx](app/admin/_components/mint-form-content.tsx)
 - [lib/nft-metadata.ts](lib/nft-metadata.ts)
 - [lib/admin.ts](lib/admin.ts)
 - [app/api/rpc/route.ts](app/api/rpc/route.ts)

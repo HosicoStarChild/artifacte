@@ -2,43 +2,30 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
+import {
+  DEFAULT_AGENT_CATEGORY,
+  normalizeAgentCategories,
+  normalizeAgentPermissions,
+  toOwnerAgentRecord,
+  toOwnerAgentSecretRecord,
+  toPublicAgentRecord,
+  type AgentBudgetStatus,
+  type AgentPermissions,
+  type AgentRecord,
+  type AgentSpendingLimit,
+  type AgentSpendingLimits,
+  type AgentsData,
+  type OwnerAgentRecord,
+  type OwnerAgentSecretRecord,
+  type PublicAgentRecord,
+} from "@/lib/agents";
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const AGENTS_FILE = path.join(DATA_DIR, "agents.json");
 
-export interface SpendingLimit {
-  enabled: boolean;
-  limit: number;
-  currency: "SOL" | "USD1";
-  spent: number;
-  resetAt: number;
-}
+export type SpendingLimit = AgentSpendingLimit;
 
-export interface SpendingLimits {
-  daily: SpendingLimit;
-  weekly: SpendingLimit;
-  monthly: SpendingLimit;
-}
-
-export interface AgentRecord {
-  walletAddress: string;
-  agentName: string;
-  apiKey: string;
-  nftMint: string;
-  agentAssetAddress?: string; // 8004 agent asset address
-  permissions: {
-    Trade: boolean;
-    Bid: boolean;
-    Chat: boolean;
-  };
-  categories: string[];
-  createdAt: number;
-  connectionStatus: "connected" | "disconnected";
-  spendingLimits?: SpendingLimits;
-}
-
-interface AgentsData {
-  agents: Record<string, AgentRecord>;
-}
+export type SpendingLimits = AgentSpendingLimits;
 
 /**
  * Generate a unique API key
@@ -57,6 +44,38 @@ function ensureDataDir() {
   }
 }
 
+function createEmptyAgentsData(): AgentsData {
+  return { agents: {} };
+}
+
+function normalizeRecord(record: Partial<AgentRecord>, apiKey: string): AgentRecord | null {
+  if (
+    !record.walletAddress ||
+    !record.agentName ||
+    !record.nftMint ||
+    typeof record.createdAt !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    walletAddress: record.walletAddress,
+    agentName: record.agentName,
+    apiKey,
+    nftMint: record.nftMint,
+    agentAssetAddress: record.agentAssetAddress,
+    description: record.description,
+    imageUri: record.imageUri,
+    permissions: normalizeAgentPermissions(record.permissions),
+    categories: normalizeAgentCategories(record.categories ?? []),
+    createdAt: record.createdAt,
+    connectionStatus: record.connectionStatus === "connected" ? "connected" : "disconnected",
+    saidVerified: Boolean(record.saidVerified),
+    services: record.services,
+    spendingLimits: record.spendingLimits,
+  };
+}
+
 /**
  * Load agents from JSON file
  */
@@ -65,13 +84,32 @@ function loadAgents(): AgentsData {
   if (fs.existsSync(AGENTS_FILE)) {
     try {
       const data = fs.readFileSync(AGENTS_FILE, "utf-8");
-      return JSON.parse(data);
+      const parsed = JSON.parse(data) as { agents?: Record<string, Partial<AgentRecord>> };
+
+      if (!parsed.agents) {
+        return createEmptyAgentsData();
+      }
+
+      const records = Object.entries(parsed.agents).reduce<Record<string, AgentRecord>>(
+        (allRecords, [apiKey, rawRecord]) => {
+          const normalizedRecord = normalizeRecord(rawRecord, apiKey);
+
+          if (normalizedRecord) {
+            allRecords[apiKey] = normalizedRecord;
+          }
+
+          return allRecords;
+        },
+        {}
+      );
+
+      return { agents: records };
     } catch (e) {
       console.error("Failed to load agents file:", e);
-      return { agents: {} };
+      return createEmptyAgentsData();
     }
   }
-  return { agents: {} };
+  return createEmptyAgentsData();
 }
 
 /**
@@ -79,7 +117,10 @@ function loadAgents(): AgentsData {
  */
 function saveAgents(data: AgentsData) {
   ensureDataDir();
-  fs.writeFileSync(AGENTS_FILE, JSON.stringify(data, null, 2));
+  const tempFile = `${AGENTS_FILE}.tmp`;
+
+  fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf-8");
+  fs.renameSync(tempFile, AGENTS_FILE);
 }
 
 /**
@@ -154,12 +195,19 @@ export function registerAgentApiKey(
   agentName: string,
   apiKey: string,
   nftMint: string,
-  permissions: { Trade: boolean; Bid: boolean; Chat: boolean },
+  permissions: AgentPermissions,
   categories: string[] = [],
   spendingLimits?: SpendingLimits,
-  agentAssetAddress?: string
+  agentAssetAddress?: string,
+  details?: Pick<AgentRecord, "description" | "imageUri" | "saidVerified" | "services">
 ): AgentRecord {
   const data = loadAgents();
+
+  for (const [currentApiKey, existingRecord] of Object.entries(data.agents)) {
+    if (existingRecord.walletAddress === walletAddress) {
+      delete data.agents[currentApiKey];
+    }
+  }
 
   const record: AgentRecord = {
     walletAddress,
@@ -167,10 +215,14 @@ export function registerAgentApiKey(
     apiKey,
     nftMint,
     agentAssetAddress,
-    permissions,
-    categories: categories.length > 0 ? categories : ["Digital Art"],
+    description: details?.description,
+    imageUri: details?.imageUri,
+    permissions: normalizeAgentPermissions(permissions),
+    categories: categories.length > 0 ? normalizeAgentCategories(categories) : [DEFAULT_AGENT_CATEGORY],
     createdAt: Date.now(),
     connectionStatus: "disconnected",
+    saidVerified: details?.saidVerified,
+    services: details?.services,
     spendingLimits: spendingLimits || createDefaultSpendingLimits(),
   };
 
@@ -194,8 +246,21 @@ export function verifyApiKey(
   }
 
   // Return agent info without the API key
-  const { apiKey: _, ...agentInfo } = record;
-  return agentInfo;
+  return {
+    walletAddress: record.walletAddress,
+    agentName: record.agentName,
+    nftMint: record.nftMint,
+    agentAssetAddress: record.agentAssetAddress,
+    description: record.description,
+    imageUri: record.imageUri,
+    permissions: record.permissions,
+    categories: record.categories,
+    createdAt: record.createdAt,
+    connectionStatus: record.connectionStatus,
+    saidVerified: record.saidVerified,
+    services: record.services,
+    spendingLimits: record.spendingLimits,
+  };
 }
 
 /**
@@ -203,7 +268,40 @@ export function verifyApiKey(
  */
 export function getAllAgents(): Array<Omit<AgentRecord, "apiKey">> {
   const data = loadAgents();
-  return Object.values(data.agents).map(({ apiKey: _, ...agent }) => agent);
+  return Object.values(data.agents).map((record) => ({
+    walletAddress: record.walletAddress,
+    agentName: record.agentName,
+    nftMint: record.nftMint,
+    agentAssetAddress: record.agentAssetAddress,
+    description: record.description,
+    imageUri: record.imageUri,
+    permissions: record.permissions,
+    categories: record.categories,
+    createdAt: record.createdAt,
+    connectionStatus: record.connectionStatus,
+    saidVerified: record.saidVerified,
+    services: record.services,
+    spendingLimits: record.spendingLimits,
+  }));
+}
+
+export function getPublicAgents(): PublicAgentRecord[] {
+  const data = loadAgents();
+
+  return Object.values(data.agents)
+    .map((record) => toPublicAgentRecord(record))
+    .sort((left, right) => right.createdAt - left.createdAt);
+}
+
+export function getPublicAgentByAssetAddress(
+  agentAssetAddress: string
+): PublicAgentRecord | null {
+  const data = loadAgents();
+  const record = Object.values(data.agents).find(
+    (agent) => agent.agentAssetAddress === agentAssetAddress
+  );
+
+  return record ? toPublicAgentRecord(record) : null;
 }
 
 /**
@@ -217,13 +315,33 @@ export function getAgentByWallet(walletAddress: string): AgentRecord | null {
   );
 }
 
+export function getAgentByApiKey(apiKey: string): AgentRecord | null {
+  const data = loadAgents();
+  return data.agents[apiKey] ?? null;
+}
+
+export function getOwnerAgentByWallet(
+  walletAddress: string,
+  includeSecret = false
+): OwnerAgentRecord | OwnerAgentSecretRecord | null {
+  const record = getAgentByWallet(walletAddress);
+
+  if (!record) {
+    return null;
+  }
+
+  return includeSecret
+    ? toOwnerAgentSecretRecord(record)
+    : toOwnerAgentRecord(record);
+}
+
 /**
  * Regenerate API key for an agent
  */
 export function regenerateApiKey(walletAddress: string): AgentRecord | null {
   const data = loadAgents();
   const oldRecord = Object.entries(data.agents).find(
-    ([_, record]) => record.walletAddress === walletAddress
+    ([currentApiKey, record]) => Boolean(currentApiKey) && record.walletAddress === walletAddress
   );
 
   if (!oldRecord) {
@@ -456,4 +574,10 @@ export function getBudgetStatus(walletAddress: string): {
           : 0,
     },
   };
+}
+
+export function getTypedBudgetStatus(
+  walletAddress: string
+): AgentBudgetStatus | null {
+  return getBudgetStatus(walletAddress);
 }

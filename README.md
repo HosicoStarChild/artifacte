@@ -10,27 +10,40 @@ Dark luxury UI with wallet integration, live auction bidding, and portfolio mana
 ## Architecture
 
 ### Smart Contracts (Anchor/Rust)
-Two Anchor programs in `/programs/`:
+Anchor program in `/programs/`:
 
-1. **rwa_nft** — Mint full NFTs representing real-world assets with metadata (name, category, appraised value, condition grade, image URI). Supports 7 asset categories. Each asset is a single NFT — no fractionalization.
+1. **auction** — Marketplace and auction logic with escrow via PDAs and fixed-price support for the current Artifacte flows.
 
-2. **auction** — Timed auction system with escrow via PDAs. Place bids with SOL (must beat current), auto-refund previous bidder, settle after end time. Winner receives the full NFT.
-
-### Frontend (Next.js 14)
+### Frontend (Next.js 16)
 - **Homepage**: Portfolio grid, live auctions carousel, recent listings
 - **`/auctions`**: All live auctions grid
 - **`/auctions/[slug]`**: Bid history, price chart, countdown timer, place bid (on-chain)
 - Wallet connect (Phantom/Solflare) via `@solana/wallet-adapter`
-- Dark navy/black + gold accent luxury UI
+- Dark navy/black + gold accent luxury UI with shadcn/ui primitives
 - Responsive/mobile friendly
 
 ## Quick Start
 
 ### Frontend
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 # Open http://localhost:3000
+```
+
+Oracle data:
+- The frontend uses the hosted Artifacte oracle by default.
+- If you want to run against a local oracle from `../artifacte-oracle`, set `ORACLE_URL` and `NEXT_PUBLIC_ORACLE_URL` to `http://localhost:4567` before starting the app.
+
+Requirements:
+- Node.js 20.9+
+- pnpm 10+
+
+Useful commands:
+```bash
+pnpm build
+pnpm lint
+pnpm typecheck
 ```
 
 ### Smart Contracts (requires Rust + Anchor CLI)
@@ -42,7 +55,7 @@ anchor deploy --provider.cluster devnet
 ```
 
 ## Tech Stack
-- **Frontend**: Next.js 14, React 18, Tailwind CSS, TypeScript
+- **Frontend**: Next.js 16, React 19, Tailwind CSS, TypeScript, shadcn/ui
 - **Blockchain**: Solana (devnet), Anchor Framework
 - **Wallet**: @solana/wallet-adapter (Phantom, Solflare)
 - **Packages**: @coral-xyz/anchor, @solana/web3.js
@@ -57,7 +70,7 @@ anchor deploy --provider.cluster devnet
 ## Project Structure
 ```
 artifacte/
-├── app/                    # Next.js 14 app router
+├── app/                    # Next.js 16 app router
 │   ├── page.tsx           # Homepage
 │   ├── auctions/
 │   │   ├── page.tsx       # Auctions grid
@@ -65,16 +78,15 @@ artifacte/
 │   ├── layout.tsx
 │   └── globals.css
 ├── components/            # React components
+│   ├── ui/                # shadcn/ui primitives
 │   ├── WalletProvider.tsx
 │   ├── Navbar.tsx
 │   ├── Footer.tsx
-│   ├── AssetCard.tsx
 │   ├── AuctionCard.tsx
 │   └── Countdown.tsx
 ├── lib/
 │   └── data.ts           # Seed data + types
 ├── programs/              # Anchor smart contracts
-│   ├── rwa_nft/
 │   └── auction/
 ├── Anchor.toml
 └── README.md

@@ -14,7 +14,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeoutId);
     return response;
-  } catch (error: any) {
+  } catch (error) {
     clearTimeout(timeoutId);
     throw error;
   }
@@ -200,11 +200,11 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("Oracle API error:", error);
 
     // Handle timeout errors gracefully
-    if (error.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json(
         { error: "Oracle API timeout - price data unavailable" },
         { status: 504 }
@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error.message || "Failed to fetch oracle data" },
+      { error: error instanceof Error ? error.message : "Failed to fetch oracle data" },
       { status: 500 }
     );
   }
@@ -220,31 +220,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const endpoint = searchParams.get("endpoint");
-    const body = await req.json();
+    new URL(req.url);
 
-    if (endpoint === "agents-register") {
-      // Proxy to oracle agent registration (admin-authed)
-      const res = await fetchWithTimeout(`${ORACLE_API}/api/agents/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.ORACLE_ADMIN_TOKEN || "oracle-admin-2026-Qr7nWz"}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      return NextResponse.json(data, { status: res.status });
-    }
+    await req.text()
 
     return NextResponse.json({ error: "Unknown POST endpoint" }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "POST failed" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "POST failed" },
+      { status: 500 }
+    );
   }
 }
 
-export async function OPTIONS(req: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     headers: {
       "Access-Control-Allow-Origin": "*",

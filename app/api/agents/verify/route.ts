@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiKey, updateConnectionStatus } from "@/app/lib/api-keys";
+import { toOwnerAgentRecord } from "@/lib/agents";
+
+interface VerifyApiKeyRequestBody {
+  apiKey: string
+}
 
 /**
  * POST /api/agents/verify
@@ -8,7 +13,7 @@ import { verifyApiKey, updateConnectionStatus } from "@/app/lib/api-keys";
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as VerifyApiKeyRequestBody;
     const { apiKey } = body;
 
     if (!apiKey) {
@@ -29,14 +34,15 @@ export async function POST(req: NextRequest) {
 
     // Update connection status to connected
     updateConnectionStatus(apiKey, "connected");
+    const normalizedAgent = toOwnerAgentRecord({
+      ...agentInfo,
+      apiKey,
+    })
 
     return NextResponse.json({
       success: true,
       agent: {
-        walletAddress: agentInfo.walletAddress,
-        agentName: agentInfo.agentName,
-        nftMint: agentInfo.nftMint,
-        permissions: agentInfo.permissions,
+        ...normalizedAgent,
         connectionStatus: "connected",
       },
     });

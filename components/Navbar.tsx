@@ -1,21 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { MenuIcon } from "lucide-react";
 import { hasAdminAccess } from "@/lib/data";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { NavbarWalletButton } from "@/components/NavbarWalletButton";
+import { cn } from "@/lib/utils";
 
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
-);
+const navigationLinks = [
+  { href: "/", label: "Home" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/my-listings", label: "My Listings", requiresWallet: true },
+  { href: "/list", label: "List Item", requiresWallet: true },
+  { href: "/agents", label: "Agent Dashboard" },
+  { href: "/about", label: "About" },
+];
 
 export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { publicKey, connected } = useWallet();
   const isAdmin = connected && hasAdminAccess(publicKey?.toBase58());
+  const visibleNavigationLinks = navigationLinks.filter(
+    (link) => !link.requiresWallet || connected
+  );
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,110 +44,95 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      scrolled
-        ? "bg-dark-900/70 backdrop-blur-md border-b border-white/8"
-        : "bg-transparent border-b border-white/5"
-    }`}>
+    <nav
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 border-b transition-all duration-300",
+        scrolled
+          ? "border-white/10 bg-dark-900/80 shadow-[0_18px_54px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+          : "border-white/5 bg-dark-900/20 backdrop-blur-md"
+      )}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
             <div className="w-7 h-7 rounded-md bg-gold-500 flex items-center justify-center">
               <span className="text-dark-900 font-serif font-semibold text-sm">A</span>
             </div>
-            <span className="font-serif text-lg font-bold text-blue-900 dark:text-blue-100 tracking-tight italic" style={{ fontFamily: "'Playfair Display', Georgia, serif", letterSpacing: "-0.02em", color: "#f5f5f0" }}>Artifacte</span>
+            <span className="font-serif text-lg font-bold tracking-tight italic text-white">
+              Artifacte
+            </span>
           </Link>
 
-          {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-12 flex-1 justify-center px-8">
-            <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Home
-            </Link>
-            <Link href="/portfolio" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Portfolio
-            </Link>
-            {connected && (
-              <Link href="/my-listings" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-                My Listings
+            {visibleNavigationLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm text-gray-400 transition-colors duration-200 hover:text-white"
+              >
+                {link.label}
               </Link>
-            )}
-            {connected && (
-              <Link href="/list" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-                List Item
-              </Link>
-            )}
-            <Link href="/agents" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Agent Dashboard
-            </Link>
-            <Link href="/apply" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              Apply to List
-            </Link>
-            <Link href="/about" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-              About
-            </Link>
+            ))}
           </div>
 
-          {/* Admin + Wallet */}
           <div className="hidden md:flex items-center gap-4">
             {isAdmin && (
-              <Link href="/admin" className="text-sm text-gold-500 hover:text-gold-400 transition-colors duration-200 font-medium">
+              <Link
+                href="/admin"
+                className="rounded-full border border-gold-500/20 bg-gold-500/10 px-4 py-2 text-sm font-medium text-gold-500 transition-colors duration-200 hover:bg-gold-500/20"
+              >
                 Admin
               </Link>
             )}
-            <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-xs !font-semibold !px-5" />
+            <NavbarWalletButton />
           </div>
 
-          {/* Mobile Menu Button */}
-          <button className="md:hidden text-white p-2" onClick={() => setMenuOpen(!menuOpen)}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {menuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-white transition-colors hover:bg-white/10 md:hidden">
+              <MenuIcon className="size-5" />
+              <span className="sr-only">Open menu</span>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-[20rem] gap-0 border-l border-white/10 bg-dark-900/95 p-0 text-white backdrop-blur-xl"
+            >
+              <SheetHeader className="border-b border-white/10 pb-5">
+                <SheetTitle className="font-serif text-white">Artifacte</SheetTitle>
+                <SheetDescription className="text-gray-400">
+                  Navigate the marketplace and manage your wallet.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="flex flex-1 flex-col gap-2 px-4 py-5">
+                {visibleNavigationLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition-colors duration-200 hover:bg-white/10"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+
+              <Separator className="bg-white/10" />
+
+              <div className="space-y-3 p-4">
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="block rounded-xl border border-gold-500/20 bg-gold-500/10 px-4 py-3 text-sm font-medium text-gold-500 transition-colors duration-200 hover:bg-gold-500/20"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Admin
+                  </Link>
+                )}
+                <NavbarWalletButton mobile />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
-
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div className="md:hidden bg-dark-900 border-t border-white/5 py-4 space-y-3">
-            <Link href="/" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Home
-            </Link>
-            <Link href="/portfolio" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Portfolio
-            </Link>
-            {connected && (
-              <Link href="/my-listings" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-                My Listings
-              </Link>
-            )}
-            {connected && (
-              <Link href="/list" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-                List Item
-              </Link>
-            )}
-            <Link href="/agents" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Agent Dashboard
-            </Link>
-            <Link href="/apply" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              Apply to List
-            </Link>
-            <Link href="/about" className="block text-sm text-gray-400 hover:text-white px-4 py-2" onClick={() => setMenuOpen(false)}>
-              About
-            </Link>
-            {isAdmin && (
-              <Link href="/admin" className="block text-sm text-gold-500 hover:text-gold-400 font-medium px-4 py-2" onClick={() => setMenuOpen(false)}>
-                Admin
-              </Link>
-            )}
-            <div className="px-4 py-2">
-              <WalletMultiButton className="!bg-gold-500 hover:!bg-gold-600 !rounded-lg !h-10 !text-xs !font-semibold" />
-            </div>
-          </div>
-        )}
       </div>
     </nav>
   );

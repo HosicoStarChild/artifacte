@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 const ARWEAVE_GATEWAYS = [
   "https://gateway.irys.xyz",
   "https://ar-io.dev",

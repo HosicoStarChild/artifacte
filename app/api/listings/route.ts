@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { hasAdminAccess, isAdminWallet } from "@/lib/admin";
-
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+import { hasAdminAccess } from "@/lib/admin";
+import {
+  readSignedAdminJson,
+  toAdminRequestErrorResponse,
+} from "@/lib/server/admin-request";
 const LISTINGS_FILE = path.join(process.cwd(), "data", "pending-listings.json");
-const WHITELIST_FILE = path.join(process.cwd(), "data", "wallet-whitelist.json");
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 
 const BUNDLED_COLLECTIONS = [
@@ -38,6 +39,28 @@ interface PendingListing {
   reviewedAt?: number;
 }
 
+interface ListingRequestBody {
+  auctionDuration?: number;
+  collectionAddress?: string;
+  collectionName?: string;
+  description?: string;
+  listingType?: "fixed" | "auction";
+  nftImage?: string;
+  nftMint?: string;
+  nftName?: string;
+  price?: number | string;
+  seller?: string;
+}
+
+interface ListingPatchBody {
+  action?: "approve" | "reject";
+  id?: string;
+}
+
+interface AllowlistData {
+  collections: Array<{ collectionAddress?: string; mintAuthority?: string }>;
+}
+
 async function readListings(): Promise<{ listings: PendingListing[] }> {
   try {
     const content = await fs.readFile(LISTINGS_FILE, "utf-8");
@@ -51,22 +74,14 @@ async function writeListings(data: { listings: PendingListing[] }): Promise<void
   await fs.writeFile(LISTINGS_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
-async function isWalletWhitelisted(address: string): Promise<boolean> {
-  try {
-    const content = await fs.readFile(WHITELIST_FILE, "utf-8");
-    const data = JSON.parse(content);
-    return data.wallets.some((w: any) => w.address === address && w.enabled);
-  } catch {
-    return false;
-  }
-}
-
 async function isCollectionAllowed(collectionAddress: string): Promise<boolean> {
   try {
     const content = await fs.readFile(ALLOWLIST_FILE, "utf-8");
-    const data = JSON.parse(content);
-    return data.collections.some((c: any) => 
-      c.collectionAddress === collectionAddress || c.mintAuthority === collectionAddress
+    const data = JSON.parse(content) as AllowlistData;
+    return data.collections.some(
+      (collection) =>
+        collection.collectionAddress === collectionAddress ||
+        collection.mintAuthority === collectionAddress
     );
   } catch {
     return BUNDLED_COLLECTIONS.includes(collectionAddress);
@@ -97,7 +112,7 @@ export async function GET(req: NextRequest) {
 // POST — submit new listing
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as ListingRequestBody;
     const { nftMint, nftName, nftImage, collectionName, collectionAddress, seller, price, listingType, auctionDuration, description } = body;
 
     if (!nftMint || !seller || !price || !collectionAddress) {
@@ -112,6 +127,13 @@ export async function POST(req: NextRequest) {
 
     // No wallet whitelist — anyone with an approved collection NFT can submit
     // Admin approval queue is the final gate
+
+    const normalizedPrice =
+      typeof price === "number" ? price : Number.parseFloat(price);
+
+    if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 });
+    }
 
     const data = await readListings();
     
@@ -128,7 +150,7 @@ export async function POST(req: NextRequest) {
       collectionName: collectionName || "Unknown Collection",
       collectionAddress,
       seller,
-      price: parseFloat(price),
+      price: normalizedPrice,
       currency: "SOL",
       listingType: listingType || "fixed",
       auctionDuration: listingType === "auction" ? (auctionDuration || 72) : undefined,
@@ -141,20 +163,20 @@ export async function POST(req: NextRequest) {
     await writeListings(data);
 
     return NextResponse.json({ ok: true, listing });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to submit listing" },
+      { status: 500 }
+    );
   }
 }
 
 // PATCH — approve or reject (admin only)
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id, action, adminWallet, adminSecret } = body;
+    const { body } = await readSignedAdminJson<ListingPatchBody>(req, "admin");
+    const { id, action } = body;
 
-    if (!ADMIN_SECRET || !isAdminWallet(adminWallet) || adminSecret !== ADMIN_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
     if (!id || !action || !["approve", "reject"].includes(action)) {
       return NextResponse.json({ error: "Missing id or invalid action" }, { status: 400 });
     }
@@ -170,7 +192,10 @@ export async function PATCH(req: NextRequest) {
     await writeListings(data);
 
     return NextResponse.json({ ok: true, listing });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    return toAdminRequestErrorResponse(
+      error instanceof Error ? error : new Error("Failed to update listing"),
+      "Failed to update listing"
+    );
   }
 }

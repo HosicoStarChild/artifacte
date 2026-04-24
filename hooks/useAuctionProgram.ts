@@ -1,15 +1,14 @@
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
+import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { AuctionProgram } from "@/lib/auction-program";
 
 export function useAuctionProgram() {
-  const { connection } = useConnection();
-  const wallet = useWallet();
+  const { connection, anchorWallet } = useWalletCapabilities();
 
   const program = useMemo(() => {
-    if (!wallet.publicKey) return null;
-    return new AuctionProgram(connection, wallet as any);
-  }, [connection, wallet]);
+    if (!anchorWallet) return null;
+    return new AuctionProgram(connection, anchorWallet);
+  }, [anchorWallet, connection]);
 
   return program;
 }

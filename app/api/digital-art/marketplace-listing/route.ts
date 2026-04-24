@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { address } from "@solana/kit";
+
 import {
   getCuratedMarketplaceListing,
   type MarketplaceSource,
 } from "@/app/lib/digital-art-marketplaces";
+
+function parseAddress(value: string | null, fieldName: string): string {
+  if (!value?.trim()) {
+    throw new Error(`Missing ${fieldName}`);
+  }
+
+  return `${address(value.trim())}`;
+}
 
 function isMarketplaceSource(value: string | null): value is MarketplaceSource {
   return value === "magiceden" || value === "tensor";
@@ -11,13 +21,13 @@ function isMarketplaceSource(value: string | null): value is MarketplaceSource {
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const collectionAddress = searchParams.get("collection");
+    const collectionAddress = parseAddress(searchParams.get("collection"), "collection");
     const source = searchParams.get("source");
-    const mint = searchParams.get("mint");
+    const mint = parseAddress(searchParams.get("mint"), "mint");
 
-    if (!collectionAddress || !mint || !isMarketplaceSource(source)) {
+    if (!isMarketplaceSource(source)) {
       return NextResponse.json(
-        { ok: false, error: "Missing collection, mint, or source" },
+        { ok: false, error: "Missing source" },
         { status: 400 }
       );
     }
@@ -39,13 +49,16 @@ export async function GET(req: NextRequest) {
       ok: true,
       listing,
     });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch marketplace listing";
+    const status = message.startsWith("Missing") || message.startsWith("Invalid") ? 400 : 500;
+
     return NextResponse.json(
       {
         ok: false,
-        error: error?.message || "Failed to fetch marketplace listing",
+        error: message,
       },
-      { status: 500 }
+      { status }
     );
   }
 }

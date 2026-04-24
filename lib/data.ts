@@ -15,15 +15,12 @@ export const ARTIFACTE_COLLECTION = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS
 export const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-// BAXUS 10% seller fee — hardcoded until they migrate to Metaplex standard
-// Set to false to disable once BAXUS has royalties on-chain
-export const BAXUS_SELLER_FEE_ENABLED = true;
-export const BAXUS_SELLER_FEE_PERCENT = 10;
-
 export {
   getListingPurchaseCurrency,
   resolveListingDisplayPrice,
+  resolveListingPayablePrice,
   type ListingPriceInput,
+  type ListingPayablePrice,
   type ListingPrimaryCurrency,
 } from "./listing-price";
 
@@ -75,9 +72,9 @@ export interface Listing {
   category?: Category;
   nftMint?: string;
   verifiedBy?: string;
-  source?: 'baxus' | 'native' | 'collector-crypt' | 'phygitals' | 'artifacte';
+  source?: 'native' | 'collector-crypt' | 'phygitals' | 'artifacte';
   externalUrl?: string;
-  // BAXUS-specific fields
+  // Optional spirits metadata
   abv?: number | null;
   age?: number | null;
   country?: string | null;
@@ -96,8 +93,11 @@ export interface Listing {
   year?: number;
   ccCategory?: string; // original CC category (Pokemon, One Piece, etc.)
   ccUrl?: string;
+  marketplace?: string;
+  buyKind?: string;
   solPrice?: number | null;
   usdcPrice?: number | null;
+  collection?: string | null;
 }
 
 const now = Date.now();
@@ -105,16 +105,6 @@ const day = 86400000;
 
 // CC listings now served live from Railway oracle — no static bundle
 let ccListings: any[] = [];
-
-// Load BAXUS bottles data
-let baxusBottles: any[] = [];
-try {
-  // This will be loaded at build time via bundler
-  const baxusData = require('../data/baxus-bottles.json');
-  baxusBottles = baxusData.bottles || [];
-} catch (err) {
-  console.warn('Could not load BAXUS bottles data:', err instanceof Error ? err.message : String(err));
-}
 
 export const assets: Asset[] = [
   {
@@ -198,34 +188,6 @@ export const auctions: Auction[] = [
     ],
   },
   {
-    id: "a3", slug: "rare-whisky-cask",
-    name: "Macallan 1990 Sherry Cask",
-    subtitle: "RARE SPIRITS COLLECTION",
-    verifiedBy: "BAXUS", category: "SPIRITS", current_bid: 98500, start_price: 65000,
-    end_time: new Date(now + 3 * day).toISOString(),
-    image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=800",
-    description: "Single cask Macallan 1990 vintage matured in first-fill Oloroso sherry butt. Cask #4567, yielding approximately 580 bottles. Stored in bonded warehouse.",
-    bids: [
-      { bidder: "6hM4...wK2d", amount: 98500, time: new Date(now - 5400000).toISOString() },
-      { bidder: "1tR9...pV7e", amount: 92000, time: new Date(now - 21600000).toISOString() },
-      { bidder: "7xK9...mP2q", amount: 85000, time: new Date(now - 57600000).toISOString() },
-    ],
-  },
-  {
-    id: "a8", slug: "blantons-1984-first-release",
-    name: "Blanton's 1984 Bottling First Release",
-    subtitle: "ULTRA-RARE BOURBON",
-    verifiedBy: "BAXUS", category: "SPIRITS", current_bid: 11200, start_price: 8000,
-    end_time: new Date(now + 5 * day).toISOString(),
-    image: "/blantons-1984.webp",
-    description: "Blanton's 1984 Bottling First Release — one of the rarest bourbons in existence. First single barrel bourbon ever marketed. BAXUS authenticated and tokenized on Solana. NFT: AzvtfyKNpYcgavoYND9dGUBonbJR5DZeCEyX7UG7qvm2",
-    bids: [
-      { bidder: "Sin✨...c502", amount: 11200, time: new Date(now - 3600000).toISOString() },
-      { bidder: "7xK9...mP2q", amount: 10500, time: new Date(now - 14400000).toISOString() },
-      { bidder: "4fG2...nR8w", amount: 9800, time: new Date(now - 43200000).toISOString() },
-    ],
-  },
-  {
     id: "a4", slug: "picasso-lithograph",
     name: "Pablo Picasso Original Lithograph",
     subtitle: "FINE ART MASTERS",
@@ -260,7 +222,7 @@ export const auctions: Auction[] = [
 const nativeListings: Listing[] = [
   // TCG Cards — removed, real CC listings now
   // Sports Cards — removed, real CC listings now
-  // Spirits — removed, real BAXUS bottles now
+  // Spirits — no bundled listings
   // Watches
   { id: "l10", name: "Rolex Submariner Date 126610LN", subtitle: "Steel • 41mm • 2024", price: 14500, image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
   { id: "l11", name: "Patek Philippe Nautilus 5711/1A", subtitle: "Steel • Blue Dial • 2021", price: 145000, image: "https://images.unsplash.com/photo-1594534475808-b18fc33b045e?w=400", verifiedBy: "Chrono24", category: "WATCHES", source: "native" },
@@ -271,28 +233,6 @@ const nativeListings: Listing[] = [
   { id: "l18", name: "Neon Dreamscape", subtitle: "Photography • Limited Edition", price: 5, image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART", source: "native" },
   { id: "l19", name: "Abstract Genesis #7", subtitle: "Mixed Media • 1/1", price: 25, image: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=400", verifiedBy: "Metaplex", category: "DIGITAL_ART", source: "native" },
 ];
-
-// Create listings from BAXUS bottles (top 50 by price for homepage display)
-const baxusListings: Listing[] = baxusBottles
-  .filter(bottle => bottle.market_price > 0 && bottle.image_url)
-  .slice(0, 200) // Get top 200 for category pages, will filter later for homepage
-  .map((bottle, index) => ({
-    id: `baxus-${bottle.bottle_release_id}`,
-    name: `${bottle.brand} ${bottle.name}`,
-    subtitle: `${bottle.spirit_type} • ${bottle.age ? `${bottle.age}yr` : 'NAS'} • ${bottle.country}`,
-    price: Math.round(bottle.market_price),
-    image: bottle.image_url,
-    category: 'SPIRITS' as Category,
-    verifiedBy: 'BAXUS',
-    source: 'baxus' as const,
-    externalUrl: bottle.baxusUrl,
-    abv: bottle.abv,
-    age: bottle.age,
-    country: bottle.country,
-    region: bottle.region,
-    volume_ml: bottle.volume_ml,
-    spirit_type: bottle.spirit_type,
-  }));
 
 // Create listings from Collector Crypt data
 const ccCategoryMap: Record<string, Category> = {
@@ -324,10 +264,9 @@ const ccTransformedListings: Listing[] = ccListings
     ccUrl: item.ccUrl,
   }));
 
-// Combine native, BAXUS, and Collector Crypt listings
+// Combine native and Collector Crypt listings
 export const listings: Listing[] = [
   ...nativeListings,
-  ...baxusListings,
   ...ccTransformedListings,
 ];
 

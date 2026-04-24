@@ -1,42 +1,63 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const productId = searchParams.get("id");
+import { jsonError, withRequestTimeout } from "@/app/api/_lib/list-route-utils";
 
-  if (!productId) {
-    return NextResponse.json({ error: "Missing product id" }, { status: 400 });
+type TcgPlayerPricePoint = {
+  condition?: string | null;
+  listedMedianPrice?: number | null;
+  marketPrice?: number | null;
+  printingType?: string | null;
+};
+
+function parseProductId(value: string | null): string {
+  if (!value || !/^\d{1,18}$/.test(value)) {
+    throw new Error("Missing or invalid product id.");
   }
 
+  return value;
+}
+
+function selectBestPricePoint(pricePoints: readonly TcgPlayerPricePoint[]): TcgPlayerPricePoint | null {
+  if (pricePoints.length === 0) {
+    return null;
+  }
+
+  const nearMintFoil = pricePoints.find((pricePoint) => pricePoint.printingType === "Foil" && pricePoint.condition === "Near Mint");
+  const nearMintNormal = pricePoints.find((pricePoint) => pricePoint.printingType === "Normal" && pricePoint.condition === "Near Mint");
+  const anyFoil = pricePoints.find((pricePoint) => pricePoint.printingType === "Foil");
+
+  return nearMintFoil || nearMintNormal || anyFoil || pricePoints[0] || null;
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+
   try {
-    const res = await fetch(
+    const productId = parseProductId(searchParams.get("id"));
+    const response = await fetch(
       `https://mpapi.tcgplayer.com/v2/product/${productId}/pricepoints`,
-      { signal: AbortSignal.timeout(8000), cache: "no-store" }
+      { signal: withRequestTimeout(8000), cache: "no-store" },
     );
 
-    if (!res.ok) {
-      return NextResponse.json({ error: "TCGplayer API error" }, { status: 502 });
+    if (!response.ok) {
+      return jsonError("TCGplayer API error.", 502);
     }
 
-    const data = await res.json();
-    
-    // Find best price: NM Foil > NM Normal > any Foil > any
-    const nmFoil = data.find((p: any) => p.printingType === "Foil" && p.condition === "Near Mint");
-    const nmNormal = data.find((p: any) => p.printingType === "Normal" && p.condition === "Near Mint");
-    const anyFoil = data.find((p: any) => p.printingType === "Foil");
-    const best = nmFoil || nmNormal || anyFoil || data[0];
+    const payload = (await response.json()) as TcgPlayerPricePoint[];
+    const pricePoints = Array.isArray(payload) ? payload : [];
+    const bestPricePoint = selectBestPricePoint(pricePoints);
 
     return NextResponse.json({
       productId,
-      marketPrice: best?.marketPrice || null,
-      listedMedianPrice: best?.listedMedianPrice || null,
-      printingType: best?.printingType || null,
-      condition: best?.condition || null,
-      allPrices: data,
+      marketPrice: bestPricePoint?.marketPrice || null,
+      listedMedianPrice: bestPricePoint?.listedMedianPrice || null,
+      printingType: bestPricePoint?.printingType || null,
+      condition: bestPricePoint?.condition || null,
     }, {
-      headers: { "Cache-Control": "public, max-age=900" }, // 15 min cache
+      headers: { "Cache-Control": "public, max-age=900" },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to fetch TCGplayer prices.";
+    return jsonError(message, 400);
   }
 }
