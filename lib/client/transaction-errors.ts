@@ -9,9 +9,7 @@ const REJECTED_TRANSACTION_PATTERNS = [
 
 const WALLET_REJECTION_ERROR_NAMES = [
   "walletsigntransactionerror",
-  "walletsendtransactionerror",
   "walletsignmessageerror",
-  "walleterror",
 ] as const;
 
 export const TRANSACTION_REQUEST_REJECTED_MESSAGE = "transaction request rejected";

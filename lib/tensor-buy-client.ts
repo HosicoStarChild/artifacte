@@ -12,6 +12,7 @@ import { Connection, VersionedTransaction } from '@solana/web3.js';
 
 import type { AnchorWalletLike } from '@/hooks/useWalletCapabilities';
 import { isTransactionRequestRejected } from '@/lib/client/transaction-errors';
+import { shouldUseTensorWalletSendTransaction } from '@/lib/tensor-buy-strategy';
 
 type WalletSignTransaction = AnchorWalletLike['signTransaction'];
 type WalletSendTransaction = (
@@ -55,6 +56,14 @@ const rpc = createSolanaRpc(RPC_PROXY_PATH);
 
 type WireTransactionBase64 = Parameters<typeof rpc.sendTransaction>[0];
 
+function getTensorBuyHostname(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.location.hostname;
+}
+
 export async function executeTensorBuy(
   mint: string,
   buyer: string,
@@ -96,10 +105,11 @@ export async function executeTensorBuy(
 
   // Solflare: use sendTransaction — wallet submits natively with balance preview
   // Phantom + all others: use signTransaction + manual RPC submission
-  const isSolflare = walletName?.toLowerCase().includes('solflare') ?? false;
+  const hostname = getTensorBuyHostname();
+  const shouldUseWalletSendTransaction = shouldUseTensorWalletSendTransaction(walletName, hostname);
   let usedSendTransaction = false;
 
-  if (isSolflare && sendTransaction) {
+  if (shouldUseWalletSendTransaction && sendTransaction) {
     const connection = createProxyConnection();
 
     try {
@@ -117,6 +127,8 @@ export async function executeTensorBuy(
       const fallbackMessage = error instanceof Error ? error.message : 'Unknown sendTransaction failure';
       console.log('[tensor-buy] Solflare sendTransaction failed, falling back:', fallbackMessage);
     }
+  } else if (sendTransaction && walletName?.toLowerCase().includes('solflare')) {
+    console.log(`[tensor-buy] Solflare localhost detected (${hostname || 'unknown host'}), using signTransaction + proxy send`);
   }
 
   if (!usedSendTransaction) {
