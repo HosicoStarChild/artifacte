@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -95,10 +94,9 @@ export function MyListingCard({
     <Card className="h-full overflow-hidden border-white/5 bg-dark-800/85 py-0 text-white transition duration-200 hover:border-white/15 hover:bg-dark-800">
       <Link className="group block" href={listing.href}>
         <div className="relative aspect-square overflow-hidden bg-dark-900">
-          <Image
+          <img
             alt={listing.name}
             className="object-cover transition duration-300 group-hover:scale-[1.02]"
-            fill
             sizes="(min-width: 1280px) 23vw, (min-width: 768px) 30vw, (min-width: 640px) 45vw, 100vw"
             src={listing.image}
           />
