@@ -7,6 +7,11 @@ import { HomeImage } from "@/components/home/HomeImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EXTERNAL_MARKETPLACE_FEE_BPS } from "@/lib/external-purchase-fees";
+import {
+  resolveExternalMarketplacePayablePrice,
+  type ExternalMarketplacePayablePrice,
+} from "@/lib/listing-price";
 import {
   Select,
   SelectContent,
@@ -92,6 +97,33 @@ function formatMarketplacePrice(
     minimumFractionDigits: 0,
   })} ${currencySymbol}`;
 }
+
+function formatBasisPointsPercent(basisPoints: number): string {
+  return `${(basisPoints / 100).toLocaleString(undefined, {
+    maximumFractionDigits: basisPoints % 100 === 0 ? 0 : 2,
+  })}%`;
+}
+
+function buildFeeSummary(
+  payablePrice: ExternalMarketplacePayablePrice
+): string | null {
+  const parts: string[] = [];
+
+  if (payablePrice.royaltyBasisPoints > 0) {
+    parts.push(`${formatBasisPointsPercent(payablePrice.royaltyBasisPoints)} royalty`);
+  }
+
+  if (payablePrice.feeApplied) {
+    parts.push(`${formatBasisPointsPercent(EXTERNAL_MARKETPLACE_FEE_BPS)} Artifacte fee`);
+  }
+
+  return parts.length ? `Includes ${parts.join(" + ")}` : null;
+}
+
+type MarketplaceListingViewModel = {
+  listing: ExternalMarketplaceListing;
+  payablePrice: ExternalMarketplacePayablePrice;
+};
 
 function formatListedAt(listedAt?: number): string | null {
   if (!listedAt) {
@@ -201,23 +233,36 @@ export function CollectionMarketplaceSection({
   const filteredListings = useMemo(() => {
     const baseListings = marketplaceListings
       .filter((listing) => listing.source === sourceFilter)
-      .filter((listing) => listing.price > 0);
+      .filter((listing) => listing.price > 0)
+      .map((listing) => ({
+        listing,
+        payablePrice: resolveExternalMarketplacePayablePrice(listing, {
+          collectionAddress: collection.collectionAddress,
+          collectionName: collection.name,
+        }),
+      }));
 
     return [...baseListings].sort((left, right) => {
       switch (sortOrder) {
         case "price_asc":
-          return left.price - right.price;
+          return left.payablePrice.amount - right.payablePrice.amount;
         case "price_desc":
-          return right.price - left.price;
+          return right.payablePrice.amount - left.payablePrice.amount;
         case "recently_listed":
-          return (right.listedAt ?? 0) - (left.listedAt ?? 0);
+          return (right.listing.listedAt ?? 0) - (left.listing.listedAt ?? 0);
         case "common_to_rare":
-          return left.price - right.price;
+          return left.payablePrice.amount - right.payablePrice.amount;
         case "rare_to_common":
-          return right.price - left.price;
+          return right.payablePrice.amount - left.payablePrice.amount;
       }
     });
-  }, [marketplaceListings, sortOrder, sourceFilter]);
+  }, [
+    collection.collectionAddress,
+    collection.name,
+    marketplaceListings,
+    sortOrder,
+    sourceFilter,
+  ]);
 
   const hasMoreMarketplace = hasMoreBySource[sourceFilter];
 
@@ -462,8 +507,11 @@ export function CollectionMarketplaceSection({
       {filteredListings.length > 0 ? (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-            {filteredListings.map((listing) => {
+            {filteredListings.map(({ listing, payablePrice }) => {
               const listedAt = formatListedAt(listing.listedAt);
+              const feeSummary = buildFeeSummary(payablePrice);
+              const payableCurrency = String(payablePrice.currency || listing.currencySymbol);
+              const showsBreakdown = Math.abs(payablePrice.amount - payablePrice.baseAmount) > 1e-9;
 
               return (
                 <Link
@@ -491,18 +539,16 @@ export function CollectionMarketplaceSection({
                       <p className="truncate text-sm font-semibold text-white">{listing.name}</p>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/40">Price</p>
+                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/40">Total</p>
                           <p className="mt-1 text-sm font-semibold text-white">
-                            {formatMarketplacePrice(listing.price, listing.currencySymbol)}
+                            {formatMarketplacePrice(payablePrice.amount, payableCurrency)}
                           </p>
+                          
                         </div>
                         <Badge className="border-white/10 bg-white/5 text-white/75">
-                          {listing.currencySymbol}
+                          {payableCurrency}
                         </Badge>
                       </div>
-                      {listedAt ? (
-                        <p className="text-xs text-white/40">Listed {listedAt}</p>
-                      ) : null}
                     </CardContent>
                   </Card>
                 </Link>

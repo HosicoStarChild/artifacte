@@ -21,6 +21,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { AuctionProgram } from "@/lib/auction-program";
+import { EXTERNAL_MARKETPLACE_FEE_BPS } from "@/lib/external-purchase-fees";
+import { resolveExternalMarketplacePayablePrice } from "@/lib/listing-price";
 
 const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 const MIN_BID_INCREMENT_LAMPORTS = 100_000_000;
@@ -95,6 +97,12 @@ function formatListedAt(listedAt?: number): string | null {
   }
 
   return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+function formatBasisPointsPercent(basisPoints: number): string {
+  return `${(basisPoints / 100).toLocaleString(undefined, {
+    maximumFractionDigits: basisPoints % 100 === 0 ? 0 : 2,
+  })}%`;
 }
 
 function formatFeeDisplay(amount: number, currency: string): string {
@@ -609,6 +617,11 @@ export function AuctionDetailActionPanel({
 
   if (externalListing) {
     const listedAt = formatListedAt(externalListing.listedAt);
+    const payablePrice = resolveExternalMarketplacePayablePrice(externalListing, {
+      collectionAddress: collectionAddress ?? externalListing.collectionAddress,
+      collectionName: externalListing.collectionName,
+    });
+    const payableCurrency = String(payablePrice.currency || externalListing.currencySymbol);
 
     return (
       <div className="space-y-6">
@@ -622,11 +635,45 @@ export function AuctionDetailActionPanel({
 
         <Card className="border-white/10 bg-dark-800/90 py-0">
           <CardContent className="px-6 py-6">
-            <p className="text-sm text-white/45">Listed Price</p>
+            <p className="text-sm text-white/45">Payable Total</p>
             <p className="mt-2 font-serif text-4xl text-gold-400">
-              {formatExternalPrice(externalListing)}
+              {formatFeeDisplay(payablePrice.amount, payableCurrency)}
             </p>
-            {listedAt ? <p className="mt-2 text-xs text-white/40">Listed {listedAt}</p> : null}
+            <details className="mt-4 rounded-lg border border-white/10 bg-white/[0.03]">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm text-white/70 marker:hidden">
+                <span className="flex items-center justify-between gap-3">
+                  <span>Fee details</span>
+                  <span className="text-xs uppercase tracking-[0.16em] text-white/40">Expand</span>
+                </span>
+              </summary>
+              <div className="space-y-2 border-t border-white/10 px-4 py-4 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-white/45">Marketplace list price</p>
+                  <p className="text-white">{formatExternalPrice(externalListing)}</p>
+                </div>
+                {payablePrice.royaltyBasisPoints > 0 ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-white/45">
+                      Royalties ({formatBasisPointsPercent(payablePrice.royaltyBasisPoints)})
+                    </p>
+                    <p className="text-white">
+                      {formatFeeDisplay(payablePrice.royaltyAmount, payableCurrency)}
+                    </p>
+                  </div>
+                ) : null}
+                {payablePrice.feeApplied ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-white/45">
+                      Artifacte fee ({formatBasisPointsPercent(EXTERNAL_MARKETPLACE_FEE_BPS)})
+                    </p>
+                    <p className="text-white">
+                      {formatFeeDisplay(payablePrice.platformFeeAmount, payableCurrency)}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </details>
+            {listedAt ? <p className="mt-4 text-xs text-white/40">Listed {listedAt}</p> : null}
           </CardContent>
         </Card>
 

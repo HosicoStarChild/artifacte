@@ -26,6 +26,7 @@ export interface ExternalMarketplaceListing {
   collectionName: string;
   price: number;
   priceRaw: number;
+  royaltyBasisPoints: number;
   currencySymbol: string;
   currencyMint: string;
   seller: string;
@@ -59,11 +60,17 @@ export interface HeliusAsset {
   content?: {
     metadata?: {
       name?: string;
+      sellerFeeBasisPoints?: number | string | null;
+      seller_fee_basis_points?: number | string | null;
     };
     links?: {
       image?: string;
     };
     files?: Array<{ uri?: string }>;
+  };
+  royalty?: {
+    basisPoints?: number | string | null;
+    basis_points?: number | string | null;
   };
   grouping?: Array<{ group_key?: string; group_value?: string }>;
   authorities?: Array<{ address?: string }>;
@@ -85,9 +92,13 @@ export interface MagicEdenListingRaw {
   mint?: string | null;
   nftAddress?: string | null;
   currency?: string | null;
+  sellerFeeBasisPoints?: number | string | null;
+  seller_fee_basis_points?: number | string | null;
   price?: number | string | null;
   priceInfo?: {
     solPrice?: number | string | null;
+    sellerFeeBasisPoints?: number | string | null;
+    seller_fee_basis_points?: number | string | null;
   } | null;
   takerAmount?: number | string | null;
   seller?: string | null;
@@ -102,12 +113,16 @@ export interface TensorMintInfoRaw {
   onchainId?: string | null;
   id?: string | null;
   currency?: string | null;
+  sellerFeeBasisPoints?: number | string | null;
+  seller_fee_basis_points?: number | string | null;
   compressed?: boolean | null;
 }
 
 export interface TensorListingDetailsRaw {
   currencyMint?: string | null;
   currency?: string | null;
+  sellerFeeBasisPoints?: number | string | null;
+  seller_fee_basis_points?: number | string | null;
   price?: number | string | null;
   grossAmount?: number | string | null;
   maxAmount?: number | string | null;
@@ -124,6 +139,8 @@ export interface TensorListingRaw {
   id?: string | null;
   currencyMint?: string | null;
   currency?: string | null;
+  sellerFeeBasisPoints?: number | string | null;
+  seller_fee_basis_points?: number | string | null;
   listing?: TensorListingDetailsRaw | null;
   activeListing?: TensorListingDetailsRaw | null;
   price?: number | string | null;
@@ -545,6 +562,17 @@ export function parseRawAmount(value: MarketplaceNumericValue): number | null {
   return Number.isFinite(numeric) ? Math.round(numeric) : null;
 }
 
+function parseBasisPoints(value: MarketplaceNumericValue): number | null {
+  if (value == null) return null;
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  return Math.round(numeric);
+}
+
 function getCurrencyInfo(currencyValue: string | null | undefined): CurrencyInfo {
   const normalized = (currencyValue || "").trim();
   if (
@@ -559,6 +587,49 @@ function getCurrencyInfo(currencyValue: string | null | undefined): CurrencyInfo
 
 function toDisplayPrice(rawAmount: number, decimals: number): number {
   return rawAmount / 10 ** decimals;
+}
+
+function resolveAssetRoyaltyBasisPoints(asset?: HeliusAsset): number {
+  return (
+    parseBasisPoints(
+      asset?.royalty?.basis_points ??
+        asset?.royalty?.basisPoints ??
+        asset?.content?.metadata?.seller_fee_basis_points ??
+        asset?.content?.metadata?.sellerFeeBasisPoints
+    ) ?? 0
+  );
+}
+
+function resolveMagicEdenRoyaltyBasisPoints(
+  raw: MagicEdenListingRaw,
+  asset?: HeliusAsset
+): number {
+  return (
+    parseBasisPoints(
+      raw.sellerFeeBasisPoints ??
+        raw.seller_fee_basis_points ??
+        raw.priceInfo?.sellerFeeBasisPoints ??
+        raw.priceInfo?.seller_fee_basis_points
+    ) ?? resolveAssetRoyaltyBasisPoints(asset)
+  );
+}
+
+function resolveTensorRoyaltyBasisPoints(
+  raw: TensorListingRaw,
+  listing: TensorListingSource,
+  mintInfo: TensorMintInfoRaw | null,
+  asset?: HeliusAsset
+): number {
+  return (
+    parseBasisPoints(
+      listing.sellerFeeBasisPoints ??
+        listing.seller_fee_basis_points ??
+        mintInfo?.sellerFeeBasisPoints ??
+        mintInfo?.seller_fee_basis_points ??
+        raw.sellerFeeBasisPoints ??
+        raw.seller_fee_basis_points
+    ) ?? resolveAssetRoyaltyBasisPoints(asset)
+  );
 }
 
 export function extractMagicEdenMint(raw: MagicEdenListingRaw): string | null {
@@ -618,6 +689,7 @@ export function normalizeMagicEdenListing(
 
   const seller = raw.seller || raw.owner || "";
   const isM3 = !raw.auctionHouse || raw.listingSource === "M3";
+  const royaltyBasisPoints = resolveMagicEdenRoyaltyBasisPoints(raw, asset);
 
   return {
     id: `magiceden:${mint}`,
@@ -632,6 +704,7 @@ export function normalizeMagicEdenListing(
     collectionName,
     priceRaw,
     price: toDisplayPrice(priceRaw, currency.decimals),
+    royaltyBasisPoints,
     currencySymbol: currency.symbol,
     currencyMint: currency.mint,
     seller,
@@ -672,6 +745,12 @@ export function normalizeTensorListing(
     Boolean(asset?.compression?.compressed) ||
     Boolean(raw.compressed) ||
     Boolean(mintInfo?.compressed);
+  const royaltyBasisPoints = resolveTensorRoyaltyBasisPoints(
+    raw,
+    listing,
+    mintInfo,
+    asset
+  );
 
   return {
     id: `tensor:${mint}`,
@@ -686,6 +765,7 @@ export function normalizeTensorListing(
     collectionName,
     priceRaw,
     price: toDisplayPrice(priceRaw, currency.decimals),
+    royaltyBasisPoints,
     currencySymbol: currency.symbol,
     currencyMint: currency.mint,
     seller: listing.seller || listing.owner || raw.owner || "",
