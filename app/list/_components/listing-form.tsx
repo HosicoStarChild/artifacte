@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,13 +71,11 @@ export function ListingForm({
         <CardContent className="space-y-6 px-6 py-6">
           <div className="flex gap-4">
             <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10 bg-dark-900">
-              <Image
+              <img
                 alt={assetCard.imageAlt}
                 className={assetCard.imageClassName}
-                fill
                 sizes="96px"
                 src={assetCard.imageSrc}
-                unoptimized={assetCard.imageSrc.startsWith("/api/")}
               />
             </div>
             <div className="min-w-0 space-y-2">
