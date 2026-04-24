@@ -118,8 +118,12 @@ export function isBaxusListing(listing: HomeListing): boolean {
   );
 }
 
+function hasDisplayableListingData(listing: HomeListing): boolean {
+  return Boolean(listing.image) && typeof listing.price === "number" && listing.price > 0;
+}
+
 export function hasVisibleListingData(listing: HomeListing): boolean {
-  return !isBaxusListing(listing) && Boolean(listing.image) && typeof listing.price === "number" && listing.price > 0;
+  return !isBaxusListing(listing) && hasDisplayableListingData(listing);
 }
 
 export function getVisibleHomeCategoryCards(showSpirits: boolean): HomeCategoryLink[] {
@@ -179,7 +183,7 @@ export async function getSpiritsCarousel(): Promise<HomeListing[]> {
 
   try {
     const listings = await fetchHomeListings("category=SPIRITS&perPage=12&sort=price-desc");
-    return listings.filter((listing) => hasVisibleListingData(listing));
+    return listings.filter((listing) => hasDisplayableListingData(listing));
   } catch {
     return [];
   }

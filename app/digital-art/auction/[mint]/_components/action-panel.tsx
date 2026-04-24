@@ -717,17 +717,6 @@ export function AuctionDetailActionPanel({
                   ? "Purchase Submitted"
                   : "Buy Now"}
           </Button>
-
-          {externalListing.marketplaceUrl ? (
-            <a
-              href={externalListing.marketplaceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center rounded-md border border-white/10 bg-dark-800 px-5 text-sm font-medium text-white transition hover:border-gold-500/30"
-            >
-              View on {formatExternalSource(externalListing.source)}
-            </a>
-          ) : null}
         </div>
       </div>
     );

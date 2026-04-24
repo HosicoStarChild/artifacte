@@ -83,6 +83,10 @@ function shouldFilterArtifacteRows(category: string | null): boolean {
   return category === 'TCG_CARDS' && Boolean(process.env.HELIUS_API_KEY);
 }
 
+function shouldFilterBaxusRows(category: string | null): boolean {
+  return category !== 'SPIRITS';
+}
+
 function matchesNormalizedValue(value: unknown, target: string): boolean {
   return typeof value === 'string' && value.trim().toLowerCase() === target;
 }
@@ -279,15 +283,17 @@ export async function GET(request: Request) {
       }
     }
 
-    const baxusFilterResult = await refillBaxusFilteredPage(
-      params,
-      listings,
-      requestedPage,
-      requestedPerPage,
-      totalPages
-    );
-    listings = baxusFilterResult.listings;
-    total = Math.max(listings.length, total - baxusFilterResult.filteredOut);
+    if (shouldFilterBaxusRows(category)) {
+      const baxusFilterResult = await refillBaxusFilteredPage(
+        params,
+        listings,
+        requestedPage,
+        requestedPerPage,
+        totalPages
+      );
+      listings = baxusFilterResult.listings;
+      total = Math.max(listings.length, total - baxusFilterResult.filteredOut);
+    }
 
     const responsePayload: OracleListingsResponse = {
       ...data,
