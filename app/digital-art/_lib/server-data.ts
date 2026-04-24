@@ -14,6 +14,8 @@ import {
   getCuratedMarketplaceListing,
   getCuratedMarketplaceListings,
   type ExternalMarketplaceListing,
+  type MarketplaceListingsState,
+  type MarketplaceSourceCounts,
   type MarketplaceSource,
   readCuratedCollections,
 } from "@/app/lib/digital-art-marketplaces";
@@ -144,7 +146,8 @@ export interface DigitalArtCollectionPageData {
   marketplaceHasMore: boolean;
   marketplaceListings: ExternalMarketplaceListing[];
   marketplaceNextCursor: string | null;
-  marketplaceSourceCounts: { magiceden: number | null; tensor: number | null } | null;
+  marketplaceSourceCounts: MarketplaceSourceCounts | null;
+  marketplaceState: MarketplaceListingsState | null;
   nativeListings: DigitalArtNativeListingSummary[];
 }
 
@@ -572,6 +575,7 @@ export const getDigitalArtCollectionPageData = cache(
         marketplaceListings: [],
         marketplaceNextCursor: null,
         marketplaceSourceCounts: null,
+        marketplaceState: null,
         nativeListings: [],
       };
     }
@@ -588,6 +592,12 @@ export const getDigitalArtCollectionPageData = cache(
             listings: [] as ExternalMarketplaceListing[],
             nextCursor: null,
             sourceCounts: undefined,
+            state: {
+              degraded: false,
+              stale: false,
+              unavailableSources: [],
+              warning: null,
+            },
           }),
     ]);
 
@@ -610,6 +620,10 @@ export const getDigitalArtCollectionPageData = cache(
       marketplaceSourceCounts:
         marketplaceResult.status === "fulfilled"
           ? marketplaceResult.value.sourceCounts ?? null
+          : null,
+      marketplaceState:
+        marketplaceResult.status === "fulfilled" && collection.hasMarketplaceConfig
+          ? marketplaceResult.value.state
           : null,
       nativeListings:
         nativeListingsResult.status === "fulfilled" ? nativeListingsResult.value : [],

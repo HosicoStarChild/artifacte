@@ -18,7 +18,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { DigitalArtCollectionDetails } from "@/app/digital-art/_lib/server-data";
 import type {
   ExternalMarketplaceListing,
+  MarketplaceListingsState,
   MarketplaceSource,
+  MarketplaceSourceCounts,
 } from "@/app/lib/digital-art-marketplaces";
 
 type MarketplaceSortOrder =
@@ -28,11 +30,6 @@ type MarketplaceSortOrder =
   | "common_to_rare"
   | "rare_to_common";
 
-interface MarketplaceSourceCounts {
-  magiceden: number | null;
-  tensor: number | null;
-}
-
 interface MarketplaceListingsResponse {
   error?: string;
   hasMore: boolean;
@@ -40,6 +37,7 @@ interface MarketplaceListingsResponse {
   nextCursor: string | null;
   ok: boolean;
   sourceCounts?: MarketplaceSourceCounts;
+  state?: MarketplaceListingsState;
 }
 
 interface CollectionMarketplaceSectionProps {
@@ -48,6 +46,7 @@ interface CollectionMarketplaceSectionProps {
   initialListings: ExternalMarketplaceListing[];
   initialNextCursor: string | null;
   initialSourceCounts: MarketplaceSourceCounts | null;
+  initialState: MarketplaceListingsState | null;
 }
 
 const SORT_LABELS: Record<MarketplaceSortOrder, string> = {
@@ -113,6 +112,26 @@ function formatListedAt(listedAt?: number): string | null {
   return `${Math.floor(diff / 86_400_000)}d ago`;
 }
 
+function resolveDefaultSource(
+  availableSources: readonly MarketplaceSource[],
+  listings: readonly ExternalMarketplaceListing[],
+  sourceCounts: MarketplaceSourceCounts | null
+): MarketplaceSource {
+  const populatedSource = availableSources.find((source) =>
+    listings.some((listing) => listing.source === source)
+  );
+
+  if (populatedSource) {
+    return populatedSource;
+  }
+
+  const countedSource = availableSources.find(
+    (source) => (sourceCounts?.[source] ?? 0) > 0
+  );
+
+  return countedSource ?? availableSources[0] ?? "tensor";
+}
+
 function isMarketplaceSortOrder(value: string): value is MarketplaceSortOrder {
   return value in SORT_LABELS;
 }
@@ -144,18 +163,24 @@ export function CollectionMarketplaceSection({
   initialListings,
   initialNextCursor,
   initialSourceCounts,
+  initialState,
 }: CollectionMarketplaceSectionProps) {
   const availableSources: MarketplaceSource[] = [
     ...(collection.hasTensor ? (["tensor"] as const) : []),
     ...(collection.hasMagicEden ? (["magiceden"] as const) : []),
   ];
-  const defaultSource = availableSources[0] ?? "tensor";
+  const defaultSource = resolveDefaultSource(
+    availableSources,
+    initialListings,
+    initialSourceCounts
+  );
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const [marketplaceListings, setMarketplaceListings] = useState(initialListings);
   const [marketplaceNextCursor, setMarketplaceNextCursor] = useState(initialNextCursor);
   const [hasMoreMarketplace, setHasMoreMarketplace] = useState(initialHasMore);
   const [marketplaceSourceCounts, setMarketplaceSourceCounts] = useState(initialSourceCounts);
+  const [marketplaceState, setMarketplaceState] = useState(initialState);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [loadingMarketplace, setLoadingMarketplace] = useState(false);
   const [loadingMoreMarketplace, setLoadingMoreMarketplace] = useState(false);
@@ -216,11 +241,13 @@ export function CollectionMarketplaceSection({
       setMarketplaceListings((previous) =>
         dedupeListings(reset ? nextListings : [...previous, ...nextListings])
       );
+      setMarketplaceError("");
       setMarketplaceNextCursor(payload.nextCursor ?? null);
       setHasMoreMarketplace(payload.hasMore);
       if (payload.sourceCounts) {
         setMarketplaceSourceCounts(payload.sourceCounts);
       }
+      setMarketplaceState(payload.state ?? null);
     } catch (error) {
       setMarketplaceError(
         error instanceof Error
@@ -298,7 +325,9 @@ export function CollectionMarketplaceSection({
                 }
               >
                 {formatMarketplaceSource(source)}
-                {marketplaceSourceCounts?.[source] ? ` (${marketplaceSourceCounts[source]})` : ""}
+                {marketplaceSourceCounts?.[source] != null
+                  ? ` (${marketplaceSourceCounts[source]})`
+                  : ""}
               </Button>
             ))}
           </div>
@@ -327,6 +356,30 @@ export function CollectionMarketplaceSection({
 
       {loadingMarketplace && marketplaceListings.length === 0 ? <MarketplaceLoadingGrid /> : null}
 
+      {marketplaceState?.warning ? (
+        <Card className="border-amber-500/20 bg-dark-800/85 py-0">
+          <CardContent className="space-y-2 px-6 py-4">
+            <h3 className="font-serif text-lg text-white">
+              {marketplaceState.stale
+                ? "Showing recent verified listings"
+                : "Marketplace data is partially unavailable"}
+            </h3>
+            <p className="text-sm text-amber-100/80">{marketplaceState.warning}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {marketplaceError && marketplaceListings.length > 0 ? (
+        <Card className="border-red-500/20 bg-dark-800/85 py-0">
+          <CardContent className="space-y-2 px-6 py-4">
+            <h3 className="font-serif text-lg text-white">Couldn’t refresh marketplace listings</h3>
+            <p className="text-sm text-red-200/80">
+              {marketplaceError}. Existing verified results are still shown below.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {marketplaceError && marketplaceListings.length === 0 ? (
         <Card className="border-red-500/20 bg-dark-800/85 py-0">
           <CardContent className="space-y-4 px-6 py-8 text-center">
@@ -346,7 +399,23 @@ export function CollectionMarketplaceSection({
         </Card>
       ) : null}
 
-      {!loadingMarketplace && !marketplaceError && filteredListings.length === 0 ? (
+      {!loadingMarketplace &&
+      !marketplaceError &&
+      marketplaceListings.length === 0 &&
+      marketplaceState?.degraded ? (
+        <MarketplaceEmptyState
+          title="Marketplace listings temporarily unavailable"
+          message={
+            marketplaceState.warning ??
+            "Live external marketplace feeds are temporarily unavailable for this collection."
+          }
+        />
+      ) : null}
+
+      {!loadingMarketplace &&
+      !marketplaceError &&
+      filteredListings.length === 0 &&
+      !(marketplaceListings.length === 0 && marketplaceState?.degraded) ? (
         <MarketplaceEmptyState
           title="No external listings right now"
           message={`No listings found on ${formatMarketplaceSource(sourceFilter)} for this collection.`}

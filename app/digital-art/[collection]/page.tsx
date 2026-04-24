@@ -166,6 +166,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           initialListings={pageData.marketplaceListings}
           initialNextCursor={pageData.marketplaceNextCursor}
           initialSourceCounts={pageData.marketplaceSourceCounts}
+          initialState={pageData.marketplaceState}
         />
       </div>
     </main>

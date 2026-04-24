@@ -38,6 +38,26 @@ export interface ExternalMarketplaceListing {
   marketplaceUrl?: string;
 }
 
+export interface MarketplaceSourceCounts {
+  magiceden: number | null;
+  tensor: number | null;
+}
+
+export interface MarketplaceListingsState {
+  degraded: boolean;
+  stale: boolean;
+  unavailableSources: MarketplaceSource[];
+  warning: string | null;
+}
+
+interface CuratedMarketplaceListingsResult {
+  listings: ExternalMarketplaceListing[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  sourceCounts?: MarketplaceSourceCounts;
+  state: MarketplaceListingsState;
+}
+
 interface HeliusAsset {
   id: string;
   content?: {
@@ -79,8 +99,40 @@ interface CuratedCollectionFile {
   collections: AllowlistEntry[];
 }
 
+interface HeliusAssetBatchResult {
+  assets: Map<string, HeliusAsset>;
+  errorCount: number;
+}
+
+interface ExpiringCacheEntry<TValue> {
+  expiresAt: number;
+  value: TValue;
+}
+
+type TensorCollIdCacheEntry = ExpiringCacheEntry<string | null>;
+
+interface GetCuratedMarketplaceListingsInput {
+  collectionAddress: string;
+  cursor?: string | null;
+  limit?: number;
+}
+
+interface GetCuratedMarketplaceListingInput {
+  collectionAddress: string;
+  source: MarketplaceSource;
+  mint: string;
+}
+
 const BUNDLED_ALLOWLIST =
   bundledAllowlist as unknown as CuratedCollectionFile;
+
+const TENSOR_COLL_ID_SUCCESS_TTL_MS = 15 * 60 * 1000;
+const TENSOR_COLL_ID_EMPTY_TTL_MS = 5 * 60 * 1000;
+const TENSOR_COLL_ID_ERROR_TTL_MS = 30 * 1000;
+const MARKETPLACE_LISTINGS_CACHE_TTL_MS = 30 * 1000;
+const MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS = 10 * 1000;
+const MARKETPLACE_LISTINGS_STALE_TTL_MS = 5 * 60 * 1000;
+const MARKETPLACE_DETAIL_CACHE_TTL_MS = 15 * 1000;
 
 export async function readCuratedCollections(): Promise<AllowlistEntry[]> {
   try {
@@ -152,6 +204,133 @@ function decodeCursor(cursor?: string | null): MarketplaceCursor {
 
 function encodeCursor(cursor: MarketplaceCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf-8").toString("base64url");
+}
+
+function normalizeMarketplaceLimit(limit?: number): number {
+  return Math.min(Math.max(limit || 12, 1), 40);
+}
+
+function getMarketplaceSourceLabel(source: MarketplaceSource): string {
+  return source === "magiceden" ? "Magic Eden" : "Tensor";
+}
+
+function uniqueMarketplaceSources(
+  sources: readonly MarketplaceSource[]
+): MarketplaceSource[] {
+  return Array.from(new Set(sources));
+}
+
+function buildMarketplaceWarning(
+  unavailableSources: readonly MarketplaceSource[],
+  stale: boolean,
+  hasListings: boolean
+): string | null {
+  if (!stale && unavailableSources.length === 0) {
+    return null;
+  }
+
+  const label = unavailableSources.length
+    ? unavailableSources.map(getMarketplaceSourceLabel).join(" and ")
+    : "one or more marketplace sources";
+
+  if (stale) {
+    return `Live listings from ${label} are temporarily unavailable. Showing recent verified listings while the feed recovers.`;
+  }
+
+  if (hasListings) {
+    return `Listings from ${label} are temporarily unavailable. Results may be incomplete until the feed recovers.`;
+  }
+
+  return `Live listings from ${label} are temporarily unavailable. Try again shortly.`;
+}
+
+function buildMarketplaceState(
+  unavailableSources: readonly MarketplaceSource[],
+  stale: boolean,
+  hasListings: boolean
+): MarketplaceListingsState {
+  const normalizedSources = uniqueMarketplaceSources(unavailableSources);
+
+  return {
+    degraded: stale || normalizedSources.length > 0,
+    stale,
+    unavailableSources: normalizedSources,
+    warning: buildMarketplaceWarning(normalizedSources, stale, hasListings),
+  };
+}
+
+function readExpiringCache<TValue>(
+  cache: Map<string, ExpiringCacheEntry<TValue>>,
+  key: string
+): TValue | undefined {
+  const cached = cache.get(key);
+
+  if (!cached) {
+    return undefined;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return undefined;
+  }
+
+  return cached.value;
+}
+
+function writeExpiringCache<TValue>(
+  cache: Map<string, ExpiringCacheEntry<TValue>>,
+  key: string,
+  value: TValue,
+  ttlMs: number
+): TValue {
+  cache.set(key, {
+    expiresAt: Date.now() + ttlMs,
+    value,
+  });
+
+  return value;
+}
+
+function createMarketplaceListingsCacheKey(
+  input: GetCuratedMarketplaceListingsInput,
+  limit: number
+): string {
+  return JSON.stringify({
+    collectionAddress: input.collectionAddress,
+    cursor: input.cursor || null,
+    limit,
+  });
+}
+
+function createMarketplaceListingDetailCacheKey(
+  input: GetCuratedMarketplaceListingInput
+): string {
+  return JSON.stringify(input);
+}
+
+function shouldKeepMarketplaceFallback(
+  result: CuratedMarketplaceListingsResult
+): boolean {
+  return !result.state.degraded;
+}
+
+function createStaleMarketplaceResult(
+  fallback: CuratedMarketplaceListingsResult,
+  liveState: MarketplaceListingsState
+): CuratedMarketplaceListingsResult {
+  const unavailableSources = uniqueMarketplaceSources([
+    ...fallback.state.unavailableSources,
+    ...liveState.unavailableSources,
+  ]);
+
+  return {
+    ...fallback,
+    state: buildMarketplaceState(
+      unavailableSources,
+      true,
+      fallback.listings.length > 0
+    ),
+  };
 }
 
 function assetMatchesCuratedCollection(
@@ -235,38 +414,54 @@ function toDisplayPrice(rawAmount: number, decimals: number): number {
   return rawAmount / 10 ** decimals;
 }
 
-async function fetchHeliusAssetsByMint(mints: string[]): Promise<Map<string, HeliusAsset>> {
+async function fetchHeliusAssetsByMint(
+  mints: string[]
+): Promise<HeliusAssetBatchResult> {
   const uniqueMints = Array.from(new Set(mints.filter(Boolean)));
   const assets = new Map<string, HeliusAsset>();
 
-  if (!uniqueMints.length || !process.env.HELIUS_API_KEY) {
-    return assets;
+  if (!uniqueMints.length) {
+    return { assets, errorCount: 0 };
   }
+
+  if (!process.env.HELIUS_API_KEY) {
+    return { assets, errorCount: 1 };
+  }
+
+  let errorCount = 0;
 
   for (let index = 0; index < uniqueMints.length; index += 100) {
     const chunk = uniqueMints.slice(index, index + 100);
-    const response = await fetch(HELIUS_RPC, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "digital-art-batch",
-        method: "getAssetBatch",
-        params: { ids: chunk },
-      }),
-      cache: "no-store",
-    });
+    try {
+      const response = await fetch(HELIUS_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "digital-art-batch",
+          method: "getAssetBatch",
+          params: { ids: chunk },
+        }),
+        cache: "no-store",
+      });
 
-    if (!response.ok) continue;
-    const payload = await response.json();
-    for (const item of payload.result || []) {
-      if (item?.id) {
-        assets.set(item.id, item as HeliusAsset);
+      if (!response.ok) {
+        errorCount += 1;
+        continue;
       }
+
+      const payload = await response.json();
+      for (const item of payload.result || []) {
+        if (item?.id) {
+          assets.set(item.id, item as HeliusAsset);
+        }
+      }
+    } catch {
+      errorCount += 1;
     }
   }
 
-  return assets;
+  return { assets, errorCount };
 }
 
 async function fetchMagicEdenListedCount(symbol: string): Promise<number | null> {
@@ -288,38 +483,86 @@ async function fetchMagicEdenListedCount(symbol: string): Promise<number | null>
 }
 
 // Cache resolved Tensor collIds so we only call find_collection once per address
-const tensorCollIdCache = new Map<string, string | null>();
+const tensorCollIdCache = new Map<string, TensorCollIdCacheEntry>();
+const tensorCollIdRequests = new Map<string, Promise<string | null>>();
+const marketplaceListingsCache = new Map<
+  string,
+  ExpiringCacheEntry<CuratedMarketplaceListingsResult>
+>();
+const marketplaceListingsFallbackCache = new Map<
+  string,
+  ExpiringCacheEntry<CuratedMarketplaceListingsResult>
+>();
+const marketplaceListingsRequests = new Map<
+  string,
+  Promise<CuratedMarketplaceListingsResult>
+>();
+const marketplaceListingDetailCache = new Map<
+  string,
+  ExpiringCacheEntry<ExternalMarketplaceListing | null>
+>();
+const marketplaceListingDetailRequests = new Map<
+  string,
+  Promise<ExternalMarketplaceListing | null>
+>();
+
+function readTensorCollIdCache(identifier: string): string | null | undefined {
+  return readExpiringCache(tensorCollIdCache, identifier);
+}
+
+function writeTensorCollIdCache(identifier: string, value: string | null, ttlMs: number): string | null {
+  return writeExpiringCache(tensorCollIdCache, identifier, value, ttlMs);
+}
 
 async function resolveTensorCollId(identifier: string): Promise<string | null> {
-  if (!process.env.TENSOR_API_KEY) return null;
+  const tensorApiKey = process.env.TENSOR_API_KEY;
 
-  const cached = tensorCollIdCache.get(identifier);
+  if (!tensorApiKey) return null;
+
+  const cached = readTensorCollIdCache(identifier);
   if (cached !== undefined) return cached;
 
-  try {
-    const response = await fetch(
-      `${TENSOR_API}/collections/find_collection?filter=${encodeURIComponent(identifier)}`,
-      {
-        headers: { "x-tensor-api-key": process.env.TENSOR_API_KEY },
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
+  const pendingRequest = tensorCollIdRequests.get(identifier);
+  if (pendingRequest) return pendingRequest;
+
+  const request = (async () => {
+    try {
+      const response = await fetch(
+        `${TENSOR_API}/collections/find_collection?filter=${encodeURIComponent(identifier)}`,
+        {
+          headers: { "x-tensor-api-key": tensorApiKey },
+          cache: "no-store",
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+
+      if (!response.ok) {
+        console.log(`[tensor] find_collection failed for ${identifier}: ${response.status}`);
+        return writeTensorCollIdCache(identifier, null, TENSOR_COLL_ID_ERROR_TTL_MS);
       }
-    );
-    if (!response.ok) {
-      console.log(`[tensor] find_collection failed for ${identifier}: ${response.status}`);
-      tensorCollIdCache.set(identifier, null);
-      return null;
+
+      const data = await response.json();
+      const collId = typeof data?.collId === "string" && data.collId.trim()
+        ? data.collId
+        : null;
+
+      console.log(`[tensor] resolved ${identifier} → collId: ${collId}`);
+
+      return writeTensorCollIdCache(
+        identifier,
+        collId,
+        collId ? TENSOR_COLL_ID_SUCCESS_TTL_MS : TENSOR_COLL_ID_EMPTY_TTL_MS
+      );
+    } catch (err) {
+      console.log(`[tensor] find_collection error for ${identifier}:`, err);
+      return writeTensorCollIdCache(identifier, null, TENSOR_COLL_ID_ERROR_TTL_MS);
+    } finally {
+      tensorCollIdRequests.delete(identifier);
     }
-    const data = await response.json();
-    const collId = data?.collId || null;
-    console.log(`[tensor] resolved ${identifier} → collId: ${collId}`);
-    tensorCollIdCache.set(identifier, collId);
-    return collId;
-  } catch (err) {
-    console.log(`[tensor] find_collection error for ${identifier}:`, err);
-    tensorCollIdCache.set(identifier, null);
-    return null;
-  }
+  })();
+
+  tensorCollIdRequests.set(identifier, request);
+  return request;
 }
 
 async function fetchTensorListedCount(collId: string): Promise<number | null> {
@@ -362,7 +605,7 @@ async function fetchMagicEdenCollectionListings(
   );
 
   if (!response.ok) {
-    return { listings: [], nextOffset: offset, hasMore: false };
+    throw new Error(`Magic Eden listings request failed with status ${response.status}`);
   }
 
   const listings = (await response.json()) as any[];
@@ -399,7 +642,7 @@ async function fetchTensorCollectionListings(
   });
 
   if (!response.ok) {
-    return { listings: [], nextCursor: null, hasMore: false };
+    throw new Error(`Tensor listings request failed with status ${response.status}`);
   }
 
   const payload = await response.json();
@@ -438,6 +681,7 @@ function normalizeMagicEdenListing(
   if (!mint) { console.log('[normME] no mint for', raw?.tokenMint, raw?.mintAddress); return null; }
 
   const asset = assetMap.get(mint);
+  if (!assetMatchesCuratedCollection(asset, curatedAddresses)) return null;
 
   const currency = getCurrencyInfo(raw?.currency || SOL_MINT);
   // ME sometimes returns price:0 while the real value is in priceInfo.solPrice or takerAmount
@@ -499,6 +743,7 @@ function normalizeTensorListing(
   if (!mint) return null;
 
   const asset = assetMap.get(mint);
+  if (!assetMatchesCuratedCollection(asset, curatedAddresses)) return null;
 
   const listing = raw?.listing || raw?.activeListing || raw;
   const currency = getCurrencyInfo(
@@ -542,22 +787,20 @@ function normalizeTensorListing(
   };
 }
 
-export async function getCuratedMarketplaceListings(input: {
-  collectionAddress: string;
-  cursor?: string | null;
-  limit?: number;
-}): Promise<{
-  listings: ExternalMarketplaceListing[];
-  nextCursor: string | null;
-  hasMore: boolean;
-  sourceCounts?: { magiceden: number | null; tensor: number | null };
-}> {
-  const limit = Math.min(Math.max(input.limit || 12, 1), 40);
+async function loadCuratedMarketplaceListingsFresh(
+  input: GetCuratedMarketplaceListingsInput,
+  limit: number
+): Promise<CuratedMarketplaceListingsResult> {
   const collections = await readCuratedCollections();
   const collection = getCollectionByAddress(collections, input.collectionAddress);
 
   if (!collection) {
-    return { listings: [], nextCursor: null, hasMore: false };
+    return {
+      listings: [],
+      nextCursor: null,
+      hasMore: false,
+      state: buildMarketplaceState([], false, false),
+    };
   }
 
   const { magicEdenSymbol, tensorCollId: tensorIdentifier } = getMarketplaceIds(collection);
@@ -568,19 +811,77 @@ export async function getCuratedMarketplaceListings(input: {
     getSiblingCollectionAddresses(collections, input.collectionAddress)
   );
   const cursor = decodeCursor(input.cursor);
+  const unavailableSources = new Set<MarketplaceSource>();
 
   const isFirstPage = !input.cursor;
 
-  const [magicEdenPage, tensorPage, meCount, tensorCount] = await Promise.all([
+  const [magicEdenResult, tensorResult, meCount, tensorCount] = await Promise.all([
     magicEdenSymbol && !cursor.meDone
       ? fetchMagicEdenCollectionListings(magicEdenSymbol, cursor.meOffset, limit)
-      : Promise.resolve({ listings: [], nextOffset: cursor.meOffset, hasMore: false }),
+          .then((page) => ({ error: null, page }))
+          .catch((error) => ({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to load Magic Eden listings",
+            page: {
+              listings: [],
+              nextOffset: cursor.meOffset,
+              hasMore: false,
+            } satisfies MagicEdenPage,
+          }))
+      : Promise.resolve({
+          error: null,
+          page: {
+            listings: [],
+            nextOffset: cursor.meOffset,
+            hasMore: false,
+          } satisfies MagicEdenPage,
+        }),
     resolvedTensorCollId && !cursor.tensorDone
       ? fetchTensorCollectionListings(resolvedTensorCollId, cursor.tensorCursor || null, limit)
-      : Promise.resolve({ listings: [], nextCursor: null, hasMore: false }),
-    isFirstPage && magicEdenSymbol ? fetchMagicEdenListedCount(magicEdenSymbol) : Promise.resolve(null),
-    isFirstPage && resolvedTensorCollId ? fetchTensorListedCount(resolvedTensorCollId) : Promise.resolve(null),
+          .then((page) => ({ error: null, page }))
+          .catch((error) => ({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to load Tensor listings",
+            page: {
+              listings: [],
+              nextCursor: null,
+              hasMore: false,
+            } satisfies TensorPage,
+          }))
+      : Promise.resolve({
+          error: null,
+          page: {
+            listings: [],
+            nextCursor: null,
+            hasMore: false,
+          } satisfies TensorPage,
+        }),
+    isFirstPage && magicEdenSymbol
+      ? fetchMagicEdenListedCount(magicEdenSymbol)
+      : Promise.resolve(null),
+    isFirstPage && resolvedTensorCollId
+      ? fetchTensorListedCount(resolvedTensorCollId)
+      : Promise.resolve(null),
   ]);
+
+  const magicEdenPage = magicEdenResult.page;
+  const tensorPage = tensorResult.page;
+
+  if (magicEdenResult.error) {
+    console.error("[marketplace] Magic Eden listings failed", magicEdenResult.error);
+    unavailableSources.add("magiceden");
+  }
+
+  if (tensorIdentifier && !resolvedTensorCollId) {
+    unavailableSources.add("tensor");
+  } else if (tensorResult.error) {
+    console.error("[marketplace] Tensor listings failed", tensorResult.error);
+    unavailableSources.add("tensor");
+  }
 
   const mintCandidates = [
     ...magicEdenPage.listings.map(
@@ -599,33 +900,55 @@ export async function getCuratedMarketplaceListings(input: {
     }),
   ].filter((value): value is string => Boolean(value));
 
-  const assetMap = await fetchHeliusAssetsByMint(mintCandidates);
+  const { assets: assetMap, errorCount: heliusErrorCount } = await fetchHeliusAssetsByMint(
+    mintCandidates
+  );
 
-  console.log(`[marketplace] ME raw: ${magicEdenPage.listings.length}, Tensor raw: ${tensorPage.listings.length}, mints: ${mintCandidates.length}, assets: ${assetMap.size}`);
+  if (heliusErrorCount > 0 && mintCandidates.length > 0) {
+    console.error(
+      `[marketplace] Helius asset lookup failed for ${heliusErrorCount} batch(es)`
+    );
+
+    if (magicEdenPage.listings.length > 0) {
+      unavailableSources.add("magiceden");
+    }
+
+    if (tensorPage.listings.length > 0) {
+      unavailableSources.add("tensor");
+    }
+  }
+
+  const magicEdenListings = magicEdenPage.listings
+    .map((item: any) =>
+      normalizeMagicEdenListing(
+        item,
+        assetMap,
+        curatedAddresses,
+        input.collectionAddress,
+        collection.name
+      )
+    )
+    .filter((value): value is ExternalMarketplaceListing => Boolean(value));
+
+  const tensorListings = tensorPage.listings
+    .map((item: any) =>
+      normalizeTensorListing(
+        item,
+        assetMap,
+        curatedAddresses,
+        input.collectionAddress,
+        collection.name
+      )
+    )
+    .filter((value): value is ExternalMarketplaceListing => Boolean(value));
+
+  console.log(
+    `[marketplace] ME raw: ${magicEdenPage.listings.length}, verified: ${magicEdenListings.length}, Tensor raw: ${tensorPage.listings.length}, verified: ${tensorListings.length}, mints: ${mintCandidates.length}, assets: ${assetMap.size}`
+  );
 
   const listings = [
-    ...magicEdenPage.listings
-      .map((item: any) =>
-        normalizeMagicEdenListing(
-          item,
-          assetMap,
-          curatedAddresses,
-          input.collectionAddress,
-          collection.name
-        )
-      )
-      .filter((value): value is ExternalMarketplaceListing => Boolean(value)),
-    ...tensorPage.listings
-      .map((item: any) =>
-        normalizeTensorListing(
-          item,
-          assetMap,
-          curatedAddresses,
-          input.collectionAddress,
-          collection.name
-        )
-      )
-      .filter((value): value is ExternalMarketplaceListing => Boolean(value)),
+    ...magicEdenListings,
+    ...tensorListings,
   ].sort((left, right) => {
     if (left.priceRaw !== right.priceRaw) {
       return left.priceRaw - right.priceRaw;
@@ -644,25 +967,114 @@ export async function getCuratedMarketplaceListings(input: {
     tensorDone: !tensorPage.hasMore,
   };
   const hasMore = Boolean(magicEdenPage.hasMore || tensorPage.hasMore);
+  const state = buildMarketplaceState(
+    Array.from(unavailableSources),
+    false,
+    dedupedListings.length > 0
+  );
 
   return {
     listings: dedupedListings,
     nextCursor: hasMore ? encodeCursor(nextState) : null,
     hasMore,
+    state,
     ...(isFirstPage && {
       sourceCounts: {
-        magiceden: dedupedListings.filter(l => l.source === 'magiceden').length || meCount,
-        tensor: dedupedListings.filter(l => l.source === 'tensor').length || tensorCount,
+        magiceden:
+          dedupedListings.filter((listing) => listing.source === "magiceden").length ||
+          meCount,
+        tensor:
+          dedupedListings.filter((listing) => listing.source === "tensor").length ||
+          tensorCount,
       },
     }),
   };
 }
 
-export async function getCuratedMarketplaceListing(input: {
-  collectionAddress: string;
-  source: MarketplaceSource;
-  mint: string;
-}): Promise<ExternalMarketplaceListing | null> {
+export async function getCuratedMarketplaceListings(
+  input: GetCuratedMarketplaceListingsInput
+): Promise<CuratedMarketplaceListingsResult> {
+  const limit = normalizeMarketplaceLimit(input.limit);
+  const cacheKey = createMarketplaceListingsCacheKey(input, limit);
+  const cached = readExpiringCache(marketplaceListingsCache, cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const pendingRequest = marketplaceListingsRequests.get(cacheKey);
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  const request = loadCuratedMarketplaceListingsFresh(
+    {
+      ...input,
+      limit,
+    },
+    limit
+  )
+    .then((result) => {
+      const fallback =
+        result.state.degraded && result.listings.length === 0
+          ? readExpiringCache(marketplaceListingsFallbackCache, cacheKey)
+          : undefined;
+      const servedResult = fallback
+        ? createStaleMarketplaceResult(fallback, result.state)
+        : result;
+
+      writeExpiringCache(
+        marketplaceListingsCache,
+        cacheKey,
+        servedResult,
+        servedResult.state.degraded
+          ? MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS
+          : MARKETPLACE_LISTINGS_CACHE_TTL_MS
+      );
+
+      if (shouldKeepMarketplaceFallback(result)) {
+        writeExpiringCache(
+          marketplaceListingsFallbackCache,
+          cacheKey,
+          result,
+          MARKETPLACE_LISTINGS_STALE_TTL_MS
+        );
+      }
+
+      return servedResult;
+    })
+    .catch((error) => {
+      const fallback = readExpiringCache(marketplaceListingsFallbackCache, cacheKey);
+
+      if (fallback) {
+        const servedResult = createStaleMarketplaceResult(
+          fallback,
+          buildMarketplaceState([], false, fallback.listings.length > 0)
+        );
+
+        writeExpiringCache(
+          marketplaceListingsCache,
+          cacheKey,
+          servedResult,
+          MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS
+        );
+
+        return servedResult;
+      }
+
+      throw error;
+    })
+    .finally(() => {
+      marketplaceListingsRequests.delete(cacheKey);
+    });
+
+  marketplaceListingsRequests.set(cacheKey, request);
+  return request;
+}
+
+async function loadCuratedMarketplaceListingFresh(
+  input: GetCuratedMarketplaceListingInput
+): Promise<ExternalMarketplaceListing | null> {
   const collections = await readCuratedCollections();
   const collection = getCollectionByAddress(collections, input.collectionAddress);
   if (!collection) return null;
@@ -670,7 +1082,13 @@ export async function getCuratedMarketplaceListing(input: {
   const curatedAddresses = new Set(
     getSiblingCollectionAddresses(collections, input.collectionAddress)
   );
-  const assetMap = await fetchHeliusAssetsByMint([input.mint]);
+  const { assets: assetMap, errorCount: heliusErrorCount } = await fetchHeliusAssetsByMint([
+    input.mint,
+  ]);
+
+  if (heliusErrorCount > 0) {
+    console.error("[marketplace] Failed to verify marketplace listing mint", input.mint);
+  }
 
   if (input.source === "magiceden") {
     const response = await fetch(`${MAGIC_EDEN_API}/tokens/${input.mint}/listings`, {
@@ -758,4 +1176,36 @@ export async function getCuratedMarketplaceListing(input: {
       )
       .find(Boolean) || null
   );
+}
+
+export async function getCuratedMarketplaceListing(
+  input: GetCuratedMarketplaceListingInput
+): Promise<ExternalMarketplaceListing | null> {
+  const cacheKey = createMarketplaceListingDetailCacheKey(input);
+  const cached = readExpiringCache(marketplaceListingDetailCache, cacheKey);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const pendingRequest = marketplaceListingDetailRequests.get(cacheKey);
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  const request = loadCuratedMarketplaceListingFresh(input)
+    .then((result) =>
+      writeExpiringCache(
+        marketplaceListingDetailCache,
+        cacheKey,
+        result,
+        MARKETPLACE_DETAIL_CACHE_TTL_MS
+      )
+    )
+    .finally(() => {
+      marketplaceListingDetailRequests.delete(cacheKey);
+    });
+
+  marketplaceListingDetailRequests.set(cacheKey, request);
+  return request;
 }
