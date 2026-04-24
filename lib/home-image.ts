@@ -8,6 +8,10 @@ const PROXIED_IMAGE_HOSTS = new Set([
   "arweave.net",
   "gateway.irys.xyz",
   "ar-io.dev",
+  "nftstorage.link",
+  "dweb.link",
+  "w3s.link",
+  "cloudflare-ipfs.com",
 ]);
 
 export function resolveHomeImageSrc(src: string | undefined): string | null {
@@ -21,16 +25,22 @@ export function resolveHomeImageSrc(src: string | undefined): string | null {
 
   try {
     const parsedUrl = new URL(src);
+    const hostname = parsedUrl.hostname;
+    const isIpfsSubdomain =
+      hostname.endsWith(".ipfs.nftstorage.link") ||
+      hostname.endsWith(".ipfs.dweb.link") ||
+      hostname.endsWith(".ipfs.w3s.link") ||
+      hostname.endsWith(".mypinata.cloud");
 
-    if (PROXIED_IMAGE_HOSTS.has(parsedUrl.hostname) || parsedUrl.hostname.endsWith(".ar-io.dev")) {
+    if (PROXIED_IMAGE_HOSTS.has(hostname) || hostname.endsWith(".ar-io.dev") || isIpfsSubdomain) {
       return `/api/img-proxy?url=${encodeURIComponent(src)}`;
     }
 
-    if (DIRECT_IMAGE_HOSTS.has(parsedUrl.hostname)) {
+    if (DIRECT_IMAGE_HOSTS.has(hostname)) {
       return src;
     }
 
-    return `/api/img-proxy?url=${encodeURIComponent(src)}`;
+    return src;
   } catch {
     return src;
   }
