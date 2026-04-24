@@ -8,7 +8,6 @@ import { HomeImage } from "@/components/home/HomeImage";
 import VerifiedBadge from "@/components/VerifiedBadge";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
-import dynamic from "next/dynamic";
 import { showToast } from "@/components/ToastContainer";
 import { Card } from "@/components/ui/card";
 import { useAuctionProgram } from "@/hooks/useAuctionProgram";
@@ -33,11 +32,6 @@ import {
   resolveCardImageSrc,
   type CardDetail,
 } from "./_lib/card-detail";
-
-const WalletMultiButton = dynamic(
-  () => import("@solana/wallet-adapter-react-ui").then((m) => m.WalletMultiButton),
-  { ssr: false }
-);
 
 function CardDetailPageContent() {
   const params = useParams<{ id: string }>();
@@ -434,9 +428,7 @@ function CardDetailPageContent() {
                       >
                         {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                       </button>
-                    ) : (
-                      <WalletMultiButton className="w-full bg-gold-500! text-dark-900! rounded-lg! text-base! font-semibold! py-3.5!" />
-                    )
+                    ) : null
                   ) : connected ? (
                     <button
                       onClick={handleBuy}
@@ -449,9 +441,7 @@ function CardDetailPageContent() {
                     >
                       {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
                     </button>
-                  ) : (
-                    <WalletMultiButton className="w-full bg-gold-500! text-dark-900! rounded-lg! text-base! font-semibold! py-3.5!" />
-                  )
+                  ) : null
                 ) : (
                   <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
                 )}
