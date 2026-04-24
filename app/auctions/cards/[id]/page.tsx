@@ -90,30 +90,35 @@ function CardDetailPageContent() {
     try {
       showToast.info("Building transaction...");
 
+      const liveAuctionListing = card.auctionListing
+        ?? (card.source === 'artifacte'
+          ? await fetchAuctionListing(connection, card.nftAddress)
+          : null);
+
       // Anchor auction program listings: buy directly via on-chain program
-      if (card.auctionListing) {
+      if (liveAuctionListing) {
         if (!signTransaction) throw new Error("Wallet does not support signing");
         if (!auctionProgram) throw new Error("Auction program unavailable");
         const { getAssociatedTokenAddress } = await import('@solana/spl-token');
         const nftMintPk = new PublicKey(card.nftAddress);
         const paymentMintPk = new PublicKey(
-          card.auctionListing.currency === 'SOL' ? 'So11111111111111111111111111111111111111112'
-          : card.auctionListing.currency === 'USD1' ? 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB'
+          liveAuctionListing.currency === 'SOL' ? 'So11111111111111111111111111111111111111112'
+          : liveAuctionListing.currency === 'USD1' ? 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB'
           : 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
         );
-        const decimals = card.auctionListing.currency === 'SOL' ? 9 : 6;
-        const priceInUnits = Math.round(card.auctionListing.price * Math.pow(10, decimals));
+        const decimals = liveAuctionListing.currency === 'SOL' ? 9 : 6;
+        const priceInUnits = Math.round(liveAuctionListing.price * Math.pow(10, decimals));
         const buyerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
         const buyerPaymentAccount = await getAssociatedTokenAddress(paymentMintPk, publicKey);
-        const sellerPk = new PublicKey(card.auctionListing.seller);
+        const sellerPk = new PublicKey(liveAuctionListing.seller);
         const sellerPaymentAccount = await getAssociatedTokenAddress(paymentMintPk, sellerPk);
-        showToast.info(`💳 Confirm purchase — ${card.auctionListing.currency === 'SOL' ? '◎' : '$'}${card.auctionListing.price.toLocaleString()} ${card.auctionListing.currency}`);
+        showToast.info(`💳 Confirm purchase — ${liveAuctionListing.currency === 'SOL' ? '◎' : '$'}${liveAuctionListing.price.toLocaleString()} ${liveAuctionListing.currency}`);
         const sig = await auctionProgram.buyNow(
           nftMintPk, sellerPaymentAccount, buyerPaymentAccount,
           buyerNftAccount, priceInUnits, paymentMintPk
         );
         showToast.success(`✅ NFT purchased! TX: ${sig.slice(0, 16)}...`);
-        setCard((prevCard) => prevCard ? { ...prevCard, sold: true } : prevCard);
+        setCard((prevCard) => prevCard ? { ...prevCard, auctionListing: liveAuctionListing, sold: true } : prevCard);
         setBuying(false);
         return;
       }
@@ -199,11 +204,16 @@ function CardDetailPageContent() {
       const nftMintPk = new PublicKey(card.nftAddress);
       const auctionListing = await fetchAuctionListing(connection, card.nftAddress);
       if (auctionListing) {
-        // Cancel via Anchor auction program
         if (!auctionProgram) throw new Error("Auction program unavailable");
-        const { getAssociatedTokenAddress } = await import('@solana/spl-token');
-        const sellerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
-        const sig = await auctionProgram.cancelListing(nftMintPk, sellerNftAccount);
+
+        const sig = auctionListing.program === 'core'
+          ? await auctionProgram.cancelCoreListing(nftMintPk)
+          : await (async () => {
+              const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+              const sellerNftAccount = await getAssociatedTokenAddress(nftMintPk, publicKey);
+              return auctionProgram.cancelListing(nftMintPk, sellerNftAccount);
+            })();
+
         showToast.success(`NFT unlisted successfully! TX: ${sig.slice(0, 12)}...`);
         setCard((prevCard) => prevCard ? { ...prevCard, price: 0, usdcPrice: null, solPrice: 0, auctionListing: null } : prevCard);
         setUnlisting(false);

@@ -11,6 +11,11 @@ const USD1_MINT = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const COLLECTOR_CRYPT_COLLECTION = "CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf";
 const PHYGITALS_COLLECTION = "BSG6DyEihFFtfvxtL9mKYsvTwiZXB1rq5gARMTJC2xAM";
+const CORE_LISTING_DISCRIMINATOR = Buffer.from([205, 178, 162, 169, 199, 166, 133, 157]);
+const CORE_LISTING_SIZE = 153;
+const CORE_OFFSET_SELLER = 8;
+const CORE_OFFSET_PRICE = 8 + 32 + 32 + 32 + 32;
+const CORE_OFFSET_CREATED_AT = CORE_OFFSET_PRICE + 8;
 
 type AttributeValue = string | number | boolean | null | undefined;
 type NumericValue = string | number | null | undefined;
@@ -79,6 +84,7 @@ export type AuctionListing = {
   highestBidder: string | null;
   listingType: "fixedPrice" | "auction";
   price: number;
+  program: "core" | "native";
   seller: string;
   startTime: number;
   stale?: boolean;
@@ -269,6 +275,16 @@ export async function fetchTensorPrice(connection: Connection, mint: string): Pr
 }
 
 export async function fetchAuctionListing(connection: Connection, mint: string): Promise<AuctionListing | null> {
+  const nativeListing = await fetchNativeAuctionListing(connection, mint);
+
+  if (nativeListing) {
+    return nativeListing;
+  }
+
+  return fetchCoreAuctionListing(connection, mint);
+}
+
+async function fetchNativeAuctionListing(connection: Connection, mint: string): Promise<AuctionListing | null> {
   try {
     const nftMint = new PublicKey(mint);
     const [listingPda] = PublicKey.findProgramAddressSync(
@@ -300,6 +316,7 @@ export async function fetchAuctionListing(connection: Connection, mint: string):
           highestBidder: null,
           listingType: "fixedPrice",
           price: 0,
+          program: "native",
           seller,
           startTime: 0,
           stale: true,
@@ -336,8 +353,50 @@ export async function fetchAuctionListing(connection: Connection, mint: string):
       highestBidder: highestBidder !== defaultKey ? highestBidder : null,
       listingType: listingType === 0 ? "fixedPrice" : "auction",
       price: price / Math.pow(10, decimals),
+      program: "native",
       seller,
       startTime: startTime * 1000,
+      status: "active",
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCoreAuctionListing(connection: Connection, mint: string): Promise<AuctionListing | null> {
+  try {
+    const nftMint = new PublicKey(mint);
+    const [coreListingPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("core_listing"), nftMint.toBuffer()],
+      AUCTION_PROGRAM_ID,
+    );
+    const coreListingInfo = await connection.getAccountInfo(coreListingPda);
+
+    if (
+      !coreListingInfo ||
+      !coreListingInfo.owner.equals(AUCTION_PROGRAM_ID) ||
+      coreListingInfo.data.length !== CORE_LISTING_SIZE ||
+      !Buffer.from(coreListingInfo.data.subarray(0, 8)).equals(CORE_LISTING_DISCRIMINATOR)
+    ) {
+      return null;
+    }
+
+    const seller = new PublicKey(
+      coreListingInfo.data.subarray(CORE_OFFSET_SELLER, CORE_OFFSET_SELLER + 32),
+    ).toBase58();
+    const price = Number(coreListingInfo.data.readBigUInt64LE(CORE_OFFSET_PRICE));
+    const createdAt = Number(coreListingInfo.data.readBigInt64LE(CORE_OFFSET_CREATED_AT));
+
+    return {
+      currency: "USDC",
+      currentBid: 0,
+      endTime: 0,
+      highestBidder: null,
+      listingType: "fixedPrice",
+      price: price / 1e6,
+      program: "core",
+      seller,
+      startTime: createdAt * 1000,
       status: "active",
     };
   } catch {
