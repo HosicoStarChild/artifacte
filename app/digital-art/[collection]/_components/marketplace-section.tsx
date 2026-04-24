@@ -191,7 +191,6 @@ export function CollectionMarketplaceSection({
   const [hasMoreBySource, setHasMoreBySource] = useState<Record<MarketplaceSource, boolean>>(
     () => createInitialHasMoreBySource(availableSources, initialHasMore)
   );
-  const [marketplaceSourceCounts, setMarketplaceSourceCounts] = useState(initialSourceCounts);
   const [marketplaceState, setMarketplaceState] = useState(initialState);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [loadingMarketplace, setLoadingMarketplace] = useState(false);
@@ -262,9 +261,6 @@ export function CollectionMarketplaceSection({
         ...previous,
         [sourceFilter]: payload.hasMore,
       }));
-      if (payload.sourceCounts) {
-        setMarketplaceSourceCounts(payload.sourceCounts);
-      }
       setMarketplaceState(payload.state ?? null);
     } catch (error) {
       setMarketplaceError(
@@ -364,32 +360,34 @@ export function CollectionMarketplaceSection({
                 }
               >
                 {formatMarketplaceSource(source)}
-                {marketplaceSourceCounts?.[source] != null
-                  ? ` (${marketplaceSourceCounts[source]})`
-                  : ""}
               </Button>
             ))}
           </div>
 
-          <Select
-            onValueChange={(value) => {
-              if (value && isMarketplaceSortOrder(value)) {
-                setSortOrder(value);
-              }
-            }}
-            value={sortOrder}
-          >
-            <SelectTrigger className="border-white/15 bg-dark-800 text-white" size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="border border-white/10 bg-dark-800 text-white">
-              {Object.entries(SORT_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/45">
+              Sort by
+            </p>
+            <Select
+              onValueChange={(value) => {
+                if (value && isMarketplaceSortOrder(value)) {
+                  setSortOrder(value);
+                }
+              }}
+              value={sortOrder}
+            >
+              <SelectTrigger className="border-white/15 bg-dark-800 text-white" size="sm">
+                <SelectValue>{SORT_LABELS[sortOrder]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="border border-white/10 bg-dark-800 text-white">
+                {Object.entries(SORT_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
