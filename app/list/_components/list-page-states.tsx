@@ -117,8 +117,8 @@ export function ListPageErrorState({ errorMessage, onRetry }: ListPageErrorState
 export function ListPageSubmittedState({ onRetry }: ListPageActionStateProps) {
   return (
     <Card className="border-white/5 bg-dark-800/85 py-0 text-white">
-      <CardHeader className="items-center px-8 pt-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+      <CardHeader className="items-center px-8 pt-8 text-center justify-center">
+        <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
           <CheckCircle2 className="size-8" />
         </div>
         <CardTitle className="text-2xl text-white">Listed successfully</CardTitle>
