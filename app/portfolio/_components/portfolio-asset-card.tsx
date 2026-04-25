@@ -50,13 +50,11 @@ export function PortfolioAssetCard({ asset }: PortfolioAssetCardProps) {
             {asset.badgeLabel}
           </Badge>
           {asset.imageSrc ? (
-            <Image
+            <img
               alt={asset.name}
               className={cn("transition duration-300 group-hover:scale-[1.02]", imageClasses)}
-              fill
               sizes="(min-width: 1280px) 23vw, (min-width: 768px) 30vw, (min-width: 640px) 45vw, 100vw"
               src={asset.imageSrc}
-              unoptimized={asset.imageSrc.startsWith("/api/img-proxy")}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-dark-800 text-3xl text-white/35">
