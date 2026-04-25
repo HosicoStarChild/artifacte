@@ -25,9 +25,12 @@ const DEFAULT_RPC_METHODS = [
 ] as const;
 
 const HOT_PATH_RPC_METHODS = [
+  "getBlockHeight",
   "getFeeForMessage",
   "getLatestBlockhash",
+  "getRecentPrioritizationFees",
   "getSignatureStatuses",
+  "getSlot",
   "isBlockhashValid",
   "simulateTransaction",
 ] as const;
@@ -39,26 +42,36 @@ const READ_HEAVY_RPC_METHODS = [
   "getTokenAccountsByOwner",
 ] as const;
 
+const CLUSTER_INFO_RPC_METHODS = [
+  "getEpochInfo",
+  "getGenesisHash",
+  "getMinimumBalanceForRentExemption",
+  "getVersion",
+] as const;
+
 const SEND_TRANSACTION_RPC_METHODS = ["sendTransaction"] as const;
 
 type AllowedRpcMethod =
   | (typeof DEFAULT_RPC_METHODS)[number]
   | (typeof HOT_PATH_RPC_METHODS)[number]
   | (typeof READ_HEAVY_RPC_METHODS)[number]
+  | (typeof CLUSTER_INFO_RPC_METHODS)[number]
   | (typeof SEND_TRANSACTION_RPC_METHODS)[number];
 
 const ALLOWED_METHODS = new Set<AllowedRpcMethod>([
   ...DEFAULT_RPC_METHODS,
   ...HOT_PATH_RPC_METHODS,
   ...READ_HEAVY_RPC_METHODS,
+  ...CLUSTER_INFO_RPC_METHODS,
   ...SEND_TRANSACTION_RPC_METHODS,
 ]);
 
 const HOT_PATH_RPC_METHOD_SET = new Set<AllowedRpcMethod>(HOT_PATH_RPC_METHODS);
 const READ_HEAVY_RPC_METHOD_SET = new Set<AllowedRpcMethod>(READ_HEAVY_RPC_METHODS);
+const CLUSTER_INFO_RPC_METHOD_SET = new Set<AllowedRpcMethod>(CLUSTER_INFO_RPC_METHODS);
 const SEND_TRANSACTION_RPC_METHOD_SET = new Set<AllowedRpcMethod>(SEND_TRANSACTION_RPC_METHODS);
 
-type RateLimitBucket = "default" | "hot-path" | "read-heavy" | "send-transaction";
+type RateLimitBucket = "cluster-info" | "default" | "hot-path" | "read-heavy" | "send-transaction";
 
 interface RpcProxyRequestBody {
   id?: number | string;
@@ -91,6 +104,7 @@ class RpcProxyRouteError extends Error {
 }
 
 const RATE_LIMITERS: Record<RateLimitBucket, (key: string) => boolean> = {
+  "cluster-info": createRateLimiter(120),
   default: createRateLimiter(90),
   "hot-path": createRateLimiter(300),
   "read-heavy": createRateLimiter(180),
@@ -98,6 +112,7 @@ const RATE_LIMITERS: Record<RateLimitBucket, (key: string) => boolean> = {
 };
 
 const RATE_LIMIT_MESSAGES: Record<RateLimitBucket, string> = {
+  "cluster-info": "Rate limit exceeded",
   default: "Rate limit exceeded",
   "hot-path": "Rate limit exceeded",
   "read-heavy": "Rate limit exceeded",
@@ -167,6 +182,10 @@ function getRateLimitBucket(method: AllowedRpcMethod): RateLimitBucket {
     return "read-heavy";
   }
 
+  if (CLUSTER_INFO_RPC_METHOD_SET.has(method)) {
+    return "cluster-info";
+  }
+
   return "default";
 }
 
@@ -186,12 +205,23 @@ function logLocalRateLimit(clientKey: string, method: AllowedRpcMethod, bucket: 
   );
 }
 
+function logDeniedMethod(request: NextRequest, clientKey: string, method: string) {
+  const origin = request.headers.get("origin")?.trim() || "unknown-origin";
+  const userAgent = request.headers.get("user-agent")?.trim() || "unknown-user-agent";
+
+  console.warn(
+    `[api/rpc] Denied RPC method | method=${method} | client=${clientKey} | origin=${origin} | userAgent=${userAgent}`
+  );
+}
+
 export async function POST(req: NextRequest) {
   const clientKey = resolveClientKey(req);
   let method: AllowedRpcMethod | "unknown" = "unknown";
+  let requestedMethod = "unknown";
 
   try {
     const body = (await req.json()) as Partial<RpcProxyRequestBody>;
+    requestedMethod = body.method?.trim() || "unknown";
     const parsedRequest = parseRpcProxyRequest(body);
     method = parsedRequest.method;
 
@@ -231,6 +261,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof RpcProxyRouteError) {
+      if (error.status === 403 && requestedMethod !== "unknown") {
+        logDeniedMethod(req, clientKey, requestedMethod);
+      }
+
       return jsonError(error.message, error.status);
     }
 
