@@ -3,12 +3,12 @@
 import Image from "next/image";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState, type ChangeEvent } from "react";
-import { SendTransactionError } from "@solana/web3.js";
+import { SendTransactionError, type Connection } from "@solana/web3.js";
 import { ARTIFACTE_COLLECTION, TREASURY_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
 import { createV1, createCollectionV1, fetchCollection, hasCollectionUpdateAuthority, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
-import { generateSigner, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
+import { generateSigner, publicKey as umiPublicKey, type TransactionBuilder, type Umi } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 import {
   ADMIN_CORE_ROYALTY_BASIS_POINTS,
@@ -115,15 +115,87 @@ interface TcgPlayerSearchResponse {
 type ImageField = "frontImage" | "backImage";
 type PreviewField = "frontImagePreview" | "backImagePreview";
 type ErrorWithLogs = Error & { logs?: string[] };
+type SignatureStatusValue = Awaited<ReturnType<Connection["getSignatureStatus"]>>["value"];
 
-function encodeBase64(bytes: Uint8Array): string {
-  let binary = "";
+const ADMIN_CONFIRMATION_INTERVAL_MS = 1_500;
+const ADMIN_CONFIRMATION_TIMEOUT_MS = 60_000;
 
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
+function isConfirmedSignatureStatus(status: SignatureStatusValue | undefined): boolean {
+  return status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized";
+}
+
+function getSignatureFailureMessage(
+  signatureValue: string,
+  status: SignatureStatusValue | undefined
+): string | null {
+  if (!status?.err) {
+    return null;
+  }
+
+  return `Transaction ${signatureValue} failed on-chain: ${JSON.stringify(status.err)}`;
+}
+
+async function waitForConfirmedSignature(
+  connection: Connection,
+  signatureValue: string
+): Promise<void> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < ADMIN_CONFIRMATION_TIMEOUT_MS) {
+    const statusResponse = await connection.getSignatureStatus(signatureValue, {
+      searchTransactionHistory: true,
+    });
+    const status = statusResponse.value;
+    const failureMessage = getSignatureFailureMessage(signatureValue, status);
+
+    if (failureMessage) {
+      throw new Error(failureMessage);
+    }
+
+    if (isConfirmedSignatureStatus(status)) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, ADMIN_CONFIRMATION_INTERVAL_MS);
+    });
+  }
+
+  const finalStatusResponse = await connection.getSignatureStatus(signatureValue, {
+    searchTransactionHistory: true,
+  });
+  const finalStatus = finalStatusResponse.value;
+  const failureMessage = getSignatureFailureMessage(signatureValue, finalStatus);
+
+  if (failureMessage) {
+    throw new Error(failureMessage);
+  }
+
+  if (isConfirmedSignatureStatus(finalStatus)) {
+    return;
+  }
+
+  throw new Error(
+    `Transaction confirmation timeout. Signature: ${signatureValue}. Check Solana Explorer before retrying.`
+  );
+}
+
+async function requestSignatureAndSendFromFrontend(
+  builder: TransactionBuilder,
+  umi: Umi,
+  connection: Connection
+): Promise<string> {
+  const signedTransaction = await builder.buildAndSign(umi);
+  const serializedTransaction = umi.transactions.serialize(signedTransaction);
+  const signatureValue = await connection.sendRawTransaction(serializedTransaction, {
+    maxRetries: 5,
+    preflightCommitment: "confirmed",
+    skipPreflight: false,
   });
 
-  return btoa(binary);
+  await waitForConfirmedSignature(connection, signatureValue);
+
+  return signatureValue;
 }
 
 function PreviewImage({ alt, src }: { alt: string; src: string }) {
@@ -421,7 +493,7 @@ function MintFormInner() {
     setCreatingCollection(true);
     setMintResult(null);
     try {
-      const umi = createUmi(connection.rpcEndpoint)
+      const umi = createUmi(connection)
         .use(walletAdapterIdentity(wallet))
         .use(irysUploader());
 
@@ -449,7 +521,7 @@ function MintFormInner() {
       setMintResult("⏳ Creating collection on-chain...");
       const collection = generateSigner(umi);
 
-      await createCollectionV1(umi, {
+      const txSignature = await requestSignatureAndSendFromFrontend(createCollectionV1(umi, {
         collection,
         name: "Artifacte",
         uri: metadataUri,
@@ -463,10 +535,10 @@ function MintFormInner() {
             },
           }),
         ],
-      }).sendAndConfirm(umi);
+      }), umi, connection);
 
       setCollectionAddress(collection.publicKey.toString());
-      setMintResult(`✅ Collection created!\nAddress: ${collection.publicKey}\n\nSave this address!`);
+      setMintResult(`✅ Collection created!\nAddress: ${collection.publicKey}\nTx: ${txSignature}\n\nSave this address!`);
     } catch (error) {
       const nextError = error instanceof Error ? error : new Error("Collection creation failed");
       setMintResult(`❌ Error: ${nextError.message}`);
@@ -500,7 +572,7 @@ function MintFormInner() {
     setMintResult(null);
     try {
       // Step 1: Set up Umi with Irys uploader
-      const umi = createUmi(connection.rpcEndpoint)
+      const umi = createUmi(connection)
         .use(walletAdapterIdentity(wallet))
         .use(irysUploader());
 
@@ -587,10 +659,9 @@ function MintFormInner() {
           : {}),
       };
 
-      const tx = await createV1(umi, createArgs).sendAndConfirm(umi);
+      const txSignature = await requestSignatureAndSendFromFrontend(createV1(umi, createArgs), umi, connection);
 
-      const sig = encodeBase64(tx.signature);
-      setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${sig}`);
+      setMintResult(`✅ Minted!\n\nAsset: ${asset.publicKey}\nMetadata: ${metadataUri}\nImage: ${imageUri || "none"}\nTx: ${txSignature}`);
     } catch (error) {
       let logs: string[] | undefined;
       if (error instanceof SendTransactionError) {
