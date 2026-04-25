@@ -163,6 +163,33 @@ function getPriceInUnits(price: string, itemCategory: ItemCategory): number {
     : Math.floor(parsedPrice * 1_000_000);
 }
 
+function isCoreListingInstructionFallback(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const rawLogs = (error as { logs?: unknown }).logs;
+  const logs = Array.isArray(rawLogs)
+    ? rawLogs.filter((entry): entry is string => typeof entry === "string")
+    : [];
+
+  return [error.message, ...logs].some(
+    (line) =>
+      line.includes("InstructionFallbackNotFound") ||
+      line.includes("Fallback functions are not supported")
+  );
+}
+
+function toCoreListingSubmissionError(error: unknown): Error {
+  if (isCoreListingInstructionFallback(error)) {
+    return new Error(
+      "Artifacte Core listing is temporarily unavailable on mainnet. The deployed auction program rejected the Core listing instruction (list_core_item). Redeploy the current auction program binary, then try again."
+    );
+  }
+
+  return error instanceof Error ? error : new Error("Listing failed.");
+}
+
 async function waitForListPageSignatureConfirmation(signatureValue: string): Promise<boolean> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -309,11 +336,17 @@ export async function submitListPageListing({
 
     notifier.info("Listing on Artifacte (Core)...");
 
-    return {
-      mintAddress,
-      shouldNotifyOracle: false,
-      signature: await auctionProgram.listCoreItem(nftMint, Math.floor(Number.parseFloat(price) * 1_000_000)),
-    };
+    const corePriceUsdc = Math.floor(Number.parseFloat(price) * 1_000_000);
+
+    try {
+      return {
+        mintAddress,
+        shouldNotifyOracle: false,
+        signature: await auctionProgram.listCoreItem(nftMint, corePriceUsdc),
+      };
+    } catch (error) {
+      throw toCoreListingSubmissionError(error);
+    }
   }
 
   if (listingType === "fixed" && flags.isArtifacteAuthority) {
