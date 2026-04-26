@@ -147,6 +147,7 @@ const BUNDLED_ALLOWLIST: CuratedCollectionFile = bundledAllowlist;
 const TENSOR_COLL_ID_SUCCESS_TTL_MS = 15 * 60 * 1000;
 const TENSOR_COLL_ID_EMPTY_TTL_MS = 5 * 60 * 1000;
 const TENSOR_COLL_ID_ERROR_TTL_MS = 30 * 1000;
+const TENSOR_COLL_ID_LOOKUP_TIMEOUT_MS = 3_000;
 const MARKETPLACE_LISTINGS_CACHE_TTL_MS = 30 * 1000;
 const MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS = 10 * 1000;
 const MARKETPLACE_LISTINGS_STALE_TTL_MS = 5 * 60 * 1000;
@@ -282,7 +283,7 @@ async function resolveTensorCollId(identifier: string): Promise<string | null> {
         {
           headers: { "x-tensor-api-key": tensorApiKey },
           cache: "no-store",
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(TENSOR_COLL_ID_LOOKUP_TIMEOUT_MS),
         }
       );
 
@@ -304,7 +305,8 @@ async function resolveTensorCollId(identifier: string): Promise<string | null> {
         collId ? TENSOR_COLL_ID_SUCCESS_TTL_MS : TENSOR_COLL_ID_EMPTY_TTL_MS
       );
     } catch (err) {
-      console.log(`[tensor] find_collection error for ${identifier}:`, err);
+      const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      console.warn(`[tensor] find_collection unavailable for ${identifier}: ${reason}`);
       return writeTensorCollIdCache(identifier, null, TENSOR_COLL_ID_ERROR_TTL_MS);
     } finally {
       tensorCollIdRequests.delete(identifier);

@@ -53,7 +53,6 @@ export function MarketplaceListingCard({
   className,
 }: MarketplaceListingCardProps) {
   const resolvedImageSrc = resolveHomeImageSrc(imageSrc) ?? "/placeholder-card.svg";
-  const unoptimized = resolvedImageSrc.startsWith("http://") || resolvedImageSrc.startsWith("https://");
 
   const content = (
     <>

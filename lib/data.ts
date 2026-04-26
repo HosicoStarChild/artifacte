@@ -98,6 +98,9 @@ export interface Listing {
   solPrice?: number | null;
   usdcPrice?: number | null;
   collection?: string | null;
+  owner?: string;
+  seller?: string;
+  isCore?: boolean;
 }
 
 const now = Date.now();

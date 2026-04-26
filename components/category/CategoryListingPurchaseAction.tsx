@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { PublicKey, Transaction } from "@solana/web3.js";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountInstruction,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import {
   getTransactionErrorMessage,
@@ -20,6 +25,8 @@ const TOKENS: Record<"USD1" | "USDC", { mint: PublicKey; decimals: number; label
   USD1: { mint: new PublicKey("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB"), decimals: 6, label: "USD1" },
   USDC: { mint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), decimals: 6, label: "USDC" },
 };
+
+const AUCTION_PROGRAM_PUBLIC_KEY = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 
 type CategoryListingPurchaseActionProps = {
   listing: Listing;
@@ -55,7 +62,12 @@ export default function CategoryListingPurchaseAction({
   const { connection } = useConnection();
   const auctionProgram = useAuctionProgram();
   const [buyingId, setBuyingId] = useState<string | null>(null);
-  const currency: "USD1" | "USDC" = "USD1";
+  const [unlistingId, setUnlistingId] = useState<string | null>(null);
+  const walletAddress = publicKey?.toBase58() ?? null;
+  const listingPaymentCurrency: "USD1" | "USDC" = listing.currency === "USDC" ? "USDC" : "USD1";
+  const isArtifacteOwner = Boolean(
+    listing.source === "artifacte" && walletAddress && listing.seller && walletAddress === listing.seller,
+  );
 
   async function handleBuyNow() {
     if (!connected || !publicKey) {
@@ -74,9 +86,47 @@ export default function CategoryListingPurchaseAction({
 
     try {
       let signature = "";
+      const mintAddr = listing?.nftAddress || nftMint;
 
-      if (listing?.source === "collector-crypt" || listing?.source === "phygitals" || listing?.nftAddress) {
-        const mintAddr = listing?.nftAddress || nftMint;
+      if (listing.source === "artifacte" && mintAddr && auctionProgram) {
+        const nftMintPubkey = new PublicKey(mintAddr);
+        const token = TOKENS[listingPaymentCurrency];
+        const buyerNftAccount = await getAssociatedTokenAddress(nftMintPubkey, publicKey);
+
+        try {
+          if (listing.isCore) {
+            signature = await auctionProgram.buyNowCore(nftMintPubkey);
+          } else {
+            if (!listing.seller) {
+              throw new Error("Listing seller not available");
+            }
+
+            const sellerPubkey = new PublicKey(listing.seller);
+            const buyerPaymentAccount = await getAssociatedTokenAddress(token.mint, publicKey);
+            const sellerPaymentAccount = await getAssociatedTokenAddress(token.mint, sellerPubkey);
+
+            signature = await auctionProgram.buyNow(
+              nftMintPubkey,
+              sellerPaymentAccount,
+              buyerPaymentAccount,
+              buyerNftAccount,
+              Math.round(listing.price * (10 ** token.decimals)),
+              token.mint,
+            );
+          }
+        } catch (programError) {
+          const programErrorMessage = programError instanceof Error ? programError.message : "unknown error";
+          console.warn("AuctionProgram.buyNow failed:", programError);
+          throw new Error(`On-chain purchase failed: ${programErrorMessage.slice(0, 50)}`);
+        }
+
+        showToast.success(`✓ Purchase successful! TX: ${signature.slice(0, 12)}...`);
+        onPurchased?.(listingId, mintAddr);
+        setBuyingId(null);
+        return;
+      }
+
+      if (listing?.source === "collector-crypt" || listing?.source === "phygitals") {
         if (!mintAddr) {
           showToast.error("NFT mint address not available");
           setBuyingId(null);
@@ -134,13 +184,12 @@ export default function CategoryListingPurchaseAction({
       if (nftMint && auctionProgram) {
         try {
           const nftMintPubkey = new PublicKey(nftMint);
-          const token = TOKENS[currency];
+          const token = TOKENS[listingPaymentCurrency];
           const buyerNftAccount = await getAssociatedTokenAddress(nftMintPubkey, publicKey);
 
-          const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
           const [coreListingPda] = PublicKey.findProgramAddressSync(
             [Buffer.from("core_listing"), nftMintPubkey.toBuffer()],
-            AUCTION_PROGRAM_ID
+            AUCTION_PROGRAM_PUBLIC_KEY
           );
           const coreListingInfo = await connection.getAccountInfo(coreListingPda);
 
@@ -156,7 +205,7 @@ export default function CategoryListingPurchaseAction({
           } else {
             const [listingPda] = PublicKey.findProgramAddressSync(
               [Buffer.from("listing"), nftMintPubkey.toBuffer()],
-              AUCTION_PROGRAM_ID
+              AUCTION_PROGRAM_PUBLIC_KEY
             );
             const listingInfo = await connection.getAccountInfo(listingPda);
             if (!listingInfo) throw new Error("On-chain listing not found");
@@ -195,7 +244,7 @@ export default function CategoryListingPurchaseAction({
         showToast.error(
           `Insufficient balance. Required: ${formatListingQuote(
             listingPayablePrice.amount,
-            listingPayablePrice.currency ?? (isDigitalArt ? "SOL" : currency)
+            listingPayablePrice.currency ?? (isDigitalArt ? "SOL" : listingPaymentCurrency)
           )}`
         );
       } else {
@@ -203,6 +252,73 @@ export default function CategoryListingPurchaseAction({
       }
     } finally {
       setBuyingId(null);
+    }
+  }
+
+  async function handleArtifacteUnlist() {
+    if (!connected || !publicKey || !auctionProgram) {
+      showToast.error("Please connect your wallet first");
+      return;
+    }
+
+    const mintAddr = listing.nftAddress || listing.nftMint;
+    if (!mintAddr) {
+      showToast.error("NFT mint address not available");
+      return;
+    }
+
+    setUnlistingId(listing.id);
+
+    try {
+      const assetMint = new PublicKey(mintAddr);
+
+      if (listing.isCore) {
+        await auctionProgram.cancelCoreListing(assetMint);
+      } else {
+        if (!sendTransaction) {
+          throw new Error("Wallet does not support transaction submission");
+        }
+
+        const mintInfo = await connection.getAccountInfo(assetMint, "confirmed");
+        const tokenProgramId = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID)
+          ? TOKEN_2022_PROGRAM_ID
+          : TOKEN_PROGRAM_ID;
+        const sellerAssetAccount = await getAssociatedTokenAddress(
+          assetMint,
+          publicKey,
+          false,
+          tokenProgramId,
+        );
+
+        const existingTokenAccount = await connection.getAccountInfo(sellerAssetAccount, "confirmed");
+        if (!existingTokenAccount) {
+          const createAtaInstruction = createAssociatedTokenAccountInstruction(
+            publicKey,
+            sellerAssetAccount,
+            publicKey,
+            assetMint,
+            tokenProgramId,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          );
+          const createAtaTransaction = new Transaction().add(createAtaInstruction);
+          const ataSignature = await sendTransaction(createAtaTransaction, connection);
+          await connection.confirmTransaction(ataSignature, "confirmed");
+        }
+
+        await auctionProgram.cancelListing(assetMint, sellerAssetAccount);
+      }
+
+      showToast.success("Listing cancelled successfully");
+      onPurchased?.(listing.id, mintAddr);
+    } catch (error) {
+      const message = getTransactionErrorMessage(error);
+      if (isTransactionRequestRejected(error)) {
+        showToast.error(TRANSACTION_REQUEST_REJECTED_MESSAGE);
+      } else {
+        showToast.error(`Error: ${message.slice(0, 80)}`);
+      }
+    } finally {
+      setUnlistingId(null);
     }
   }
 
@@ -220,13 +336,36 @@ export default function CategoryListingPurchaseAction({
   }
 
   if (listing.source === "artifacte" && listing.nftAddress) {
+    if (isArtifacteOwner) {
+      return (
+        <button
+          type="button"
+          onClick={handleArtifacteUnlist}
+          disabled={unlistingId === listing.id}
+          className="h-10 w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {unlistingId === listing.id ? "Unlisting..." : "Unlist"}
+        </button>
+      );
+    }
+
+    if (connected) {
+      return (
+        <button
+          type="button"
+          onClick={handleBuyNow}
+          disabled={buyingId === listing.id}
+          className={primaryButtonClassName}
+        >
+          {buyingId === listing.id ? "Processing..." : "Buy Now"}
+        </button>
+      );
+    }
+
     return (
-      <Link
-        href={`/auctions/cards/${listing.nftAddress}`}
-        className="w-full px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-dark-900 rounded-lg text-sm font-semibold transition-colors duration-200 text-center block"
-      >
-        View Details
-      </Link>
+      <button type="button" disabled className={disabledButtonClassName}>
+        Buy Now
+      </button>
     );
   }
 

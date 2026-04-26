@@ -6,12 +6,16 @@ const ARWEAVE_GATEWAYS = [
   "https://arweave.net",
 ];
 
-const FETCH_TIMEOUT = 8000; // 8s per gateway attempt
+const FETCH_TIMEOUT = 2500; // Keep placeholder fallback snappy when gateways are down.
 
 function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = FETCH_TIMEOUT): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+function redirectToPlaceholder(request: NextRequest): NextResponse {
+  return NextResponse.redirect(new URL("/placeholder.png", request.url));
 }
 
 export async function GET(req: NextRequest) {
@@ -64,7 +68,7 @@ export async function GET(req: NextRequest) {
         continue;
       }
     }
-    return new NextResponse("Image not found on any IPFS gateway", { status: 404 });
+    return redirectToPlaceholder(req);
   }
 
   // Extract Arweave TX ID if present
@@ -93,7 +97,7 @@ export async function GET(req: NextRequest) {
         continue;
       }
     }
-    return new NextResponse("Image not found on any gateway", { status: 404 });
+    return redirectToPlaceholder(req);
   }
 
   // Non-arweave URLs: direct fetch with timeout
@@ -102,7 +106,7 @@ export async function GET(req: NextRequest) {
       headers: { Accept: "image/*" },
       redirect: "follow",
     });
-    if (!res.ok) return new NextResponse("Upstream error", { status: res.status });
+    if (!res.ok) return redirectToPlaceholder(req);
     const contentType = res.headers.get("content-type") || "image/jpeg";
     return new NextResponse(res.body, {
       headers: {
@@ -112,6 +116,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch {
-    return new NextResponse("Fetch failed", { status: 502 });
+    return redirectToPlaceholder(req);
   }
 }

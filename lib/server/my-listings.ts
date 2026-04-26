@@ -16,11 +16,6 @@ import { PublicKey } from "@solana/web3.js";
 import { readFile } from "fs/promises";
 import path from "path";
 
-const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-const HELIUS_RPC = HELIUS_API_KEY
-  ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`
-  : null;
-
 const ALLOWLIST_FILE = path.join(process.cwd(), "data", "allowlist.json");
 const ALLOWLIST_FALLBACK = bundledAllowlist.collections as AllowlistEntry[];
 
@@ -32,6 +27,7 @@ const LISTING_ACCOUNT_SIZE_CURRENT = 241;
 const CORE_LISTING_ACCOUNT_SIZE = 153;
 const DAS_BATCH_SIZE = 100;
 const REQUEST_TIMEOUT_MS = 12_000;
+const DEFAULT_SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 
 const LISTING_ACCOUNT_DISCRIMINATOR = [218, 32, 50, 73, 43, 134, 26, 58] as const;
 const CORE_LISTING_ACCOUNT_DISCRIMINATOR = [205, 178, 162, 169, 199, 166, 133, 157] as const;
@@ -152,15 +148,85 @@ const sourcePriority: Record<MyListingSource, number> = {
 };
 
 function ensureHeliusRpc(): string {
-  if (!HELIUS_RPC) {
+  const rpcUrl = buildHeliusRpcUrl();
+  if (!rpcUrl) {
     throw new Error("HELIUS_API_KEY is not configured");
   }
 
-  return HELIUS_RPC;
+  return rpcUrl;
 }
 
 function withTimeout(): AbortSignal {
   return AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+}
+
+function normalizeConfiguredUrl(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function buildHeliusRpcUrl(): string | null {
+  const explicitRpcUrl = normalizeConfiguredUrl(process.env.HELIUS_RPC_URL);
+  if (explicitRpcUrl) {
+    return explicitRpcUrl;
+  }
+
+  const apiKey = normalizeConfiguredUrl(process.env.HELIUS_API_KEY);
+  return apiKey ? `https://mainnet.helius-rpc.com/?api-key=${apiKey}` : null;
+}
+
+function getSolanaRpcUpstreamUrls(): string[] {
+  return [
+    normalizeConfiguredUrl(process.env.SOLANA_RPC_URL),
+    normalizeConfiguredUrl(process.env.SOLANA_RPC_URL_MAINNET),
+    normalizeConfiguredUrl(process.env.NEXT_PUBLIC_SOLANA_RPC_URL),
+    normalizeConfiguredUrl(process.env.NEXT_PUBLIC_SOLANA_RPC_URL_MAINNET),
+    buildHeliusRpcUrl(),
+    DEFAULT_SOLANA_RPC_URL,
+  ].filter((url, index, urls): url is string => Boolean(url) && urls.indexOf(url) === index);
+}
+
+function getDasRpcUpstreamUrls(): string[] {
+  return getSolanaRpcUpstreamUrls();
+}
+
+async function fetchRpcPayload<TPayload extends { error?: { message?: string } }>(
+  upstreamUrls: readonly string[],
+  body: object,
+  requestLabel: string,
+): Promise<TPayload> {
+  let lastError: unknown = null;
+
+  for (const rpcUrl of upstreamUrls) {
+    try {
+      const response = await fetch(rpcUrl, {
+        body: JSON.stringify(body),
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        signal: withTimeout(),
+      });
+
+      if (!response.ok) {
+        lastError = new Error(`${requestLabel} RPC failed with ${response.status}`);
+        continue;
+      }
+
+      const payload = (await response.json()) as TPayload;
+      if (payload.error?.message) {
+        lastError = new Error(payload.error.message);
+        continue;
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to fetch ${requestLabel} from configured RPC upstreams`);
 }
 
 function readPublicKey(data: Buffer, offset: number): string {
@@ -341,9 +407,9 @@ async function fetchProgramAccounts(
   programId: string,
   filters: RpcProgramAccountFilter[],
 ): Promise<RpcProgramAccount[]> {
-  const rpcUrl = ensureHeliusRpc();
-  const response = await fetch(rpcUrl, {
-    body: JSON.stringify({
+  const payload = await fetchRpcPayload<RpcProgramAccountsResponse>(
+    getSolanaRpcUpstreamUrls(),
+    {
       id: "my-listings-program-accounts",
       jsonrpc: "2.0",
       method: "getProgramAccounts",
@@ -354,59 +420,33 @@ async function fetchProgramAccounts(
           filters,
         },
       ],
-    }),
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
     },
-    method: "POST",
-    signal: withTimeout(),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Program account RPC failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as RpcProgramAccountsResponse;
-
-  if (payload.error?.message) {
-    throw new Error(payload.error.message);
-  }
+    "program accounts",
+  );
 
   return Array.isArray(payload.result) ? payload.result : [];
 }
 
 async function fetchAssetMap(mintAddresses: string[]): Promise<Map<string, HeliusAsset>> {
-  const rpcUrl = ensureHeliusRpc();
   const uniqueMints = Array.from(new Set(mintAddresses.filter(Boolean)));
   const assetMap = new Map<string, HeliusAsset>();
 
+  if (uniqueMints.length === 0) {
+    return assetMap;
+  }
+
   for (let index = 0; index < uniqueMints.length; index += DAS_BATCH_SIZE) {
     const batch = uniqueMints.slice(index, index + DAS_BATCH_SIZE);
-    const response = await fetch(rpcUrl, {
-      body: JSON.stringify({
+    const payload = await fetchRpcPayload<HeliusAssetBatchResponse>(
+      getDasRpcUpstreamUrls(),
+      {
         id: `my-listings-asset-batch-${index / DAS_BATCH_SIZE}`,
         jsonrpc: "2.0",
         method: "getAssetBatch",
         params: { ids: batch },
-      }),
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
       },
-      method: "POST",
-      signal: withTimeout(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Helius DAS returned ${response.status}`);
-    }
-
-    const payload = (await response.json()) as HeliusAssetBatchResponse;
-
-    if (payload.error?.message) {
-      throw new Error(payload.error.message);
-    }
+      "asset metadata",
+    );
 
     for (const asset of payload.result ?? []) {
       if (asset.id) {
@@ -653,18 +693,22 @@ export async function getMyListingsPageData(
 ): Promise<MyListingsPageData> {
   const validatedWallet = validateMyListingsWallet(wallet);
 
-  const [allowlistEntries, artifacteListings, coreListings, tensorListings] = await Promise.all([
+  const [allowlistEntries, artifacteListingsResult, coreListingsResult, tensorListingsResult] = await Promise.all([
     readAllowlistEntries(),
-    fetchArtifacteListingsForWallet(validatedWallet),
-    fetchCoreListingsForWallet(validatedWallet),
-    fetchTensorListingsForWallet(validatedWallet),
+    fetchArtifacteListingsForWallet(validatedWallet).catch(() => []),
+    fetchCoreListingsForWallet(validatedWallet).catch(() => []),
+    fetchTensorListingsForWallet(validatedWallet).catch(() => []),
   ]);
+
+  const artifacteListings = artifacteListingsResult;
+  const coreListings = coreListingsResult;
+  const tensorListings = tensorListingsResult;
 
   const assetMap = await fetchAssetMap([
     ...artifacteListings.map((listing) => listing.nftMint),
     ...coreListings.map((listing) => listing.asset),
     ...tensorListings.map((listing) => listing.nftMint),
-  ]);
+  ]).catch(() => new Map<string, HeliusAsset>());
 
   const allowlistIdentifiers = createAllowlistIdentifierSet(allowlistEntries);
 

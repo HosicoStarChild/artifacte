@@ -27,6 +27,7 @@ import {
   resolvePortfolioImageSrc,
   type CollectorCryptResponse,
 } from "@/lib/portfolio";
+import { ensureHeliusRpcUrl, fetchHeliusRpc } from "@/app/api/_lib/list-route-utils";
 import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import { getFloorPriceSnapshot, type FloorPriceSnapshot } from "@/lib/server/floor-prices";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
@@ -91,7 +92,6 @@ interface ResolvedRwaAsset {
 }
 
 const ORACLE_API = getOracleApiUrl();
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const COLLECTOR_CRYPT_API = "https://api.collectorcrypt.com/marketplace";
 const COLLECTOR_CRYPT_USER_AGENT = "Artifacte-Portfolio/2.0";
 const PORTFOLIO_TIMEOUT_MS = 10_000;
@@ -563,16 +563,9 @@ async function buildCollectorCryptSnapshot(wallet: string): Promise<PortfolioCol
 }
 
 async function fetchHeliusAssetsByOwner(wallet: string): Promise<HeliusAsset[]> {
-  if (!process.env.HELIUS_API_KEY) {
-    return [];
-  }
-
-  const response = await fetch(HELIUS_RPC, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  try {
+    const rpcUrl = ensureHeliusRpcUrl();
+    const payload = await fetchHeliusRpc<HeliusRpcResponse>(rpcUrl, {
       jsonrpc: "2.0",
       id: "portfolio-das",
       method: "getAssetsByOwner",
@@ -581,21 +574,12 @@ async function fetchHeliusAssetsByOwner(wallet: string): Promise<HeliusAsset[]> 
         page: 1,
         limit: 1000,
       },
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-  });
+    });
 
-  if (!response.ok) {
-    throw new Error(`Helius DAS error: ${response.status}`);
+    return payload.result?.items ?? [];
+  } catch {
+    return [];
   }
-
-  const payload = (await response.json()) as HeliusRpcResponse;
-  if (payload.error?.message) {
-    throw new Error(payload.error.message);
-  }
-
-  return payload.result?.items ?? [];
 }
 
 async function fetchOracleCertPrice(cert: string): Promise<number> {

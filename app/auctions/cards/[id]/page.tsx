@@ -22,8 +22,10 @@ import { resolveListingDisplayPrice, resolveListingPayablePrice } from "@/lib/da
 import { buildNftImageFallbackPath } from "@/lib/helius-asset-image";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
+import { CardDetailActionPanel } from "./_components/card-action-panel";
 import { ArtifactePriceSection, TcgPlayerPriceBox } from "./_components/card-price-sections";
 import { CardDetailLoadingState, CardDetailNotFoundState } from "./_components/card-detail-states";
+import { resolveCardDetailActionState } from "./_lib/card-action-state";
 import {
   fetchAuctionListing,
   formatListingQuote,
@@ -290,6 +292,26 @@ function CardDetailPageContent() {
     }
   };
 
+  const handleCloseStaleListing = async () => {
+    if (!signTransaction || !card?.nftAddress) return;
+
+    setUnlisting(true);
+
+    try {
+      showToast.info("Closing stale listing...");
+      if (!auctionProgram) throw new Error("Auction program unavailable");
+
+      const sig = await auctionProgram.closeStaleListing(new PublicKey(card.nftAddress));
+      showToast.success(`Stale listing closed! TX: ${sig.slice(0, 12)}...`);
+      setCard((prevCard) => prevCard ? { ...prevCard, auctionListing: null } : prevCard);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to close listing";
+      showToast.error(message.slice(0, 80));
+    } finally {
+      setUnlisting(false);
+    }
+  };
+
   if (loading) {
     return <CardDetailLoadingState />;
   }
@@ -314,6 +336,11 @@ function CardDetailPageContent() {
     : isTensorMarketplaceListing(card)
       ? 'Powered by Tensor'
       : 'Powered by Magic Eden';
+  const actionState = resolveCardDetailActionState({
+    card,
+    connected,
+    viewerPublicKey: publicKey?.toBase58() ?? null,
+  });
   const backHref = getCardBackHref(card.category);
   const backLabel = getCardBackLabel(card.category);
   const fallbackCardImageSrc = buildNftImageFallbackPath(card.nftAddress);
@@ -376,7 +403,19 @@ function CardDetailPageContent() {
 
             {/* Price */}
             {card.source === "artifacte" ? (
-              <ArtifactePriceSection card={card} />
+              <ArtifactePriceSection card={card}>
+                <CardDetailActionPanel
+                  actionState={actionState}
+                  buying={buying}
+                  buyLabel={card.auctionListing?.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
+                  card={card}
+                  marketplaceLabel={marketplaceLabel}
+                  onBuy={handleBuy}
+                  onCloseStaleListing={handleCloseStaleListing}
+                  onUnlist={handleUnlist}
+                  unlisting={unlisting}
+                />
+              </ArtifactePriceSection>
             ) : (
               <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
                 <p className="text-gray-500 text-xs font-medium tracking-wider mb-2">
@@ -405,82 +444,17 @@ function CardDetailPageContent() {
                   <p className="text-white font-serif text-4xl mb-4">Unlisted</p>
                 )}
 
-                {!card.price && card.auctionListing?.stale && connected && publicKey && card.auctionListing.seller === publicKey.toBase58() && (
-                  <button
-                    onClick={async () => {
-                      if (!signTransaction || !card.nftAddress) return;
-                      setUnlisting(true);
-                      try {
-                        showToast.info("Closing stale listing...");
-                        if (!auctionProgram) throw new Error("Auction program unavailable");
-                        const sig = await auctionProgram.closeStaleListing(new PublicKey(card.nftAddress));
-                        showToast.success(`Stale listing closed! TX: ${sig.slice(0, 12)}...`);
-                        setCard((prevCard) => prevCard ? { ...prevCard, auctionListing: null } : prevCard);
-                      } catch (error) {
-                        const message = error instanceof Error ? error.message : "Failed to close listing";
-                        showToast.error(message.slice(0, 80));
-                      } finally {
-                        setUnlisting(false);
-                      }
-                    }}
-                    disabled={unlisting}
-                    className={`w-full px-6 py-3 rounded-lg text-sm font-semibold transition ${
-                      unlisting ? "bg-gray-600/50 cursor-not-allowed text-gray-400" : "bg-dark-700 border border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
-                    }`}
-                  >
-                    {unlisting ? "Closing..." : "Close Stale Listing (reclaim rent)"}
-                  </button>
-                )}
-
-                {card.price ? (
-                  connected && publicKey && card.seller && publicKey.toBase58() === card.seller ? (
-                    <div className="space-y-3">
-                      <div className="w-full px-6 py-3 rounded-lg text-sm font-semibold bg-dark-700 border border-gold-500/30 text-gold-500 text-center">
-                        Your Listing
-                      </div>
-                      <button
-                        onClick={handleUnlist}
-                        disabled={unlisting}
-                        className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
-                          unlisting
-                            ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
-                            : "bg-red-600 hover:bg-red-700 text-white"
-                        }`}
-                      >
-                        {unlisting ? "Unlisting..." : "Unlist Item"}
-                      </button>
-                    </div>
-                  ) : card.auctionListing ? (
-                    connected ? (
-                      <button
-                        onClick={handleBuy}
-                        disabled={buying || card.sold}
-                        className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
-                          buying || card.sold
-                            ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
-                            : "bg-gold-500 hover:bg-gold-600 text-dark-900"
-                        }`}
-                      >
-                        {card.sold ? "✅ Sold" : buying ? "Processing..." : card.auctionListing.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
-                      </button>
-                    ) : null
-                  ) : connected ? (
-                    <button
-                      onClick={handleBuy}
-                      disabled={buying || card.sold}
-                      className={`w-full px-6 py-3.5 rounded-lg text-base font-semibold transition ${
-                        buying || card.sold
-                          ? "bg-gray-600/50 cursor-not-allowed text-gray-400"
-                          : "bg-gold-500 hover:bg-gold-600 text-dark-900"
-                      }`}
-                    >
-                      {card.sold ? "✅ Sold" : buying ? "Processing..." : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
-                    </button>
-                  ) : null
-                ) : (
-                  <p className="text-gray-500 text-sm">This item is not currently listed for sale</p>
-                )}
-                {card.price && <p className="text-gray-600 text-xs mt-2">{marketplaceLabel}</p>}
+                <CardDetailActionPanel
+                  actionState={actionState}
+                  buying={buying}
+                  buyLabel={card.auctionListing?.listingType === 'auction' ? 'Place Bid' : `Buy Now — ${formatListingQuote(buyPrice, buyCurrency)}`}
+                  card={card}
+                  marketplaceLabel={marketplaceLabel}
+                  onBuy={handleBuy}
+                  onCloseStaleListing={handleCloseStaleListing}
+                  onUnlist={handleUnlist}
+                  unlisting={unlisting}
+                />
               </div>
             )}
 

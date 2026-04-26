@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   createRateLimiter,
-  ensureHeliusRpcUrl,
+  getSolanaRpcUpstreamUrls,
   getRequestIp,
   jsonError,
   withRequestTimeout,
@@ -214,6 +214,80 @@ function logDeniedMethod(request: NextRequest, clientKey: string, method: string
   );
 }
 
+function getRpcFetchErrorCode(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+
+  const cause = error.cause;
+  if (typeof cause !== "object" || cause === null || !("code" in cause)) {
+    return null;
+  }
+
+  return typeof cause.code === "string" ? cause.code : null;
+}
+
+function getRpcProxyErrorStatus(error: unknown): number {
+  if (!(error instanceof Error)) {
+    return 500;
+  }
+
+  const code = getRpcFetchErrorCode(error);
+  if (
+    error.name === "AbortError" ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "EHOSTUNREACH"
+  ) {
+    return 504;
+  }
+
+  return 500;
+}
+
+async function forwardRpcRequest(
+  parsedRequest: ParsedRpcProxyRequest,
+  upstreamUrls: readonly string[],
+  method: AllowedRpcMethod,
+  clientKey: string,
+): Promise<Response> {
+  let lastError: unknown = null;
+  let lastResponse: Response | null = null;
+  const failedUpstreams: string[] = [];
+
+  for (const rpcUrl of upstreamUrls) {
+    try {
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsedRequest),
+        signal: withRequestTimeout(),
+      });
+
+      if (response.ok) {
+        return response;
+      }
+
+      lastResponse = response;
+      failedUpstreams.push(`${rpcUrl} -> HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : "Unknown upstream RPC error";
+      failedUpstreams.push(`${rpcUrl} -> ${errorMessage}`);
+    }
+  }
+
+  if (lastResponse) {
+    console.warn(
+      `[api/rpc] All upstream RPCs failed | method=${method} | client=${clientKey} | attempts=${failedUpstreams.join("; ")}`
+    );
+    return lastResponse;
+  }
+
+  throw lastError ?? new Error("Failed to reach any configured RPC upstream");
+}
+
 export async function POST(req: NextRequest) {
   const clientKey = resolveClientKey(req);
   let method: AllowedRpcMethod | "unknown" = "unknown";
@@ -231,22 +305,14 @@ export async function POST(req: NextRequest) {
       return jsonError(rateLimitResult.message, 429);
     }
 
-    const rpcUrl = ensureHeliusRpcUrl();
-
-    const res = await fetch(rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsedRequest),
-      signal: withRequestTimeout(),
-    });
+    const res = await forwardRpcRequest(
+      parsedRequest,
+      getSolanaRpcUpstreamUrls(),
+      method,
+      clientKey,
+    );
 
     const responseText = await res.text();
-
-    if (!res.ok) {
-      console.warn(
-        `[api/rpc] Upstream RPC responded with ${res.status} | method=${method} | client=${clientKey}`
-      );
-    }
 
     if (responseText.length === 0) {
       return new NextResponse(null, { status: res.status });
@@ -273,6 +339,6 @@ export async function POST(req: NextRequest) {
       `[api/rpc] Proxy error | method=${method || "unknown"} | client=${clientKey}`,
       error
     );
-    return jsonError(message, 500);
+    return jsonError(message, getRpcProxyErrorStatus(error));
   }
 }

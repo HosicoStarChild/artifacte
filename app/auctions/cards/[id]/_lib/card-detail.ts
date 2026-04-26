@@ -7,6 +7,8 @@ import {
 } from "@/lib/helius-asset-image";
 import { resolveHomeImageSrc } from "@/lib/home-image";
 
+import { applyArtifacteMarketplaceState } from "./artifacte-marketplace-state";
+
 const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
@@ -73,6 +75,18 @@ type HeliusAsset = {
 type NftRouteResponse = {
   nft?: HeliusAsset;
   result?: HeliusAsset;
+};
+
+type ArtifacteProgramListingSnapshot = {
+  id: string;
+  isCore?: boolean;
+  nftAddress: string;
+  owner?: string;
+  seller?: string;
+};
+
+type ArtifacteProgramListingsResponse = {
+  listings?: ArtifacteProgramListingSnapshot[];
 };
 
 type TensorPrice = {
@@ -224,11 +238,54 @@ function buildCardDetail(base: Partial<CardDetail> & Pick<CardDetail, "id" | "na
     image,
     name: base.name,
     nftAddress,
+    owner: base.owner || "",
     price: base.price ?? 0,
     solPrice: base.solPrice ?? null,
     source,
     subtitle,
     usdcPrice: base.usdcPrice ?? null,
+  };
+}
+
+async function fetchArtifacteProgramListingSnapshot(mint: string): Promise<ArtifacteProgramListingSnapshot | null> {
+  try {
+    const response = await fetch(
+      `/api/artifacte-program-listings?q=${encodeURIComponent(mint)}&perPage=10&sort=price-desc`,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as ArtifacteProgramListingsResponse;
+    const listings = Array.isArray(payload.listings) ? payload.listings : [];
+    return listings.find((listing) => listing.id === mint || listing.nftAddress === mint) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function hydrateArtifacteCard(card: CardDetail, connection: Connection): Promise<CardDetail> {
+  if (card.source !== "artifacte" || !card.nftAddress) {
+    return card;
+  }
+
+  const [tensorPrice, auctionListing, liveArtifacteListing] = await Promise.all([
+    fetchTensorPrice(connection, card.nftAddress),
+    fetchAuctionListing(connection, card.nftAddress),
+    fetchArtifacteProgramListingSnapshot(card.nftAddress),
+  ]);
+
+  const nextCard = applyArtifacteMarketplaceState(card, {
+    auctionListing,
+    tensorPrice,
+  });
+
+  return {
+    ...nextCard,
+    isCore: auctionListing?.program === "core" || liveArtifacteListing?.isCore || card.isCore,
+    owner: liveArtifacteListing?.owner || card.owner || "",
+    seller: auctionListing?.seller || liveArtifacteListing?.seller || nextCard.seller || "",
   };
 }
 
@@ -525,6 +582,10 @@ async function loadOracleCard(cardId: string, connection: Connection): Promise<C
       card.price = card.solPrice;
     }
 
+    if (card.source === "artifacte") {
+      return hydrateArtifacteCard(card, connection);
+    }
+
     return card;
   } catch {
     return null;
@@ -568,6 +629,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         image: resolvedAssetImage || asset.content?.links?.animation_url || "",
         name: asset.content?.metadata?.name || "Unknown",
         nftAddress: mintAddress,
+        owner: asset.ownership?.owner || "",
         price: 0,
         priceSource: tcgPlayerId ? "TCGplayer" : undefined,
         priceSourceId: tcgPlayerId || undefined,
@@ -613,6 +675,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         language: getAttr("Language") || null,
         name: asset.content?.metadata?.name || asset.name || "Unknown",
         nftAddress: mintAddress,
+        owner: asset.ownership?.owner || "",
         price: auctionListing?.price || tensorPrice?.usdcPrice || tensorPrice?.solPrice || 0,
         priceSource: getAttr("Price Source") || undefined,
         priceSourceId: getAttr("Price Source ID") || undefined,
@@ -652,6 +715,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         marketplace: !auctionListing && (tensorPrice?.usdcPrice || tensorPrice?.solPrice) ? "tensor" : undefined,
         name: asset.content?.metadata?.name || asset.name || "Unknown",
         nftAddress: mintAddress,
+        owner: asset.ownership?.owner || "",
         price: auctionListing?.price || tensorPrice?.usdcPrice || tensorPrice?.solPrice || 0,
         seller: auctionListing?.seller || tensorPrice?.seller || asset.ownership?.owner,
         solPrice: tensorPrice?.solPrice || 0,

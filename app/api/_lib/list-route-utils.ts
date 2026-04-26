@@ -88,6 +88,7 @@ export interface TensorPseudoSigner {
 
 const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 12_000;
+const DEFAULT_SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 
 export const LIST_PAGE_ALLOWED_DAS_METHODS = new Set([
   "getAssetsByOwner",
@@ -136,31 +137,102 @@ export function withRequestTimeout(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Abor
   return AbortSignal.timeout(timeoutMs);
 }
 
-export function ensureHeliusRpcUrl(): string {
-  const apiKey = process.env.HELIUS_API_KEY;
+function normalizeConfiguredUrl(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
 
-  if (!apiKey) {
+function buildHeliusRpcUrl(): string | null {
+  const explicitRpcUrl = normalizeConfiguredUrl(process.env.HELIUS_RPC_URL);
+  if (explicitRpcUrl) {
+    return explicitRpcUrl;
+  }
+
+  const apiKey = normalizeConfiguredUrl(process.env.HELIUS_API_KEY);
+  return apiKey ? `https://mainnet.helius-rpc.com/?api-key=${apiKey}` : null;
+}
+
+export function ensureHeliusRpcUrl(): string {
+  const rpcUrl = buildHeliusRpcUrl();
+
+  if (!rpcUrl) {
     throw new Error("HELIUS_API_KEY is not configured.");
   }
 
-  return `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+  return rpcUrl;
+}
+
+export function getSolanaRpcUpstreamUrls(): string[] {
+  return [
+    normalizeConfiguredUrl(process.env.SOLANA_RPC_URL),
+    normalizeConfiguredUrl(process.env.SOLANA_RPC_URL_MAINNET),
+    normalizeConfiguredUrl(process.env.NEXT_PUBLIC_SOLANA_RPC_URL),
+    normalizeConfiguredUrl(process.env.NEXT_PUBLIC_SOLANA_RPC_URL_MAINNET),
+    buildHeliusRpcUrl(),
+    DEFAULT_SOLANA_RPC_URL,
+  ].filter((url, index, urls): url is string => Boolean(url) && urls.indexOf(url) === index);
+}
+
+export function getRpcFetchErrorStatus(error: unknown): number {
+  if (!(error instanceof Error)) {
+    return 500;
+  }
+
+  const cause = error.cause;
+  const code = typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "string"
+    ? cause.code
+    : null;
+
+  if (
+    error.name === "AbortError"
+    || code === "UND_ERR_CONNECT_TIMEOUT"
+    || code === "ECONNREFUSED"
+    || code === "ENOTFOUND"
+    || code === "EHOSTUNREACH"
+  ) {
+    return 504;
+  }
+
+  return 500;
 }
 
 export async function fetchHeliusRpc<TResponse>(rpcUrl: string, body: object): Promise<TResponse> {
-  const response = await fetch(rpcUrl, {
-    body: JSON.stringify(body),
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-    signal: withRequestTimeout(),
-  });
+  const upstreamUrls = [
+    rpcUrl,
+    ...getSolanaRpcUpstreamUrls().filter((upstreamUrl) => upstreamUrl !== rpcUrl),
+  ];
 
-  if (!response.ok) {
-    throw new Error(`Helius error: ${response.status}`);
+  let lastError: unknown = null;
+
+  for (const upstreamUrl of upstreamUrls) {
+    try {
+      const response = await fetch(upstreamUrl, {
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        signal: withRequestTimeout(),
+      });
+
+      if (!response.ok) {
+        lastError = new Error(`Helius error: ${response.status}`);
+        continue;
+      }
+
+      const payload = (await response.json()) as TResponse & { error?: HeliusJsonRpcError };
+      if (payload.error?.message) {
+        lastError = new Error(payload.error.message);
+        continue;
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  return (await response.json()) as TResponse;
+  throw lastError ?? new Error("Failed to reach any configured Helius RPC upstream");
 }
 
 export function parseMintAddress(value: string | null | undefined, fieldName = "mint"): string {

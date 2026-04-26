@@ -22,6 +22,7 @@ export async function GET(
   try {
     const searchParams = req.nextUrl.searchParams;
     const wallet = searchParams.get("wallet");
+    const bypassCache = searchParams.get("fresh") === "1";
 
     if (!wallet) {
       return NextResponse.json(
@@ -43,7 +44,7 @@ export async function GET(
 
     // Check cache
     const cached = portfolioCache.get(validatedWallet);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    if (!bypassCache && cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return NextResponse.json(cached.data, {
         headers: {
           "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
@@ -62,8 +63,10 @@ export async function GET(
 
     return NextResponse.json(portfolioData, {
       headers: {
-        "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
-        "X-Cache": "MISS",
+        "Cache-Control": bypassCache
+          ? "private, no-store"
+          : "public, max-age=300, stale-while-revalidate=60",
+        "X-Cache": bypassCache ? "BYPASS" : "MISS",
       },
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import {
   createRateLimiter,
   ensureHeliusRpcUrl,
   fetchHeliusRpc,
+  getRpcFetchErrorStatus,
   getRequestIp,
   jsonError,
   parseDasProxyRequest,
@@ -41,6 +42,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "DAS proxy error.";
-    return jsonError(message, 500);
+    return jsonError(message, getRpcFetchErrorStatus(error));
   }
 }

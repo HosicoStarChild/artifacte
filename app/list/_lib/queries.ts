@@ -35,7 +35,6 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
       params: {
         displayOptions: {
           showFungible: false,
-          showNativeBalance: false,
         },
         limit: 1000,
         ownerAddress: walletAddress,

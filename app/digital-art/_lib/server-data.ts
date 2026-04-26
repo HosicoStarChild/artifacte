@@ -1,6 +1,6 @@
 import "server-only";
 
-import { address, createSolanaRpc } from "@solana/kit";
+import { address } from "@solana/kit";
 import { PublicKey } from "@solana/web3.js";
 import { cache } from "react";
 
@@ -8,6 +8,7 @@ import {
   buildNftLookupResponse,
   ensureHeliusRpcUrl,
   fetchHeliusRpc,
+  getSolanaRpcUpstreamUrls,
   type HeliusAssetResponse,
 } from "@/app/api/_lib/list-route-utils";
 import {
@@ -34,6 +35,7 @@ const AUCTION_PROGRAM_PUBLIC_KEY = new PublicKey(AUCTION_PROGRAM_ID);
 const LISTING_ACCOUNT_SIZE = 240;
 const OWNER_ASSETS_PAGE_SIZE = 1000;
 const FALLBACK_IMAGE = "/placeholder.png";
+const SOLANA_RPC_TIMEOUT_MS = 5_000;
 
 const OFFSET_LISTING_SELLER = 8;
 const OFFSET_LISTING_NFT_MINT = 40;
@@ -72,6 +74,31 @@ interface HeliusAssetsByOwnerResponse {
   };
   result?: {
     items?: HeliusBatchAsset[];
+  };
+}
+
+interface RpcProgramAccount {
+  account: {
+    data: [string, string];
+  };
+  pubkey: string;
+}
+
+interface RpcProgramAccountsResponse {
+  error?: {
+    message?: string;
+  };
+  result?: RpcProgramAccount[];
+}
+
+interface RpcAccountInfoResponse {
+  error?: {
+    message?: string;
+  };
+  result?: {
+    value?: {
+      data: [string, string];
+    } | null;
   };
 }
 
@@ -167,6 +194,76 @@ function chunkValues<TValue>(values: readonly TValue[], size: number): TValue[][
   }
 
   return chunks;
+}
+
+async function fetchSolanaRpcPayload<TPayload extends { error?: { message?: string } }>(
+  body: object,
+): Promise<TPayload> {
+  let lastError: unknown = null;
+
+  for (const rpcUrl of getSolanaRpcUpstreamUrls()) {
+    try {
+      const response = await fetch(rpcUrl, {
+        body: JSON.stringify(body),
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        signal: AbortSignal.timeout(SOLANA_RPC_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        lastError = new Error(`Solana RPC error: ${response.status}`);
+        continue;
+      }
+
+      const payload = (await response.json()) as TPayload;
+      if (payload.error?.message) {
+        lastError = new Error(payload.error.message);
+        continue;
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error("Failed to fetch from configured Solana RPC upstreams");
+}
+
+async function fetchNativeListingProgramAccounts(): Promise<RpcProgramAccount[]> {
+  const payload = await fetchSolanaRpcPayload<RpcProgramAccountsResponse>({
+    id: "digital-art-program-accounts",
+    jsonrpc: "2.0",
+    method: "getProgramAccounts",
+    params: [
+      AUCTION_PROGRAM_ID,
+      {
+        encoding: "base64",
+        filters: [{ dataSize: LISTING_ACCOUNT_SIZE }],
+      },
+    ],
+  });
+
+  return Array.isArray(payload.result) ? payload.result : [];
+}
+
+async function fetchAccountInfo(accountAddress: string): Promise<[string, string] | null> {
+  const payload = await fetchSolanaRpcPayload<RpcAccountInfoResponse>({
+    id: "digital-art-account-info",
+    jsonrpc: "2.0",
+    method: "getAccountInfo",
+    params: [
+      accountAddress,
+      {
+        encoding: "base64",
+      },
+    ],
+  });
+
+  return payload.result?.value?.data ?? null;
 }
 
 function decodeAccountData(data: readonly [string, string]): Buffer {
@@ -415,7 +512,6 @@ async function fetchAssetsByOwner(owner: string): Promise<HeliusBatchAsset[]> {
       params: {
         displayOptions: {
           showFungible: false,
-          showNativeBalance: false,
         },
         limit: OWNER_ASSETS_PAGE_SIZE,
         ownerAddress: owner,
@@ -441,14 +537,7 @@ async function fetchAssetsByOwner(owner: string): Promise<HeliusBatchAsset[]> {
 }
 
 const getAllNativeListingAccounts = cache(async (): Promise<ParsedNativeListingAccount[]> => {
-  const rpcUrl = ensureHeliusRpcUrl();
-  const rpc = createSolanaRpc(rpcUrl);
-  const accounts = await rpc
-    .getProgramAccounts(AUCTION_PROGRAM_ADDRESS, {
-      encoding: "base64",
-      filters: [{ dataSize: BigInt(LISTING_ACCOUNT_SIZE) }],
-    })
-    .send();
+  const accounts = await fetchNativeListingProgramAccounts();
 
   return accounts
     .map((account) =>
@@ -512,20 +601,15 @@ export const getDigitalArtNativeListingDetail = cache(
       AUCTION_PROGRAM_PUBLIC_KEY
     )[0];
     const rpcUrl = ensureHeliusRpcUrl();
-    const rpc = createSolanaRpc(rpcUrl);
-    const response = await rpc
-      .getAccountInfo(address(listingPda.toBase58()), {
-        encoding: "base64",
-      })
-      .send();
+    const accountData = await fetchAccountInfo(listingPda.toBase58());
 
-    if (!response.value) {
+    if (!accountData) {
       return null;
     }
 
     const parsed = parseNativeListingAccount(
       listingPda.toBase58(),
-      decodeAccountData(response.value.data)
+      decodeAccountData(accountData)
     );
 
     if (!parsed) {

@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
     const allListings = await loadActiveArtifacteFixedPriceListings();
     const filteredListings = (
       query
-        ? allListings.filter((listing) => listing.name.toLowerCase().includes(query))
+        ? allListings.filter((listing) => (
+            listing.name.toLowerCase().includes(query)
+            || listing.id.toLowerCase().includes(query)
+            || listing.nftAddress.toLowerCase().includes(query)
+          ))
         : allListings
     ).slice();
 

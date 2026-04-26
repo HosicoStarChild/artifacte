@@ -3,8 +3,10 @@
 import { startTransition, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { PortfolioSection } from "@/app/portfolio/_components/portfolio-section";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
+import type { PortfolioApiResponse, PortfolioPageData, PortfolioSection as PortfolioSectionData } from "@/lib/portfolio";
 import type { MyListingsPageData, MyListingRecord, MyListingStatus } from "@/lib/my-listings";
 
 import { MyListingCard } from "./_components/my-listing-card";
@@ -31,6 +33,28 @@ const EMPTY_COUNTS: Record<MyListingStatus, number> = {
   completed: 0,
 };
 
+async function fetchOwnedArtifacteSection(walletAddress: string): Promise<PortfolioSectionData | null> {
+  const response = await fetch(
+    `/api/portfolio?wallet=${encodeURIComponent(walletAddress)}&fresh=1`,
+  );
+  const payload = (await response.json()) as PortfolioApiResponse;
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.ok ? "Failed to fetch owned Artifacte NFTs" : payload.error);
+  }
+
+  const artifacteSection = payload.sections.find((section) => section.id === "artifacte-rwa");
+  if (!artifacteSection) {
+    return null;
+  }
+
+  return {
+    ...artifacteSection,
+    description: "Artifacte NFTs currently held by this wallet, including newly purchased cards.",
+    title: "Owned Artifacte NFTs",
+  };
+}
+
 export default function MyListingsPage() {
   const {
     anchorWallet,
@@ -51,6 +75,13 @@ export default function MyListingsPage() {
     enabled: Boolean(connected && walletAddress),
     queryFn: () => fetchMyListings(walletAddress ?? ""),
     queryKey: getMyListingsQueryKey(walletAddress),
+    staleTime: 30_000,
+  });
+
+  const ownedArtifacteQuery = useQuery<PortfolioSectionData | null, Error>({
+    enabled: Boolean(connected && walletAddress),
+    queryFn: () => fetchOwnedArtifacteSection(walletAddress ?? ""),
+    queryKey: ["my-listings-owned-artifacte", walletAddress],
     staleTime: 30_000,
   });
 
@@ -75,12 +106,15 @@ export default function MyListingsPage() {
   );
 
   const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your marketplace positions`
-    : "Connect your wallet to manage your active listings";
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your listings and review owned Artifacte NFTs`
+    : "Connect your wallet to manage your listings and review owned Artifacte NFTs";
 
   const handleRefresh = async (): Promise<void> => {
     setActionError(null);
-    await myListingsQuery.refetch();
+    await Promise.all([
+      myListingsQuery.refetch(),
+      ownedArtifacteQuery.refetch(),
+    ]);
   };
 
   const handleListingAction = async (listing: MyListingRecord): Promise<void> => {
@@ -123,9 +157,9 @@ export default function MyListingsPage() {
       <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <div className="space-y-8">
           <MyListingsHeader
-            isRefreshing={myListingsQuery.isFetching}
+            isRefreshing={myListingsQuery.isFetching || ownedArtifacteQuery.isFetching}
             onRefresh={connected && walletAddress ? () => { void handleRefresh(); } : undefined}
-            refreshDisabled={myListingsQuery.isFetching}
+            refreshDisabled={myListingsQuery.isFetching || ownedArtifacteQuery.isFetching}
             walletLabel={walletLabel}
           />
 
@@ -168,6 +202,10 @@ export default function MyListingsPage() {
                   ))}
                 </div>
               )}
+
+              {ownedArtifacteQuery.data?.items.length ? (
+                <PortfolioSection section={ownedArtifacteQuery.data} />
+              ) : null}
             </div>
           )}
         </div>

@@ -43,7 +43,7 @@ describe("resolveHeliusAssetImageSrc", () => {
 
     assert.equal(
       resolveHeliusAssetImageSrc(asset),
-      "/api/img-proxy?url=https%3A%2F%2Fnftstorage.link%2Fipfs%2Fbafybeigdyrzt%2Fimage.webp"
+      "https://nftstorage.link/ipfs/bafybeigdyrzt/image.webp"
     );
   });
 
@@ -64,7 +64,7 @@ describe("resolveHeliusAssetImageSrc", () => {
 
     assert.equal(
       resolveHeliusAssetImageSrc(asset),
-      "/api/img-proxy?url=https%3A%2F%2Farweave.net%2Fimage.png"
+      "https://arweave.net/image.png"
     );
   });
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getRpcFetchErrorStatus } from "@/app/api/_lib/list-route-utils";
 import type { MyListingsApiResponse, MyListingsPageData } from "@/lib/my-listings";
 import { getMyListingsPageData, validateMyListingsWallet } from "@/lib/server/my-listings";
 
@@ -70,6 +71,15 @@ export async function GET(
       ? error.message
       : "Failed to fetch my listings";
 
+    if (cached) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          "Cache-Control": "private, max-age=0, stale-while-revalidate=30",
+          "X-Cache": "STALE",
+        },
+      });
+    }
+
     console.error("My listings API error:", error);
 
     return NextResponse.json(
@@ -77,7 +87,7 @@ export async function GET(
         error: message,
         ok: false,
       },
-      { status: 500 },
+      { status: getRpcFetchErrorStatus(error) },
     );
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -56,7 +56,7 @@ export function TcgPlayerPriceBox({ productId }: { productId: string }) {
   );
 }
 
-export function ArtifactePriceSection({ card }: { card: CardDetail }) {
+export function ArtifactePriceSection({ card, children }: { card: CardDetail; children?: ReactNode }) {
   const [marketPrice, setMarketPrice] = useState<number | null>(null);
 
   useEffect(() => {
@@ -148,6 +148,8 @@ export function ArtifactePriceSection({ card }: { card: CardDetail }) {
             Artifacte collection items do not incur the 2% external Artifacte fee.
           </p>
         ) : null}
+
+        {children}
       </CardContent>
     </Card>
   );
