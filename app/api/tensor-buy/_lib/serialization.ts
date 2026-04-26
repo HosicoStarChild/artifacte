@@ -28,7 +28,11 @@ export function toBase64SizedSerializedTransaction(
 
 export async function planLookupTableSetupBatchSizes(input: {
   addressCount: number;
-  fitsWithinLimit: (batchSize: number, includeCreateInstruction: boolean) => Promise<boolean>;
+  fitsWithinLimit: (
+    batchSize: number,
+    includeCreateInstruction: boolean,
+    currentOffset: number,
+  ) => Promise<boolean>;
   maxBatchSize?: number;
 }): Promise<number[]> {
   if (input.addressCount <= 0) {
@@ -45,7 +49,7 @@ export async function planLookupTableSetupBatchSizes(input: {
       input.addressCount - nextOffset,
     );
 
-    while (!(await input.fitsWithinLimit(batchSize, includeCreateInstruction))) {
+    while (!(await input.fitsWithinLimit(batchSize, includeCreateInstruction, nextOffset))) {
       if (batchSize <= 1) {
         throw new Error('Tensor proof lookup table setup exceeds Solana size limits');
       }

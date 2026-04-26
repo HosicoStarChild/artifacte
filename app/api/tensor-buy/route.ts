@@ -534,8 +534,8 @@ export async function POST(request: Request) {
       const plannedBatchSizes = await planLookupTableSetupBatchSizes({
         addressCount: proofAddresses.length,
         maxBatchSize: MAX_LOOKUP_TABLE_EXTEND_ADDRESSES,
-        fitsWithinLimit: async (batchSize, shouldIncludeCreateInstruction) => {
-          const batchAddresses = proofAddresses.slice(nextOffset, nextOffset + batchSize);
+        fitsWithinLimit: async (batchSize, shouldIncludeCreateInstruction, currentOffset) => {
+          const batchAddresses = proofAddresses.slice(currentOffset, currentOffset + batchSize);
           const extendIx = AddressLookupTableProgram.extendLookupTable({
             payer: authority.publicKey,
             authority: authority.publicKey,

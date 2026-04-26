@@ -50,24 +50,24 @@ describe('tensor-buy route helpers', () => {
   });
 
   it('plans proof ALT batches by shrinking oversized chunks', async () => {
-    const attempts: Array<{ batchSize: number; includeCreateInstruction: boolean }> = [];
+    const attempts: Array<{ batchSize: number; includeCreateInstruction: boolean; currentOffset: number }> = [];
 
     const batches = await planLookupTableSetupBatchSizes({
       addressCount: 25,
       maxBatchSize: 20,
-      fitsWithinLimit: async (batchSize, includeCreateInstruction) => {
-        attempts.push({ batchSize, includeCreateInstruction });
+      fitsWithinLimit: async (batchSize, includeCreateInstruction, currentOffset) => {
+        attempts.push({ batchSize, includeCreateInstruction, currentOffset });
         return includeCreateInstruction ? batchSize <= 10 : batchSize <= 8;
       },
     });
 
     assert.deepEqual(batches, [10, 7, 8]);
     assert.deepEqual(attempts, [
-      { batchSize: 20, includeCreateInstruction: true },
-      { batchSize: 10, includeCreateInstruction: true },
-      { batchSize: 15, includeCreateInstruction: false },
-      { batchSize: 7, includeCreateInstruction: false },
-      { batchSize: 8, includeCreateInstruction: false },
+      { batchSize: 20, includeCreateInstruction: true, currentOffset: 0 },
+      { batchSize: 10, includeCreateInstruction: true, currentOffset: 0 },
+      { batchSize: 15, includeCreateInstruction: false, currentOffset: 10 },
+      { batchSize: 7, includeCreateInstruction: false, currentOffset: 10 },
+      { batchSize: 8, includeCreateInstruction: false, currentOffset: 17 },
     ]);
   });
 
