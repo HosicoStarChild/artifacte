@@ -139,6 +139,13 @@ type OracleListingsResponse = {
   listings?: OracleListing[];
 };
 
+type OracleListingLookupOptions = {
+  cardId: string;
+  mint?: string;
+  perPage?: number;
+  source?: NonNullable<Listing["source"]>;
+};
+
 export type CardDetail = OracleListing & {
   auctionListing?: AuctionListing | null;
   category: string;
@@ -309,6 +316,52 @@ async function fetchNftAsset(mint: string): Promise<HeliusAsset | null> {
   return payload.result || payload.nft || null;
 }
 
+function matchesOracleListing(
+  listing: OracleListing,
+  { cardId, mint, source }: OracleListingLookupOptions,
+): boolean {
+  if (source && typeof listing.source === "string" && listing.source !== source) {
+    return false;
+  }
+
+  const collectorCryptId = cardId.startsWith("cc-") ? cardId.slice(3) : cardId;
+  const candidates = new Set(
+    [cardId, collectorCryptId, mint].filter((value): value is string => Boolean(value)),
+  );
+
+  return candidates.has(listing.id || "")
+    || candidates.has(listing.nftAddress || "")
+    || candidates.has(listing.ccId || "");
+}
+
+async function findOracleListing(options: OracleListingLookupOptions): Promise<OracleListing | null> {
+  const { cardId, mint, perPage = 25, source } = options;
+  const collectorCryptId = cardId.startsWith("cc-") ? cardId.slice(3) : cardId;
+  const queries = Array.from(
+    new Set([cardId, mint, collectorCryptId].filter((value): value is string => Boolean(value))),
+  );
+
+  for (const query of queries) {
+    const params = new URLSearchParams({
+      perPage: String(perPage),
+      q: query,
+    });
+
+    if (source) {
+      params.set("source", source);
+    }
+
+    const listings = await fetchOracleListings(`/api/me-listings?${params.toString()}`);
+    const foundListing = listings.find((listing) => matchesOracleListing(listing, options));
+
+    if (foundListing) {
+      return foundListing;
+    }
+  }
+
+  return null;
+}
+
 export async function fetchTensorPrice(connection: Connection, mint: string): Promise<TensorPrice | null> {
   try {
     const [listStatePda] = PublicKey.findProgramAddressSync(
@@ -469,10 +522,11 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
   const mint = cardId.replace("phyg-", "");
 
   try {
-    const oracleListings = await fetchOracleListings(
-      `/api/me-listings?category=TCG_CARDS&q=${encodeURIComponent(mint)}&perPage=1`,
-    );
-    const oracleListing = oracleListings.find((listing) => listing.id === cardId || listing.nftAddress === mint) || null;
+    const oracleListing = await findOracleListing({
+      cardId,
+      mint,
+      source: "phygitals",
+    });
     const [asset, auctionListing] = await Promise.all([
       fetchNftAsset(mint),
       fetchAuctionListing(connection, mint),
@@ -508,7 +562,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
     return buildCardDetail({
       auctionListing,
       cardNumber: oracleListing?.cardNumber || getAttributeValue(attributes, "Card Number"),
-      category: "TCG_CARDS",
+      category: oracleListing?.category || "TCG_CARDS",
       currency: listingCurrency,
       grade,
       gradeNum: oracleListing?.gradeNum || (gradeNumberMatch ? gradeNumberMatch[1] : null),
@@ -548,11 +602,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
 
 async function loadOracleCard(cardId: string, connection: Connection): Promise<CardDetail | null> {
   try {
-    const collectorCryptId = cardId.replace("cc-", "");
-    const listings = await fetchOracleListings(`/api/me-listings?q=${encodeURIComponent(collectorCryptId)}&perPage=5`);
-    const foundListing = listings.find(
-      (listing) => listing.id === cardId || listing.nftAddress === cardId || listing.ccId === collectorCryptId,
-    );
+    const foundListing = await findOracleListing({ cardId });
 
     if (!foundListing) {
       return null;
