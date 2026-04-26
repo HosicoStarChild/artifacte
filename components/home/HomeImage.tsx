@@ -1,3 +1,5 @@
+import type { SyntheticEvent } from "react";
+
 import { resolveHomeImageSrc } from "@/lib/home-image";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +10,7 @@ type HomeImageProps = {
   priority?: boolean;
   contain?: boolean;
   className?: string;
+  onError?: (event: SyntheticEvent<HTMLImageElement, Event>) => void;
 };
 
 export function HomeImage({
@@ -17,6 +20,7 @@ export function HomeImage({
   priority = false,
   contain = false,
   className,
+  onError,
 }: HomeImageProps) {
   const resolvedSrc = resolveHomeImageSrc(src);
 
@@ -34,6 +38,7 @@ export function HomeImage({
         contain ? "object-contain" : "object-cover",
         className
       )}
+      onError={onError}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { resolveHomeImageSrc } from "./home-image.ts";
+import { resolveHomeImageSrc } from "./home-image";
 
 interface ResolvableHeliusAssetFile {
   uri?: string;

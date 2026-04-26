@@ -1,6 +1,10 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
 import type { Listing } from "@/lib/data";
+import {
+  buildNftImageFallbackPath,
+  resolveHeliusAssetImageSrc,
+} from "@/lib/helius-asset-image";
 import { resolveHomeImageSrc } from "@/lib/home-image";
 
 const TENSOR_MARKETPLACE = new PublicKey("TCMPhJdwDryooaGtiocG1u3xcYbRpiJzb283XfCZsDp");
@@ -416,6 +420,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       fetchNftAsset(mint),
       fetchAuctionListing(connection, mint),
     ]);
+    const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mint });
     const attributes = getAssetAttributes(asset);
     const tcgPlayerId = getAttributeValue(attributes, "TCGPlayer ID")
       || getAttributeValue(attributes, "TCGplayer Product ID")
@@ -453,7 +458,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       gradingCompany: oracleListing?.gradingCompany || (gradingCompanyMatch ? gradingCompanyMatch[1].toUpperCase() : getAttributeValue(attributes, "Grader") || null),
       gradingId: getAttributeValue(attributes, "Cert Number") || getAttributeValue(attributes, "Grading ID") || null,
       id: cardId,
-      image: oracleListing?.image || asset?.image || asset?.content?.links?.image || "",
+      image: oracleListing?.image || resolvedAssetImage || "",
       name: oracleListing?.name || asset?.name || mint.slice(0, 12),
       nftAddress: mint,
       price: listingPrice,
@@ -541,6 +546,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
 
     if (isPhygital) {
       const mintAddress = asset.id || asset.mint || cardId;
+      const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mintAddress });
       const oraclePhygitalCard = await loadPhygitalCard(`phyg-${mintAddress}`, connection);
       if (oraclePhygitalCard) {
         return oraclePhygitalCard;
@@ -559,7 +565,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         gradingCompany: gradeMatch ? gradeMatch[1].toUpperCase() : getAttr("Grader") || null,
         gradingId: getAttr("Cert Number") || getAttr("Grading ID") || null,
         id: mintAddress,
-        image: asset.content?.links?.image || asset.content?.links?.animation_url || "",
+        image: resolvedAssetImage || asset.content?.links?.animation_url || "",
         name: asset.content?.metadata?.name || "Unknown",
         nftAddress: mintAddress,
         price: 0,
@@ -581,6 +587,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
 
     if (isArtifacte) {
       const mintAddress = asset.id || asset.mint || cardId;
+      const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mintAddress });
       const [tensorPrice, auctionListing] = await Promise.all([
         fetchTensorPrice(connection, mintAddress),
         fetchAuctionListing(connection, mintAddress),
@@ -601,7 +608,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         gradingCompany: getAttr("Grading Company") || null,
         gradingId: getAttr("Grading ID") || null,
         id: mintAddress,
-        image: asset.content?.links?.image || asset.image || "",
+        image: resolvedAssetImage || "",
         insuredValue: null,
         language: getAttr("Language") || null,
         name: asset.content?.metadata?.name || asset.name || "Unknown",
@@ -623,6 +630,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
 
     if (isCollectorCrypt) {
       const mintAddress = asset.id || asset.mint || cardId;
+      const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mintAddress });
       const [tensorPrice, auctionListing] = await Promise.all([
         fetchTensorPrice(connection, mintAddress),
         fetchAuctionListing(connection, mintAddress),
@@ -639,7 +647,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         gradingCompany: getAttr("Grading Company") || null,
         gradingId: getAttr("Grading ID") || null,
         id: mintAddress,
-        image: asset.content?.links?.image || asset.image || "",
+        image: resolvedAssetImage || "",
         insuredValue: parseNullableInteger(getAttr("Insured Value")),
         marketplace: !auctionListing && (tensorPrice?.usdcPrice || tensorPrice?.solPrice) ? "tensor" : undefined,
         name: asset.content?.metadata?.name || asset.name || "Unknown",
@@ -720,14 +728,15 @@ export function getCardBackLabel(category: string): string {
   return "TCG Cards";
 }
 
-export function resolveCardImageSrc(src?: string): string {
+export function resolveCardImageSrc(src?: string, mint?: string): string {
   if (!src) {
-    return "/placeholder-card.svg";
+    return mint ? buildNftImageFallbackPath(mint) : "/placeholder-card.svg";
   }
 
   const normalizedSource = src.startsWith("ipfs://")
     ? src.replace("ipfs://", "https://nftstorage.link/ipfs/")
     : src;
 
-  return resolveHomeImageSrc(normalizedSource) || "/placeholder-card.svg";
+  return resolveHomeImageSrc(normalizedSource)
+    || (mint ? buildNftImageFallbackPath(mint) : "/placeholder-card.svg");
 }

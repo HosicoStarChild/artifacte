@@ -19,6 +19,7 @@ import {
 } from "@/lib/client/transaction-errors";
 import PriceHistory from "@/components/PriceHistory";
 import { resolveListingDisplayPrice, resolveListingPayablePrice } from "@/lib/data";
+import { buildNftImageFallbackPath } from "@/lib/helius-asset-image";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
 import { ArtifactePriceSection, TcgPlayerPriceBox } from "./_components/card-price-sections";
@@ -37,6 +38,7 @@ function CardDetailPageContent() {
   const params = useParams<{ id: string }>();
   const cardId = params.id;
   const [card, setCard] = useState<CardDetail | null>(null);
+  const [cardImageSrc, setCardImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [unlisting, setUnlisting] = useState(false);
@@ -74,6 +76,15 @@ function CardDetailPageContent() {
       cancelled = true;
     };
   }, [cardId, connection]);
+
+  useEffect(() => {
+    if (!card) {
+      setCardImageSrc(null);
+      return;
+    }
+
+    setCardImageSrc(resolveCardImageSrc(card.image, card.nftAddress));
+  }, [card]);
 
   const handleBuy = async () => {
     if (!connected || !publicKey || !card) return;
@@ -305,6 +316,7 @@ function CardDetailPageContent() {
       : 'Powered by Magic Eden';
   const backHref = getCardBackHref(card.category);
   const backLabel = getCardBackLabel(card.category);
+  const fallbackCardImageSrc = buildNftImageFallbackPath(card.nftAddress);
 
   return (
     <div className="pt-24 pb-20 min-h-screen">
@@ -322,11 +334,24 @@ function CardDetailPageContent() {
             <Card className="overflow-hidden border-white/5 bg-dark-800 py-0">
               <div className="relative aspect-square bg-dark-900">
                 <HomeImage
-                  src={resolveCardImageSrc(card.image)}
+                  src={cardImageSrc || fallbackCardImageSrc}
                   alt={card.name}
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   contain
                   className="p-6"
+                  onError={() => {
+                    setCardImageSrc((current) => {
+                      if (current === "/placeholder-card.svg") {
+                        return current;
+                      }
+
+                      if (current === fallbackCardImageSrc) {
+                        return "/placeholder-card.svg";
+                      }
+
+                      return fallbackCardImageSrc;
+                    });
+                  }}
                 />
               </div>
             </Card>
