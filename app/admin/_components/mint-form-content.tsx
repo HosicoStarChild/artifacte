@@ -7,7 +7,7 @@ import { SendTransactionError, type Connection } from "@solana/web3.js";
 import { ARTIFACTE_COLLECTION, TREASURY_WALLET } from "@/lib/data";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { createV1, createCollectionV1, fetchCollection, hasCollectionUpdateAuthority, pluginAuthorityPair, ruleSet } from "@metaplex-foundation/mpl-core";
+import { addCollectionPlugin, createV1, createCollectionV1, fetchCollection, hasCollectionUpdateAuthority, pluginAuthorityPair, ruleSet, updateCollectionPlugin } from "@metaplex-foundation/mpl-core";
 import { generateSigner, publicKey as umiPublicKey, type TransactionBuilder, type Umi } from "@metaplex-foundation/umi";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
 import {
@@ -69,6 +69,7 @@ interface CollectionAccessState {
   checking: boolean;
   canUse: boolean | null;
   message: string | null;
+  royaltyBasisPoints: number | null;
   updateAuthority: string | null;
 }
 
@@ -76,6 +77,7 @@ interface CollectionValidationResult {
   canUse: boolean;
   normalizedAddress: string;
   updateAuthority?: string;
+  royaltyBasisPoints?: number;
   message: string;
 }
 
@@ -122,6 +124,11 @@ const ADMIN_CONFIRMATION_TIMEOUT_MS = 60_000;
 
 function isConfirmedSignatureStatus(status: SignatureStatusValue | undefined): boolean {
   return status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized";
+}
+
+function formatRoyaltyBasisPoints(basisPoints: number): string {
+  const royaltyPercent = basisPoints / 100;
+  return `${Number.isInteger(royaltyPercent) ? royaltyPercent.toFixed(0) : royaltyPercent.toFixed(2)}%`;
 }
 
 function getSignatureFailureMessage(
@@ -233,12 +240,16 @@ async function validateCollectionAccess(
     const collection = await fetchCollection(umi, normalizedAddress);
     const updateAuthority = String(collection.updateAuthority);
     const canUse = hasCollectionUpdateAuthority(walletAddress, collection);
+    const royaltyBasisPoints = typeof collection.royalties?.basisPoints === "number"
+      ? Number(collection.royalties.basisPoints)
+      : undefined;
 
     if (canUse) {
       return {
         canUse: true,
         normalizedAddress,
         updateAuthority,
+        royaltyBasisPoints,
         message: `Collection ready. This wallet is authorized for ${normalizedAddress}.`,
       };
     }
@@ -247,6 +258,7 @@ async function validateCollectionAccess(
       canUse: false,
       normalizedAddress,
       updateAuthority,
+      royaltyBasisPoints,
       message: `Selected collection is controlled by ${updateAuthority}. Wallet ${walletAddress} cannot mint into it. Clear the collection field, create a new collection with this wallet, or switch wallets.`,
     };
   } catch {
@@ -417,10 +429,12 @@ function MintFormInner() {
   const [mintResult, setMintResult] = useState<string | null>(null);
   const [collectionAddress, setCollectionAddress] = useState(ARTIFACTE_COLLECTION || "");
   const [creatingCollection, setCreatingCollection] = useState(false);
+  const [updatingCollectionRoyalty, setUpdatingCollectionRoyalty] = useState(false);
   const [collectionAccess, setCollectionAccess] = useState<CollectionAccessState>({
     checking: false,
     canUse: null,
     message: null,
+    royaltyBasisPoints: null,
     updateAuthority: null,
   });
   const normalizedCollectionAddress = collectionAddress.trim();
@@ -446,6 +460,10 @@ function MintFormInner() {
   const collectionAccessSummary = !normalizedCollectionAddress
     ? "No collection selected. This mint will be created as a standalone Metaplex Core asset."
     : collectionAccess.message || "Checking collection authority...";
+  const collectionRoyaltyLabel = collectionAccess.royaltyBasisPoints == null
+    ? "No Royalties plugin found"
+    : formatRoyaltyBasisPoints(collectionAccess.royaltyBasisPoints);
+  const collectionRoyaltyNeedsUpdate = collectionAccess.royaltyBasisPoints !== ADMIN_CORE_ROYALTY_BASIS_POINTS;
 
   useEffect(() => {
     let cancelled = false;
@@ -456,6 +474,7 @@ function MintFormInner() {
           checking: false,
           canUse: null,
           message: null,
+          royaltyBasisPoints: null,
           updateAuthority: null,
         });
         return;
@@ -465,6 +484,7 @@ function MintFormInner() {
         checking: true,
         canUse: null,
         message: "Checking collection authority...",
+        royaltyBasisPoints: null,
         updateAuthority: null,
       });
 
@@ -477,6 +497,7 @@ function MintFormInner() {
         checking: false,
         canUse: result.canUse,
         message: result.message,
+        royaltyBasisPoints: result.royaltyBasisPoints ?? null,
         updateAuthority: result.updateAuthority || null,
       });
     }
@@ -487,6 +508,96 @@ function MintFormInner() {
       cancelled = true;
     };
   }, [walletAddress, collectionAddress, connection.rpcEndpoint]);
+
+  const handleUpdateCollectionRoyalty = async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) return;
+
+    const normalizedAddress = collectionAddress.trim();
+    if (!normalizedAddress) {
+      setMintResult("❌ Enter a Metaplex Core collection address first");
+      return;
+    }
+
+    setUpdatingCollectionRoyalty(true);
+    setMintResult(null);
+
+    try {
+      const collectionValidation = await validateCollectionAccess(connection.rpcEndpoint, normalizedAddress, walletAddress);
+      if (!collectionValidation.canUse) {
+        setMintResult(`❌ ${collectionValidation.message}`);
+        return;
+      }
+
+      if (collectionValidation.royaltyBasisPoints === ADMIN_CORE_ROYALTY_BASIS_POINTS) {
+        setMintResult(`✅ Collection royalty already set to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}.\nCollection: ${collectionValidation.normalizedAddress}`);
+        setCollectionAccess({
+          checking: false,
+          canUse: collectionValidation.canUse,
+          message: collectionValidation.message,
+          royaltyBasisPoints: collectionValidation.royaltyBasisPoints ?? null,
+          updateAuthority: collectionValidation.updateAuthority || null,
+        });
+        return;
+      }
+
+      const currentRoyaltyLabel = collectionValidation.royaltyBasisPoints == null
+        ? "not set"
+        : formatRoyaltyBasisPoints(collectionValidation.royaltyBasisPoints);
+      const umi = createUmi(connection).use(walletAdapterIdentity(wallet));
+      const collection = await fetchCollection(umi, collectionValidation.normalizedAddress);
+      const royaltiesPlugin = {
+        type: "Royalties" as const,
+        basisPoints: ADMIN_CORE_ROYALTY_BASIS_POINTS,
+        creators: collection.royalties?.creators ?? [{ address: umiPublicKey(TREASURY_WALLET), percentage: 100 }],
+        ruleSet: collection.royalties?.ruleSet ?? ruleSet("None"),
+      };
+      const builder = collectionValidation.royaltyBasisPoints == null
+        ? addCollectionPlugin(umi, {
+            collection: umiPublicKey(collectionValidation.normalizedAddress),
+            plugin: royaltiesPlugin,
+          })
+        : updateCollectionPlugin(umi, {
+            collection: umiPublicKey(collectionValidation.normalizedAddress),
+            plugin: royaltiesPlugin,
+          });
+
+      setMintResult(
+        `⏳ Requesting signature to update collection royalties...\nCollection: ${collectionValidation.normalizedAddress}\nCurrent royalty: ${currentRoyaltyLabel}\nTarget royalty: ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}`
+      );
+
+      const txSignature = await requestSignatureAndSendFromFrontend(builder, umi, connection);
+      const refreshedValidation = await validateCollectionAccess(connection.rpcEndpoint, collectionValidation.normalizedAddress, walletAddress);
+
+      setCollectionAccess({
+        checking: false,
+        canUse: refreshedValidation.canUse,
+        message: refreshedValidation.message,
+        royaltyBasisPoints: refreshedValidation.royaltyBasisPoints ?? ADMIN_CORE_ROYALTY_BASIS_POINTS,
+        updateAuthority: refreshedValidation.updateAuthority || collectionValidation.updateAuthority || null,
+      });
+      setMintResult(
+        `✅ Collection royalties updated to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}.\nCollection: ${collectionValidation.normalizedAddress}\nPrevious royalty: ${currentRoyaltyLabel}\nTx: ${txSignature}`
+      );
+    } catch (error) {
+      let logs: string[] | undefined;
+      if (error instanceof SendTransactionError) {
+        try {
+          logs = await error.getLogs(connection);
+        } catch {
+          logs = error.logs;
+        }
+      } else if (error instanceof Error && Array.isArray((error as ErrorWithLogs).logs)) {
+        logs = (error as ErrorWithLogs).logs;
+      }
+
+      const nextError = error instanceof Error ? error : new Error("Collection royalty update failed");
+      const logSuffix = logs && logs.length > 0 ? `\n\nLogs:\n${logs.slice(-10).join("\n")}` : "";
+      setMintResult(`❌ Error: ${nextError.message}${logSuffix}`);
+      console.error("Collection royalty update error:", error);
+    } finally {
+      setUpdatingCollectionRoyalty(false);
+    }
+  };
 
   const handleCreateCollection = async () => {
     if (!wallet.publicKey || !wallet.signTransaction) return;
@@ -722,9 +833,15 @@ function MintFormInner() {
                 Connected wallet: <span className="font-mono text-gray-300">{walletAddress || "Connect wallet"}</span>
               </p>
               {normalizedCollectionAddress && (
-                <p className="text-gray-500 break-all">
-                  Collection: <span className="font-mono text-gray-300">{normalizedCollectionAddress}</span>
-                </p>
+                <>
+                  <p className="text-gray-500 break-all">
+                    Collection: <span className="font-mono text-gray-300">{normalizedCollectionAddress}</span>
+                  </p>
+                  <p className="text-gray-500 break-all">
+                    Current royalty: <span className="font-mono text-gray-300">{collectionRoyaltyLabel}</span>
+                    <span className="ml-2 text-gray-500">Target {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}</span>
+                  </p>
+                </>
               )}
               <p className={`${collectionAccess.checking ? "text-gray-400" : collectionAccess.canUse === false ? "text-amber-400" : "text-gray-400"}`}>
                 {collectionAccessSummary}
@@ -745,7 +862,27 @@ function MintFormInner() {
               {creatingCollection ? "Creating..." : "Create Artifacte Collection (one-time)"}
             </button>
           )}
-          {collectionAddress && collectionAccess.canUse === true && <p className="text-green-400 text-xs">✅ Collection set and authorized</p>}
+          {collectionAddress && collectionAccess.canUse === true && (
+            <div className="space-y-2">
+              <p className="text-green-400 text-xs">✅ Collection set and authorized</p>
+              {collectionRoyaltyNeedsUpdate ? (
+                <button
+                  type="button"
+                  onClick={handleUpdateCollectionRoyalty}
+                  disabled={updatingCollectionRoyalty}
+                  className={`w-full py-2 rounded-lg text-xs font-medium transition ${updatingCollectionRoyalty ? "bg-gray-700 text-gray-500" : "bg-gold-500/20 border border-gold-500/50 text-gold-400 hover:bg-gold-500/30"}`}
+                >
+                  {updatingCollectionRoyalty
+                    ? `Updating royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}...`
+                    : `Update collection royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}`}
+                </button>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  Collection royalty already matches the admin target of {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Basic Info */}
