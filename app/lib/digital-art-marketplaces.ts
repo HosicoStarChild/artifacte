@@ -112,6 +112,16 @@ interface MarketplaceFetchResult<TPage> {
   page: TPage;
 }
 
+interface MarketplaceListingDetailLoadResult {
+  listing: ExternalMarketplaceListing | null;
+  shouldCache: boolean;
+}
+
+interface TensorMarketplaceListingLookupResult {
+  listing: ExternalMarketplaceListing | null;
+  unavailable: boolean;
+}
+
 function createEmptyMagicEdenPage(offset: number): MagicEdenPage {
   return {
     listings: [],
@@ -153,6 +163,155 @@ const MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS = 10 * 1000;
 const MARKETPLACE_LISTINGS_STALE_TTL_MS = 5 * 60 * 1000;
 const MARKETPLACE_DETAIL_CACHE_TTL_MS = 15 * 1000;
 const MAX_MARKETPLACE_PAGE_PASSES = 4;
+const MAX_TENSOR_DETAIL_FALLBACK_PASSES = 4;
+const TENSOR_DETAIL_FALLBACK_PAGE_SIZE = 60;
+
+function isTransientMarketplaceStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function getMarketplaceErrorReason(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+function normalizeTensorMarketplaceListingCandidate(
+  raw: TensorListingRaw,
+  assetMap: Map<string, HeliusAsset>,
+  curatedAddresses: ReadonlySet<string>,
+  collectionAddress: string,
+  collectionName: string
+): ExternalMarketplaceListing | null {
+  return normalizeTensorListing(
+    raw,
+    assetMap,
+    curatedAddresses,
+    collectionAddress,
+    collectionName
+  );
+}
+
+async function fetchTensorMarketplaceListingByMint(input: {
+  assetMap: Map<string, HeliusAsset>;
+  collectionAddress: string;
+  collectionName: string;
+  curatedAddresses: ReadonlySet<string>;
+  mint: string;
+}): Promise<TensorMarketplaceListingLookupResult> {
+  if (!process.env.TENSOR_API_KEY) {
+    return { listing: null, unavailable: false };
+  }
+
+  try {
+    const response = await fetch(
+      `${TENSOR_API}/mint?mints=${encodeURIComponent(input.mint)}`,
+      {
+        headers: {
+          "x-tensor-api-key": process.env.TENSOR_API_KEY,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+
+    if (!response.ok) {
+      if (isTransientMarketplaceStatus(response.status)) {
+        console.warn(
+          `[marketplace] Tensor mint detail unavailable for ${input.mint}: ${response.status}`
+        );
+      }
+
+      return {
+        listing: null,
+        unavailable: isTransientMarketplaceStatus(response.status),
+      };
+    }
+
+    const payload: TensorMintResponse = await response.json();
+    const mints = Array.isArray(payload.mints) ? payload.mints : [];
+    const listing =
+      mints
+        .map((item) =>
+          normalizeTensorMarketplaceListingCandidate(
+            item,
+            input.assetMap,
+            input.curatedAddresses,
+            input.collectionAddress,
+            input.collectionName
+          )
+        )
+        .find(Boolean) || null;
+
+    return { listing, unavailable: false };
+  } catch (error) {
+    console.warn(
+      `[marketplace] Tensor mint detail unavailable for ${input.mint}: ${getMarketplaceErrorReason(error)}`
+    );
+
+    return { listing: null, unavailable: true };
+  }
+}
+
+async function searchTensorMarketplaceListingInCollection(input: {
+  assetMap: Map<string, HeliusAsset>;
+  collId: string;
+  collectionAddress: string;
+  collectionName: string;
+  curatedAddresses: ReadonlySet<string>;
+  mint: string;
+}): Promise<TensorMarketplaceListingLookupResult> {
+  let cursor: string | null = null;
+
+  for (let pass = 0; pass < MAX_TENSOR_DETAIL_FALLBACK_PASSES; pass += 1) {
+    let page: TensorPage;
+
+    try {
+      page = await fetchTensorCollectionListings(
+        input.collId,
+        cursor,
+        TENSOR_DETAIL_FALLBACK_PAGE_SIZE
+      );
+    } catch (error) {
+      console.warn(
+        `[marketplace] Tensor collection fallback unavailable for ${input.mint}: ${getMarketplaceErrorReason(error)}`
+      );
+
+      return { listing: null, unavailable: true };
+    }
+
+    const match = page.listings.find((item) => extractTensorMint(item) === input.mint);
+
+    if (match) {
+      return {
+        listing: normalizeTensorMarketplaceListingCandidate(
+          match,
+          input.assetMap,
+          input.curatedAddresses,
+          input.collectionAddress,
+          input.collectionName
+        ),
+        unavailable: false,
+      };
+    }
+
+    if (!page.hasMore || !page.nextCursor || page.nextCursor === cursor) {
+      break;
+    }
+
+    cursor = page.nextCursor;
+  }
+
+  return { listing: null, unavailable: false };
+}
+
+export function __resetDigitalArtMarketplaceCachesForTests(): void {
+  tensorCollIdCache.clear();
+  tensorCollIdRequests.clear();
+  marketplaceListingsCache.clear();
+  marketplaceListingsFallbackCache.clear();
+  marketplaceListingsRequests.clear();
+  marketplaceListingDetailCache.clear();
+  marketplaceListingDetailRequests.clear();
+}
 
 export async function readCuratedCollections(): Promise<AllowlistEntry[]> {
   try {
@@ -702,10 +861,15 @@ export async function getCuratedMarketplaceListings(
 
 async function loadCuratedMarketplaceListingFresh(
   input: GetCuratedMarketplaceListingInput
-): Promise<ExternalMarketplaceListing | null> {
+): Promise<MarketplaceListingDetailLoadResult> {
   const collections = await readCuratedCollections();
   const collection = getCollectionByAddress(collections, input.collectionAddress);
-  if (!collection) return null;
+  if (!collection) {
+    return {
+      listing: null,
+      shouldCache: true,
+    };
+  }
 
   const curatedAddresses = new Set(
     getSiblingCollectionAddresses(collections, input.collectionAddress)
@@ -719,82 +883,102 @@ async function loadCuratedMarketplaceListingFresh(
   }
 
   if (input.source === "magiceden") {
-    const response = await fetch(`${MAGIC_EDEN_API}/tokens/${input.mint}/listings`, {
-      headers: ME_API_KEY ? { Authorization: `Bearer ${ME_API_KEY}` } : undefined,
-      cache: "no-store",
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) return null;
-    const payload: MagicEdenListingRaw[] | null = await response.json();
-    const listings = Array.isArray(payload) ? payload : [];
-    return listings
-      .map((item) =>
-        normalizeMagicEdenListing(
-          item,
-          assetMap,
-          curatedAddresses,
-          input.collectionAddress,
-          collection.name
-        )
-      )
-      .filter((value): value is ExternalMarketplaceListing => Boolean(value))
-      .sort((left, right) => left.priceRaw - right.priceRaw)[0] || null;
+    try {
+      const response = await fetch(`${MAGIC_EDEN_API}/tokens/${input.mint}/listings`, {
+        headers: ME_API_KEY ? { Authorization: `Bearer ${ME_API_KEY}` } : undefined,
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        return {
+          listing: null,
+          shouldCache: !isTransientMarketplaceStatus(response.status),
+        };
+      }
+
+      const payload: MagicEdenListingRaw[] | null = await response.json();
+      const listings = Array.isArray(payload) ? payload : [];
+
+      return {
+        listing:
+          listings
+            .map((item) =>
+              normalizeMagicEdenListing(
+                item,
+                assetMap,
+                curatedAddresses,
+                input.collectionAddress,
+                collection.name
+              )
+            )
+            .filter((value): value is ExternalMarketplaceListing => Boolean(value))
+            .sort((left, right) => left.priceRaw - right.priceRaw)[0] || null,
+        shouldCache: true,
+      };
+    } catch (error) {
+      console.warn(
+        `[marketplace] Magic Eden listing detail unavailable for ${input.mint}: ${getMarketplaceErrorReason(error)}`
+      );
+
+      return {
+        listing: null,
+        shouldCache: false,
+      };
+    }
   }
 
   if (!process.env.TENSOR_API_KEY) {
-    return null;
+    return {
+      listing: null,
+      shouldCache: true,
+    };
   }
 
-  const response = await fetch(
-    `${TENSOR_API}/mint?mints=${encodeURIComponent(input.mint)}`,
-    {
-      headers: {
-        "x-tensor-api-key": process.env.TENSOR_API_KEY,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(15000),
-    }
-  );
+  const directResult = await fetchTensorMarketplaceListingByMint({
+    assetMap,
+    collectionAddress: input.collectionAddress,
+    collectionName: collection.name,
+    curatedAddresses,
+    mint: input.mint,
+  });
 
-  if (response.ok) {
-    const payload: TensorMintResponse = await response.json();
-    const mints = Array.isArray(payload.mints) ? payload.mints : [];
-    const listing =
-      mints
-        .map((item) =>
-          normalizeTensorListing(
-            item,
-            assetMap,
-            curatedAddresses,
-            input.collectionAddress,
-            collection.name
-          )
-        )
-        .find(Boolean) || null;
-    if (listing) return listing;
+  if (directResult.listing) {
+    return {
+      listing: directResult.listing,
+      shouldCache: true,
+    };
   }
 
   const { tensorCollId: fallbackIdentifier } = getMarketplaceIds(collection);
-  if (!fallbackIdentifier) return null;
+  if (!fallbackIdentifier) {
+    return {
+      listing: null,
+      shouldCache: !directResult.unavailable,
+    };
+  }
 
   const resolvedFallbackCollId = await resolveTensorCollId(fallbackIdentifier);
-  if (!resolvedFallbackCollId) return null;
+  if (!resolvedFallbackCollId) {
+    return {
+      listing: null,
+      shouldCache: !directResult.unavailable,
+    };
+  }
 
-  const fallback = await fetchTensorCollectionListings(resolvedFallbackCollId, null, 60);
-  return (
-    fallback.listings
-      .filter((item) => extractTensorMint(item) === input.mint)
-      .map((item) =>
-        normalizeTensorListing(
-          item,
-          assetMap,
-          curatedAddresses,
-          input.collectionAddress,
-          collection.name
-        )
-      )
-      .find(Boolean) || null
-  );
+  const fallbackResult = await searchTensorMarketplaceListingInCollection({
+    assetMap,
+    collId: resolvedFallbackCollId,
+    collectionAddress: input.collectionAddress,
+    collectionName: collection.name,
+    curatedAddresses,
+    mint: input.mint,
+  });
+
+  return {
+    listing: fallbackResult.listing,
+    shouldCache: !(directResult.unavailable || fallbackResult.unavailable),
+  };
 }
 
 export async function getCuratedMarketplaceListing(
@@ -814,12 +998,14 @@ export async function getCuratedMarketplaceListing(
 
   const request = loadCuratedMarketplaceListingFresh(input)
     .then((result) =>
-      writeExpiringCache(
-        marketplaceListingDetailCache,
-        cacheKey,
-        result,
-        MARKETPLACE_DETAIL_CACHE_TTL_MS
-      )
+      result.shouldCache
+        ? writeExpiringCache(
+            marketplaceListingDetailCache,
+            cacheKey,
+            result.listing,
+            MARKETPLACE_DETAIL_CACHE_TTL_MS
+          )
+        : result.listing
     )
     .finally(() => {
       marketplaceListingDetailRequests.delete(cacheKey);
