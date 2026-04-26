@@ -142,7 +142,18 @@ export function HomeTCGSection() {
         purchasedIds={purchasedIds}
         onBuyNow={handleBuyNow}
       />
-      <HomeTCGCarousel title="Sealed Product" emoji="📦" items={sealed} viewAllHref="/auctions/categories/sealed" viewAllLabel="View All Sealed" />
+      <HomeTCGCarousel
+        title="Sealed Product"
+        emoji="📦"
+        items={sealed}
+        viewAllHref="/auctions/categories/sealed"
+        viewAllLabel="View All Sealed"
+        showBuyButton
+        connected={connected}
+        buyingId={buyingId}
+        purchasedIds={purchasedIds}
+        onBuyNow={handleBuyNow}
+      />
     </>
   );
 }
