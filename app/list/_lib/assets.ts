@@ -1,6 +1,6 @@
 import { ItemCategory } from "@/lib/auction-program";
+import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import type { AllowlistEntry } from "@/lib/allowlist";
-import { resolveHomeImageSrc } from "@/lib/home-image";
 
 import {
   LIST_PAGE_ARTIFACTE_AUTHORITY,
@@ -156,32 +156,7 @@ export function getAssetCollection(
 }
 
 export function resolveListPageImageSrc(asset: ListPageAsset): string {
-  const cdnUri = asset.content?.files?.find((file) => file.cdn_uri)?.cdn_uri;
-
-  if (cdnUri && cdnUri.length > 40 && !cdnUri.endsWith("//")) {
-    return resolveHomeImageSrc(cdnUri) ?? "/placeholder.png";
-  }
-
-  const imageLink = asset.content?.links?.image?.trim();
-
-  if (!imageLink || imageLink.startsWith("data:")) {
-    return `/api/nft-image?mint=${encodeURIComponent(asset.id)}`;
-  }
-
-  const normalized = imageLink.startsWith("ipfs://")
-    ? imageLink.replace("ipfs://", "https://nftstorage.link/ipfs/")
-    : imageLink;
-
-  if (
-    normalized.includes("arweave.net/") ||
-    normalized.includes("nftstorage.link/") ||
-    normalized.includes("/ipfs/") ||
-    normalized.includes("irys.xyz/")
-  ) {
-    return `/api/img-proxy?url=${encodeURIComponent(normalized)}`;
-  }
-
-  return resolveHomeImageSrc(normalized) ?? "/placeholder.png";
+  return resolveHeliusAssetImageSrc(asset) ?? "/placeholder.png";
 }
 
 export function toAssetCardModel(

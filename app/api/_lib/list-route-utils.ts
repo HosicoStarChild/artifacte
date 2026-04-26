@@ -1,5 +1,6 @@
 import { address } from "@solana/kit";
 import { NextResponse } from "next/server";
+import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
@@ -241,9 +242,8 @@ export function buildNftLookupResponse(asset: HeliusAssetResponse["result"], min
 
   const content = asset.content ?? {};
   const metadata = content.metadata ?? {};
-  const files = content.files ?? [];
-  const links = content.links ?? {};
   const collection = asset.grouping?.find((group) => group.group_key === "collection")?.group_value;
+  const image = resolveHeliusAssetImageSrc(asset, { fallbackMint: mint }) ?? "/placeholder.png";
 
   return {
     nft: {
@@ -252,7 +252,7 @@ export function buildNftLookupResponse(asset: HeliusAssetResponse["result"], min
       collection: collection ?? metadata.symbol ?? "Unknown",
       creators: asset.creators ?? [],
       description: metadata.description ?? "",
-      image: links.image ?? files[0]?.uri ?? "/placeholder.png",
+      image,
       mint,
       mint_extensions: asset.mint_extensions ?? null,
       name: metadata.name ?? "Untitled",

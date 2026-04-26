@@ -27,6 +27,7 @@ import {
   resolvePortfolioImageSrc,
   type CollectorCryptResponse,
 } from "@/lib/portfolio";
+import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import { getFloorPriceSnapshot, type FloorPriceSnapshot } from "@/lib/server/floor-prices";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
@@ -213,11 +214,7 @@ function getAssetName(asset: HeliusAsset): string {
 }
 
 function getAssetImageSrc(asset: HeliusAsset): string | null {
-  const primaryCdnFile = asset.content?.files?.find((file) => file.cdn_uri)?.cdn_uri;
-
-  return resolvePortfolioImageSrc(
-    primaryCdnFile || asset.content?.links?.image || asset.image
-  );
+  return resolveHeliusAssetImageSrc(asset);
 }
 
 function hasMatchingAddress(asset: HeliusAsset, targetAddress: string): boolean {
