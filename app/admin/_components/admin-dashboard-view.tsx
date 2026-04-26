@@ -62,6 +62,7 @@ const adminTabs = [
   "overview",
   "listings",
   "submissions",
+  "collection",
   "mint",
   "whitelist",
   "settings",
@@ -152,6 +153,7 @@ export interface NewWhitelistEntryInput {
 
 interface AdminDashboardViewProps {
   canAccessMintTab: boolean
+  collectionTabContent?: ReactNode
   dashboard?: AdminDashboardData
   errorMessage?: string | null
   isDashboardLoading: boolean
@@ -171,6 +173,7 @@ interface AdminDashboardViewProps {
 
 export function AdminDashboardView({
   canAccessMintTab,
+  collectionTabContent,
   dashboard,
   errorMessage,
   isDashboardLoading,
@@ -189,7 +192,7 @@ export function AdminDashboardView({
 }: AdminDashboardViewProps) {
   const availableTabs = canAccessMintTab
     ? adminTabs
-    : adminTabs.filter((tab) => tab !== "mint")
+    : adminTabs.filter((tab) => tab !== "collection" && tab !== "mint")
   const [activeTab, setActiveTab] = useState<AdminPageTab>("overview")
   const [rejectTargetId, setRejectTargetId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
@@ -396,6 +399,11 @@ export function AdminDashboardView({
                 <Button onClick={() => setActiveTab("listings")} variant="outline">
                   Moderate listing approvals
                 </Button>
+                {canAccessMintTab ? (
+                  <Button onClick={() => setActiveTab("collection")} variant="outline">
+                    Manage collection values
+                  </Button>
+                ) : null}
                 <Link
                   className={cn(
                     buttonVariants({ size: "default", variant: "ghost" }),
@@ -776,6 +784,22 @@ export function AdminDashboardView({
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {!isDashboardLoading && activeTab === "collection" ? (
+        canAccessMintTab ? (
+          collectionTabContent ?? (
+            <EmptyState
+              description="Owner-only collection controls are not available in this build."
+              title="Collection tools unavailable"
+            />
+          )
+        ) : (
+          <EmptyState
+            description="Only the owner wallet can access the embedded collection workflow."
+            title="Owner access required"
+          />
+        )
       ) : null}
 
       {!isDashboardLoading && activeTab === "mint" ? (

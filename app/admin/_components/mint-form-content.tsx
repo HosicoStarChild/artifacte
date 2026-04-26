@@ -114,10 +114,15 @@ interface TcgPlayerSearchResponse {
   results?: TcgPlayerSearchResult[];
 }
 
+type MintFormMode = "full" | "collection";
 type ImageField = "frontImage" | "backImage";
 type PreviewField = "frontImagePreview" | "backImagePreview";
 type ErrorWithLogs = Error & { logs?: string[] };
 type SignatureStatusValue = Awaited<ReturnType<Connection["getSignatureStatus"]>>["value"];
+
+interface MintFormContentProps {
+  mode?: MintFormMode;
+}
 
 const ADMIN_CONFIRMATION_INTERVAL_MS = 1_500;
 const ADMIN_CONFIRMATION_TIMEOUT_MS = 60_000;
@@ -271,11 +276,11 @@ async function validateCollectionAccess(
 }
 
 /** Embeddable form content (no auth check, no page wrapper) — used by admin tab */
-export function MintFormContent() {
-  return <MintFormInner />;
+export function MintFormContent({ mode = "full" }: MintFormContentProps) {
+  return <MintFormInner mode={mode} />;
 }
 
-function MintFormInner() {
+function MintFormInner({ mode }: { mode: MintFormMode }) {
   const [formData, setFormData] = useState<MintFormData>({
     type: "Card",
     tcg: "Pokemon",
@@ -425,6 +430,7 @@ function MintFormInner() {
   const wallet = useWallet();
   const { connection } = useConnection();
   const walletAddress = wallet.publicKey?.toBase58() || "";
+  const isCollectionOnly = mode === "collection";
   const [minting, setMinting] = useState(false);
   const [mintResult, setMintResult] = useState<string | null>(null);
   const [collectionAddress, setCollectionAddress] = useState(ARTIFACTE_COLLECTION || "");
@@ -444,7 +450,9 @@ function MintFormInner() {
       : collectionAccess.updateAuthority || "Authority unavailable"
     : "No collection selected";
   const collectionAccessLabel = !normalizedCollectionAddress
-    ? "Standalone Mint"
+    ? isCollectionOnly
+      ? "Not selected"
+      : "Standalone Mint"
     : collectionAccess.checking
       ? "Checking"
       : collectionAccess.canUse
@@ -458,7 +466,9 @@ function MintFormInner() {
         ? "border-green-500/30 bg-green-500/10 text-green-300"
         : "border-red-500/30 bg-red-500/10 text-red-300";
   const collectionAccessSummary = !normalizedCollectionAddress
-    ? "No collection selected. This mint will be created as a standalone Metaplex Core asset."
+    ? isCollectionOnly
+      ? "No collection selected. Paste a Metaplex Core collection address or create a new collection with the connected wallet."
+      : "No collection selected. This mint will be created as a standalone Metaplex Core asset."
     : collectionAccess.message || "Checking collection authority...";
   const collectionRoyaltyLabel = collectionAccess.royaltyBasisPoints == null
     ? "No Royalties plugin found"
@@ -802,6 +812,130 @@ function MintFormInner() {
     setMinting(false);
   };
 
+  const collectionPanel = (
+    <div className={`${isCollectionOnly ? "" : "mb-6 "}rounded-lg border border-white/5 bg-dark-700 p-4`}>
+      <h4 className="mb-2 font-semibold text-gold-400">Collection</h4>
+      <div className="mb-2 flex gap-2">
+        <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 rounded-lg border border-white/10 bg-dark-900 px-3 py-2 text-xs font-mono text-white focus:outline-hidden focus:border-gold-500" placeholder="Collection address (create one first)" />
+      </div>
+      <div className="mb-3 rounded-lg border border-white/10 bg-dark-800/70 p-3">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Collection Authority</p>
+            <p className="mt-1 break-all text-xs font-mono text-white">{collectionAuthorityLabel}</p>
+          </div>
+          <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${collectionAccessTone}`}>
+            {collectionAccessLabel}
+          </span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <p className="break-all text-gray-500">
+            Connected wallet: <span className="font-mono text-gray-300">{walletAddress || "Connect wallet"}</span>
+          </p>
+          {normalizedCollectionAddress && (
+            <>
+              <p className="break-all text-gray-500">
+                Collection: <span className="font-mono text-gray-300">{normalizedCollectionAddress}</span>
+              </p>
+              <p className="break-all text-gray-500">
+                Current royalty: <span className="font-mono text-gray-300">{collectionRoyaltyLabel}</span>
+                <span className="ml-2 text-gray-500">Target {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}</span>
+              </p>
+            </>
+          )}
+          <p className={`${collectionAccess.checking ? "text-gray-400" : collectionAccess.canUse === false ? "text-amber-400" : "text-gray-400"}`}>
+            {collectionAccessSummary}
+          </p>
+        </div>
+        {collectionAccess.canUse === false && (
+          <button
+            type="button"
+            onClick={() => setCollectionAddress("")}
+            className="mt-2 text-xs text-gold-400 transition hover:text-gold-300"
+          >
+            Clear collection and mint standalone
+          </button>
+        )}
+      </div>
+      {!collectionAddress && (
+        <button onClick={handleCreateCollection} disabled={creatingCollection} className={`w-full rounded-lg py-2 text-xs font-medium transition ${creatingCollection ? "bg-gray-700 text-gray-500" : "border border-gold-500/50 bg-gold-500/20 text-gold-400 hover:bg-gold-500/30"}`}>
+          {creatingCollection ? "Creating..." : "Create Artifacte Collection (one-time)"}
+        </button>
+      )}
+      {collectionAddress && collectionAccess.canUse === true && (
+        <div className="space-y-2">
+          <p className="text-xs text-green-400">✅ Collection set and authorized</p>
+          {collectionRoyaltyNeedsUpdate ? (
+            <button
+              type="button"
+              onClick={handleUpdateCollectionRoyalty}
+              disabled={updatingCollectionRoyalty}
+              className={`w-full rounded-lg py-2 text-xs font-medium transition ${updatingCollectionRoyalty ? "bg-gray-700 text-gray-500" : "border border-gold-500/50 bg-gold-500/20 text-gold-400 hover:bg-gold-500/30"}`}
+            >
+              {updatingCollectionRoyalty
+                ? `Updating royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}...`
+                : `Update collection royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}`}
+            </button>
+          ) : (
+            <p className="text-xs text-gray-400">
+              Collection royalty already matches the admin target of {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const mintResultPanel = mintResult ? (
+    <div className={`mt-3 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap ${mintResult.startsWith("✅") ? "border border-green-700/30 bg-green-900/20 text-green-400" : "border border-red-700/30 bg-red-900/20 text-red-400"}`}>
+      {mintResult}
+    </div>
+  ) : null;
+
+  if (isCollectionOnly) {
+    return (
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="rounded-xl border border-white/10 bg-dark-800 p-8">
+          <h3 className="mb-2 font-serif text-xl font-bold text-white">Manage Collection</h3>
+          <p className="mb-6 text-sm text-gray-400">
+            Update the active Metaplex Core collection address, confirm the current authority, and sync royalties to the Artifacte default.
+          </p>
+          {collectionPanel}
+          {mintResultPanel}
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-dark-800 p-8">
+          <h3 className="mb-6 font-serif text-xl font-bold text-white">Collection Snapshot</h3>
+          <div className="space-y-4 text-sm text-gray-300">
+            <div className="rounded-lg border border-white/10 bg-dark-700/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Default collection</p>
+              <p className="mt-2 break-all font-mono text-white">{ARTIFACTE_COLLECTION}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-dark-700/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Selected collection</p>
+              <p className="mt-2 break-all font-mono text-white">{normalizedCollectionAddress || "No collection selected"}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-dark-700/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Target royalty</p>
+              <p className="mt-2 text-white">{formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-dark-700/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Resolved authority</p>
+              <p className="mt-2 break-all font-mono text-white">{collectionAuthorityLabel}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-dark-700/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Connected wallet</p>
+              <p className="mt-2 break-all font-mono text-white">{walletAddress || "Connect wallet"}</p>
+            </div>
+            <p className="text-xs leading-6 text-gray-400">
+              Collection changes require the connected wallet to match the on-chain update authority. Creating a collection uploads fresh metadata first and then creates the Core collection on-chain.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Reuse the same JSX but without the page wrapper
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -811,79 +945,7 @@ function MintFormInner() {
         <p className="mb-6 rounded-lg border border-gold-500/20 bg-gold-500/10 px-4 py-3 text-sm text-gold-300">
           Admin mints use a fixed {ADMIN_CORE_ROYALTY_BASIS_POINTS / 100}% secondary royalty.
         </p>
-        
-        {/* Collection */}
-        <div className="mb-6 p-4 bg-dark-700 rounded-lg border border-white/5">
-          <h4 className="text-gold-400 font-semibold mb-2">Collection</h4>
-          <div className="flex gap-2 mb-2">
-            <input type="text" value={collectionAddress} onChange={(e) => setCollectionAddress(e.target.value)} className="flex-1 bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-hidden focus:border-gold-500" placeholder="Collection address (create one first)" />
-          </div>
-          <div className="mb-3 rounded-lg border border-white/10 bg-dark-800/70 p-3">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Collection Authority</p>
-                <p className="mt-1 text-xs font-mono text-white break-all">{collectionAuthorityLabel}</p>
-              </div>
-              <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${collectionAccessTone}`}>
-                {collectionAccessLabel}
-              </span>
-            </div>
-            <div className="space-y-1 text-xs">
-              <p className="text-gray-500 break-all">
-                Connected wallet: <span className="font-mono text-gray-300">{walletAddress || "Connect wallet"}</span>
-              </p>
-              {normalizedCollectionAddress && (
-                <>
-                  <p className="text-gray-500 break-all">
-                    Collection: <span className="font-mono text-gray-300">{normalizedCollectionAddress}</span>
-                  </p>
-                  <p className="text-gray-500 break-all">
-                    Current royalty: <span className="font-mono text-gray-300">{collectionRoyaltyLabel}</span>
-                    <span className="ml-2 text-gray-500">Target {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}</span>
-                  </p>
-                </>
-              )}
-              <p className={`${collectionAccess.checking ? "text-gray-400" : collectionAccess.canUse === false ? "text-amber-400" : "text-gray-400"}`}>
-                {collectionAccessSummary}
-              </p>
-            </div>
-            {collectionAccess.canUse === false && (
-              <button
-                type="button"
-                onClick={() => setCollectionAddress("")}
-                className="mt-2 text-xs text-gold-400 hover:text-gold-300 transition"
-              >
-                Clear collection and mint standalone
-              </button>
-            )}
-          </div>
-          {!collectionAddress && (
-            <button onClick={handleCreateCollection} disabled={creatingCollection} className={`w-full py-2 rounded-lg text-xs font-medium transition ${creatingCollection ? "bg-gray-700 text-gray-500" : "bg-gold-500/20 border border-gold-500/50 text-gold-400 hover:bg-gold-500/30"}`}>
-              {creatingCollection ? "Creating..." : "Create Artifacte Collection (one-time)"}
-            </button>
-          )}
-          {collectionAddress && collectionAccess.canUse === true && (
-            <div className="space-y-2">
-              <p className="text-green-400 text-xs">✅ Collection set and authorized</p>
-              {collectionRoyaltyNeedsUpdate ? (
-                <button
-                  type="button"
-                  onClick={handleUpdateCollectionRoyalty}
-                  disabled={updatingCollectionRoyalty}
-                  className={`w-full py-2 rounded-lg text-xs font-medium transition ${updatingCollectionRoyalty ? "bg-gray-700 text-gray-500" : "bg-gold-500/20 border border-gold-500/50 text-gold-400 hover:bg-gold-500/30"}`}
-                >
-                  {updatingCollectionRoyalty
-                    ? `Updating royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}...`
-                    : `Update collection royalty to ${formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}`}
-                </button>
-              ) : (
-                <p className="text-xs text-gray-400">
-                  Collection royalty already matches the admin target of {formatRoyaltyBasisPoints(ADMIN_CORE_ROYALTY_BASIS_POINTS)}.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        {collectionPanel}
 
         {/* Basic Info */}
         <div className="mb-6">
@@ -1025,9 +1087,7 @@ function MintFormInner() {
           <input type="text" value={formData.recipientWallet} onChange={(e) => setFormData(prev => ({ ...prev, recipientWallet: e.target.value }))} className="w-full bg-dark-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-hidden focus:border-gold-500" placeholder="Solana wallet address" />
         </div>
         <button onClick={handleMint} disabled={!mintName.canonicalName || !formData.recipientWallet || minting} className={`w-full py-3 rounded-lg font-semibold text-sm transition ${!mintName.canonicalName || !formData.recipientWallet || minting ? "bg-gray-600 text-gray-400 cursor-not-allowed" : "bg-gold-500 hover:bg-gold-600 text-dark-900"}`}>{minting ? "Minting..." : "Mint NFT"}</button>
-        {mintResult && (
-          <div className={`mt-3 p-3 rounded-lg text-xs font-mono whitespace-pre-wrap ${mintResult.startsWith("✅") ? "bg-green-900/20 border border-green-700/30 text-green-400" : "bg-red-900/20 border border-red-700/30 text-red-400"}`}>{mintResult}</div>
-        )}
+        {mintResultPanel}
       </div>
       {/* Metadata Preview */}
       <div className="bg-dark-800 border border-white/10 rounded-xl p-8">

@@ -8,6 +8,7 @@ export type AdminPageTab =
   | "overview"
   | "listings"
   | "submissions"
+  | "collection"
   | "mint"
   | "whitelist"
   | "settings"

@@ -314,6 +314,7 @@ export default function AdminPage() {
         ) : (
           <AdminDashboardView
             canAccessMintTab={canAccessMintTab}
+            collectionTabContent={<MintFormContent mode="collection" />}
             dashboard={dashboardQuery.data}
             errorMessage={
               dashboardQuery.error instanceof Error
