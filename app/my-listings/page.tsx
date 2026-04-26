@@ -24,6 +24,10 @@ import {
   getMyListingsQueryKey,
   updateCachedListingStatus,
 } from "./_lib/client";
+import {
+  filterOwnedArtifacteSection,
+  getActiveMyListingMintSet,
+} from "./_lib/owned-artifacte";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
 
@@ -44,15 +48,7 @@ async function fetchOwnedArtifacteSection(walletAddress: string): Promise<Portfo
   }
 
   const artifacteSection = payload.sections.find((section) => section.id === "artifacte-rwa");
-  if (!artifacteSection) {
-    return null;
-  }
-
-  return {
-    ...artifacteSection,
-    description: "Artifacte NFTs currently held by this wallet, including newly purchased cards.",
-    title: "Owned Artifacte NFTs",
-  };
+  return artifacteSection ?? null;
 }
 
 export default function MyListingsPage() {
@@ -104,10 +100,18 @@ export default function MyListingsPage() {
     () => listings.filter((listing) => listing.status === activeTab),
     [activeTab, listings],
   );
+  const activeListingMints = useMemo(
+    () => getActiveMyListingMintSet(listings),
+    [listings],
+  );
+  const ownedListedArtifacteSection = useMemo(
+    () => filterOwnedArtifacteSection(ownedArtifacteQuery.data ?? null, activeListingMints),
+    [activeListingMints, ownedArtifacteQuery.data],
+  );
 
   const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your listings and review owned Artifacte NFTs`
-    : "Connect your wallet to manage your listings and review owned Artifacte NFTs";
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your listings and review your actively listed Artifacte NFTs`
+    : "Connect your wallet to manage your listings and review your actively listed Artifacte NFTs";
 
   const handleRefresh = async (): Promise<void> => {
     setActionError(null);
@@ -203,8 +207,8 @@ export default function MyListingsPage() {
                 </div>
               )}
 
-              {ownedArtifacteQuery.data?.items.length ? (
-                <PortfolioSection section={ownedArtifacteQuery.data} />
+              {ownedListedArtifacteSection?.items.length ? (
+                <PortfolioSection section={ownedListedArtifacteSection} />
               ) : null}
             </div>
           )}
