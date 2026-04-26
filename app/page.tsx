@@ -10,7 +10,7 @@ import {
 
 const PROJECT_TITLE = "Artifacte";
 const PROJECT_DESCRIPTION =
-  "Institutional-grade real world asset tokenization platform built on Solana. Buy, sell, and trade tokenized collectibles with verified on-chain provenance across cards, spirits, sealed products, and more.";
+  "The premier RWA protocol on Solana for authenticated collectibles. We provide verified on-chain provenance for trading cards, rare spirits, sealed products, and beyond.";
 
 export default async function Home() {
   const spiritsCarousel = await getSpiritsCarousel();

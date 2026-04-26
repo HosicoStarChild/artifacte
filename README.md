@@ -1,6 +1,6 @@
 # Artifacte — RWA Tokenization on Solana
 
-Institutional-grade real world asset tokenization platform built on Solana. Mint NFTs representing real-world assets and auction them on-chain.
+The premier RWA protocol on Solana for authenticated collectibles. We provide verified on-chain provenance for trading cards, rare spirits, sealed products, and beyond.
 
 **Built for the Solana Graveyard Hackathon 2026**
 
