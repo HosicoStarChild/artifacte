@@ -1,5 +1,17 @@
 import { NextResponse } from 'next/server';
 import {
+  createBase64VersionedTransaction,
+  waitForWeb3Confirmation,
+} from '@/app/api/_lib/list-route-utils';
+import {
+  LOOKUP_TABLE_ACTIVATION_DELAY_MS,
+  MAX_LOOKUP_TABLE_EXTEND_ADDRESSES,
+  MAX_SOLANA_TRANSACTION_BYTES,
+  isUint8EncodingOverrun,
+  planLookupTableSetupBatchSizes,
+  toBase64SizedSerializedTransaction,
+} from './_lib/serialization';
+import {
   EXTERNAL_MARKETPLACE_FEE_WALLET,
   calculateExternalMarketplaceFeeAmount,
   shouldApplyExternalMarketplaceFee,
@@ -10,7 +22,6 @@ import { getOracleApiUrl } from '@/lib/server/oracle-env';
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
 const TENSOR_API_BASE = 'https://api.mainnet.tensordev.io/api/v1';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-
 type HeliusAsset = ArtifacteAssetLike & {
   compression?: {
     compressed?: boolean;
@@ -279,7 +290,10 @@ async function buildStandardTensorBuyResponse(input: {
     }
 
     const recompiled = decompiled.compileToV0Message(validAlts);
-    encodedTx = Buffer.from(new VersionedTransaction(recompiled).serialize()).toString('base64');
+    encodedTx = toBase64SizedSerializedTransaction(
+      () => new VersionedTransaction(recompiled).serialize(),
+      'Tensor buy transaction exceeds Solana size limits after fee injection',
+    );
   } else {
     const legacyTx = Transaction.from(txBytes);
 
@@ -299,7 +313,10 @@ async function buildStandardTensorBuyResponse(input: {
       legacyTx.add(SystemProgram.transfer({ fromPubkey: buyerPk, toPubkey: treasuryPk, lamports: feeAmount }));
     }
 
-    encodedTx = Buffer.from(legacyTx.serialize({ requireAllSignatures: false })).toString('base64');
+    encodedTx = toBase64SizedSerializedTransaction(
+      () => legacyTx.serialize({ requireAllSignatures: false }),
+      'Tensor buy transaction exceeds Solana size limits after fee injection',
+    );
   }
 
   return {
@@ -449,105 +466,172 @@ export async function POST(request: Request) {
     }
 
     const {
-      PublicKey, TransactionMessage, VersionedTransaction, TransactionInstruction,
-      ComputeBudgetProgram, Connection: SolConnection, SystemProgram,
-      AddressLookupTableProgram, Transaction, Keypair,
+      PublicKey,
+      Connection: SolConnection,
+      AddressLookupTableProgram,
+      Transaction,
+      Keypair,
     } = await import('@solana/web3.js');
 
     const conn = new SolConnection(HELIUS_RPC, 'confirmed');
-    const buyerPk = new PublicKey(buyer);
-
     const buyInstruction = buyIx as TensorBuyInstruction;
-    const v1Keys = buyInstruction.accounts.map((acct) => {
-      const addr = String(acct.address);
-      return {
-        pubkey: new PublicKey(addr),
-        isSigner: acct.role >= 2,
-        isWritable: acct.role === 1 || acct.role === 3,
-      };
-    });
-
-    const v1Ix = new TransactionInstruction({
-      programId: new PublicKey(String(buyInstruction.programAddress)),
-      keys: v1Keys,
-      data: Buffer.from(buyInstruction.data),
-    });
 
     // Phygitals' program ALT (59 addresses covering all Tensor/Bubblegum/compression programs)
     const PROGRAM_ALT = new PublicKey('4NYENhRXdSq1ek7mvJyzMUvdn2aN3JeAr6huzfL7869j');
-
-    // Create a per-tx proof ALT with this card's proof nodes
-    // This is how Phygitals handles tx size — compress proof nodes via a fresh ALT
-    const authoritySecret = JSON.parse(process.env.SOLANA_AUTHORITY_SECRET || '[]');
-    if (authoritySecret.length === 0) {
-      throw new Error('SOLANA_AUTHORITY_SECRET not configured');
-    }
-    const authority = Keypair.fromSecretKey(Uint8Array.from(authoritySecret));
-
-    const slot = await conn.getSlot();
-    const [createIx, proofAltAddress] = AddressLookupTableProgram.createLookupTable({
-      authority: authority.publicKey,
-      payer: authority.publicKey,
-      recentSlot: slot - 1,
-    });
-
     const proofAddresses = proofFields.proof.map((p: string) => new PublicKey(p));
-    const extendIx = AddressLookupTableProgram.extendLookupTable({
-      payer: authority.publicKey,
-      authority: authority.publicKey,
-      lookupTable: proofAltAddress,
-      addresses: proofAddresses,
-    });
 
-    // Create + extend in one tx
-    const { blockhash: altBh } = await conn.getLatestBlockhash('confirmed');
-    const altTx = new Transaction().add(createIx).add(extendIx);
-    altTx.recentBlockhash = altBh;
-    altTx.feePayer = authority.publicKey;
-    altTx.sign(authority);
-    const altSig = await conn.sendRawTransaction(altTx.serialize(), { skipPreflight: true });
+    const maybeBuildCompressedBuyTransaction = async (
+      lookupTables: NonNullable<Awaited<ReturnType<typeof conn.getAddressLookupTable>>['value']>[],
+      blockhashOverride: Awaited<ReturnType<typeof conn.getLatestBlockhash>>,
+    ) => {
+      try {
+        const txBase64 = await createBase64VersionedTransaction({
+          connection: {
+            ...conn,
+            getLatestBlockhash: async () => blockhashOverride,
+          } as typeof conn,
+          instruction: buyInstruction as never,
+          lookupTables,
+          payer: buyer,
+        });
 
-    // Poll for ALT tx confirmation (avoids WebSocket issues in Next.js server)
-    for (let i = 0; i < 30; i++) {
-      const status = await conn.getSignatureStatuses([altSig]);
-      if (status.value[0]?.confirmationStatus === 'confirmed' || status.value[0]?.confirmationStatus === 'finalized') break;
-      await new Promise(r => setTimeout(r, 500));
-    }
+        return {
+          txBase64,
+          txSize: Buffer.from(txBase64, 'base64').length,
+        };
+      } catch (error) {
+        if (isUint8EncodingOverrun(error)) {
+          return null;
+        }
 
-    // Wait for ALT to activate (~800ms)
-    await new Promise(r => setTimeout(r, 800));
+        throw error;
+      }
+    };
 
-    // Load both ALTs
-    const [programAlt, proofAlt, bh] = await Promise.all([
+    const [programAlt, initialBlockhash] = await Promise.all([
       conn.getAddressLookupTable(PROGRAM_ALT),
-      conn.getAddressLookupTable(proofAltAddress),
       conn.getLatestBlockhash('confirmed'),
     ]);
+    const baseLookupTables = [programAlt.value].filter((value): value is NonNullable<typeof value> => value != null);
 
-    const alts = [programAlt.value, proofAlt.value].filter((a): a is NonNullable<typeof a> => a != null);
-    const cuIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 });
+    let txBuild = await maybeBuildCompressedBuyTransaction(baseLookupTables, initialBlockhash);
+    let proofAltAddress: InstanceType<typeof PublicKey> | null = null;
+
+    if ((!txBuild || txBuild.txSize > MAX_SOLANA_TRANSACTION_BYTES) && proofAddresses.length > 0) {
+      const authoritySecret = JSON.parse(process.env.SOLANA_AUTHORITY_SECRET || '[]');
+      if (authoritySecret.length === 0) {
+        throw new Error('SOLANA_AUTHORITY_SECRET not configured');
+      }
+
+      const authority = Keypair.fromSecretKey(Uint8Array.from(authoritySecret));
+      const slot = await conn.getSlot();
+      const [createIx, nextProofAltAddress] = AddressLookupTableProgram.createLookupTable({
+        authority: authority.publicKey,
+        payer: authority.publicKey,
+        recentSlot: slot - 1,
+      });
+
+      const plannedBatchSizes = await planLookupTableSetupBatchSizes({
+        addressCount: proofAddresses.length,
+        maxBatchSize: MAX_LOOKUP_TABLE_EXTEND_ADDRESSES,
+        fitsWithinLimit: async (batchSize, shouldIncludeCreateInstruction) => {
+          const batchAddresses = proofAddresses.slice(nextOffset, nextOffset + batchSize);
+          const extendIx = AddressLookupTableProgram.extendLookupTable({
+            payer: authority.publicKey,
+            authority: authority.publicKey,
+            lookupTable: nextProofAltAddress,
+            addresses: batchAddresses,
+          });
+          const setupTx = new Transaction();
+
+          if (shouldIncludeCreateInstruction) {
+            setupTx.add(createIx);
+          }
+
+          setupTx.add(extendIx);
+
+          const { blockhash } = await conn.getLatestBlockhash('confirmed');
+          setupTx.recentBlockhash = blockhash;
+          setupTx.feePayer = authority.publicKey;
+          setupTx.sign(authority);
+
+          try {
+            return setupTx.serialize().length <= MAX_SOLANA_TRANSACTION_BYTES;
+          } catch (error) {
+            if (isUint8EncodingOverrun(error) || error instanceof RangeError) {
+              return false;
+            }
+
+            throw error;
+          }
+        },
+      });
+
+      let nextOffset = 0;
+      let includeCreateInstruction = true;
+
+      for (const batchSize of plannedBatchSizes) {
+        let batchAddresses = proofAddresses.slice(nextOffset, nextOffset + batchSize);
+        const extendIx = AddressLookupTableProgram.extendLookupTable({
+          payer: authority.publicKey,
+          authority: authority.publicKey,
+          lookupTable: nextProofAltAddress,
+          addresses: batchAddresses,
+        });
+        const setupTx = new Transaction();
+
+        if (includeCreateInstruction) {
+          setupTx.add(createIx);
+        }
+
+        setupTx.add(extendIx);
+
+        const { blockhash } = await conn.getLatestBlockhash('confirmed');
+        setupTx.recentBlockhash = blockhash;
+        setupTx.feePayer = authority.publicKey;
+        setupTx.sign(authority);
+        const serializedSetupTx = setupTx.serialize();
+
+        if (serializedSetupTx.length > MAX_SOLANA_TRANSACTION_BYTES) {
+          throw new Error('Tensor proof lookup table setup exceeds Solana size limits');
+        }
+
+        const altSig = await conn.sendRawTransaction(serializedSetupTx, { skipPreflight: true });
+        await waitForWeb3Confirmation(conn, altSig);
+        nextOffset += batchAddresses.length;
+        includeCreateInstruction = false;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, LOOKUP_TABLE_ACTIVATION_DELAY_MS));
+      proofAltAddress = nextProofAltAddress;
+
+      const [proofAlt, finalBlockhash] = await Promise.all([
+        conn.getAddressLookupTable(proofAltAddress),
+        conn.getLatestBlockhash('confirmed'),
+      ]);
+
+      if (!proofAlt.value) {
+        throw new Error('Tensor proof lookup table failed to activate');
+      }
+
+      const lookupTables = [...baseLookupTables, proofAlt.value];
+      txBuild = await maybeBuildCompressedBuyTransaction(lookupTables, finalBlockhash);
+    }
+
+    if (!txBuild || txBuild.txSize > MAX_SOLANA_TRANSACTION_BYTES) {
+      throw new Error('Tensor compressed buy transaction exceeds Solana size limits');
+    }
 
     // Tensor applies the buyer-side broker fee through `takerBroker`; do not append
     // a second transfer here or the buyer is charged twice.
     const platformFeeAmount = feeApplied
       ? calculateExternalMarketplaceFeeAmount(Number(listState.data.amount))
       : 0;
-
-    const msg = new TransactionMessage({
-      payerKey: buyerPk,
-      recentBlockhash: bh.blockhash,
-      instructions: [cuIx, v1Ix],
-    }).compileToV0Message(alts);
-
-    const tx = new VersionedTransaction(msg);
-    const size = tx.serialize().length;
     const platformFee = platformFeeAmount / 10 ** decimals;
-    console.log(`[tensor-buy] tx size: ${size} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress.toBase58()}, currency: ${listingCurrency}, platformFee: ${platformFee.toFixed(6)} ${listingCurrency}, feeApplied: ${feeApplied})`);
-
-    const txBase64 = Buffer.from(tx.serialize()).toString('base64');
+    console.log(`[tensor-buy] tx size: ${txBuild.txSize} bytes (proof nodes: ${proofFields.proof.length}, proof ALT: ${proofAltAddress?.toBase58() ?? 'none'}, currency: ${listingCurrency}, platformFee: ${platformFee.toFixed(6)} ${listingCurrency}, feeApplied: ${feeApplied})`);
 
     return NextResponse.json({
-      tx: txBase64,
+      tx: txBuild.txBase64,
       price,
       platformFee,
       platformFeeCurrency: listingCurrency,
