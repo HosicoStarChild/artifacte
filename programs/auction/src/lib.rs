@@ -142,19 +142,9 @@ fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
     )
 }
 
-fn is_existing_mpl_core_plugin_error(error: &ProgramError) -> bool {
-    matches!(
-        error,
-        ProgramError::Custom(code)
-            if *code == mpl_core::errors::MplCoreError::PluginAlreadyExists as u32
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        is_existing_mpl_core_plugin_error, is_missing_mpl_core_plugin_error,
-    };
+    use super::is_missing_mpl_core_plugin_error;
     use anchor_lang::solana_program::program_error::ProgramError;
 
     #[test]
@@ -169,17 +159,6 @@ mod tests {
             mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
         )));
         assert!(!is_missing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
-    }
-
-    #[test]
-    fn identifies_only_existing_mpl_core_plugin_errors() {
-        assert!(is_existing_mpl_core_plugin_error(&ProgramError::Custom(
-            mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
-        )));
-        assert!(!is_existing_mpl_core_plugin_error(&ProgramError::Custom(
-            mpl_core::errors::MplCoreError::PluginNotFound as u32,
-        )));
-        assert!(!is_existing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
     }
 }
 
@@ -1399,46 +1378,47 @@ pub mod auction {
         listing.created_at = clock.unix_timestamp;
         listing.bump = ctx.bumps.core_listing;
 
-        let add_transfer_delegate = mpl_core::instructions::AddPluginV1Cpi {
-            __program: &ctx.accounts.mpl_core_program.to_account_info(),
-            asset: &ctx.accounts.asset.to_account_info(),
-            collection: Some(&ctx.accounts.collection.to_account_info()),
-            payer: &ctx.accounts.seller.to_account_info(),
-            authority: Some(&ctx.accounts.seller.to_account_info()),
-            system_program: &ctx.accounts.system_program.to_account_info(),
-            log_wrapper: None,
-            __args: mpl_core::instructions::AddPluginV1InstructionArgs {
-                plugin: mpl_core::types::Plugin::TransferDelegate(
-                    mpl_core::types::TransferDelegate {},
-                ),
-                init_authority: Some(mpl_core::types::PluginAuthority::Address {
-                    address: ctx.accounts.core_authority.key(),
-                }),
-            },
-        }
-        .invoke();
+        let expected_transfer_delegate_authority = mpl_core::types::PluginAuthority::Address {
+            address: ctx.accounts.core_authority.key(),
+        };
 
-        if let Err(error) = add_transfer_delegate {
-            if !is_existing_mpl_core_plugin_error(&error) {
-                return Err(error.into());
-            }
-
-            mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
-                __program: &ctx.accounts.mpl_core_program.to_account_info(),
-                asset: &ctx.accounts.asset.to_account_info(),
-                collection: Some(&ctx.accounts.collection.to_account_info()),
-                payer: &ctx.accounts.seller.to_account_info(),
-                authority: Some(&ctx.accounts.seller.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-                __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
-                    plugin_type: mpl_core::types::PluginType::TransferDelegate,
-                    new_authority: mpl_core::types::PluginAuthority::Address {
-                        address: ctx.accounts.core_authority.key(),
+        match read_core_transfer_delegate_state(&ctx.accounts.asset.to_account_info())? {
+            CoreTransferDelegateState::Missing => {
+                mpl_core::instructions::AddPluginV1Cpi {
+                    __program: &ctx.accounts.mpl_core_program.to_account_info(),
+                    asset: &ctx.accounts.asset.to_account_info(),
+                    collection: Some(&ctx.accounts.collection.to_account_info()),
+                    payer: &ctx.accounts.seller.to_account_info(),
+                    authority: Some(&ctx.accounts.seller.to_account_info()),
+                    system_program: &ctx.accounts.system_program.to_account_info(),
+                    log_wrapper: None,
+                    __args: mpl_core::instructions::AddPluginV1InstructionArgs {
+                        plugin: mpl_core::types::Plugin::TransferDelegate(
+                            mpl_core::types::TransferDelegate {},
+                        ),
+                        init_authority: Some(expected_transfer_delegate_authority.clone()),
                     },
-                },
+                }
+                .invoke()?;
             }
-            .invoke()?;
+            CoreTransferDelegateState::Address(address)
+                if address == ctx.accounts.core_authority.key() => {}
+            CoreTransferDelegateState::Address(_) | CoreTransferDelegateState::Other => {
+                mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
+                    __program: &ctx.accounts.mpl_core_program.to_account_info(),
+                    asset: &ctx.accounts.asset.to_account_info(),
+                    collection: Some(&ctx.accounts.collection.to_account_info()),
+                    payer: &ctx.accounts.seller.to_account_info(),
+                    authority: Some(&ctx.accounts.seller.to_account_info()),
+                    system_program: &ctx.accounts.system_program.to_account_info(),
+                    log_wrapper: None,
+                    __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
+                        plugin_type: mpl_core::types::PluginType::TransferDelegate,
+                        new_authority: expected_transfer_delegate_authority,
+                    },
+                }
+                .invoke()?;
+            }
         }
 
         emit!(CoreListingCreated {
@@ -2275,6 +2255,8 @@ pub enum AuctionError {
     InvalidTokenProgram,
     #[msg("Invalid royalty basis points — must be 0 or >= 100 (1%)")]
     InvalidRoyaltyBps,
+    #[msg("Invalid Metaplex Core plugin state")]
+    InvalidCorePluginState,
 }
 
 // ============================================================================
@@ -2519,4 +2501,26 @@ fn read_core_royalties(
     }
 
     Ok((0u16, Pubkey::default()))
+}
+
+enum CoreTransferDelegateState {
+    Missing,
+    Address(Pubkey),
+    Other,
+}
+
+fn read_core_transfer_delegate_state(asset_account: &AccountInfo) -> Result<CoreTransferDelegateState> {
+    let data = asset_account.try_borrow_data()?;
+    let asset = mpl_core::Asset::from_bytes(&data)
+        .map_err(|_error| error!(AuctionError::InvalidCorePluginState))?;
+
+    let transfer_delegate = match asset.plugin_list.transfer_delegate {
+        Some(plugin) => plugin,
+        None => return Ok(CoreTransferDelegateState::Missing),
+    };
+
+    match transfer_delegate.base.authority.address {
+        Some(address) => Ok(CoreTransferDelegateState::Address(address)),
+        None => Ok(CoreTransferDelegateState::Other),
+    }
 }
