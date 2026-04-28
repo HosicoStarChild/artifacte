@@ -1347,26 +1347,52 @@ pub mod auction {
         listing.created_at = clock.unix_timestamp;
         listing.bump = ctx.bumps.core_listing;
 
-        // Approve our `core_authority` PDA as the TransferDelegate authority
-        // by adding the TransferDelegate plugin with that PDA as initAuthority.
-        mpl_core::instructions::AddPluginV1Cpi {
-            __program: &ctx.accounts.mpl_core_program.to_account_info(),
-            asset: &ctx.accounts.asset.to_account_info(),
-            collection: Some(&ctx.accounts.collection.to_account_info()),
-            payer: &ctx.accounts.seller.to_account_info(),
-            authority: Some(&ctx.accounts.seller.to_account_info()),
-            system_program: &ctx.accounts.system_program.to_account_info(),
-            log_wrapper: None,
-            __args: mpl_core::instructions::AddPluginV1InstructionArgs {
-                plugin: mpl_core::types::Plugin::TransferDelegate(
-                    mpl_core::types::TransferDelegate {},
-                ),
-                init_authority: Some(mpl_core::types::PluginAuthority::Address {
-                    address: ctx.accounts.core_authority.key(),
-                }),
-            },
+        let transfer_delegate_exists = mpl_core::fetch_plugin::<
+            mpl_core::accounts::BaseAssetV1,
+            mpl_core::types::Plugin,
+        >(
+            &ctx.accounts.asset.to_account_info(),
+            mpl_core::types::PluginType::TransferDelegate,
+        )
+        .is_ok();
+
+        if transfer_delegate_exists {
+            mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
+                __program: &ctx.accounts.mpl_core_program.to_account_info(),
+                asset: &ctx.accounts.asset.to_account_info(),
+                collection: Some(&ctx.accounts.collection.to_account_info()),
+                payer: &ctx.accounts.seller.to_account_info(),
+                authority: Some(&ctx.accounts.seller.to_account_info()),
+                system_program: &ctx.accounts.system_program.to_account_info(),
+                log_wrapper: None,
+                __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
+                    plugin_type: mpl_core::types::PluginType::TransferDelegate,
+                    new_authority: mpl_core::types::PluginAuthority::Address {
+                        address: ctx.accounts.core_authority.key(),
+                    },
+                },
+            }
+            .invoke()?;
+        } else {
+            mpl_core::instructions::AddPluginV1Cpi {
+                __program: &ctx.accounts.mpl_core_program.to_account_info(),
+                asset: &ctx.accounts.asset.to_account_info(),
+                collection: Some(&ctx.accounts.collection.to_account_info()),
+                payer: &ctx.accounts.seller.to_account_info(),
+                authority: Some(&ctx.accounts.seller.to_account_info()),
+                system_program: &ctx.accounts.system_program.to_account_info(),
+                log_wrapper: None,
+                __args: mpl_core::instructions::AddPluginV1InstructionArgs {
+                    plugin: mpl_core::types::Plugin::TransferDelegate(
+                        mpl_core::types::TransferDelegate {},
+                    ),
+                    init_authority: Some(mpl_core::types::PluginAuthority::Address {
+                        address: ctx.accounts.core_authority.key(),
+                    }),
+                },
+            }
+            .invoke()?;
         }
-        .invoke()?;
 
         emit!(CoreListingCreated {
             asset: listing.asset,
@@ -1377,8 +1403,8 @@ pub mod auction {
         Ok(())
     }
 
-    /// Cancel a Core listing (owner only). Revokes the TransferDelegate authority
-    /// by removing the plugin, and closes the CoreListing PDA.
+    /// Cancel a Core listing (owner only). Returns TransferDelegate authority
+    /// to the owner and closes the CoreListing PDA.
     pub fn cancel_core_listing(ctx: Context<CancelCoreListing>) -> Result<()> {
         // Only the original seller (= owner) may cancel
         require!(
@@ -1386,29 +1412,19 @@ pub mod auction {
             AuctionError::Unauthorized
         );
 
-        let asset_key = ctx.accounts.asset.key();
-        let core_authority_bump = ctx.bumps.core_authority;
-        let core_authority_seeds: &[&[u8]] = &[
-            b"core_authority",
-            asset_key.as_ref(),
-            &[core_authority_bump],
-        ];
-
-        // Remove the TransferDelegate plugin (the program PDA is the plugin
-        // authority, so it must sign the CPI).
-        mpl_core::instructions::RemovePluginV1Cpi {
+        mpl_core::instructions::RevokePluginAuthorityV1Cpi {
             __program: &ctx.accounts.mpl_core_program.to_account_info(),
             asset: &ctx.accounts.asset.to_account_info(),
             collection: Some(&ctx.accounts.collection.to_account_info()),
             payer: &ctx.accounts.seller.to_account_info(),
-            authority: Some(&ctx.accounts.core_authority.to_account_info()),
+            authority: Some(&ctx.accounts.seller.to_account_info()),
             system_program: &ctx.accounts.system_program.to_account_info(),
             log_wrapper: None,
-            __args: mpl_core::instructions::RemovePluginV1InstructionArgs {
+            __args: mpl_core::instructions::RevokePluginAuthorityV1InstructionArgs {
                 plugin_type: mpl_core::types::PluginType::TransferDelegate,
             },
         }
-        .invoke_signed(&[core_authority_seeds])?;
+        .invoke()?;
 
         emit!(CoreListingCancelled {
             asset: ctx.accounts.core_listing.asset,
