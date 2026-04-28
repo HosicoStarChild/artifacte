@@ -10,7 +10,6 @@ import type { MyListingsPageData, MyListingRecord, MyListingStatus } from "@/lib
 import { MyListingCard } from "./_components/my-listing-card";
 import { MyListingsHeader } from "./_components/my-listings-header";
 import {
-  MyListingsArtifacteSectionEmptyState,
   MyListingsDisconnectedState,
   MyListingsEmptyState,
   MyListingsErrorState,
@@ -23,11 +22,6 @@ import {
   getMyListingsQueryKey,
   updateCachedListingStatus,
 } from "./_lib/client";
-import {
-  ARTIFACTE_LISTINGS_SECTION_DESCRIPTION,
-  ARTIFACTE_LISTINGS_SECTION_TITLE,
-  getActiveArtifacteListings,
-} from "./_lib/owned-artifacte";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
 
@@ -79,14 +73,10 @@ export default function MyListingsPage() {
     () => listings.filter((listing) => listing.status === activeTab),
     [activeTab, listings],
   );
-  const activeArtifacteListings = useMemo(
-    () => getActiveArtifacteListings(listings),
-    [listings],
-  );
 
   const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your listings and review your actively listed Artifacte NFTs`
-    : "Connect your wallet to manage your listings and review your actively listed Artifacte NFTs";
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your marketplace listings`
+    : "Connect your wallet to manage your marketplace listings";
 
   const handleRefresh = async (): Promise<void> => {
     setActionError(null);
@@ -178,30 +168,6 @@ export default function MyListingsPage() {
                   ))}
                 </div>
               )}
-
-              <section className="space-y-6">
-                <div className="space-y-2">
-                  <h2 className="font-serif text-2xl text-white">{ARTIFACTE_LISTINGS_SECTION_TITLE}</h2>
-                  <p className="max-w-3xl text-sm text-white/55">
-                    {ARTIFACTE_LISTINGS_SECTION_DESCRIPTION}
-                  </p>
-                </div>
-
-                {activeArtifacteListings.length === 0 ? (
-                  <MyListingsArtifacteSectionEmptyState />
-                ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                    {activeArtifacteListings.map((listing) => (
-                      <MyListingCard
-                        isPending={pendingMint === listing.nftMint}
-                        key={`artifacte-section-${listing.id}`}
-                        listing={listing}
-                        onAction={(nextListing) => { void handleListingAction(nextListing); }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
             </div>
           )}
         </div>
