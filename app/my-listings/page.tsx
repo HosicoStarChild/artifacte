@@ -75,8 +75,8 @@ export default function MyListingsPage() {
   );
 
   const walletLabel = walletAddress
-    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your marketplace listings`
-    : "Connect your wallet to manage your marketplace listings";
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)} — manage your marketplace listings, including Artifacte NFTs`
+    : "Connect your wallet to manage your marketplace listings, including Artifacte NFTs";
 
   const handleRefresh = async (): Promise<void> => {
     setActionError(null);
@@ -145,6 +145,10 @@ export default function MyListingsPage() {
                 counts={counts}
                 onChange={setActiveTab}
               />
+
+              <p className="text-sm text-white/55">
+                All supported marketplace listings appear in this main grid, including Artifacte NFTs.
+              </p>
 
               {actionError ? (
                 <Card className="border-red-500/20 bg-dark-800/80 py-0">
