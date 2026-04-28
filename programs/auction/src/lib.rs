@@ -132,6 +132,7 @@ const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const OWNER_WALLET: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 
+#[cfg(test)]
 fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
     matches!(
         error,
@@ -141,9 +142,19 @@ fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
     )
 }
 
+fn is_existing_mpl_core_plugin_error(error: &ProgramError) -> bool {
+    matches!(
+        error,
+        ProgramError::Custom(code)
+            if *code == mpl_core::errors::MplCoreError::PluginAlreadyExists as u32
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_missing_mpl_core_plugin_error;
+    use super::{
+        is_existing_mpl_core_plugin_error, is_missing_mpl_core_plugin_error,
+    };
     use anchor_lang::solana_program::program_error::ProgramError;
 
     #[test]
@@ -158,6 +169,17 @@ mod tests {
             mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
         )));
         assert!(!is_missing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
+    }
+
+    #[test]
+    fn identifies_only_existing_mpl_core_plugin_errors() {
+        assert!(is_existing_mpl_core_plugin_error(&ProgramError::Custom(
+            mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
+        )));
+        assert!(!is_existing_mpl_core_plugin_error(&ProgramError::Custom(
+            mpl_core::errors::MplCoreError::PluginNotFound as u32,
+        )));
+        assert!(!is_existing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
     }
 }
 
@@ -1377,7 +1399,7 @@ pub mod auction {
         listing.created_at = clock.unix_timestamp;
         listing.bump = ctx.bumps.core_listing;
 
-        let approve_transfer_delegate = mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
+        let add_transfer_delegate = mpl_core::instructions::AddPluginV1Cpi {
             __program: &ctx.accounts.mpl_core_program.to_account_info(),
             asset: &ctx.accounts.asset.to_account_info(),
             collection: Some(&ctx.accounts.collection.to_account_info()),
@@ -1385,21 +1407,23 @@ pub mod auction {
             authority: Some(&ctx.accounts.seller.to_account_info()),
             system_program: &ctx.accounts.system_program.to_account_info(),
             log_wrapper: None,
-            __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
-                plugin_type: mpl_core::types::PluginType::TransferDelegate,
-                new_authority: mpl_core::types::PluginAuthority::Address {
+            __args: mpl_core::instructions::AddPluginV1InstructionArgs {
+                plugin: mpl_core::types::Plugin::TransferDelegate(
+                    mpl_core::types::TransferDelegate {},
+                ),
+                init_authority: Some(mpl_core::types::PluginAuthority::Address {
                     address: ctx.accounts.core_authority.key(),
-                },
+                }),
             },
         }
         .invoke();
 
-        if let Err(error) = approve_transfer_delegate {
-            if !is_missing_mpl_core_plugin_error(&error) {
+        if let Err(error) = add_transfer_delegate {
+            if !is_existing_mpl_core_plugin_error(&error) {
                 return Err(error.into());
             }
 
-            mpl_core::instructions::AddPluginV1Cpi {
+            mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
                 __program: &ctx.accounts.mpl_core_program.to_account_info(),
                 asset: &ctx.accounts.asset.to_account_info(),
                 collection: Some(&ctx.accounts.collection.to_account_info()),
@@ -1407,13 +1431,11 @@ pub mod auction {
                 authority: Some(&ctx.accounts.seller.to_account_info()),
                 system_program: &ctx.accounts.system_program.to_account_info(),
                 log_wrapper: None,
-                __args: mpl_core::instructions::AddPluginV1InstructionArgs {
-                    plugin: mpl_core::types::Plugin::TransferDelegate(
-                        mpl_core::types::TransferDelegate {},
-                    ),
-                    init_authority: Some(mpl_core::types::PluginAuthority::Address {
+                __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
+                    plugin_type: mpl_core::types::PluginType::TransferDelegate,
+                    new_authority: mpl_core::types::PluginAuthority::Address {
                         address: ctx.accounts.core_authority.key(),
-                    }),
+                    },
                 },
             }
             .invoke()?;
