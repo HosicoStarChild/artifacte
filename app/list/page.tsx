@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +9,7 @@ import Link from "next/link";
 import { showToast } from "@/components/ToastContainer";
 import { buttonVariants } from "@/components/ui/button";
 import { useAllowlist } from "@/hooks/useAllowlist";
+import { LIST_PAGE_RESET_EVENT } from "@/lib/list-page-reset";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +44,31 @@ function toRoyaltyBps(mintAddress: string | null, royaltyBps: number, loading: b
     loading,
     royaltyBps,
   };
+}
+
+type ListPageStateSetters = {
+  setAuctionDuration: Dispatch<SetStateAction<string>>;
+  setListingType: Dispatch<SetStateAction<ListPageListingMode>>;
+  setPrice: Dispatch<SetStateAction<string>>;
+  setSelectedAsset: Dispatch<SetStateAction<ListPageAsset | null>>;
+  setSubmitted: Dispatch<SetStateAction<boolean>>;
+  setSubmissionError: Dispatch<SetStateAction<string>>;
+};
+
+function resetListPageState({
+  setAuctionDuration,
+  setListingType,
+  setPrice,
+  setSelectedAsset,
+  setSubmitted,
+  setSubmissionError,
+}: ListPageStateSetters) {
+  setSelectedAsset(null);
+  setPrice("");
+  setSubmissionError("");
+  setSubmitted(false);
+  setListingType("fixed");
+  setAuctionDuration("72");
 }
 
 export default function ListNFTPage() {
@@ -95,6 +122,25 @@ export default function ListNFTPage() {
   const eligibleAssetsCount = useMemo(() => getEligibleAssetsCount(sections), [sections]);
   const hiddenAssetsCount = (assetsQuery.data?.length ?? 0) - eligibleAssetsCount;
 
+  useEffect(() => {
+    const handleListPageReset = () => {
+      resetListPageState({
+        setAuctionDuration,
+        setListingType,
+        setPrice,
+        setSelectedAsset,
+        setSubmitted,
+        setSubmissionError,
+      });
+    };
+
+    window.addEventListener(LIST_PAGE_RESET_EVENT, handleListPageReset);
+
+    return () => {
+      window.removeEventListener(LIST_PAGE_RESET_EVENT, handleListPageReset);
+    };
+  }, [setAuctionDuration, setListingType, setPrice, setSelectedAsset, setSubmitted, setSubmissionError]);
+
   const handleSelectAsset = (card: ListPageAssetCardModel) => {
     setSelectedAsset(card.asset);
     setPrice("");
@@ -104,11 +150,14 @@ export default function ListNFTPage() {
   };
 
   const handleResetSelection = () => {
-    setSelectedAsset(null);
-    setPrice("");
-    setSubmissionError("");
-    setSubmitted(false);
-    setListingType("fixed");
+    resetListPageState({
+      setAuctionDuration,
+      setListingType,
+      setPrice,
+      setSelectedAsset,
+      setSubmitted,
+      setSubmissionError,
+    });
   };
 
   const handleSubmit = async () => {

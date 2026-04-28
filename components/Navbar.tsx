@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { MouseEvent } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { MenuIcon } from "lucide-react";
 import { hasAdminAccess } from "@/lib/data";
+import { dispatchListPageReset } from "@/lib/list-page-reset";
 import {
   Sheet,
   SheetContent,
@@ -29,6 +32,7 @@ const navigationLinks = [
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
   const { publicKey, connected } = useWallet();
   const isAdmin = connected && hasAdminAccess(publicKey?.toBase58());
   const visibleNavigationLinks = navigationLinks.filter(
@@ -42,6 +46,24 @@ export default function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleNavigationClick = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+
+    if (
+      pathname === "/list" &&
+      href === "/list" &&
+      event.button === 0 &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      dispatchListPageReset();
+    }
+  };
 
   return (
     <nav
@@ -69,6 +91,7 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 className="text-sm text-gray-400 transition-colors duration-200 hover:text-white"
+                onClick={handleNavigationClick(link.href)}
               >
                 {link.label}
               </Link>
@@ -109,7 +132,7 @@ export default function Navbar() {
                     key={link.href}
                     href={link.href}
                     className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white transition-colors duration-200 hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={handleNavigationClick(link.href)}
                   >
                     {link.label}
                   </Link>
