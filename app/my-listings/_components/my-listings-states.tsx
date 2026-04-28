@@ -106,9 +106,9 @@ export function MyListingsArtifacteSectionEmptyState() {
           <PackageSearch className="size-9" />
         </div>
         <div className="space-y-2">
-          <h3 className="font-serif text-2xl text-white">No active Artifacte listings</h3>
+          <h3 className="font-serif text-2xl text-white">No active Artifacte collection listings</h3>
           <p className="max-w-md text-sm text-white/55">
-            Active Artifacte listings for this wallet will appear here, including NFTs currently held in marketplace escrow.
+            Active listings from the Artifacte collection for this wallet will appear here, including NFTs currently held in marketplace escrow.
           </p>
         </div>
       </CardContent>
