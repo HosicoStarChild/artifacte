@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
+use anchor_lang::solana_program::program_error::ProgramError;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, CloseAccount};
 use anchor_spl::token_interface::{
     Mint as IfaceMint,
@@ -130,6 +131,35 @@ const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 // Artifacte v2 (Metaplex Core) constants
 const OWNER_WALLET: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
+
+fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
+    matches!(
+        error,
+        ProgramError::Custom(code)
+            if *code == mpl_core::errors::MplCoreError::PluginNotFound as u32
+                || *code == mpl_core::errors::MplCoreError::PluginsNotInitialized as u32
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_missing_mpl_core_plugin_error;
+    use anchor_lang::solana_program::program_error::ProgramError;
+
+    #[test]
+    fn identifies_only_missing_mpl_core_plugin_errors() {
+        assert!(is_missing_mpl_core_plugin_error(&ProgramError::Custom(
+            mpl_core::errors::MplCoreError::PluginNotFound as u32,
+        )));
+        assert!(is_missing_mpl_core_plugin_error(&ProgramError::Custom(
+            mpl_core::errors::MplCoreError::PluginsNotInitialized as u32,
+        )));
+        assert!(!is_missing_mpl_core_plugin_error(&ProgramError::Custom(
+            mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
+        )));
+        assert!(!is_missing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
+    }
+}
 
 /// Perform a Token-2022 transfer_checked CPI that properly supports transfer hooks.
 /// remaining_accounts must include the hook-related accounts (extra_metas, approve_account, hook_program).
@@ -1347,33 +1377,28 @@ pub mod auction {
         listing.created_at = clock.unix_timestamp;
         listing.bump = ctx.bumps.core_listing;
 
-        let transfer_delegate_exists = mpl_core::fetch_plugin::<
-            mpl_core::accounts::BaseAssetV1,
-            mpl_core::types::Plugin,
-        >(
-            &ctx.accounts.asset.to_account_info(),
-            mpl_core::types::PluginType::TransferDelegate,
-        )
-        .is_ok();
-
-        if transfer_delegate_exists {
-            mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
-                __program: &ctx.accounts.mpl_core_program.to_account_info(),
-                asset: &ctx.accounts.asset.to_account_info(),
-                collection: Some(&ctx.accounts.collection.to_account_info()),
-                payer: &ctx.accounts.seller.to_account_info(),
-                authority: Some(&ctx.accounts.seller.to_account_info()),
-                system_program: &ctx.accounts.system_program.to_account_info(),
-                log_wrapper: None,
-                __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
-                    plugin_type: mpl_core::types::PluginType::TransferDelegate,
-                    new_authority: mpl_core::types::PluginAuthority::Address {
-                        address: ctx.accounts.core_authority.key(),
-                    },
+        let approve_transfer_delegate = mpl_core::instructions::ApprovePluginAuthorityV1Cpi {
+            __program: &ctx.accounts.mpl_core_program.to_account_info(),
+            asset: &ctx.accounts.asset.to_account_info(),
+            collection: Some(&ctx.accounts.collection.to_account_info()),
+            payer: &ctx.accounts.seller.to_account_info(),
+            authority: Some(&ctx.accounts.seller.to_account_info()),
+            system_program: &ctx.accounts.system_program.to_account_info(),
+            log_wrapper: None,
+            __args: mpl_core::instructions::ApprovePluginAuthorityV1InstructionArgs {
+                plugin_type: mpl_core::types::PluginType::TransferDelegate,
+                new_authority: mpl_core::types::PluginAuthority::Address {
+                    address: ctx.accounts.core_authority.key(),
                 },
+            },
+        }
+        .invoke();
+
+        if let Err(error) = approve_transfer_delegate {
+            if !is_missing_mpl_core_plugin_error(&error) {
+                return Err(error.into());
             }
-            .invoke()?;
-        } else {
+
             mpl_core::instructions::AddPluginV1Cpi {
                 __program: &ctx.accounts.mpl_core_program.to_account_info(),
                 asset: &ctx.accounts.asset.to_account_info(),

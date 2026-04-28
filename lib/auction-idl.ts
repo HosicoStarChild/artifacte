@@ -492,7 +492,7 @@ export type Auction = {
       "name": "cancel_core_listing",
       "docs": [
         "Cancel a Core listing (owner only). Revokes the TransferDelegate authority",
-        "by removing the plugin, and closes the CoreListing PDA."
+        "and closes the CoreListing PDA."
       ],
       "discriminator": [
         58,
@@ -2885,7 +2885,7 @@ export const IDL: Auction = {
       "name": "cancel_core_listing",
       "docs": [
         "Cancel a Core listing (owner only). Revokes the TransferDelegate authority",
-        "by removing the plugin, and closes the CoreListing PDA."
+        "and closes the CoreListing PDA."
       ],
       "discriminator": [
         58,
