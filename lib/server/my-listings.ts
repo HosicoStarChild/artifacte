@@ -11,6 +11,7 @@ import type {
   MyListingStatus,
 } from "@/lib/my-listings";
 import type { AllowlistEntry } from "@/lib/allowlist";
+import * as anchor from "@coral-xyz/anchor";
 import { address } from "@solana/kit";
 import { PublicKey } from "@solana/web3.js";
 import { readFile } from "fs/promises";
@@ -146,6 +147,9 @@ const sourcePriority: Record<MyListingSource, number> = {
   artifacte: 1,
   tensor: 2,
 };
+
+const bs58Encode = (data: Buffer | Uint8Array): string =>
+  anchor.utils.bytes.bs58.encode(data instanceof Buffer ? data : Buffer.from(data));
 
 function ensureHeliusRpc(): string {
   const rpcUrl = buildHeliusRpcUrl();
@@ -647,7 +651,7 @@ async function fetchCoreListingsForWallet(
     },
     {
       memcmp: {
-        bytes: new PublicKey(Buffer.from(CORE_LISTING_ACCOUNT_DISCRIMINATOR)).toBase58(),
+        bytes: bs58Encode(Buffer.from(CORE_LISTING_ACCOUNT_DISCRIMINATOR)),
         offset: 0,
       },
     },
