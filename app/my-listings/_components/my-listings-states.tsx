@@ -97,3 +97,21 @@ export function MyListingsEmptyState({ activeTab }: MyListingsEmptyStateProps) {
     </Card>
   );
 }
+
+export function MyListingsArtifacteSectionEmptyState() {
+  return (
+    <Card className="border-white/5 bg-dark-800/80 py-0">
+      <CardContent className="flex flex-col items-center gap-4 px-6 py-14 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-dark-900 text-white/40">
+          <PackageSearch className="size-9" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="font-serif text-2xl text-white">No active Artifacte listings</h3>
+          <p className="max-w-md text-sm text-white/55">
+            Active Artifacte listings for this wallet will appear here, including NFTs currently held in marketplace escrow.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

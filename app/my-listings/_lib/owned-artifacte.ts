@@ -1,36 +1,12 @@
-import type { PortfolioSection as PortfolioSectionData } from "../../../lib/portfolio";
 import type { MyListingRecord } from "../../../lib/my-listings";
 
-const OWNED_LISTED_ARTIFACTE_TITLE = "Owned Listed Artifacte NFTs";
-const OWNED_LISTED_ARTIFACTE_DESCRIPTION = "Artifacte NFTs this wallet still holds and currently has listed for sale.";
+export const ARTIFACTE_LISTINGS_SECTION_TITLE = "Artifacte NFTs";
+export const ARTIFACTE_LISTINGS_SECTION_DESCRIPTION = "Active Artifacte listings created by this wallet, including NFTs currently held in marketplace escrow.";
 
-export function getActiveMyListingMintSet(
+export function getActiveArtifacteListings(
   listings: MyListingRecord[],
-): Set<string> {
-  return new Set(
-    listings
-      .filter((listing) => listing.status === "active")
-      .map((listing) => listing.nftMint),
+): MyListingRecord[] {
+  return listings.filter(
+    (listing) => listing.source === "artifacte" && listing.status === "active",
   );
-}
-
-export function filterOwnedArtifacteSection(
-  section: PortfolioSectionData | null,
-  activeListingMints: ReadonlySet<string>,
-): PortfolioSectionData | null {
-  if (!section || activeListingMints.size === 0) {
-    return null;
-  }
-
-  const filteredItems = section.items.filter((item) => activeListingMints.has(item.id));
-  if (filteredItems.length === 0) {
-    return null;
-  }
-
-  return {
-    ...section,
-    description: OWNED_LISTED_ARTIFACTE_DESCRIPTION,
-    items: filteredItems,
-    title: OWNED_LISTED_ARTIFACTE_TITLE,
-  };
 }

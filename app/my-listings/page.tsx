@@ -3,15 +3,14 @@
 import { startTransition, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { PortfolioSection } from "@/app/portfolio/_components/portfolio-section";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
-import type { PortfolioApiResponse, PortfolioPageData, PortfolioSection as PortfolioSectionData } from "@/lib/portfolio";
 import type { MyListingsPageData, MyListingRecord, MyListingStatus } from "@/lib/my-listings";
 
 import { MyListingCard } from "./_components/my-listing-card";
 import { MyListingsHeader } from "./_components/my-listings-header";
 import {
+  MyListingsArtifacteSectionEmptyState,
   MyListingsDisconnectedState,
   MyListingsEmptyState,
   MyListingsErrorState,
@@ -25,8 +24,9 @@ import {
   updateCachedListingStatus,
 } from "./_lib/client";
 import {
-  filterOwnedArtifacteSection,
-  getActiveMyListingMintSet,
+  ARTIFACTE_LISTINGS_SECTION_DESCRIPTION,
+  ARTIFACTE_LISTINGS_SECTION_TITLE,
+  getActiveArtifacteListings,
 } from "./_lib/owned-artifacte";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
@@ -36,20 +36,6 @@ const EMPTY_COUNTS: Record<MyListingStatus, number> = {
   cancelled: 0,
   completed: 0,
 };
-
-async function fetchOwnedArtifacteSection(walletAddress: string): Promise<PortfolioSectionData | null> {
-  const response = await fetch(
-    `/api/portfolio?wallet=${encodeURIComponent(walletAddress)}&fresh=1`,
-  );
-  const payload = (await response.json()) as PortfolioApiResponse;
-
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.ok ? "Failed to fetch owned Artifacte NFTs" : payload.error);
-  }
-
-  const artifacteSection = payload.sections.find((section) => section.id === "artifacte-rwa");
-  return artifacteSection ?? null;
-}
 
 export default function MyListingsPage() {
   const {
@@ -74,13 +60,6 @@ export default function MyListingsPage() {
     staleTime: 30_000,
   });
 
-  const ownedArtifacteQuery = useQuery<PortfolioSectionData | null, Error>({
-    enabled: Boolean(connected && walletAddress),
-    queryFn: () => fetchOwnedArtifacteSection(walletAddress ?? ""),
-    queryKey: ["my-listings-owned-artifacte", walletAddress],
-    staleTime: 30_000,
-  });
-
   const listings = myListingsQuery.data?.listings ?? EMPTY_LISTINGS;
   const counts = useMemo<Record<MyListingStatus, number>>(() => {
     if (!listings.length) {
@@ -100,13 +79,9 @@ export default function MyListingsPage() {
     () => listings.filter((listing) => listing.status === activeTab),
     [activeTab, listings],
   );
-  const activeListingMints = useMemo(
-    () => getActiveMyListingMintSet(listings),
+  const activeArtifacteListings = useMemo(
+    () => getActiveArtifacteListings(listings),
     [listings],
-  );
-  const ownedListedArtifacteSection = useMemo(
-    () => filterOwnedArtifacteSection(ownedArtifacteQuery.data ?? null, activeListingMints),
-    [activeListingMints, ownedArtifacteQuery.data],
   );
 
   const walletLabel = walletAddress
@@ -115,10 +90,7 @@ export default function MyListingsPage() {
 
   const handleRefresh = async (): Promise<void> => {
     setActionError(null);
-    await Promise.all([
-      myListingsQuery.refetch(),
-      ownedArtifacteQuery.refetch(),
-    ]);
+    await myListingsQuery.refetch();
   };
 
   const handleListingAction = async (listing: MyListingRecord): Promise<void> => {
@@ -161,9 +133,9 @@ export default function MyListingsPage() {
       <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <div className="space-y-8">
           <MyListingsHeader
-            isRefreshing={myListingsQuery.isFetching || ownedArtifacteQuery.isFetching}
+            isRefreshing={myListingsQuery.isFetching}
             onRefresh={connected && walletAddress ? () => { void handleRefresh(); } : undefined}
-            refreshDisabled={myListingsQuery.isFetching || ownedArtifacteQuery.isFetching}
+            refreshDisabled={myListingsQuery.isFetching}
             walletLabel={walletLabel}
           />
 
@@ -207,9 +179,29 @@ export default function MyListingsPage() {
                 </div>
               )}
 
-              {ownedListedArtifacteSection?.items.length ? (
-                <PortfolioSection section={ownedListedArtifacteSection} />
-              ) : null}
+              <section className="space-y-6">
+                <div className="space-y-2">
+                  <h2 className="font-serif text-2xl text-white">{ARTIFACTE_LISTINGS_SECTION_TITLE}</h2>
+                  <p className="max-w-3xl text-sm text-white/55">
+                    {ARTIFACTE_LISTINGS_SECTION_DESCRIPTION}
+                  </p>
+                </div>
+
+                {activeArtifacteListings.length === 0 ? (
+                  <MyListingsArtifacteSectionEmptyState />
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {activeArtifacteListings.map((listing) => (
+                      <MyListingCard
+                        isPending={pendingMint === listing.nftMint}
+                        key={`artifacte-section-${listing.id}`}
+                        listing={listing}
+                        onAction={(nextListing) => { void handleListingAction(nextListing); }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
         </div>

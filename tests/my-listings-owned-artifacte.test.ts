@@ -1,41 +1,16 @@
 import assert from "node:assert";
 
 import {
-  filterOwnedArtifacteSection,
-  getActiveMyListingMintSet,
+  ARTIFACTE_LISTINGS_SECTION_DESCRIPTION,
+  ARTIFACTE_LISTINGS_SECTION_TITLE,
+  getActiveArtifacteListings,
 } from "../app/my-listings/_lib/owned-artifacte.ts";
-import type { PortfolioAssetCard, PortfolioSection } from "../lib/portfolio.ts";
-import type { MyListingRecord, MyListingStatus } from "../lib/my-listings.ts";
-
-function createAssetCard(id: string): PortfolioAssetCard {
-  return {
-    aspectRatio: "square",
-    badgeAccent: "gold",
-    badgeLabel: "Artifacte Verified",
-    href: `/auctions/cards/${id}`,
-    id,
-    imageFit: "cover",
-    imageSrc: "https://example.com/card.png",
-    marketValue: 55,
-    marketValueCurrency: "USD",
-    name: `Card ${id}`,
-    sectionId: "artifacte-rwa",
-  };
-}
-
-function createSection(ids: string[]): PortfolioSection {
-  return {
-    accent: "gold",
-    description: "Artifacte-minted RWAs priced from oracle and marketplace data.",
-    id: "artifacte-rwa",
-    items: ids.map(createAssetCard),
-    title: "Artifacte RWA",
-  };
-}
+import type { MyListingRecord, MyListingSource, MyListingStatus } from "../lib/my-listings.ts";
 
 function createListing(
   nftMint: string,
   status: MyListingStatus = "active",
+  source: MyListingSource = "artifacte",
 ): MyListingRecord {
   return {
     currency: "USDC",
@@ -51,42 +26,36 @@ function createListing(
     nftMint,
     price: 55,
     royaltyBasisPoints: 0,
-    source: "artifacte",
+    source,
     status,
   };
 }
 
-describe("filterOwnedArtifacteSection", () => {
-  it("keeps only owned assets that are still actively listed", () => {
-    const activeListingMints = getActiveMyListingMintSet([
+describe("getActiveArtifacteListings", () => {
+  it("keeps only active Artifacte listings for the wallet", () => {
+    const listings = getActiveArtifacteListings([
       createListing("mint-active", "active"),
       createListing("mint-cancelled", "cancelled"),
       createListing("mint-completed", "completed"),
+      createListing("mint-core", "active", "artifacte-core"),
+      createListing("mint-tensor", "active", "tensor"),
     ]);
 
-    const filteredSection = filterOwnedArtifacteSection(
-      createSection(["mint-active", "mint-cancelled", "mint-unlisted"]),
-      activeListingMints,
-    );
-
-    assert.ok(filteredSection);
-    assert.deepEqual(filteredSection?.items.map((item) => item.id), ["mint-active"]);
-    assert.equal(filteredSection?.title, "Owned Listed Artifacte NFTs");
+    assert.deepEqual(listings.map((listing) => listing.nftMint), ["mint-active"]);
+    assert.equal(ARTIFACTE_LISTINGS_SECTION_TITLE, "Artifacte NFTs");
     assert.equal(
-      filteredSection?.description,
-      "Artifacte NFTs this wallet still holds and currently has listed for sale.",
+      ARTIFACTE_LISTINGS_SECTION_DESCRIPTION,
+      "Active Artifacte listings created by this wallet, including NFTs currently held in marketplace escrow.",
     );
   });
 
-  it("returns null when the wallet does not own any actively listed Artifacte NFTs", () => {
-    const filteredSection = filterOwnedArtifacteSection(
-      createSection(["mint-unlisted", "mint-cancelled"]),
-      getActiveMyListingMintSet([
-        createListing("mint-cancelled", "cancelled"),
-        createListing("mint-completed", "completed"),
-      ]),
-    );
+  it("returns an empty list when the wallet has no active Artifacte listings", () => {
+    const listings = getActiveArtifacteListings([
+      createListing("mint-cancelled", "cancelled"),
+      createListing("mint-completed", "completed"),
+      createListing("mint-core", "active", "artifacte-core"),
+    ]);
 
-    assert.equal(filteredSection, null);
+    assert.deepEqual(listings, []);
   });
 });
