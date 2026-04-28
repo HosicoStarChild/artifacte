@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { WalletProviderWrapper } from "@/components/WalletProvider";
 import Navbar from "@/components/Navbar";
@@ -58,6 +59,23 @@ export const metadata: Metadata = {
   keywords: ["Solana", "NFT", "trading cards", "PSA", "CGC", "graded cards", "RWA", "tokenization", "collectibles", "Pokemon cards", "sports cards"],
 };
 
+function NavbarFallback() {
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-dark-900/20 backdrop-blur-md">
+      <div className="mx-auto flex h-20 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gold-500">
+            <span className="font-serif text-sm font-semibold text-dark-900">A</span>
+          </div>
+          <span className="font-serif text-lg font-bold italic tracking-tight text-white">
+            Artifacte
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -66,7 +84,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="bg-background font-sans text-foreground antialiased">
         <WalletProviderWrapper>
-          <Navbar />
+          <Suspense fallback={<NavbarFallback />}>
+            <Navbar />
+          </Suspense>
           <main className="min-h-screen">{children}</main>
           <Footer />
           <ToastContainer />

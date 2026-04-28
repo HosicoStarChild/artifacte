@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PortfolioApiResponse } from "@/lib/portfolio";
 import { getPortfolioPageData, validatePortfolioWallet } from "@/lib/server/portfolio";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 function isPrerenderInterruption(error: Error & { digest?: string }): boolean {
   return (
     error.digest === "NEXT_PRERENDER_INTERRUPTED" ||
