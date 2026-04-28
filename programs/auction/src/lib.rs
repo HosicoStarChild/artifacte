@@ -2510,17 +2510,25 @@ enum CoreTransferDelegateState {
 }
 
 fn read_core_transfer_delegate_state(asset_account: &AccountInfo) -> Result<CoreTransferDelegateState> {
-    let data = asset_account.try_borrow_data()?;
-    let asset = mpl_core::Asset::from_bytes(&data)
-        .map_err(|_error| error!(AuctionError::InvalidCorePluginState))?;
-
-    let transfer_delegate = match asset.plugin_list.transfer_delegate {
-        Some(plugin) => plugin,
-        None => return Ok(CoreTransferDelegateState::Missing),
+    use mpl_core::{
+        fetch_asset_plugin,
+        types::{PluginAuthority, PluginType, TransferDelegate},
     };
 
-    match transfer_delegate.base.authority.address {
-        Some(address) => Ok(CoreTransferDelegateState::Address(address)),
-        None => Ok(CoreTransferDelegateState::Other),
+    match fetch_asset_plugin::<TransferDelegate>(asset_account, PluginType::TransferDelegate) {
+        Ok((PluginAuthority::Address { address }, _plugin, _offset)) => {
+            Ok(CoreTransferDelegateState::Address(address))
+        }
+        Ok((_authority, _plugin, _offset)) => Ok(CoreTransferDelegateState::Other),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::Other
+                && (error.to_string()
+                    == mpl_core::errors::MplCoreError::PluginNotFound.to_string()
+                    || error.to_string()
+                        == mpl_core::errors::MplCoreError::PluginsNotInitialized.to_string()) =>
+        {
+            Ok(CoreTransferDelegateState::Missing)
+        }
+        Err(_error) => Err(error!(AuctionError::InvalidCorePluginState)),
     }
 }
