@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { PortfolioApiResponse, PortfolioPageData } from "@/lib/portfolio";
+import type { PortfolioApiResponse } from "@/lib/portfolio";
 import { getPortfolioPageData, validatePortfolioWallet } from "@/lib/server/portfolio";
 
-const portfolioCache = new Map<
-  string,
-  { data: PortfolioPageData; timestamp: number }
->();
-
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function isPrerenderInterruption(error: Error & { digest?: string }): boolean {
   return (
@@ -22,7 +18,6 @@ export async function GET(
   try {
     const searchParams = req.nextUrl.searchParams;
     const wallet = searchParams.get("wallet");
-    const bypassCache = searchParams.get("fresh") === "1";
 
     if (!wallet) {
       return NextResponse.json(
@@ -42,31 +37,12 @@ export async function GET(
       );
     }
 
-    // Check cache
-    const cached = portfolioCache.get(validatedWallet);
-    if (!bypassCache && cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return NextResponse.json(cached.data, {
-        headers: {
-          "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
-          "X-Cache": "HIT",
-        },
-      });
-    }
-
     const portfolioData = await getPortfolioPageData(validatedWallet);
-
-    // Store in cache
-    portfolioCache.set(validatedWallet, {
-      data: portfolioData,
-      timestamp: Date.now(),
-    });
 
     return NextResponse.json(portfolioData, {
       headers: {
-        "Cache-Control": bypassCache
-          ? "private, no-store"
-          : "public, max-age=300, stale-while-revalidate=60",
-        "X-Cache": bypassCache ? "BYPASS" : "MISS",
+        "Cache-Control": "private, no-store",
+        "X-Cache": "LIVE",
       },
     });
   } catch (error) {

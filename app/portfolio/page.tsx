@@ -17,7 +17,9 @@ import { PortfolioSection } from "./_components/portfolio-section";
 import { PortfolioSummary } from "./_components/portfolio-summary";
 
 async function fetchPortfolio(wallet: string): Promise<PortfolioPageData> {
-  const response = await fetch(`/api/portfolio?wallet=${encodeURIComponent(wallet)}`);
+  const response = await fetch(`/api/portfolio?wallet=${encodeURIComponent(wallet)}`, {
+    cache: "no-store",
+  });
   const payload = (await response.json()) as PortfolioApiResponse;
 
   if (!response.ok || !payload.ok) {
@@ -123,10 +125,13 @@ export default function PortfolioPage() {
     queryKey: ["portfolio", walletAddress],
     queryFn: () => fetchPortfolio(walletAddress ?? ""),
     enabled: Boolean(walletAddress && connected),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
   });
 
-  const handleRetry = async (): Promise<void> => {
+  const handleRefresh = async (): Promise<void> => {
     await portfolioQuery.refetch();
   };
 
@@ -143,12 +148,28 @@ export default function PortfolioPage() {
             <ArrowLeft className="mr-2 size-4" />
             Back to Home
           </Link>
-          <div className="space-y-2">
-            <Badge className="border-gold-500/30 bg-gold-500/10 text-[10px] font-semibold tracking-[0.24em] uppercase text-gold-300">
-              Investor Profile
-            </Badge>
-            <h1 className="font-serif text-3xl text-white">My Portfolio</h1>
-            <p className="text-sm text-white/55">{walletLabel}</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-2">
+              <Badge className="border-gold-500/30 bg-gold-500/10 text-[10px] font-semibold tracking-[0.24em] uppercase text-gold-300">
+                Investor Profile
+              </Badge>
+              <h1 className="font-serif text-3xl text-white">My Portfolio</h1>
+              <p className="text-sm text-white/55">{walletLabel}</p>
+            </div>
+            {connected && walletAddress ? (
+              <Button
+                className="self-start sm:self-auto"
+                disabled={portfolioQuery.isFetching}
+                onClick={() => {
+                  void handleRefresh();
+                }}
+                size="sm"
+                variant="secondary"
+              >
+                <RefreshCcw className={cn("mr-2 size-4", portfolioQuery.isFetching && "animate-spin")} />
+                {portfolioQuery.isFetching ? "Refreshing..." : "Refresh portfolio"}
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -157,7 +178,7 @@ export default function PortfolioPage() {
         ) : portfolioQuery.isPending ? (
           <PortfolioLoadingState />
         ) : portfolioQuery.isError ? (
-          <PortfolioErrorState errorMessage={portfolioQuery.error.message} onRetry={handleRetry} />
+          <PortfolioErrorState errorMessage={portfolioQuery.error.message} onRetry={handleRefresh} />
         ) : !portfolioData || portfolioData.sections.length === 0 ? (
           <PortfolioEmptyState />
         ) : (
