@@ -3,6 +3,13 @@ import { cacheLife, cacheTag } from "next/cache";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
 const ORACLE_API = getOracleApiUrl();
+const HOME_LISTINGS_CACHE_TAG = "home-listings";
+const HOME_SPIRITS_CACHE_TAG = "home-spirits";
+const HOME_SPIRITS_CACHE_PROFILE = {
+  stale: 60,
+  revalidate: 60,
+  expire: 300,
+};
 
 export type HomeListing = {
   id?: string;
@@ -126,12 +133,9 @@ export function hasVisibleListingData(listing: HomeListing): boolean {
   return !isBaxusListing(listing) && hasDisplayableListingData(listing);
 }
 
-export function getVisibleHomeCategoryCards(showSpirits: boolean): HomeCategoryLink[] {
-  if (showSpirits) {
-    return [...homeCategoryCards];
-  }
-
-  return homeCategoryCards.filter((card) => card.slug !== "spirits");
+export function getVisibleHomeCategoryCards(_showSpirits?: boolean): HomeCategoryLink[] {
+  // Keep the Spirits entry visible even if the carousel cache temporarily goes empty.
+  return [...homeCategoryCards];
 }
 
 export function getHomeHeroCta(listing: HomeListing): {
@@ -178,8 +182,9 @@ async function fetchHomeListings(query: string): Promise<HomeListing[]> {
 export async function getSpiritsCarousel(): Promise<HomeListing[]> {
   "use cache";
 
-  cacheLife("hours");
-  cacheTag("home-listings");
+  cacheLife(HOME_SPIRITS_CACHE_PROFILE);
+  cacheTag(HOME_LISTINGS_CACHE_TAG);
+  cacheTag(HOME_SPIRITS_CACHE_TAG);
 
   try {
     const listings = await fetchHomeListings("category=SPIRITS&perPage=12&sort=price-desc");
@@ -193,7 +198,7 @@ export async function getFeaturedListing(): Promise<HomeListing | null> {
   "use cache";
 
   cacheLife("hours");
-  cacheTag("home-listings");
+  cacheTag(HOME_LISTINGS_CACHE_TAG);
 
   try {
     const now = new Date();

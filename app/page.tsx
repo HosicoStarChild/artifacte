@@ -15,7 +15,7 @@ const PROJECT_DESCRIPTION =
 export default async function Home() {
   const spiritsCarousel = await getSpiritsCarousel();
   const showSpirits = spiritsCarousel.length > 0;
-  const visibleCategoryCards = getVisibleHomeCategoryCards(showSpirits);
+  const visibleCategoryCards = getVisibleHomeCategoryCards();
 
   return (
     <div>
