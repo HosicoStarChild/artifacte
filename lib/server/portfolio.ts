@@ -217,6 +217,28 @@ function getAssetImageSrc(asset: HeliusAsset): string | null {
   return resolveHeliusAssetImageSrc(asset);
 }
 
+function getNonEmptyString(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function isPortfolioHeldAsset(asset: HeliusAsset, wallet: string): boolean {
+  if (asset.burnt) {
+    return false;
+  }
+
+  if (asset.interface === "FungibleToken" || asset.interface === "FungibleAsset") {
+    return false;
+  }
+
+  const currentOwner = getNonEmptyString(asset.ownership?.owner);
+  return !currentOwner || currentOwner === wallet;
+}
+
 function hasMatchingAddress(asset: HeliusAsset, targetAddress: string): boolean {
   return (
     asset.authorities?.some((authority) => authority.address === targetAddress) ||
@@ -756,8 +778,7 @@ function sumMarketValues(items: PortfolioAssetCard[]): number {
 }
 
 export function validatePortfolioWallet(wallet: string): string {
-  address(wallet);
-  return wallet;
+  return `${address(wallet)}`;
 }
 
 export async function getPortfolioPageData(wallet: string): Promise<PortfolioPageData> {
@@ -775,7 +796,9 @@ export async function getPortfolioPageData(wallet: string): Promise<PortfolioPag
   const floorPriceSnapshot = floorPriceResult.status === "fulfilled"
     ? floorPriceResult.value
     : { floors: {}, collections: {}, timestamp: Date.now() };
-  const heliusAssets = heliusResult.status === "fulfilled" ? heliusResult.value : [];
+  const heliusAssets = heliusResult.status === "fulfilled"
+    ? heliusResult.value.filter((asset) => isPortfolioHeldAsset(asset, validatedWallet))
+    : [];
 
   if (
     collectorCryptResult.status === "rejected" &&

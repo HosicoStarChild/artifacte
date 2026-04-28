@@ -153,14 +153,21 @@ export interface HeliusAssetCreator {
   address?: string;
 }
 
+export interface HeliusAssetOwnership {
+  owner?: string;
+}
+
 export interface HeliusAsset {
+  burnt?: boolean;
   id: string;
   content?: HeliusAssetContent;
   grouping?: HeliusAssetGrouping[];
+  interface?: string;
   authorities?: HeliusAssetAuthority[];
   creators?: HeliusAssetCreator[];
   image?: string;
   name?: string;
+  ownership?: HeliusAssetOwnership;
 }
 
 export interface HeliusAssetsByOwnerResponse {
