@@ -44,6 +44,39 @@ type ListPageStateSetters = {
   setSubmissionError: Dispatch<SetStateAction<string>>;
 };
 
+type ListingNotifyResponse = {
+  added?: boolean;
+  error?: string;
+  message?: string;
+  ok?: boolean;
+  reason?: string;
+  skipped?: boolean;
+};
+
+async function notifyOracleListing(mintAddress: string): Promise<void> {
+  const response = await fetch("/api/listing-notify", {
+    body: JSON.stringify({ mint: mintAddress }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  const payload = (await response.json().catch(() => null)) as ListingNotifyResponse | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? "Failed to notify oracle.");
+  }
+
+  if (payload?.skipped) {
+    throw new Error(payload.error ?? "Oracle sync is disabled on this deployment.");
+  }
+
+  if (payload?.added === false && payload.reason !== "already exists") {
+    throw new Error(payload.reason ?? "Oracle listing push did not add the mint.");
+  }
+}
+
 function resetListPageState({
   setAuctionDuration,
   setListingType,
@@ -157,19 +190,27 @@ export default function ListNFTPage() {
         signTransaction,
       });
 
+      let notifyWarning: string | null = null;
+
+      if (result.shouldNotifyOracle && result.oracleNotifyDelayMs === 0) {
+        try {
+          await notifyOracleListing(result.mintAddress);
+        } catch (error) {
+          notifyWarning = error instanceof Error ? error.message : "Failed to notify oracle.";
+        }
+      }
+
       showToast.success("NFT listed successfully!");
       setSubmitted(true);
       void assetsQuery.refetch();
 
-      if (result.shouldNotifyOracle) {
+      if (notifyWarning) {
+        showToast.info(`${notifyWarning} The listing is live on-chain, but category feeds may take a moment to refresh.`);
+      }
+
+      if (result.shouldNotifyOracle && result.oracleNotifyDelayMs > 0) {
         window.setTimeout(() => {
-          fetch("/api/listing-notify", {
-            body: JSON.stringify({ mint: result.mintAddress }),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            method: "POST",
-          }).catch(() => undefined);
+          notifyOracleListing(result.mintAddress).catch(() => undefined);
         }, result.oracleNotifyDelayMs);
       }
     } catch (error) {

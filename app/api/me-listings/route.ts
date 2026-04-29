@@ -7,7 +7,6 @@ import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 const ORACLE_API = getOracleApiUrl();
 const REQUEST_TIMEOUT_MS = 12000;
-const ARTIFACTE_MINT_CACHE_TTL = 30_000;
 const ARTIFACTE_FILTER_REFILL_PAGES = 2;
 
 export const maxDuration = 30;
@@ -55,8 +54,6 @@ const FORWARDED_QUERY_KEYS = [
   'source',
 ] as const;
 
-let activeArtifacteListingsCache: { ts: number; value: ArtifacteProgramListing[] } | null = null;
-
 function getOracleRequestErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
@@ -93,6 +90,10 @@ function shouldFilterArtifacteRows(category: string | null): boolean {
   return category === 'TCG_CARDS' && Boolean(process.env.HELIUS_API_KEY);
 }
 
+function shouldServeFreshArtifacteListings(category: string | null, source: string | null): boolean {
+  return category === 'TCG_CARDS' && (!source || source === 'artifacte');
+}
+
 function shouldFilterBaxusRows(category: string | null): boolean {
   return category !== 'SPIRITS';
 }
@@ -117,16 +118,6 @@ function getOracleListingMint(listing: OracleListing): string | null {
   if (typeof listing.nftAddress === 'string' && listing.nftAddress) return listing.nftAddress;
   if (typeof listing.id === 'string' && listing.id) return listing.id;
   return null;
-}
-
-async function getCachedActiveArtifacteListings(): Promise<ArtifacteProgramListing[]> {
-  if (activeArtifacteListingsCache && Date.now() - activeArtifacteListingsCache.ts < ARTIFACTE_MINT_CACHE_TTL) {
-    return activeArtifacteListingsCache.value;
-  }
-
-  const value = await loadActiveArtifacteFixedPriceListings();
-  activeArtifacteListingsCache = { ts: Date.now(), value };
-  return value;
 }
 
 function mergeArtifacteListingSnapshots(
@@ -302,6 +293,7 @@ async function refillArtifacteFilteredPage(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category');
+  const source = searchParams.get('source');
   const requestedPage = parsePositiveInt(searchParams.get('page'), 1);
   const requestedPerPage = Math.min(100, Math.max(1, parsePositiveInt(searchParams.get('perPage'), 24)));
   const params = new URLSearchParams();
@@ -322,7 +314,7 @@ export async function GET(request: Request) {
 
     if (shouldFilterArtifacteRows(category) && listings.some(isArtifacteOracleListing)) {
       try {
-        const activeArtifacteListings = await getCachedActiveArtifacteListings();
+        const activeArtifacteListings = await loadActiveArtifacteFixedPriceListings();
         const activeArtifacteMints = new Set(activeArtifacteListings.map((listing) => listing.nftAddress));
         const refillResult = await refillArtifacteFilteredPage(
           params,
@@ -363,7 +355,12 @@ export async function GET(request: Request) {
     };
 
     const response = NextResponse.json(responsePayload);
-    response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    response.headers.set(
+      'Cache-Control',
+      shouldServeFreshArtifacteListings(category, source)
+        ? 'no-store'
+        : 'public, s-maxage=10, stale-while-revalidate=30'
+    );
     return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

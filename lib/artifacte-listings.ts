@@ -71,6 +71,10 @@ export interface ArtifacteProgramListing {
 
 let listingsCache: { ts: number; listings: ArtifacteProgramListing[] } | null = null;
 
+export function invalidateActiveArtifacteFixedPriceListingsCache(): void {
+  listingsCache = null;
+}
+
 function normalizeConfiguredUrl(value?: string | null): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
