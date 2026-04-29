@@ -19,9 +19,9 @@ import { MyListingsTabs } from "./_components/my-listings-tabs";
 import {
   executeMyListingAction,
   fetchMyListings,
-  getMyListingsQueryKey,
   updateCachedListingStatus,
 } from "./_lib/client";
+import { getMyListingsQueryKey } from "./_lib/query-key";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
 
@@ -51,7 +51,10 @@ export default function MyListingsPage() {
     enabled: Boolean(connected && walletAddress),
     queryFn: () => fetchMyListings(walletAddress ?? ""),
     queryKey: getMyListingsQueryKey(walletAddress),
-    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const listings = myListingsQuery.data?.listings ?? EMPTY_LISTINGS;

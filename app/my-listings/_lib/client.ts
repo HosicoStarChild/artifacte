@@ -19,6 +19,8 @@ import {
 } from "@/lib/my-listings";
 import { AuctionProgram } from "@/lib/auction-program";
 
+import { getMyListingsQueryKey } from "./query-key";
+
 const RPC_PROXY_PATH = "/api/rpc";
 const myListingsRpc = createSolanaRpc(RPC_PROXY_PATH);
 
@@ -51,13 +53,12 @@ export interface MyListingActionContext {
   walletAddress: string;
 }
 
-export function getMyListingsQueryKey(walletAddress: string | null) {
-  return ["my-listings", walletAddress] as const;
-}
-
 export async function fetchMyListings(walletAddress: string): Promise<MyListingsPageData> {
   const response = await fetch(
     `/api/my-listings?wallet=${encodeURIComponent(walletAddress)}`,
+    {
+      cache: "no-store",
+    },
   );
   const payload = (await response.json()) as MyListingsApiResponse;
 

@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getRpcFetchErrorStatus } from "@/app/api/_lib/list-route-utils";
-import type { MyListingsApiResponse, MyListingsPageData } from "@/lib/my-listings";
+import type { MyListingsApiResponse } from "@/lib/my-listings";
 import { getMyListingsPageData, validateMyListingsWallet } from "@/lib/server/my-listings";
-
-const routeCache = new Map<
-  string,
-  {
-    data: MyListingsPageData;
-    timestamp: number;
-  }
->();
-
-const CACHE_TTL_MS = 30_000;
 
 export async function GET(
   request: NextRequest,
@@ -43,42 +33,18 @@ export async function GET(
     );
   }
 
-  const cached = routeCache.get(validatedWallet);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json(cached.data, {
-      headers: {
-        "Cache-Control": "private, max-age=30, stale-while-revalidate=30",
-        "X-Cache": "HIT",
-      },
-    });
-  }
-
   try {
     const data = await getMyListingsPageData(validatedWallet);
-    routeCache.set(validatedWallet, {
-      data,
-      timestamp: Date.now(),
-    });
 
     return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "private, max-age=30, stale-while-revalidate=30",
-        "X-Cache": "MISS",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {
     const message = error instanceof Error
       ? error.message
       : "Failed to fetch my listings";
-
-    if (cached) {
-      return NextResponse.json(cached.data, {
-        headers: {
-          "Cache-Control": "private, max-age=0, stale-while-revalidate=30",
-          "X-Cache": "STALE",
-        },
-      });
-    }
 
     console.error("My listings API error:", error);
 
@@ -87,7 +53,12 @@ export async function GET(
         error: message,
         ok: false,
       },
-      { status: getRpcFetchErrorStatus(error) },
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+        },
+        status: getRpcFetchErrorStatus(error),
+      },
     );
   }
 }

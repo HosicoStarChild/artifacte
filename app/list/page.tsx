@@ -10,6 +10,7 @@ import { showToast } from "@/components/ToastContainer";
 import { buttonVariants } from "@/components/ui/button";
 import { useAllowlist } from "@/hooks/useAllowlist";
 import { LIST_PAGE_RESET_EVENT } from "@/lib/list-page-reset";
+import { getMyListingsQueryKey } from "@/app/my-listings/_lib/query-key";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import { cn } from "@/lib/utils";
 
@@ -218,6 +219,13 @@ export default function ListNFTPage() {
       }
 
       showToast.success("NFT listed successfully!");
+
+      if (walletAddress) {
+        await queryClient.invalidateQueries({
+          queryKey: getMyListingsQueryKey(walletAddress),
+        });
+      }
+
       setSubmitted(true);
       void refreshAvailableAssets(result.mintAddress).catch(() => {
         showToast.info("Your listing is live. Refreshing the available NFT inventory may take a moment.");
