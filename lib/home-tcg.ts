@@ -7,6 +7,8 @@ export type HomeTCGListing = {
   currency: string;
   verifiedBy: string;
   ccCategory: string;
+  collection?: string | null;
+  collectionAddress?: string | null;
   source?: string;
   marketplace?: string;
   buyKind?: string;

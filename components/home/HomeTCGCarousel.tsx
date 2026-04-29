@@ -92,6 +92,8 @@ export function HomeTCGCarousel({
               {items.map((listing) => {
                 const displayPrice = resolveListingDisplayPrice(listing);
                 const totalDisplayPrice = getExternalMarketplaceTotalPrice(displayPrice.amount, {
+                  collectionAddress: listing.collectionAddress,
+                  collectionName: listing.collection,
                   source: listing.source,
                 });
                 const primaryAmount =

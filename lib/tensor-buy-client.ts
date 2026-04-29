@@ -22,9 +22,9 @@ type WalletSendTransaction = (
 ) => Promise<string>;
 
 interface TensorBuyFeeContext {
-  collectionAddress?: string;
-  collectionName?: string;
-  source?: string;
+  collectionAddress?: string | null;
+  collectionName?: string | null;
+  source?: string | null;
 }
 
 interface TensorBuyBuildResponse {

@@ -98,6 +98,7 @@ export interface Listing {
   solPrice?: number | null;
   usdcPrice?: number | null;
   collection?: string | null;
+  collectionAddress?: string | null;
   owner?: string;
   seller?: string;
   isCore?: boolean;

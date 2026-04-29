@@ -186,6 +186,7 @@ export function CategoryListingsSection({
       <div className={`grid grid-cols-1 gap-8 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3 ${listingsFilterLoading ? "opacity-40" : "opacity-100"}`}>
         {fixedListings.map((listing, index) => {
           const payablePrice = resolveListingPayablePrice(listing, {
+            collectionAddress: listing.collectionAddress,
             collectionName: listing.collection,
           });
           const formattedAmount = payablePrice.currency === "SOL"

@@ -36,6 +36,7 @@ type HeliusAuthority = {
 };
 
 type HeliusGrouping = {
+  group_key?: string;
   group_value?: string;
 };
 
@@ -228,6 +229,18 @@ function hasGrouping(asset: HeliusAsset, address: string): boolean {
   return asset.grouping?.some((group) => group.group_value === address) || asset.collection === address;
 }
 
+function getAssetCollectionAddress(asset: HeliusAsset | null | undefined): string | null {
+  if (!asset) {
+    return null;
+  }
+
+  const collectionAddress = asset.grouping?.find(
+    (group) => group.group_key === "collection",
+  )?.group_value;
+
+  return collectionAddress || asset.collection || null;
+}
+
 function buildCardDetail(base: Partial<CardDetail> & Pick<CardDetail, "id" | "name">): CardDetail {
   const source = base.source || "collector-crypt";
   const category = base.category || "TCG_CARDS";
@@ -301,6 +314,7 @@ async function hydrateArtifacteCard(card: CardDetail, connection: Connection): P
 
   return {
     ...nextCard,
+    collectionAddress: nextCard.collectionAddress ?? getAssetCollectionAddress(liveAsset) ?? card.collectionAddress,
     isCore: normalizedAuctionListing?.program === "core" || liveArtifacteListing?.isCore || card.isCore,
     owner,
     seller: normalizedAuctionListing?.seller || liveArtifacteListing?.seller || nextCard.seller || "",
@@ -722,6 +736,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         category: "TCG_CARDS",
         ccCategory: getAttr("TCG"),
         collection: "Artifacte",
+        collectionAddress: getAssetCollectionAddress(asset),
         condition: getAttr("Condition") || null,
         currency: auctionListing?.currency || (tensorPrice?.usdcPrice ? "USDC" : "SOL"),
         grade: getAttr("Condition") === "Graded"

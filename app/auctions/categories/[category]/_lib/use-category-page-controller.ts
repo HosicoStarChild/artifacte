@@ -178,9 +178,11 @@ function applyClientSideListingFilters(
     })
     .sort((left, right) => {
       const leftTotal = resolveListingPayablePrice(left, {
+        collectionAddress: left.collectionAddress,
         collectionName: left.collection,
       }).amount;
       const rightTotal = resolveListingPayablePrice(right, {
+        collectionAddress: right.collectionAddress,
         collectionName: right.collection,
       }).amount;
 

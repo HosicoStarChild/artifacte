@@ -79,6 +79,7 @@ export default function CategoryListingPurchaseAction({
     const nftMint = listing?.nftAddress || listing?.nftMint;
     const listingDisplayPrice = resolveListingDisplayPrice(listing);
     const listingPayablePrice = resolveListingPayablePrice(listing, {
+      collectionAddress: listing.collectionAddress,
       collectionName: listing.collection,
     });
 
@@ -144,7 +145,11 @@ export default function CategoryListingPurchaseAction({
             showToast.info,
             sendTransaction ?? undefined,
             walletName ?? undefined,
-            { source: listing?.source },
+            {
+              source: listing?.source,
+              collectionAddress: listing.collectionAddress,
+              collectionName: listing.collection,
+            },
             true
           );
 
@@ -165,6 +170,8 @@ export default function CategoryListingPurchaseAction({
           mint: mintAddr,
           buyer: publicKey.toBase58(),
           source: listing.source,
+          collectionAddress: listing.collectionAddress,
+          collectionName: listing.collection,
           signTransaction,
           listingDisplayPrice,
           onStatus: showToast.info,

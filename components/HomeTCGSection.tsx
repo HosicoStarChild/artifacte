@@ -64,7 +64,11 @@ export function HomeTCGSection() {
           showToast.info,
           sendTransaction ?? undefined,
           walletName ?? undefined,
-          { source: listing.source },
+          {
+            source: listing.source,
+            collectionAddress: listing.collectionAddress,
+            collectionName: listing.collection,
+          },
           true
         );
 
@@ -87,6 +91,8 @@ export function HomeTCGSection() {
         mint: mintAddr,
         buyer: publicKey.toBase58(),
         source: listing.source,
+        collectionAddress: listing.collectionAddress,
+        collectionName: listing.collection,
         signTransaction,
         listingDisplayPrice,
         onStatus: showToast.info,

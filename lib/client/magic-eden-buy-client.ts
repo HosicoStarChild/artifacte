@@ -38,9 +38,9 @@ export type MagicEdenBuyResult = {
 type MagicEdenBuyOptions = {
   mint: string;
   buyer: string;
-  source?: string;
-  collectionAddress?: string;
-  collectionName?: string;
+  source?: string | null;
+  collectionAddress?: string | null;
+  collectionName?: string | null;
   signTransaction: WalletSignTransaction;
   listingDisplayPrice: ListingDisplayPrice;
   onStatus?: (message: string) => void;

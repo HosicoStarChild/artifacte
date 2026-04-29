@@ -97,6 +97,7 @@ function CardDetailPageContent() {
     setBuying(true);
     const cardDisplayPrice = resolveListingDisplayPrice(card);
     const cardPayablePrice = resolveListingPayablePrice(card, {
+      collectionAddress: card.collectionAddress,
       collectionName: card.collection,
     });
 
@@ -149,6 +150,7 @@ function CardDetailPageContent() {
           sendTransaction ?? undefined,
           walletName ?? undefined,
           {
+            collectionAddress: card.collectionAddress,
             source: card.source,
             collectionName: card.collection,
           },
@@ -171,6 +173,7 @@ function CardDetailPageContent() {
         mint: card.nftAddress,
         buyer: publicKey.toBase58(),
         source: card.source,
+        collectionAddress: card.collectionAddress,
         collectionName: card.collection,
         signTransaction,
         listingDisplayPrice: cardDisplayPrice,
@@ -324,6 +327,7 @@ function CardDetailPageContent() {
   }
 
   const payablePrice = resolveListingPayablePrice(card, {
+    collectionAddress: card.collectionAddress,
     collectionName: card.collection,
   });
   const primaryPrice = card.auctionListing ? card.auctionListing.price : payablePrice.amount;
