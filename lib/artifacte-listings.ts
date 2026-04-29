@@ -8,6 +8,7 @@ const bs58Encode = (data: Buffer | Uint8Array): string =>
 
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 const ARTIFACTE_AUTHORITY = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
+const ARTIFACTE_COLLECTION_ID = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 const LISTING_ACCOUNT_SIZE = 240;
 const OFFSET_SELLER = 8;
 const OFFSET_NFT_MINT = 40;
@@ -27,9 +28,10 @@ const CORE_LISTING_DISCRIMINATOR = Buffer.from([205, 178, 162, 169, 199, 166, 13
 const CORE_LISTING_SIZE = 153;
 const CORE_OFFSET_SELLER = 8;
 const CORE_OFFSET_ASSET = 8 + 32;
+const CORE_OFFSET_COLLECTION = 8 + 32 + 32;
 const CORE_OFFSET_PRICE = 8 + 32 + 32 + 32 + 32;
 
-type ActiveMint = { isCore: boolean; nftMint: string; price: bigint; seller: string };
+type ActiveMint = { isCore: boolean; nftMint: string; price: bigint; seller: string; collection?: string };
 
 type HeliusAuthority = { address?: string };
 type HeliusAttribute = { trait_type?: string; value?: string };
@@ -138,8 +140,17 @@ function normalizeImage(image: string): string {
 }
 
 function buildListingFromAsset(activeMint: ActiveMint, asset: HeliusAsset): ArtifacteProgramListing | null {
+  if (activeMint.isCore && activeMint.collection !== ARTIFACTE_COLLECTION_ID) {
+    return null;
+  }
+
   const authorities = Array.isArray(asset.authorities) ? asset.authorities : [];
   if (!authorities.some((authority) => authority.address === ARTIFACTE_AUTHORITY)) {
+    return null;
+  }
+
+  const assetOwner = asset.ownership?.owner;
+  if (activeMint.isCore && assetOwner && assetOwner !== activeMint.seller) {
     return null;
   }
 
@@ -223,7 +234,7 @@ async function fetchActiveArtifacteMints(connection: Connection): Promise<Active
     }
   }
 
-  // Also include Core listings (USDC fixed-price; seller-filtered to owner).
+  // Also include Core listings (USDC fixed-price).
   const coreAccounts = await connection.getProgramAccounts(AUCTION_PROGRAM_ID, {
     filters: [
       { dataSize: CORE_LISTING_SIZE },
@@ -234,10 +245,10 @@ async function fetchActiveArtifacteMints(connection: Connection): Promise<Active
     const data = account.data;
     try {
       const seller = new PublicKey(data.slice(CORE_OFFSET_SELLER, CORE_OFFSET_SELLER + 32)).toBase58();
-      if (seller !== ARTIFACTE_AUTHORITY) continue;
       const nftMint = new PublicKey(data.slice(CORE_OFFSET_ASSET, CORE_OFFSET_ASSET + 32)).toBase58();
+      const collection = new PublicKey(data.slice(CORE_OFFSET_COLLECTION, CORE_OFFSET_COLLECTION + 32)).toBase58();
       const price = data.readBigUInt64LE(CORE_OFFSET_PRICE);
-      activeMints.push({ isCore: true, nftMint, price, seller });
+      activeMints.push({ isCore: true, nftMint, price, seller, collection });
     } catch {
       // Skip unparseable accounts.
     }

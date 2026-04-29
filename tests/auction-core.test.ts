@@ -82,9 +82,9 @@ describe("auction — Metaplex Core listings", () => {
   };
   const programId = program.programId;
 
-  // Owner of the program / Artifacte authority. In real life this is
-  // DDSpv... — for the test we fund a fresh keypair and assert that
-  // the program rejects non-OWNER_WALLET listers.
+  // Seller and buyer wallets used to exercise the Core listing flow.
+  // The current program allows any current holder of the Artifacte
+  // Core asset to list, not just the collection owner wallet.
   const owner = Keypair.generate();
   const buyer = Keypair.generate();
   const stranger = Keypair.generate();
@@ -92,7 +92,7 @@ describe("auction — Metaplex Core listings", () => {
   // Surrogate for an Artifacte Core asset. In the upgraded program the
   // handler validates `asset.collection == ARTIFACTE_COLLECTION_ID` and
   // `asset.owner == seller` via mpl-core deserialization. For pure unit
-  // tests of the gate we can stop at "non-owner gets rejected" and rely
+  // tests of the gate we can stop at "non-holder gets rejected" and rely
   // on a separate end-to-end test (below) for the full mpl-core flow.
   let asset: Keypair;
   let usdcMint: PublicKey;
@@ -127,7 +127,7 @@ describe("auction — Metaplex Core listings", () => {
   // Owner-gate
   // ---------------------------------------------------------------
 
-  it("rejects list_core_item when seller != OWNER_WALLET", async () => {
+  it("rejects list_core_item when seller is not the current holder", async () => {
     const listing = coreListingPda(asset.publicKey, programId);
     const authority = coreAuthorityPda(asset.publicKey, programId);
 
@@ -149,12 +149,12 @@ describe("auction — Metaplex Core listings", () => {
         .rpc();
     } catch (e: any) {
       threw = true;
-      // Either the explicit Unauthorized error or a constraint failure is acceptable.
+      // Either the explicit ownership error or an account constraint failure is acceptable.
       expect(String(e.message ?? e).toLowerCase()).to.match(
-        /unauthorized|owner|constraint|account/
+        /unauthorized|owner|holder|constraint|account|mint|invalid/
       );
     }
-    expect(threw, "non-owner should not be able to list").to.equal(true);
+    expect(threw, "non-holder should not be able to list").to.equal(true);
   });
 
   // ---------------------------------------------------------------

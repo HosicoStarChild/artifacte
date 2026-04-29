@@ -491,8 +491,7 @@
     {
       "name": "cancel_core_listing",
       "docs": [
-        "Cancel a Core listing (owner only). Revokes the TransferDelegate authority",
-        "and closes the CoreListing PDA."
+        "Cancel an active Core listing while the seller still holds the asset."
       ],
       "discriminator": [
         58,
@@ -507,6 +506,106 @@
       "accounts": [
         {
           "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "collection",
+          "writable": true
+        },
+        {
+          "name": "core_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "core_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_stale_core_listing",
+      "docs": [
+        "Close a stale Core listing after ownership changed outside the program.",
+        "Allows the current holder to clear old state and re-list the asset."
+      ],
+      "discriminator": [
+        108,
+        204,
+        165,
+        119,
+        83,
+        128,
+        227,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "holder",
           "writable": true,
           "signer": true
         },
@@ -928,7 +1027,7 @@
         {
           "name": "seller",
           "docs": [
-            "Owner-signed (must equal OWNER_WALLET — checked in handler)."
+            "Current holder-signed."
           ],
           "writable": true,
           "signer": true
@@ -1935,6 +2034,21 @@
       "code": 6020,
       "name": "InvalidRoyaltyBps",
       "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidCorePluginState",
+      "msg": "Invalid Metaplex Core plugin state"
+    },
+    {
+      "code": 6022,
+      "name": "StaleCoreListing",
+      "msg": "Core listing is stale because the seller no longer owns the asset"
+    },
+    {
+      "code": 6023,
+      "name": "CoreListingNotStale",
+      "msg": "Core listing is not stale"
     }
   ],
   "types": [

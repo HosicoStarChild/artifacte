@@ -9,7 +9,6 @@ import {
 } from "@solana/spl-token";
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 
-import { isOwnerWallet } from "@/lib/admin";
 import { AuctionProgram, ItemCategory, ListingType } from "@/lib/auction-program";
 import type { AnchorWalletLike } from "@/hooks/useWalletCapabilities";
 
@@ -312,26 +311,27 @@ export async function submitListPageListing({
   );
   const auctionProgram = new AuctionProgram(connection, anchorWallet, sendTransaction);
 
-  const [listingPda] = PublicKey.findProgramAddressSync([LISTING_SEED, nftMint.toBytes()], LIST_PAGE_PROGRAM_ID);
-  const existingListing = await connection.getAccountInfo(listingPda, "confirmed");
-
-  if (existingListing) {
-    notifier.info("Closing stale listing...");
-    await auctionProgram.closeStaleListing(nftMint);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-
   if (itemCategory !== ItemCategory.DigitalArt) {
     await ensureSellerUsdcAccount(connection, publicKey, sendTransaction, notifier);
   }
 
   if (flags.isCore) {
-    if (!isOwnerWallet(publicKey.toBase58())) {
-      throw new Error("Listing Artifacte Core assets is restricted to the owner wallet.");
-    }
-
     if (listingType !== "fixed") {
       throw new Error("Auctions are not supported for Artifacte Core assets.");
+    }
+
+    const existingCoreListing = await auctionProgram.fetchCoreListing(nftMint);
+
+    if (existingCoreListing) {
+      const listingSeller = new PublicKey(existingCoreListing.seller);
+
+      if (listingSeller.equals(publicKey)) {
+        throw new Error("This Artifacte Core asset is already listed by your wallet.");
+      }
+
+      notifier.info("Closing stale Core listing...");
+      await auctionProgram.closeStaleCoreListing(nftMint);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     notifier.info("Listing on Artifacte (Core)...");
@@ -347,6 +347,15 @@ export async function submitListPageListing({
     } catch (error) {
       throw toCoreListingSubmissionError(error);
     }
+  }
+
+  const [listingPda] = PublicKey.findProgramAddressSync([LISTING_SEED, nftMint.toBytes()], LIST_PAGE_PROGRAM_ID);
+  const existingListing = await connection.getAccountInfo(listingPda, "confirmed");
+
+  if (existingListing) {
+    notifier.info("Closing stale listing...");
+    await auctionProgram.closeStaleListing(nftMint);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
   if (listingType === "fixed" && flags.isArtifacteAuthority) {

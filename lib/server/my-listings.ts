@@ -73,6 +73,9 @@ interface HeliusAsset {
   compression?: {
     compressed?: boolean;
   };
+  ownership?: {
+    owner?: string;
+  };
   content?: {
     files?: HeliusAssetFile[];
     links?: {
@@ -714,9 +717,14 @@ export async function getMyListingsPageData(
     ...tensorListings.map((listing) => listing.nftMint),
   ]).catch(() => new Map<string, HeliusAsset>());
 
+  const activeCoreListings = coreListings.filter((listing) => {
+    const assetOwner = assetMap.get(listing.asset)?.ownership?.owner;
+    return !assetOwner || assetOwner === listing.seller;
+  });
+
   const allowlistIdentifiers = createAllowlistIdentifierSet(allowlistEntries);
 
-  const normalizedCoreListings = coreListings.map((listing) =>
+  const normalizedCoreListings = activeCoreListings.map((listing) =>
     toCoreListing(listing, getAssetMetadata(assetMap.get(listing.asset))),
   );
 

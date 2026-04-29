@@ -6,7 +6,6 @@ import { IDL } from "./auction-idl";
 // Program IDs and constants
 const AUCTION_PROGRAM_ID = new PublicKey("81s1tEx4MPdVvqS6X84Mok5K4N5fMbRLzcsT5eo2K8J3");
 const TREASURY_WALLET = new PublicKey("82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6");
-const OWNER_WALLET = new PublicKey("DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX");
 const ARTIFACTE_COLLECTION = new PublicKey("jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS");
 const MPL_CORE_PROGRAM_ID = new PublicKey("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
 
@@ -1159,6 +1158,16 @@ export class AuctionProgram {
     )[0];
   }
 
+  async fetchCoreListing(asset: PublicKey): Promise<any | null> {
+    const coreListing = this.coreListingPda(asset);
+
+    try {
+      return await this.program.account.coreListing.fetch(coreListing);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Read the Royalties plugin from a Core asset (or fall back to collection).
    * Returns first creator + basis points. Mirrors on-chain `read_core_royalties`.
@@ -1200,12 +1209,9 @@ export class AuctionProgram {
 
   /**
    * List a Metaplex Core asset for fixed-price USDC sale.
-   * Owner-only; the asset stays in the seller wallet (TransferDelegate model).
+   * Current holder-only; the asset stays in the seller wallet (TransferDelegate model).
    */
   async listCoreItem(asset: PublicKey, priceUsdc: number | bigint): Promise<string> {
-    if (!this.wallet.publicKey?.equals(OWNER_WALLET)) {
-      throw new Error("Listing is restricted to the Artifacte owner wallet");
-    }
     const coreListing = this.coreListingPda(asset);
     const coreAuthority = this.coreAuthorityPda(asset);
 
@@ -1229,7 +1235,7 @@ export class AuctionProgram {
     return await this.sendAndConfirm(tx);
   }
 
-  /** Cancel a Core listing — owner-only. */
+  /** Cancel an active Core listing while the seller still holds the asset. */
   async cancelCoreListing(asset: PublicKey): Promise<string> {
     const coreListing = this.coreListingPda(asset);
     const coreAuthority = this.coreAuthorityPda(asset);
@@ -1242,6 +1248,32 @@ export class AuctionProgram {
       .cancelCoreListing()
       .accounts({
         seller: this.wallet.publicKey,
+        asset,
+        collection,
+        coreListing,
+        coreAuthority,
+        mplCoreProgram: MPL_CORE_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction();
+
+    const tx = new Transaction()
+      .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }))
+      .add(ix);
+    return await this.sendAndConfirm(tx);
+  }
+
+  /** Close a stale Core listing after the asset moved to a new holder. */
+  async closeStaleCoreListing(asset: PublicKey): Promise<string> {
+    const coreListing = this.coreListingPda(asset);
+    const coreAuthority = this.coreAuthorityPda(asset);
+    const listingAcc: any = await this.program.account.coreListing.fetch(coreListing);
+    const collection: PublicKey = listingAcc.collection;
+
+    const ix = await this.program.methods
+      .closeStaleCoreListing()
+      .accounts({
+        holder: this.wallet.publicKey,
         asset,
         collection,
         coreListing,
@@ -1331,7 +1363,7 @@ export class AuctionProgram {
     return await this.sendAndConfirm(tx);
   }
 
-  /** Fetch all Core listings (owner-filtered server-side). */
+  /** Fetch all Core listings. */
   async fetchAllCoreListings(): Promise<any[]> {
     try {
       return await this.program.account.coreListing.all();

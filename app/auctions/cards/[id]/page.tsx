@@ -301,7 +301,10 @@ function CardDetailPageContent() {
       showToast.info("Closing stale listing...");
       if (!auctionProgram) throw new Error("Auction program unavailable");
 
-      const sig = await auctionProgram.closeStaleListing(new PublicKey(card.nftAddress));
+      const nftMint = new PublicKey(card.nftAddress);
+      const sig = card.auctionListing?.program === 'core'
+        ? await auctionProgram.closeStaleCoreListing(nftMint)
+        : await auctionProgram.closeStaleListing(nftMint);
       showToast.success(`Stale listing closed! TX: ${sig.slice(0, 12)}...`);
       setCard((prevCard) => prevCard ? { ...prevCard, auctionListing: null } : prevCard);
     } catch (error) {

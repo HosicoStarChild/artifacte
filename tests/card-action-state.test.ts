@@ -79,14 +79,20 @@ describe("resolveCardDetailActionState", () => {
     assert.equal(state.isOwner, true);
   });
 
-  it("returns owner-listed actions for the asset owner when core listing seller differs", () => {
+  it("lets the asset owner close a stale core listing when seller differs", () => {
     const state = resolveCardDetailActionState({
-      card: createCard({ owner: "asset-owner-wallet", seller: "artifacte-authority" }),
+      card: createCard({
+        auctionListing: createAuctionListing({ price: 0, seller: "artifacte-authority", stale: true }),
+        owner: "asset-owner-wallet",
+        price: 0,
+        seller: "artifacte-authority",
+      }),
       connected: true,
       viewerPublicKey: "asset-owner-wallet",
     });
 
-    assert.equal(state.action.type, "owner-listed");
+    assert.equal(state.action.type, "none");
+    assert.equal(state.canCloseStaleListing, true);
     assert.equal(state.isOwner, true);
   });
 

@@ -129,7 +129,6 @@ const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 // Artifacte v2 (Metaplex Core) constants
-const OWNER_WALLET: &str = "DDSpvAK8DbuAdEaaBHkfLieLPSJVCWWgquFAA3pvxXoX";
 const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 
 #[cfg(test)]
@@ -1334,7 +1333,7 @@ pub mod auction {
     // delegate, transferring the asset directly from seller to buyer.
     //
     // Constraints:
-    //   - Only OWNER_WALLET (the Artifacte owner) may list.
+    //   - Current asset holder may list.
     //   - Asset must belong to ARTIFACTE_COLLECTION.
     //   - Payment mint must be USDC.
     //   - 2% platform fee + creator royalty (from on-chain Royalties plugin)
@@ -1344,11 +1343,6 @@ pub mod auction {
 
     /// List a Metaplex Core asset for fixed-price USDC sale.
     pub fn list_core_item(ctx: Context<ListCoreItem>, price_usdc: u64) -> Result<()> {
-        // Owner-only listing
-        require!(
-            ctx.accounts.seller.key().to_string() == OWNER_WALLET,
-            AuctionError::Unauthorized
-        );
         // Artifacte collection only
         require!(
             ctx.accounts.collection.key().to_string() == ARTIFACTE_COLLECTION_ID,
@@ -1430,14 +1424,18 @@ pub mod auction {
         Ok(())
     }
 
-    /// Cancel a Core listing (owner only). Returns TransferDelegate authority
-    /// to the owner and closes the CoreListing PDA.
+    /// Cancel an active Core listing while the seller still holds the asset.
     pub fn cancel_core_listing(ctx: Context<CancelCoreListing>) -> Result<()> {
         // Only the original seller (= owner) may cancel
         require!(
             ctx.accounts.seller.key() == ctx.accounts.core_listing.seller,
             AuctionError::Unauthorized
         );
+        verify_active_core_listing_owner(
+            &ctx.accounts.asset.to_account_info(),
+            ctx.accounts.core_listing.seller,
+            ctx.accounts.collection.key(),
+        )?;
 
         mpl_core::instructions::RevokePluginAuthorityV1Cpi {
             __program: &ctx.accounts.mpl_core_program.to_account_info(),
@@ -1461,6 +1459,46 @@ pub mod auction {
         Ok(())
     }
 
+    /// Close a stale Core listing after ownership changed outside the program.
+    /// Allows the current holder to clear old state and re-list the asset.
+    pub fn close_stale_core_listing(ctx: Context<CloseStaleCoreListing>) -> Result<()> {
+        let listing = &ctx.accounts.core_listing;
+        let (asset_owner, asset_collection) =
+            read_core_asset_owner_and_collection(&ctx.accounts.asset.to_account_info())?;
+
+        require_keys_eq!(asset_collection, ctx.accounts.collection.key(), AuctionError::Unauthorized);
+        require_keys_eq!(asset_owner, ctx.accounts.holder.key(), AuctionError::Unauthorized);
+        require!(listing.seller != ctx.accounts.holder.key(), AuctionError::CoreListingNotStale);
+
+        match read_core_transfer_delegate_state(&ctx.accounts.asset.to_account_info())? {
+            CoreTransferDelegateState::Address(address)
+                if address == ctx.accounts.core_authority.key() =>
+            {
+                mpl_core::instructions::RevokePluginAuthorityV1Cpi {
+                    __program: &ctx.accounts.mpl_core_program.to_account_info(),
+                    asset: &ctx.accounts.asset.to_account_info(),
+                    collection: Some(&ctx.accounts.collection.to_account_info()),
+                    payer: &ctx.accounts.holder.to_account_info(),
+                    authority: Some(&ctx.accounts.holder.to_account_info()),
+                    system_program: &ctx.accounts.system_program.to_account_info(),
+                    log_wrapper: None,
+                    __args: mpl_core::instructions::RevokePluginAuthorityV1InstructionArgs {
+                        plugin_type: mpl_core::types::PluginType::TransferDelegate,
+                    },
+                }
+                .invoke()?;
+            }
+            _ => {}
+        }
+
+        emit!(CoreListingCancelled {
+            asset: listing.asset,
+            seller: listing.seller,
+        });
+
+        Ok(())
+    }
+
     /// Public buy of a Core listing. Splits USDC (platform fee + royalty +
     /// remainder), then CPIs TransferV1 to move the asset to the buyer.
     pub fn buy_now_core(ctx: Context<BuyNowCore>) -> Result<()> {
@@ -1480,6 +1518,11 @@ pub mod auction {
             ctx.accounts.collection.key() == listing.collection,
             AuctionError::Unauthorized
         );
+        verify_active_core_listing_owner(
+            &ctx.accounts.asset.to_account_info(),
+            listing.seller,
+            ctx.accounts.collection.key(),
+        )?;
 
         // Resolve treasury (config PDA if initialized, else fallback constant)
         let treasury_address = if let Some(ref config) = ctx.accounts.treasury_config {
@@ -2257,6 +2300,10 @@ pub enum AuctionError {
     InvalidRoyaltyBps,
     #[msg("Invalid Metaplex Core plugin state")]
     InvalidCorePluginState,
+    #[msg("Core listing is stale because the seller no longer owns the asset")]
+    StaleCoreListing,
+    #[msg("Core listing is not stale")]
+    CoreListingNotStale,
 }
 
 // ============================================================================
@@ -2265,7 +2312,7 @@ pub enum AuctionError {
 
 #[derive(Accounts)]
 pub struct ListCoreItem<'info> {
-    /// Owner-signed (must equal OWNER_WALLET — checked in handler).
+    /// Current holder-signed.
     #[account(mut)]
     pub seller: Signer<'info>,
 
@@ -2322,6 +2369,41 @@ pub struct CancelCoreListing<'info> {
         seeds = [b"core_listing", asset.key().as_ref()],
         bump = core_listing.bump,
         close = seller,
+    )]
+    pub core_listing: Account<'info, CoreListing>,
+
+    /// CHECK: Program-controlled PDA = TransferDelegate authority.
+    #[account(
+        seeds = [b"core_authority", asset.key().as_ref()],
+        bump,
+    )]
+    pub core_authority: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core program.
+    #[account(address = mpl_core::ID)]
+    pub mpl_core_program: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseStaleCoreListing<'info> {
+    #[account(mut)]
+    pub holder: Signer<'info>,
+
+    /// CHECK: Metaplex Core asset.
+    #[account(mut, address = core_listing.asset)]
+    pub asset: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex Core collection.
+    #[account(mut, address = core_listing.collection)]
+    pub collection: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"core_listing", asset.key().as_ref()],
+        bump = core_listing.bump,
+        close = holder,
     )]
     pub core_listing: Account<'info, CoreListing>,
 
@@ -2439,22 +2521,40 @@ pub struct CorePurchased {
 /// Verify that a Metaplex Core asset is owned by `expected_owner` and belongs
 /// to `expected_collection`. Reads the BaseAssetV1 header directly from the
 /// account data.
+fn read_core_asset_owner_and_collection(asset_account: &AccountInfo) -> Result<(Pubkey, Pubkey)> {
+    require_keys_eq!(*asset_account.owner, mpl_core::ID, AuctionError::Unauthorized);
+    let data = asset_account.try_borrow_data()?;
+    let asset = mpl_core::accounts::BaseAssetV1::from_bytes(&data)
+        .map_err(|_| error!(AuctionError::Unauthorized))?;
+    let collection = match asset.update_authority {
+        mpl_core::types::UpdateAuthority::Collection(collection) => collection,
+        _ => return err!(AuctionError::Unauthorized),
+    };
+
+    Ok((asset.owner, collection))
+}
+
 fn verify_core_asset_ownership(
     asset_account: &AccountInfo,
     expected_owner: Pubkey,
     expected_collection: Pubkey,
 ) -> Result<()> {
-    require_keys_eq!(*asset_account.owner, mpl_core::ID, AuctionError::Unauthorized);
-    let data = asset_account.try_borrow_data()?;
-    let asset = mpl_core::accounts::BaseAssetV1::from_bytes(&data)
-        .map_err(|_| error!(AuctionError::Unauthorized))?;
-    require_keys_eq!(asset.owner, expected_owner, AuctionError::Unauthorized);
-    match asset.update_authority {
-        mpl_core::types::UpdateAuthority::Collection(c) => {
-            require_keys_eq!(c, expected_collection, AuctionError::Unauthorized);
-        }
-        _ => return err!(AuctionError::Unauthorized),
-    }
+    let (asset_owner, asset_collection) = read_core_asset_owner_and_collection(asset_account)?;
+    require_keys_eq!(asset_owner, expected_owner, AuctionError::Unauthorized);
+    require_keys_eq!(asset_collection, expected_collection, AuctionError::Unauthorized);
+
+    Ok(())
+}
+
+fn verify_active_core_listing_owner(
+    asset_account: &AccountInfo,
+    expected_owner: Pubkey,
+    expected_collection: Pubkey,
+) -> Result<()> {
+    let (asset_owner, asset_collection) = read_core_asset_owner_and_collection(asset_account)?;
+    require_keys_eq!(asset_collection, expected_collection, AuctionError::Unauthorized);
+    require_keys_eq!(asset_owner, expected_owner, AuctionError::StaleCoreListing);
+
     Ok(())
 }
 

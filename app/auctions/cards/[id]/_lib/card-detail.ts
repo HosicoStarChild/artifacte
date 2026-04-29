@@ -277,22 +277,33 @@ async function hydrateArtifacteCard(card: CardDetail, connection: Connection): P
     return card;
   }
 
-  const [tensorPrice, auctionListing, liveArtifacteListing] = await Promise.all([
+  const [tensorPrice, auctionListing, liveArtifacteListing, liveAsset] = await Promise.all([
     fetchTensorPrice(connection, card.nftAddress),
     fetchAuctionListing(connection, card.nftAddress),
     fetchArtifacteProgramListingSnapshot(card.nftAddress),
+    fetchNftAsset(card.nftAddress),
   ]);
 
+  const owner = liveArtifacteListing?.owner || liveAsset?.ownership?.owner || card.owner || "";
+  const normalizedAuctionListing = (
+    auctionListing?.program === "core"
+    && owner
+    && auctionListing.seller
+    && owner !== auctionListing.seller
+  )
+    ? { ...auctionListing, price: 0, stale: true }
+    : auctionListing;
+
   const nextCard = applyArtifacteMarketplaceState(card, {
-    auctionListing,
-    tensorPrice,
+    auctionListing: normalizedAuctionListing,
+    tensorPrice: normalizedAuctionListing?.stale ? null : tensorPrice,
   });
 
   return {
     ...nextCard,
-    isCore: auctionListing?.program === "core" || liveArtifacteListing?.isCore || card.isCore,
-    owner: liveArtifacteListing?.owner || card.owner || "",
-    seller: auctionListing?.seller || liveArtifacteListing?.seller || nextCard.seller || "",
+    isCore: normalizedAuctionListing?.program === "core" || liveArtifacteListing?.isCore || card.isCore,
+    owner,
+    seller: normalizedAuctionListing?.seller || liveArtifacteListing?.seller || nextCard.seller || "",
   };
 }
 
