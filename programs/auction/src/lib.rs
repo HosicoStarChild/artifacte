@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::program_error::ProgramError;
+use anchor_lang::solana_program::pubkey;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, CloseAccount};
 use anchor_spl::token_interface::{
     Mint as IfaceMint,
@@ -127,9 +128,11 @@ const TREASURY_FALLBACK: &str = "82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6";
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC_MINT_PUBKEY: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 
 // Artifacte v2 (Metaplex Core) constants
 const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
+const ARTIFACTE_COLLECTION_PUBKEY: Pubkey = pubkey!("jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS");
 
 #[cfg(test)]
 fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
@@ -1344,13 +1347,15 @@ pub mod auction {
     /// List a Metaplex Core asset for fixed-price USDC sale.
     pub fn list_core_item(ctx: Context<ListCoreItem>, price_usdc: u64) -> Result<()> {
         // Artifacte collection only
-        require!(
-            ctx.accounts.collection.key().to_string() == ARTIFACTE_COLLECTION_ID,
+        require_keys_eq!(
+            ctx.accounts.collection.key(),
+            ARTIFACTE_COLLECTION_PUBKEY,
             AuctionError::Unauthorized
         );
         // USDC only
-        require!(
-            ctx.accounts.payment_mint.key().to_string() == USDC_MINT,
+        require_keys_eq!(
+            ctx.accounts.payment_mint.key(),
+            USDC_MINT_PUBKEY,
             AuctionError::InvalidPaymentMint
         );
         require!(price_usdc > 0, AuctionError::InvalidPrice);
@@ -1505,7 +1510,7 @@ pub mod auction {
         let listing = &ctx.accounts.core_listing;
 
         // Re-validate state (defence in depth)
-        require!(listing.payment_mint.to_string() == USDC_MINT, AuctionError::InvalidPaymentMint);
+        require_keys_eq!(listing.payment_mint, USDC_MINT_PUBKEY, AuctionError::InvalidPaymentMint);
         require!(
             ctx.accounts.payment_mint.key() == listing.payment_mint,
             AuctionError::InvalidPaymentMint
