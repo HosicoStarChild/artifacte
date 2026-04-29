@@ -81,11 +81,12 @@ const SERVER_TCG_CATEGORY_MAP: Record<string, string> = {
 const SOURCE_FILTER_MAP: Record<string, string> = {
   "Collectors Crypt": "collector-crypt",
   Phygitals: "phygitals",
+  Artifacte: "artifacte",
 };
 
 export const CATEGORY_FILTERS: Record<string, readonly CategoryFilterDefinition[]> = {
   TCG_CARDS: [
-    { label: "Source", key: "source", options: ["All", "Collectors Crypt", "Phygitals"] },
+    { label: "Source", key: "source", options: ["All", "Collectors Crypt", "Phygitals", "Artifacte"] },
     { label: "TCG", key: "tcg", options: ["All", "One Piece", "Pokemon", "Dragon Ball Z", "Magic", "Yu-Gi-Oh"] },
     { label: "Rarity", key: "rarity", options: ["All", "Common", "Rare", "Ultra Rare", "Secret Rare", "Alt Art", "Manga Alt Art"] },
     { label: "Grade", key: "grade", options: ["All", "PSA 10", "PSA 9", "PSA 8", "BGS 9.5", "BGS 10", "CGC 10", "CGC 9.5", "CGC 9", "CGC 8", "Ungraded"] },
