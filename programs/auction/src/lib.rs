@@ -2574,35 +2574,31 @@ fn read_core_royalties(
     collection_account: &AccountInfo,
 ) -> Result<(u16, Pubkey)> {
     use mpl_core::{
-        accounts::{BaseAssetV1, BaseCollectionV1},
-        fetch_plugin,
-        types::{Plugin, PluginType},
+        fetch_asset_plugin,
+        fetch_collection_plugin,
+        types::{PluginType, Royalties},
     };
 
-    if let Ok((_auth, plugin, _offset)) =
-        fetch_plugin::<BaseAssetV1, Plugin>(asset_account, PluginType::Royalties)
+    if let Ok((_auth, royalties, _offset)) =
+        fetch_asset_plugin::<Royalties>(asset_account, PluginType::Royalties)
     {
-        if let Plugin::Royalties(r) = plugin {
-            let creator = r
-                .creators
-                .first()
-                .map(|c| c.address)
-                .unwrap_or_default();
-            return Ok((r.basis_points, creator));
-        }
+        let creator = royalties
+            .creators
+            .first()
+            .map(|c| c.address)
+            .unwrap_or_default();
+        return Ok((royalties.basis_points, creator));
     }
 
-    if let Ok((_auth, plugin, _offset)) =
-        fetch_plugin::<BaseCollectionV1, Plugin>(collection_account, PluginType::Royalties)
+    if let Ok((_auth, royalties, _offset)) =
+        fetch_collection_plugin::<Royalties>(collection_account, PluginType::Royalties)
     {
-        if let Plugin::Royalties(r) = plugin {
-            let creator = r
-                .creators
-                .first()
-                .map(|c| c.address)
-                .unwrap_or_default();
-            return Ok((r.basis_points, creator));
-        }
+        let creator = royalties
+            .creators
+            .first()
+            .map(|c| c.address)
+            .unwrap_or_default();
+        return Ok((royalties.basis_points, creator));
     }
 
     Ok((0u16, Pubkey::default()))
