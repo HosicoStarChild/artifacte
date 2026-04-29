@@ -143,6 +143,37 @@ fn core_platform_fee_bps(collection: Pubkey) -> u64 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CoreSaleSplit {
+    platform_fee: u64,
+    creator_royalty: u64,
+    seller_amount: u64,
+}
+
+fn calculate_core_sale_split(price: u64, collection: Pubkey, royalty_bps: u16) -> Result<CoreSaleSplit> {
+    require!(royalty_bps <= 1000, AuctionError::RoyaltyTooHigh);
+
+    let platform_fee = price
+        .checked_mul(core_platform_fee_bps(collection))
+        .and_then(|value| value.checked_div(10000))
+        .ok_or(AuctionError::CalculationError)?;
+    let creator_royalty = price
+        .checked_mul(royalty_bps as u64)
+        .and_then(|value| value.checked_div(10000))
+        .ok_or(AuctionError::CalculationError)?;
+    let seller_amount = price
+        .checked_sub(platform_fee)
+        .ok_or(AuctionError::CalculationError)?
+        .checked_sub(creator_royalty)
+        .ok_or(AuctionError::CalculationError)?;
+
+    Ok(CoreSaleSplit {
+        platform_fee,
+        creator_royalty,
+        seller_amount,
+    })
+}
+
 #[cfg(test)]
 fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
     matches!(
@@ -155,7 +186,13 @@ fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{core_platform_fee_bps, is_missing_mpl_core_plugin_error, ARTIFACTE_COLLECTION_PUBKEY, PLATFORM_FEE_BPS};
+    use super::{
+        calculate_core_sale_split,
+        core_platform_fee_bps,
+        is_missing_mpl_core_plugin_error,
+        ARTIFACTE_COLLECTION_PUBKEY,
+        PLATFORM_FEE_BPS,
+    };
     use anchor_lang::solana_program::program_error::ProgramError;
     use anchor_lang::prelude::Pubkey;
 
@@ -177,6 +214,29 @@ mod tests {
     fn waives_core_platform_fee_for_artifacte_collection() {
         assert_eq!(core_platform_fee_bps(ARTIFACTE_COLLECTION_PUBKEY), 0);
         assert_eq!(core_platform_fee_bps(Pubkey::new_unique()), PLATFORM_FEE_BPS);
+    }
+
+    #[test]
+    fn artifacte_core_sale_split_waives_platform_fee_but_keeps_royalty() {
+        let split = calculate_core_sale_split(25_000_000, ARTIFACTE_COLLECTION_PUBKEY, 200).unwrap();
+
+        assert_eq!(split.platform_fee, 0);
+        assert_eq!(split.creator_royalty, 500_000);
+        assert_eq!(split.seller_amount, 24_500_000);
+    }
+
+    #[test]
+    fn non_artifacte_core_sale_split_keeps_platform_fee_and_royalty() {
+        let split = calculate_core_sale_split(25_000_000, Pubkey::new_unique(), 200).unwrap();
+
+        assert_eq!(split.platform_fee, 500_000);
+        assert_eq!(split.creator_royalty, 500_000);
+        assert_eq!(split.seller_amount, 24_000_000);
+    }
+
+    #[test]
+    fn core_sale_split_rejects_excessive_royalties() {
+        assert!(calculate_core_sale_split(25_000_000, ARTIFACTE_COLLECTION_PUBKEY, 1001).is_err());
     }
 }
 

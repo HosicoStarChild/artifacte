@@ -90,8 +90,9 @@ Smoke-test devnet:
 3. From a separate wallet: call `buy_now_core`.
 4. Verify on a Solana explorer:
    - asset owner → buyer
-   - treasury USDC ATA → +0.625 (2.5% platform fee) +0.50 (2% royalty)
-   - seller USDC ATA → +23.875
+  - treasury USDC ATA → +0 (Artifacte collection platform fee waived)
+  - creator USDC ATA → +0.50 (2% royalty from the Royalties plugin)
+  - seller USDC ATA → +24.50
    - `core_listing` PDA closed; rent refunded to seller
 
 ---
