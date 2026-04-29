@@ -68,9 +68,13 @@ export interface SubmitListPageListingArgs {
 
 export interface SubmitListPageListingResult {
   mintAddress: string;
+  oracleNotifyDelayMs: number;
   shouldNotifyOracle: boolean;
   signature: string;
 }
+
+const ARTIFACTE_ORACLE_NOTIFY_DELAY_MS = 0;
+const TENSOR_ORACLE_NOTIFY_DELAY_MS = 3000;
 
 function decodeBase64Transaction(base64Transaction: string): Uint8Array {
   return Uint8Array.from(atob(base64Transaction), (character) => character.charCodeAt(0));
@@ -341,7 +345,8 @@ export async function submitListPageListing({
     try {
       return {
         mintAddress,
-        shouldNotifyOracle: false,
+        oracleNotifyDelayMs: ARTIFACTE_ORACLE_NOTIFY_DELAY_MS,
+        shouldNotifyOracle: true,
         signature: await auctionProgram.listCoreItem(nftMint, corePriceUsdc),
       };
     } catch (error) {
@@ -364,7 +369,8 @@ export async function submitListPageListing({
     if (flags.isPnft) {
       return {
         mintAddress,
-        shouldNotifyOracle: false,
+        oracleNotifyDelayMs: ARTIFACTE_ORACLE_NOTIFY_DELAY_MS,
+        shouldNotifyOracle: true,
         signature: await auctionProgram.listItemPnft(
           nftMint,
           paymentMint,
@@ -381,7 +387,8 @@ export async function submitListPageListing({
 
     return {
       mintAddress,
-      shouldNotifyOracle: false,
+      oracleNotifyDelayMs: ARTIFACTE_ORACLE_NOTIFY_DELAY_MS,
+      shouldNotifyOracle: true,
       signature: await auctionProgram.listItem(
         nftMint,
         sellerNftAccount,
@@ -420,6 +427,7 @@ export async function submitListPageListing({
 
     return {
       mintAddress,
+      oracleNotifyDelayMs: TENSOR_ORACLE_NOTIFY_DELAY_MS,
       shouldNotifyOracle: true,
       signature: signatureValue,
     };
@@ -434,6 +442,7 @@ export async function submitListPageListing({
   if (flags.isPnft) {
     return {
       mintAddress,
+      oracleNotifyDelayMs: ARTIFACTE_ORACLE_NOTIFY_DELAY_MS,
       shouldNotifyOracle: false,
       signature: await auctionProgram.listItemPnft(
         nftMint,
@@ -451,6 +460,7 @@ export async function submitListPageListing({
 
   return {
     mintAddress,
+    oracleNotifyDelayMs: ARTIFACTE_ORACLE_NOTIFY_DELAY_MS,
     shouldNotifyOracle: false,
     signature: await auctionProgram.listItem(
       nftMint,

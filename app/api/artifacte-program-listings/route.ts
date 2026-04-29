@@ -4,6 +4,10 @@ import { loadActiveArtifacteFixedPriceListings } from "@/lib/artifacte-listings"
 
 type ArtifacteListingsSort = "newest" | "price-asc" | "price-desc";
 
+function parseOptionalNormalizedParam(value: string | null): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
 function parsePositiveIntegerParam(value: string | null, fallbackValue: number, min: number, max: number): number {
   const parsedValue = Number.parseInt(value || `${fallbackValue}`, 10);
 
@@ -29,16 +33,22 @@ export async function GET(request: NextRequest) {
     const perPage = parsePositiveIntegerParam(searchParams.get("perPage"), 24, 1, 100);
     const sort = parseSortParam(searchParams.get("sort"));
     const query = searchParams.get("q")?.trim().toLowerCase() || "";
+    const seller = parseOptionalNormalizedParam(searchParams.get("seller"));
 
     const allListings = await loadActiveArtifacteFixedPriceListings();
     const filteredListings = (
       query
         ? allListings.filter((listing) => (
+            (!seller || listing.seller.toLowerCase() === seller)
+            && (
             listing.name.toLowerCase().includes(query)
             || listing.id.toLowerCase().includes(query)
             || listing.nftAddress.toLowerCase().includes(query)
+            )
           ))
-        : allListings
+        : seller
+          ? allListings.filter((listing) => listing.seller.toLowerCase() === seller)
+          : allListings
     ).slice();
 
     if (sort === "price-asc") {

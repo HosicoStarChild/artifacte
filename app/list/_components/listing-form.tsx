@@ -18,14 +18,12 @@ interface ListingFormProps {
   assetCard: ListPageAssetCardModel;
   auctionDuration: string;
   listingType: ListPageListingMode;
-  loadingRoyalty: boolean;
   onAuctionDurationChange: (value: string) => void;
   onBack: () => void;
   onListingTypeChange: (value: ListPageListingMode) => void;
   onPriceChange: (value: string) => void;
   onSubmit: () => void;
   price: string;
-  royaltyBps: number;
   submitting: boolean;
 }
 
@@ -45,14 +43,12 @@ export function ListingForm({
   assetCard,
   auctionDuration,
   listingType,
-  loadingRoyalty,
   onAuctionDurationChange,
   onBack,
   onListingTypeChange,
   onPriceChange,
   onSubmit,
   price,
-  royaltyBps,
   submitting,
 }: ListingFormProps) {
   const currencyLabel = getListingCurrencyLabel(assetCard.asset);
@@ -84,15 +80,6 @@ export function ListingForm({
                 <Badge className="border-white/10 bg-dark-900/80 text-xs text-white/65" variant="outline">
                   {assetCard.collection.name}
                 </Badge>
-                {loadingRoyalty ? (
-                  <Badge className="border-white/10 bg-dark-900/80 text-xs text-white/65" variant="outline">
-                    Loading royalty
-                  </Badge>
-                ) : royaltyBps > 0 ? (
-                  <Badge className="border-gold-500/20 bg-gold-500/10 text-xs text-gold-300" variant="outline">
-                    Royalty {royaltyBps / 100}%
-                  </Badge>
-                ) : null}
               </div>
               <p className="truncate text-xs font-mono text-white/40">{assetCard.mintAddress}</p>
             </div>

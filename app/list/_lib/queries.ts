@@ -12,6 +12,15 @@ import type {
   ListPageRoyaltyMetadata,
 } from "./types";
 
+interface ListPageArtifacteProgramListing {
+  id: string;
+  nftAddress: string;
+}
+
+interface ListPageArtifacteProgramListingsResponse {
+  listings?: ListPageArtifacteProgramListing[];
+}
+
 function getResponseErrorMessage(
   response: Response,
   payload?: ListPageErrorResponse,
@@ -28,6 +37,26 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
   if (!walletAddress) {
     return [];
   }
+
+  const listedArtifacteMintSetPromise = fetch(
+    `/api/artifacte-program-listings?seller=${encodeURIComponent(walletAddress)}&perPage=100&sort=price-desc`
+  )
+    .then(async (response) => {
+      const payload = (await response.json()) as ListPageArtifacteProgramListingsResponse & ListPageErrorResponse;
+
+      if (!response.ok) {
+        throw new Error(getResponseErrorMessage(response, payload, "Failed to load active Artifacte listings"));
+      }
+
+      const listedMints = new Set<string>();
+
+      for (const listing of payload.listings ?? []) {
+        listedMints.add(listing.nftAddress || listing.id);
+      }
+
+      return listedMints;
+    })
+    .catch(() => new Set<string>());
 
   const response = await fetch("/api/helius-das", {
     body: JSON.stringify({
@@ -53,7 +82,16 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
     throw new Error(getResponseErrorMessage(response, payload, "Failed to load wallet assets"));
   }
 
-  return (payload.result?.items ?? []).filter(isListableAsset);
+  const listedArtifacteMintSet = await listedArtifacteMintSetPromise;
+
+  return (payload.result?.items ?? []).filter((asset) => {
+    if (!isListableAsset(asset)) {
+      return false;
+    }
+
+    const mintAddress = asset.nftAddress || asset.id;
+    return !listedArtifacteMintSet.has(mintAddress);
+  });
 }
 
 export function getListPageAssetsQueryOptions(walletAddress: string | null) {

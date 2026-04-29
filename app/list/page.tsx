@@ -35,17 +35,6 @@ import { getListPageAssetsQueryOptions, getListPageRoyaltyQueryOptions } from ".
 import { submitListPageListing } from "./_lib/submit-listing";
 import type { ListPageAsset, ListPageAssetCardModel, ListPageListingMode } from "./_lib/types";
 
-function toRoyaltyBps(mintAddress: string | null, royaltyBps: number, loading: boolean): { loading: boolean; royaltyBps: number } {
-  if (!mintAddress) {
-    return { loading: false, royaltyBps: 0 };
-  }
-
-  return {
-    loading,
-    royaltyBps,
-  };
-}
-
 type ListPageStateSetters = {
   setAuctionDuration: Dispatch<SetStateAction<string>>;
   setListingType: Dispatch<SetStateAction<ListPageListingMode>>;
@@ -107,17 +96,6 @@ export default function ListNFTPage() {
 
   const selectedMintAddress = selectedAssetCard?.mintAddress ?? null;
   const royaltyQuery = useQuery(getListPageRoyaltyQueryOptions(selectedMintAddress));
-
-  const royaltyMetadata = toRoyaltyBps(
-    selectedMintAddress,
-    royaltyQuery.data?.mintExtensions?.metadata?.additional_metadata?.find(([key]) => key === "royalty_basis_points")
-      ? Number.parseInt(
-          royaltyQuery.data?.mintExtensions?.metadata?.additional_metadata?.find(([key]) => key === "royalty_basis_points")?.[1] ?? "0",
-          10
-        ) || 0
-      : royaltyQuery.data?.royalty.basis_points ?? 0,
-    royaltyQuery.isPending
-  );
 
   const eligibleAssetsCount = useMemo(() => getEligibleAssetsCount(sections), [sections]);
   const hiddenAssetsCount = (assetsQuery.data?.length ?? 0) - eligibleAssetsCount;
@@ -192,7 +170,7 @@ export default function ListNFTPage() {
             },
             method: "POST",
           }).catch(() => undefined);
-        }, 3000);
+        }, result.oracleNotifyDelayMs);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Listing failed.";
@@ -290,14 +268,12 @@ export default function ListNFTPage() {
               assetCard={selectedAssetCard}
               auctionDuration={auctionDuration}
               listingType={listingType}
-              loadingRoyalty={royaltyMetadata.loading}
               onAuctionDurationChange={setAuctionDuration}
               onBack={handleResetSelection}
               onListingTypeChange={setListingType}
               onPriceChange={setPrice}
               onSubmit={handleSubmit}
               price={price}
-              royaltyBps={royaltyMetadata.royaltyBps}
               submitting={submitting}
             />
           )}
