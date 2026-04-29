@@ -222,7 +222,7 @@ describe("auction — Metaplex Core listings", () => {
   // This test mints a real Core asset in the Artifacte collection,
   // lists it for 25 USDC, has `buyer` purchase it, and verifies:
   //   - asset transferred to buyer
-  //   - 2.5% fee → treasury
+  //   - no platform fee → treasury for Artifacte collection assets
   //   - 2% royalty → treasury (per Royalties plugin)
   //   - remainder → seller
   //   - core_listing PDA closed (rent → seller)
@@ -251,7 +251,7 @@ describe("auction — Metaplex Core listings", () => {
       // 5. await program.methods.buyNowCore().accounts({...}).signers([buyer]).rpc()
       // 6. Assertions:
       //    - new asset.owner == buyer.publicKey
-      //    - treasury_payment_account balance += 25*0.025  (platform fee)
+      //    - treasury_payment_account balance += 0          (platform fee waived)
       //    - creator_payment_account balance  += 25*0.02   (royalty → treasury)
       //    - seller_payment_account balance   += 25 - the above
       //    - core_listing account no longer exists

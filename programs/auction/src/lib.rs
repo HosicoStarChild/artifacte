@@ -129,10 +129,19 @@ const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
 const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDC_MINT_PUBKEY: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const PLATFORM_FEE_BPS: u64 = 200;
 
 // Artifacte v2 (Metaplex Core) constants
 const ARTIFACTE_COLLECTION_ID: &str = "jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS";
 const ARTIFACTE_COLLECTION_PUBKEY: Pubkey = pubkey!("jzkJTGAuDcWthM91S1ch7wPcfMUQB5CdYH6hA25K4CS");
+
+fn core_platform_fee_bps(collection: Pubkey) -> u64 {
+    if collection == ARTIFACTE_COLLECTION_PUBKEY {
+        0
+    } else {
+        PLATFORM_FEE_BPS
+    }
+}
 
 #[cfg(test)]
 fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
@@ -146,8 +155,9 @@ fn is_missing_mpl_core_plugin_error(error: &ProgramError) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_missing_mpl_core_plugin_error;
+    use super::{core_platform_fee_bps, is_missing_mpl_core_plugin_error, ARTIFACTE_COLLECTION_PUBKEY, PLATFORM_FEE_BPS};
     use anchor_lang::solana_program::program_error::ProgramError;
+    use anchor_lang::prelude::Pubkey;
 
     #[test]
     fn identifies_only_missing_mpl_core_plugin_errors() {
@@ -161,6 +171,12 @@ mod tests {
             mpl_core::errors::MplCoreError::PluginAlreadyExists as u32,
         )));
         assert!(!is_missing_mpl_core_plugin_error(&ProgramError::InvalidArgument));
+    }
+
+    #[test]
+    fn waives_core_platform_fee_for_artifacte_collection() {
+        assert_eq!(core_platform_fee_bps(ARTIFACTE_COLLECTION_PUBKEY), 0);
+        assert_eq!(core_platform_fee_bps(Pubkey::new_unique()), PLATFORM_FEE_BPS);
     }
 }
 
@@ -1339,9 +1355,9 @@ pub mod auction {
     //   - Current asset holder may list.
     //   - Asset must belong to ARTIFACTE_COLLECTION.
     //   - Payment mint must be USDC.
-    //   - 2% platform fee + creator royalty (from on-chain Royalties plugin)
-    //     routed to the configured treasury / royalty creator (= treasury);
-    //     remainder to the seller.
+    //   - Artifacte collection buys waive the platform fee.
+    //   - Creator royalty (from the on-chain Royalties plugin) is still
+    //     routed to the royalty creator; remainder goes to the seller.
     // ========================================================================
 
     /// List a Metaplex Core asset for fixed-price USDC sale.
@@ -1504,8 +1520,9 @@ pub mod auction {
         Ok(())
     }
 
-    /// Public buy of a Core listing. Splits USDC (platform fee + royalty +
-    /// remainder), then CPIs TransferV1 to move the asset to the buyer.
+    /// Public buy of a Core listing. Artifacte collection buys waive the
+    /// platform fee and only split USDC between creator royalty and seller.
+    /// Then CPI TransferV1 moves the asset to the buyer.
     pub fn buy_now_core(ctx: Context<BuyNowCore>) -> Result<()> {
         let listing = &ctx.accounts.core_listing;
 
@@ -1558,7 +1575,7 @@ pub mod auction {
 
         let platform_fee = listing
             .price
-            .checked_mul(200)
+            .checked_mul(core_platform_fee_bps(listing.collection))
             .and_then(|x| x.checked_div(10000))
             .ok_or(AuctionError::CalculationError)?;
         let creator_royalty = listing
@@ -1598,18 +1615,20 @@ pub mod auction {
             ),
             seller_amount,
         )?;
-        // USDC: buyer → treasury (platform fee)
-        token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.buyer_payment_account.to_account_info(),
-                    to: ctx.accounts.treasury_payment_account.to_account_info(),
-                    authority: ctx.accounts.buyer.to_account_info(),
-                },
-            ),
-            platform_fee,
-        )?;
+        if platform_fee > 0 {
+            // USDC: buyer → treasury (platform fee)
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.buyer_payment_account.to_account_info(),
+                        to: ctx.accounts.treasury_payment_account.to_account_info(),
+                        authority: ctx.accounts.buyer.to_account_info(),
+                    },
+                ),
+                platform_fee,
+            )?;
+        }
         if creator_royalty > 0 {
             token::transfer(
                 CpiContext::new(
