@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getActiveArtifacteMintSet } from '@/lib/artifacte-listings';
+import {
+  loadActiveArtifacteFixedPriceListings,
+  type ArtifacteProgramListing,
+} from '@/lib/artifacte-listings';
 import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 const ORACLE_API = getOracleApiUrl();
@@ -11,8 +14,15 @@ export const maxDuration = 30;
 
 type OracleListing = {
   id?: string;
+  image?: string;
+  name?: string;
   nftAddress?: string;
+  price?: number;
+  seller?: string;
   source?: string;
+  subtitle?: string;
+  currency?: string;
+  usdcPrice?: number;
   marketplace?: string;
   verifiedBy?: string;
   [key: string]: unknown;
@@ -45,7 +55,7 @@ const FORWARDED_QUERY_KEYS = [
   'source',
 ] as const;
 
-let activeArtifacteMintSetCache: { ts: number; value: Set<string> } | null = null;
+let activeArtifacteListingsCache: { ts: number; value: ArtifacteProgramListing[] } | null = null;
 
 function getOracleRequestErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -109,14 +119,61 @@ function getOracleListingMint(listing: OracleListing): string | null {
   return null;
 }
 
-async function getCachedActiveArtifacteMintSet(): Promise<Set<string>> {
-  if (activeArtifacteMintSetCache && Date.now() - activeArtifacteMintSetCache.ts < ARTIFACTE_MINT_CACHE_TTL) {
-    return activeArtifacteMintSetCache.value;
+async function getCachedActiveArtifacteListings(): Promise<ArtifacteProgramListing[]> {
+  if (activeArtifacteListingsCache && Date.now() - activeArtifacteListingsCache.ts < ARTIFACTE_MINT_CACHE_TTL) {
+    return activeArtifacteListingsCache.value;
   }
 
-  const value = await getActiveArtifacteMintSet();
-  activeArtifacteMintSetCache = { ts: Date.now(), value };
+  const value = await loadActiveArtifacteFixedPriceListings();
+  activeArtifacteListingsCache = { ts: Date.now(), value };
   return value;
+}
+
+function mergeArtifacteListingSnapshots(
+  listings: OracleListing[],
+  activeArtifacteListings: readonly ArtifacteProgramListing[],
+): OracleListing[] {
+  const activeArtifacteListingsByMint = new Map<string, ArtifacteProgramListing>();
+
+  for (const listing of activeArtifacteListings) {
+    activeArtifacteListingsByMint.set(listing.nftAddress, listing);
+  }
+
+  return listings.map((listing) => {
+    if (!isArtifacteOracleListing(listing)) {
+      return listing;
+    }
+
+    const mint = getOracleListingMint(listing);
+    if (!mint) {
+      return listing;
+    }
+
+    const activeListing = activeArtifacteListingsByMint.get(mint);
+    if (!activeListing) {
+      return listing;
+    }
+
+    return {
+      ...listing,
+      currency: activeListing.currency,
+      id: typeof listing.id === 'string' && listing.id ? listing.id : activeListing.id,
+      image: typeof listing.image === 'string' && listing.image.trim() ? listing.image : activeListing.image,
+      marketplace: activeListing.marketplace,
+      name: typeof listing.name === 'string' && listing.name.trim() ? listing.name : activeListing.name,
+      nftAddress: activeListing.nftAddress,
+      price: activeListing.price,
+      seller: activeListing.seller,
+      source: activeListing.source,
+      subtitle: typeof listing.subtitle === 'string' && listing.subtitle.trim()
+        ? listing.subtitle
+        : activeListing.subtitle,
+      usdcPrice: activeListing.usdcPrice,
+      verifiedBy: typeof listing.verifiedBy === 'string' && listing.verifiedBy.trim()
+        ? listing.verifiedBy
+        : 'Artifacte',
+    };
+  });
 }
 
 async function fetchOracleListings(params: URLSearchParams): Promise<OracleListingsResponse> {
@@ -265,7 +322,8 @@ export async function GET(request: Request) {
 
     if (shouldFilterArtifacteRows(category) && listings.some(isArtifacteOracleListing)) {
       try {
-        const activeArtifacteMints = await getCachedActiveArtifacteMintSet();
+        const activeArtifacteListings = await getCachedActiveArtifacteListings();
+        const activeArtifacteMints = new Set(activeArtifacteListings.map((listing) => listing.nftAddress));
         const refillResult = await refillArtifacteFilteredPage(
           params,
           listings,
@@ -275,7 +333,7 @@ export async function GET(request: Request) {
           activeArtifacteMints
         );
 
-        listings = refillResult.listings;
+        listings = mergeArtifacteListingSnapshots(refillResult.listings, activeArtifacteListings);
         total = Math.max(listings.length, total - refillResult.filteredOut);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
