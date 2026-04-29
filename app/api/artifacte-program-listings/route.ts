@@ -60,9 +60,12 @@ export async function GET(request: NextRequest) {
     const total = filteredListings.length;
     const start = (page - 1) * perPage;
     const paginated = filteredListings.slice(start, start + perPage);
+    const cacheControl = seller
+      ? "private, no-store"
+      : "public, max-age=30, stale-while-revalidate=120";
 
     return NextResponse.json({ listings: paginated, total }, {
-      headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=120" },
+      headers: { "Cache-Control": cacheControl },
     });
   } catch (error) {
     unstable_rethrow(error);

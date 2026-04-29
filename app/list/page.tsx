@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -31,7 +31,12 @@ import {
   getEligibleAssetsCount,
   toAssetCardModel,
 } from "./_lib/assets";
-import { getListPageAssetsQueryOptions, getListPageRoyaltyQueryOptions } from "./_lib/queries";
+import {
+  getListPageAssetsQueryKey,
+  getListPageAssetsQueryOptions,
+  getListPageRoyaltyQueryOptions,
+  removeListPageAssetByMint,
+} from "./_lib/queries";
 import { submitListPageListing } from "./_lib/submit-listing";
 import type { ListPageAsset, ListPageAssetCardModel, ListPageListingMode } from "./_lib/types";
 
@@ -94,6 +99,7 @@ function resetListPageState({
 }
 
 export default function ListNFTPage() {
+  const queryClient = useQueryClient();
   const {
     anchorWallet,
     connected,
@@ -114,6 +120,7 @@ export default function ListNFTPage() {
   const walletAddress = connected && publicKey ? publicKey.toBase58() : null;
   const allowlistNameMap = useMemo(() => createAllowlistNameMap(allowlist), [allowlist]);
   const allowedCollectionNames = useMemo(() => getAllowedCollectionNames(allowlist), [allowlist]);
+  const assetsQueryKey = getListPageAssetsQueryKey(walletAddress);
 
   const assetsQuery = useQuery(getListPageAssetsQueryOptions(walletAddress));
 
@@ -171,6 +178,16 @@ export default function ListNFTPage() {
     });
   };
 
+  const refreshAvailableAssets = async (listedMintAddress?: string) => {
+    if (listedMintAddress) {
+      queryClient.setQueryData<ListPageAsset[] | undefined>(assetsQueryKey, (currentAssets) =>
+        removeListPageAssetByMint(currentAssets, listedMintAddress)
+      );
+    }
+
+    await assetsQuery.refetch();
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmissionError("");
@@ -202,7 +219,9 @@ export default function ListNFTPage() {
 
       showToast.success("NFT listed successfully!");
       setSubmitted(true);
-      void assetsQuery.refetch();
+      void refreshAvailableAssets(result.mintAddress).catch(() => {
+        showToast.info("Your listing is live. Refreshing the available NFT inventory may take a moment.");
+      });
 
       if (notifyWarning) {
         showToast.info(`${notifyWarning} The listing is live on-chain, but category feeds may take a moment to refresh.`);
@@ -281,7 +300,7 @@ export default function ListNFTPage() {
             <ListPageErrorState
               errorMessage={assetsQuery.error.message}
               onRetry={() => {
-                void assetsQuery.refetch();
+                void refreshAvailableAssets();
               }}
             />
           ) : !selectedAssetCard ? (
@@ -289,7 +308,7 @@ export default function ListNFTPage() {
               <ListPageEmptyState
                 allowedCollectionNames={allowedCollectionNames}
                 onRetry={() => {
-                  void assetsQuery.refetch();
+                  void refreshAvailableAssets();
                 }}
               />
             ) : (

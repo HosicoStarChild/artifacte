@@ -21,6 +21,10 @@ interface ListPageArtifacteProgramListingsResponse {
   listings?: ListPageArtifacteProgramListing[];
 }
 
+export function getListPageAssetsQueryKey(walletAddress: string | null) {
+  return ["list-page-assets", walletAddress] as const;
+}
+
 function getResponseErrorMessage(
   response: Response,
   payload?: ListPageErrorResponse,
@@ -39,7 +43,10 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
   }
 
   const listedArtifacteMintSetPromise = fetch(
-    `/api/artifacte-program-listings?seller=${encodeURIComponent(walletAddress)}&perPage=100&sort=price-desc`
+    `/api/artifacte-program-listings?seller=${encodeURIComponent(walletAddress)}&perPage=100&sort=price-desc`,
+    {
+      cache: "no-store",
+    }
   )
     .then(async (response) => {
       const payload = (await response.json()) as ListPageArtifacteProgramListingsResponse & ListPageErrorResponse;
@@ -73,6 +80,7 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
     headers: {
       "Content-Type": "application/json",
     },
+    cache: "no-store",
     method: "POST",
   });
 
@@ -94,13 +102,27 @@ export async function fetchListPageAssets(walletAddress: string): Promise<ListPa
   });
 }
 
+export function removeListPageAssetByMint(
+  assets: ListPageAsset[] | undefined,
+  mintAddress: string
+): ListPageAsset[] | undefined {
+  if (!assets) {
+    return assets;
+  }
+
+  return assets.filter((asset) => (asset.nftAddress || asset.id) !== mintAddress);
+}
+
 export function getListPageAssetsQueryOptions(walletAddress: string | null) {
   return queryOptions({
     enabled: Boolean(walletAddress),
-    gcTime: 10 * 60_000,
+    gcTime: 0,
     queryFn: () => fetchListPageAssets(walletAddress ?? ""),
-    queryKey: ["list-page-assets", walletAddress],
-    staleTime: 60_000,
+    queryKey: getListPageAssetsQueryKey(walletAddress),
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
