@@ -112,6 +112,7 @@ export type AuctionListing = {
 
 type OracleListing = Omit<Listing, "gradeNum" | "gradingCompany" | "vault" | "year"> & {
   auctionListing?: AuctionListing | null;
+  altAssetName?: string | null;
   cardName?: string | null;
   cardNumber?: string;
   ccId?: string;
@@ -586,6 +587,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
 
     return buildCardDetail({
       auctionListing,
+      altAssetName: oracleListing?.altAssetName ?? null,
       cardNumber: oracleListing?.cardNumber || getAttributeValue(attributes, "Card Number"),
       category: oracleListing?.category || "TCG_CARDS",
       currency: listingCurrency,

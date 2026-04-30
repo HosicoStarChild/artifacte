@@ -591,6 +591,7 @@ function CardDetailPageContent() {
             {card.category !== 'MERCHANDISE' && (
             <PriceHistory 
               cardName={card.name} 
+              altAssetName={card.altAssetName ?? undefined}
               category={card.category} 
               grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
               year={card.year ?? undefined}

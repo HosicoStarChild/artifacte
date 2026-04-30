@@ -104,8 +104,29 @@ function buildSearchQuery(name: string): string {
   return q || name.slice(0, 50);
 }
 
+function normalizeOptionalText(value?: string | null): string | undefined {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : undefined;
+}
+
+function getPreferredChartQuery(
+  cardName: string,
+  {
+    altAssetName,
+    certCardName,
+  }: {
+    altAssetName?: string;
+    certCardName?: string | null;
+  } = {},
+): string {
+  return normalizeOptionalText(altAssetName)
+    ?? normalizeOptionalText(certCardName)
+    ?? buildSearchQuery(cardName);
+}
+
 interface PriceHistoryProps {
   cardName?: string;
+  altAssetName?: string;
   category?: string;
   grade?: string;
   year?: number | string;
@@ -130,7 +151,7 @@ function normalizeGrade(g?: string): string | undefined {
   return normalized;
 }
 
-export default function PriceHistory({ cardName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany, priceSource, priceSourceId }: PriceHistoryProps) {
+export default function PriceHistory({ cardName, altAssetName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany, priceSource, priceSourceId }: PriceHistoryProps) {
   const grade = normalizeGrade(rawGrade);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,9 +204,10 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
           } else if (priceSource === 'alt.xyz' && srcId) {
             // alt.xyz: srcId is the assetId — go straight to chart
             const chartParams = new URLSearchParams();
+            const chartQuery = getPreferredChartQuery(cardName, { altAssetName });
             chartParams.set("endpoint", "chart");
             chartParams.set("assetId", srcId);
-            if (cardName) chartParams.set("q", cardName);
+            chartParams.set("q", chartQuery);
             const chartRes = await fetch(`/api/oracle?${chartParams}`, { signal: AbortSignal.timeout(15000) });
             if (chartRes.ok) {
               const blob = await chartRes.blob();
@@ -303,10 +325,11 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         // Cert lookup gave us an assetId — skip search, go straight to chart
         if (certAssetId) {
           const chartParams = new URLSearchParams();
+          const chartQuery = getPreferredChartQuery(cardName, { altAssetName, certCardName });
           chartParams.set("endpoint", "chart");
           chartParams.set("assetId", certAssetId);
+          chartParams.set("q", chartQuery);
           if (grade) chartParams.set("grade", grade);
-          if (certCardName) chartParams.set("q", certCardName);
           setChartUrl(`/api/oracle?${chartParams.toString()}`);
           setLoading(false);
           return;
@@ -315,7 +338,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
         // Live search using cert card name if available, otherwise build from CC name.
         // When we have the mint, the oracle can often derive the right assetId directly
         // from on-chain metadata even when the free-text variant search fails.
-        const searchQuery = certCardName ? certCardName : buildSearchQuery(cardName);
+        const searchQuery = getPreferredChartQuery(cardName, { altAssetName, certCardName });
 
         if (nftAddress) {
           try {
@@ -468,7 +491,7 @@ export default function PriceHistory({ cardName, category, grade: rawGrade, year
     };
 
     fetchChart();
-  }, [cardName, category, grade, nftAddress, shouldShow]);
+  }, [altAssetName, cardName, category, grade, gradingCompany, gradingId, nftAddress, priceSource, priceSourceId, shouldShow, source, tcgPlayerId]);
 
   if (!shouldShow) return null;
 
