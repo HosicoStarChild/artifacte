@@ -551,15 +551,11 @@ export default function PriceHistory({
 
       try {
         const sourceId = priceSourceId || tcgPlayerId;
+        const shouldUseTcgplayerHistory = Boolean(sourceId)
+          && !gradingId
+          && (source === "phygitals" || priceSource === "TCGplayer");
 
-        if (source === "artifacte" && priceSource === "TCGplayer" && sourceId) {
-          if (!cancelled) {
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (source === "phygitals" && !gradingId) {
+        if (shouldUseTcgplayerHistory) {
           if (sourceId) {
             const [historyResponse, currentPriceResponse] = await Promise.all([
               fetch(
@@ -589,12 +585,11 @@ export default function PriceHistory({
             }
 
             if (historyResponse.status !== 404) {
-              if (!cancelled) {
+              if (source === "phygitals" && !cancelled) {
                 setError(await readApiError(historyResponse, "TCGplayer history lookup failed"));
                 setLoading(false);
+                return;
               }
-
-              return;
             }
 
             if (currentPrice !== null && !cancelled) {
@@ -611,43 +606,46 @@ export default function PriceHistory({
             }
           }
 
-          const cleanName = cardName
-            .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, "")
-            .trim();
+          if (source === "phygitals") {
+            const cleanName = cardName
+              .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, "")
+              .trim();
 
-          const searchResponse = await fetch(
-            `/api/oracle?endpoint=search&q=${encodeURIComponent(cleanName)}`,
-            { signal: AbortSignal.timeout(10000) },
-          );
+            const searchResponse = await fetch(
+              `/api/oracle?endpoint=search&q=${encodeURIComponent(cleanName)}`,
+              { signal: AbortSignal.timeout(10000) },
+            );
 
-          if (searchResponse.ok) {
-            const searchData = (await searchResponse.json()) as OracleSearchResponse;
-            if (searchData.variants && searchData.variants.length > 0) {
-              const ungraded = searchData.variants.find(
-                (variant) => !variant.grade || variant.grade === "Ungraded" || variant.grade === "Raw",
-              ) || searchData.variants[0];
+            if (searchResponse.ok) {
+              const searchData = (await searchResponse.json()) as OracleSearchResponse;
+              if (searchData.variants && searchData.variants.length > 0) {
+                const ungraded = searchData.variants.find(
+                  (variant) => !variant.grade || variant.grade === "Ungraded" || variant.grade === "Raw",
+                ) || searchData.variants[0];
 
-              if ((ungraded.marketPrice || ungraded.lowestPrice) && !cancelled) {
-                setSealedPrice({
-                  lowestPrice: ungraded.lowestPrice || 0,
-                  marketPrice: ungraded.marketPrice || ungraded.lowestPrice || 0,
-                  name: ungraded.fullName || ungraded.name || cleanName,
-                  tcg: ungraded.tcg || "Pokemon",
-                });
+                if ((ungraded.marketPrice || ungraded.lowestPrice) && !cancelled) {
+                  setSealedPrice({
+                    lowestPrice: ungraded.lowestPrice || 0,
+                    marketPrice: ungraded.marketPrice || ungraded.lowestPrice || 0,
+                    name: ungraded.fullName || ungraded.name || cleanName,
+                    tcg: ungraded.tcg || "Pokemon",
+                  });
+                } else if (!cancelled) {
+                  setError("No TCGplayer price data found");
+                }
               } else if (!cancelled) {
                 setError("No TCGplayer price data found");
               }
             } else if (!cancelled) {
-              setError("No TCGplayer price data found");
+              setError(await readApiError(searchResponse, "TCGplayer lookup failed"));
             }
-          } else if (!cancelled) {
-            setError(await readApiError(searchResponse, "TCGplayer lookup failed"));
-          }
 
-          if (!cancelled) {
-            setLoading(false);
+            if (!cancelled) {
+              setLoading(false);
+            }
+
+            return;
           }
-          return;
         }
 
         if (category === "SEALED") {
