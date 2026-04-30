@@ -303,6 +303,8 @@ function describeValueSource(valueSource?: string | null): string | null {
       return "Based on current Alt listing values";
     case "alt_direct":
       return "Based on direct Alt value";
+    case "cardhedge_price_guide":
+      return "Based on Card Hedge price guide market value";
     case "pricecharting_grade_guide":
       return "Based on PriceCharting grade guide market value";
     case "pricecharting_ungraded_search":
