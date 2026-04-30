@@ -2,7 +2,7 @@ import {
   fetchTcgPlayerProductPrice,
   resolveTcgPlayerPriceValue,
   type TcgPlayerProductPrice,
-} from "./tcgplayer-price.ts";
+} from "./tcgplayer-price";
 
 export interface PortfolioMarketLookupEntry {
   name: string;
@@ -88,11 +88,17 @@ async function fetchLiveTcgplayerPortfolioMarketValueMap(
     }
   );
 
-  return Object.fromEntries(
-    liveEntries.filter(
-      (entry): entry is readonly [string, PortfolioMarketValue] => Boolean(entry)
-    )
-  );
+  const liveValueMap: PortfolioMarketValueMap = {};
+
+  for (const entry of liveEntries) {
+    if (!entry) {
+      continue;
+    }
+
+    liveValueMap[entry[0]] = entry[1];
+  }
+
+  return liveValueMap;
 }
 
 export async function resolvePortfolioRwaMarketValueMap(
