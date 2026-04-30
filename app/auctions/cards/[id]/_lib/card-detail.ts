@@ -53,6 +53,7 @@ type HeliusContent = {
   links?: HeliusLinks;
   metadata?: {
     attributes?: HeliusAttribute[];
+    description?: string;
     name?: string;
   };
 };
@@ -175,6 +176,55 @@ function getAttributeValue(attributes: readonly HeliusAttribute[], name: string)
   );
 
   return getAttributeTextValue(matchingAttribute?.value);
+}
+
+function resolveAssetDisplayName(asset: HeliusAsset | null | undefined): string {
+  const attributes = getAssetAttributes(asset);
+  const title = getAttributeValue(attributes, "Title").trim();
+  const metadataName = asset?.content?.metadata?.name?.trim() || "";
+  const metadataDescription = asset?.content?.metadata?.description?.trim() || "";
+  const assetName = asset?.name?.trim() || "";
+
+  if (title) {
+    return title;
+  }
+
+  if (metadataName && !metadataName.endsWith("#")) {
+    return metadataName;
+  }
+
+  if (metadataDescription) {
+    return metadataDescription;
+  }
+
+  if (metadataName) {
+    return metadataName;
+  }
+
+  return assetName;
+}
+
+function resolvePreferredCardName(primaryName: string | null | undefined, fallbackName: string): string {
+  const trimmedPrimaryName = primaryName?.trim() || "";
+  const trimmedFallbackName = fallbackName.trim();
+
+  if (!trimmedPrimaryName) {
+    return trimmedFallbackName;
+  }
+
+  if (!trimmedFallbackName) {
+    return trimmedPrimaryName;
+  }
+
+  if (trimmedPrimaryName.endsWith("#") && !trimmedFallbackName.endsWith("#")) {
+    return trimmedFallbackName;
+  }
+
+  if (trimmedFallbackName.length > trimmedPrimaryName.length + 8) {
+    return trimmedFallbackName;
+  }
+
+  return trimmedPrimaryName;
 }
 
 function getPositiveNumber(value: NumericValue): number | null {
@@ -559,6 +609,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
     ]);
     const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mint });
     const attributes = getAssetAttributes(asset);
+    const assetDisplayName = resolveAssetDisplayName(asset);
     const tcgPlayerId = getAttributeValue(attributes, "TCGPlayer ID")
       || getAttributeValue(attributes, "TCGplayer Product ID")
       || oracleListing?.tcgPlayerId
@@ -597,7 +648,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       gradingId: getAttributeValue(attributes, "Cert Number") || getAttributeValue(attributes, "Grading ID") || null,
       id: cardId,
       image: oracleListing?.image || resolvedAssetImage || "",
-      name: oracleListing?.name || asset?.name || mint.slice(0, 12),
+      name: resolvePreferredCardName(oracleListing?.name, assetDisplayName || mint.slice(0, 12)),
       nftAddress: mint,
       price: listingPrice,
       priceSource: tcgPlayerId ? "TCGplayer" : undefined,
@@ -659,6 +710,10 @@ async function loadOracleCard(cardId: string, connection: Connection): Promise<C
       card.price = card.solPrice;
     }
 
+    if (card.source === "phygitals" && card.nftAddress) {
+      return loadPhygitalCard(`phyg-${card.nftAddress}`, connection);
+    }
+
     if (card.source === "artifacte") {
       return hydrateArtifacteCard(card, connection);
     }
@@ -681,6 +736,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
     const isArtifacte = hasAuthority(asset, ARTIFACTE_AUTHORITY);
     const isCollectorCrypt = hasGrouping(asset, COLLECTOR_CRYPT_COLLECTION);
     const isPhygital = hasGrouping(asset, PHYGITALS_COLLECTION);
+    const assetDisplayName = resolveAssetDisplayName(asset);
 
     if (isPhygital) {
       const mintAddress = asset.id || asset.mint || cardId;
@@ -704,7 +760,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         gradingId: getAttr("Cert Number") || getAttr("Grading ID") || null,
         id: mintAddress,
         image: resolvedAssetImage || asset.content?.links?.animation_url || "",
-        name: asset.content?.metadata?.name || "Unknown",
+        name: assetDisplayName || "Unknown",
         nftAddress: mintAddress,
         owner: asset.ownership?.owner || "",
         price: 0,
@@ -751,7 +807,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         image: resolvedAssetImage || "",
         insuredValue: null,
         language: getAttr("Language") || null,
-        name: asset.content?.metadata?.name || asset.name || "Unknown",
+        name: assetDisplayName || "Unknown",
         nftAddress: mintAddress,
         owner: asset.ownership?.owner || "",
         price: auctionListing?.price || tensorPrice?.usdcPrice || tensorPrice?.solPrice || 0,
@@ -791,7 +847,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         image: resolvedAssetImage || "",
         insuredValue: parseNullableInteger(getAttr("Insured Value")),
         marketplace: !auctionListing && (tensorPrice?.usdcPrice || tensorPrice?.solPrice) ? "tensor" : undefined,
-        name: asset.content?.metadata?.name || asset.name || "Unknown",
+        name: assetDisplayName || "Unknown",
         nftAddress: mintAddress,
         owner: asset.ownership?.owner || "",
         price: auctionListing?.price || tensorPrice?.usdcPrice || tensorPrice?.solPrice || 0,

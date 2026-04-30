@@ -465,6 +465,11 @@ function CardDetailPageContent() {
               </div>
             )}
 
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Grading Info */}
             <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
               <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">{card.source === "artifacte" && card.condition !== "Graded" ? "Card Details" : "Grading Details"}</h3>
@@ -578,17 +583,18 @@ function CardDetailPageContent() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Phygitals: show TCGplayer price box */}
-            {card.source === 'phygitals' && card.priceSourceId && (
-              <TcgPlayerPriceBox productId={card.priceSourceId} />
-            )}
-            {/* CC cards with TCGplayer source: show TCGplayer price box */}
-            {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
-              <TcgPlayerPriceBox productId={card.priceSourceId} />
-            )}
-            {/* Oracle Price History — CC, Sports, Phygitals */}
-            {card.category !== 'MERCHANDISE' && (
+          {/* Phygitals: show TCGplayer price box */}
+          {card.source === 'phygitals' && card.priceSourceId && (
+            <TcgPlayerPriceBox productId={card.priceSourceId} />
+          )}
+          {/* CC cards with TCGplayer source: show TCGplayer price box */}
+          {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
+            <TcgPlayerPriceBox productId={card.priceSourceId} />
+          )}
+          {/* Oracle Price History — CC, Sports, Phygitals */}
+          {card.category !== 'MERCHANDISE' && (
             <PriceHistory 
               cardName={card.name} 
               altAssetName={card.altAssetName ?? undefined}
@@ -603,39 +609,38 @@ function CardDetailPageContent() {
               priceSource={card.priceSource}
               priceSourceId={card.priceSourceId}
             />
-            )}
+          )}
 
-            {/* NFT Details */}
-            <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
-              <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">NFT Details</h3>
-              <div className="space-y-3">
-                {card.nftAddress && (
-                  <div>
-                    <p className="text-gray-500 text-xs mb-1">Mint Address</p>
-                    <p className="text-white text-xs font-mono break-all">{card.nftAddress}</p>
-                  </div>
-                )}
+          {/* NFT Details */}
+          <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
+            <h3 className="text-white font-medium text-sm mb-4 tracking-wider uppercase">NFT Details</h3>
+            <div className="space-y-3">
+              {card.nftAddress && (
+                <div>
+                  <p className="text-gray-500 text-xs mb-1">Mint Address</p>
+                  <p className="text-white text-xs font-mono break-all">{card.nftAddress}</p>
+                </div>
+              )}
 {/* CC ID removed */}
-                {card.seller && (
-                  <div>
-                    <p className="text-gray-500 text-xs mb-1">Seller</p>
-                    <p className="text-white text-xs font-mono break-all">{card.seller}</p>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 flex gap-3">
-                {card.nftAddress && (
-                  <a
-                    href={`https://explorer.solana.com/address/${card.nftAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-gold-500 hover:text-gold-400 transition"
-                  >
-                    View on Explorer →
-                  </a>
-                )}
+              {card.seller && (
+                <div>
+                  <p className="text-gray-500 text-xs mb-1">Seller</p>
+                  <p className="text-white text-xs font-mono break-all">{card.seller}</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex gap-3">
+              {card.nftAddress && (
+                <a
+                  href={`https://explorer.solana.com/address/${card.nftAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gold-500 hover:text-gold-400 transition"
+                >
+                  View on Explorer →
+                </a>
+              )}
 {/* CC link removed */}
-              </div>
             </div>
           </div>
         </div>

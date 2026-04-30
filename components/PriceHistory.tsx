@@ -1,107 +1,201 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-/**
- * Extract search-friendly query from verbose CC/ME card names.
- * E.g. "2015 Pokemon Japanese XY Promo Poncho-wearing Pikachu #150/XY-P PSA 10"
- *   → "Pikachu Poncho 150 XY-P"
- * E.g. "2023 One Piece OP05 Awakening SEC Monkey D. Luffy #OP05-119 PSA 10"
- *   → "OP05-119"
- */
-// Manual overrides for cards where ME listing names are too generic to match correctly
 const CHART_OVERRIDES: Record<string, string> = {
-  '2022 #001 Monkey D. Luffy PSA 10 One Piece Promos': 'one piece luffy P-001 super prerelease winner',
-  '2024 #019 Divine Departure PSA 10 One Piece Japanese OP10-Royal Blood': 'OP10019 divine depature Japanese',
-  '2023 #092 Rob Lucci PSA 10 One Piece Japanese OP05-Awakening of the New Era Pokemon': 'OP05092 rob lucci japanese special alternate art',
+  "2022 #001 Monkey D. Luffy PSA 10 One Piece Promos": "one piece luffy P-001 super prerelease winner",
+  "2024 #019 Divine Departure PSA 10 One Piece Japanese OP10-Royal Blood": "OP10019 divine depature Japanese",
+  "2023 #092 Rob Lucci PSA 10 One Piece Japanese OP05-Awakening of the New Era Pokemon": "OP05092 rob lucci japanese special alternate art",
 };
 
+type UngradedPrice = {
+  lowestPrice: number;
+  marketPrice: number;
+  name: string;
+  rarity: string;
+};
+
+type SealedPrice = {
+  lowestPrice: number;
+  marketPrice: number;
+  name: string;
+  tcg: string;
+};
+
+type ApiErrorPayload = {
+  error?: string;
+  message?: string;
+};
+
+type OracleSearchVariant = {
+  fullName?: string;
+  grade?: string | null;
+  lowestPrice?: number | null;
+  marketPrice?: number | null;
+  name?: string;
+  tcg?: string;
+};
+
+type OracleSearchResponse = {
+  variants?: OracleSearchVariant[];
+};
+
+type OracleCertCard = {
+  assetId?: string | null;
+  assetName?: string | null;
+  cardName?: string | null;
+  cardNumber?: string | null;
+  cardSet?: string | null;
+};
+
+type OracleCertResponse = {
+  card?: OracleCertCard | null;
+};
+
+type OracleCgcCertResponse = {
+  assetId?: string | null;
+  card?: OracleCertCard | null;
+  matchedName?: string | null;
+};
+
+type OracleAnalyticsPeriod = {
+  averagePriceUsd: number | null;
+  displayPriceUsd: number | null;
+  hasAltValue: boolean;
+  label: string;
+  maxPriceUsd: number | null;
+  minPriceUsd: number | null;
+  periodStart: string;
+  salesCount: number;
+  salesVolumeUsd: number;
+};
+
+type OracleAnalyticsResponse = {
+  altValueUsd: number | null;
+  assetId: string | null;
+  averageSalePriceUsd: number | null;
+  cardName: string;
+  coverageEnd: string | null;
+  coverageStart: string | null;
+  currentValueUsd: number | null;
+  empty: boolean;
+  gradeFilter: string | null;
+  latestAveragePriceUsd: number | null;
+  maxPriceUsd: number | null;
+  minPriceUsd: number | null;
+  periods: OracleAnalyticsPeriod[];
+  title: string;
+  totalObservedSales: number;
+  totalSales: number;
+  totalVolumeUsd: number;
+};
+
+type AnalyticsTooltipPayloadItem = {
+  payload?: OracleAnalyticsPeriod;
+};
+
+interface PriceHistoryProps {
+  altAssetName?: string;
+  cardName?: string;
+  category?: string;
+  grade?: string;
+  gradingCompany?: string;
+  gradingId?: string;
+  nftAddress?: string;
+  priceSource?: string;
+  priceSourceId?: string;
+  source?: string;
+  tcgPlayerId?: string;
+  year?: number | string;
+}
+
 function buildSearchQuery(name: string): string {
-  // Check manual overrides first
   if (CHART_OVERRIDES[name]) return CHART_OVERRIDES[name];
 
-  // 1. Extract full card number like #OP05-119, OP11-118, OP05119 (must have dash or 5+ digits)
   const opMatch = name.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i) || name.match(/#?((?:OP|ST|EB|PRB?)\d{5,})/i);
   if (opMatch) {
-    // Normalize: insert dash if missing (OP05119 → OP05-119)
     let cardNum = opMatch[1];
-    if (!cardNum.includes('-')) {
-      const m = cardNum.match(/^([A-Z]+\d{2})(\d+)$/i);
-      if (m) cardNum = `${m[1]}-${m[2]}`;
+    if (!cardNum.includes("-")) {
+      const match = cardNum.match(/^([A-Z]+\d{2})(\d+)$/i);
+      if (match) cardNum = `${match[1]}-${match[2]}`;
     }
-    // Include variant keywords for disambiguation (manga art vs alt art vs standard)
     const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|super\s*pre.?release|winner|sp|sec)\b/i);
     return variant ? `${cardNum} ${variant[0]}` : cardNum;
   }
 
-  // 2. Extract Pokemon set codes: SV06-061, SWSH12-150, XY-150
   const pkMatch = name.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH|sv|S|s)\d*[-/]\d+[-/]?[A-Z]*)/i);
   if (pkMatch) return pkMatch[1];
 
-  // 3. Extract card number with # prefix: #051, #118, #150/XY-P
   const hashMatch = name.match(/#(\d+(?:\/[\w-]+)?)/);
   if (hashMatch) {
-    // Check if set code like OP09, ST01, EB01 exists in the name (e.g. "OP09-Emperors in the New World")
     const setPrefix = name.match(/\b(OP|ST|EB|PRB?)\d{2}/i);
     if (setPrefix) {
-      // Combine: OP09 + #051 → OP09-051, plus character name + variant for disambiguation
       const cardNum = `${setPrefix[0]}-${hashMatch[1]}`;
       const variant = name.match(/\b(manga|alt(?:ernate)?\s*art|wanted|super\s*pre.?release|winner|sp|sec|3rd\s*anniversary|gold|serialized|tournament)\b/i);
-      // Also extract character name
       const charWords = name
-        .replace(/\b\d{4}\b/g, '').replace(/#\d+/g, '')
-        .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
-        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|English|EN)\b/gi, '')
-        .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
-        .replace(/\b(OP|ST|EB)\d+[-\w]*/gi, '')
-        .replace(/[\/|,-]/g, ' ')
-        .trim().split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w)).slice(0, 3);
+        .replace(/\b\d{4}\b/g, "")
+        .replace(/#\d+/g, "")
+        .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, "")
+        .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|English|EN)\b/gi, "")
+        .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, "")
+        .replace(/\b(OP|ST|EB)\d+[-\w]*/gi, "")
+        .replace(/[\/|,-]/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter((word) => word.length > 2 && /^[A-Z]/.test(word))
+        .slice(0, 3);
       const parts = [cardNum, ...charWords];
       if (variant) parts.push(variant[0]);
-      return parts.join(' ');
+      return parts.join(" ");
     }
-    // Build query from card number + name context
+
     const parts: string[] = [];
-    // Extract character/card name (first 1-3 capitalized words before common keywords)
     const cleanName = name
-      .replace(/[\/|]/g, ' ')
-      .replace(/\b\d{4}\b/g, '')
-      .replace(/#\d+/g, '')
-      .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
-      .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, '')
-      .replace(/\b(English|EN)\b/gi, '')
-      .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, '')
-      .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, '')
-      .replace(/-HOLO\b/gi, '')
-      .replace(/-/g, ' ')
+      .replace(/[\/|]/g, " ")
+      .replace(/\b\d{4}\b/g, "")
+      .replace(/#\d+/g, "")
+      .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, "")
+      .replace(/\b(GEM[- ]?MT|MINT|PRISTINE)\b/gi, "")
+      .replace(/\b(English|EN)\b/gi, "")
+      .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball)\b/gi, "")
+      .replace(/\b(Promos?|Promo|FULL ART|SPECIAL BOX)\b/gi, "")
+      .replace(/-HOLO\b/gi, "")
+      .replace(/-/g, " ")
       .trim();
-    // Get meaningful words (character name, set identifiers, etc.)
-    const words = cleanName.split(/\s+/).filter(w => w.length > 2 && /^[A-Z]/.test(w));
+    const words = cleanName.split(/\s+/).filter((word) => word.length > 2 && /^[A-Z]/.test(word));
     if (words.length > 0) parts.push(...words.slice(0, 6));
     parts.push(hashMatch[1]);
-    // Add TCG context
-    if (/one piece/i.test(name)) parts.push('one piece');
-    else if (/pokemon/i.test(name)) parts.push('pokemon');
-    else if (/dragon ball/i.test(name)) parts.push('dragon ball');
-    else if (/yu-?gi-?oh/i.test(name)) parts.push('yugioh');
-    return parts.join(' ');
+    if (/one piece/i.test(name)) parts.push("one piece");
+    else if (/pokemon/i.test(name)) parts.push("pokemon");
+    else if (/dragon ball/i.test(name)) parts.push("dragon ball");
+    else if (/yu-?gi-?oh/i.test(name)) parts.push("yugioh");
+    return parts.join(" ");
   }
 
-  // 4. Clean up name for freetext search
-  let q = name
-    .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, '')
-    .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, '')
-    .replace(/\b\d{4}\b/g, '') // years
-    .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes|TCG)\b/gi, '')
-    .replace(/\b(English|EN)\b/gi, '')
-    .replace(/\b(1st Edition|Unlimited|Shadowless|Holo|Reverse)\b/gi, '')
-    .replace(/\s+/g, ' ')
+  let query = name
+    .replace(/\b(PSA|CGC|BGS|SGC)\s*\d+\.?\d*/gi, "")
+    .replace(/\b(GEM[- ]?MT|MINT|PRISTINE|NEAR MINT)\b/gi, "")
+    .replace(/\b\d{4}\b/g, "")
+    .replace(/\b(Pokemon|One Piece|Yu-Gi-Oh|Magic|Dragon Ball|Vibes|TCG)\b/gi, "")
+    .replace(/\b(English|EN)\b/gi, "")
+    .replace(/\b(1st Edition|Unlimited|Shadowless|Holo|Reverse)\b/gi, "")
+    .replace(/\s+/g, " ")
     .trim();
 
-  const words = q.split(' ').filter(w => w.length > 2);
-  if (words.length > 5) q = words.slice(0, 5).join(' ');
+  const words = query.split(" ").filter((word) => word.length > 2);
+  if (words.length > 5) query = words.slice(0, 5).join(" ");
 
-  return q || name.slice(0, 50);
+  return query || name.slice(0, 50);
 }
 
 function normalizeOptionalText(value?: string | null): string | undefined {
@@ -124,516 +218,584 @@ function getPreferredChartQuery(
     ?? buildSearchQuery(cardName);
 }
 
-interface PriceHistoryProps {
-  cardName?: string;
-  altAssetName?: string;
-  category?: string;
-  grade?: string;
-  year?: number | string;
-  nftAddress?: string;
-  source?: string;
-  tcgPlayerId?: string;
-  gradingId?: string;
-  gradingCompany?: string;
-  priceSource?: string;
-  priceSourceId?: string;
-}
-
-function normalizeGrade(g?: string): string | undefined {
-  if (!g) return undefined;
-  // Normalize grading company names to Alt.xyz format
-  let normalized = g.trim()
-    .replace(/^Beckett\s*/i, 'BGS ')
-    .replace(/^Professional Sports Authenticator\s*/i, 'PSA ')
-    .replace(/^Certified Guaranty Company\s*/i, 'CGC ');
-  // Normalize space to dash: "PSA 10" → "PSA-10"
-  normalized = normalized.replace(/^(PSA|BGS|CGC|SGC)\s+/i, (_, co) => `${co.toUpperCase()}-`);
+function normalizeGrade(value?: string): string | undefined {
+  if (!value) return undefined;
+  let normalized = value.trim()
+    .replace(/^Beckett\s*/i, "BGS ")
+    .replace(/^Professional Sports Authenticator\s*/i, "PSA ")
+    .replace(/^Certified Guaranty Company\s*/i, "CGC ");
+  normalized = normalized.replace(/^(PSA|BGS|CGC|SGC)\s+/i, (_, company) => `${company.toUpperCase()}-`);
   return normalized;
 }
 
-export default function PriceHistory({ cardName, altAssetName, category, grade: rawGrade, year, nftAddress, source, tcgPlayerId, gradingId, gradingCompany, priceSource, priceSourceId }: PriceHistoryProps) {
+function formatUsd(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value >= 1000 ? 0 : 2,
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  }).format(value);
+}
+
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    notation: value >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: value >= 1000 ? 1 : 0,
+  }).format(value);
+}
+
+function formatCompactUsd(value: number | string): string {
+  const numericValue = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(numericValue)) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: Math.abs(numericValue) >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: Math.abs(numericValue) >= 1000 ? 1 : 0,
+  }).format(numericValue);
+}
+
+function formatCoverage(start?: string | null, end?: string | null): string {
+  if (!start || !end) {
+    return "No history yet";
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
+  return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`;
+}
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as ApiErrorPayload;
+    return payload.error || payload.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function MetricCard({
+  detail,
+  label,
+  value,
+}: {
+  detail?: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-dark-900/80 px-4 py-4">
+      <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">{label}</p>
+      <p className="mt-2 font-serif text-2xl text-white">{value}</p>
+      {detail ? <p className="mt-2 text-xs text-gray-500">{detail}</p> : null}
+    </div>
+  );
+}
+
+function AnalyticsTooltip({ active, payload }: { active?: boolean; payload?: AnalyticsTooltipPayloadItem[] }) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const point = payload.find((entry) => entry.payload)?.payload;
+  if (!point) {
+    return null;
+  }
+
+  const showCurrentValue = point.hasAltValue && point.displayPriceUsd !== point.averagePriceUsd;
+
+  return (
+    <div className="min-w-56 rounded-xl border border-white/10 bg-dark-900/95 px-4 py-3 shadow-2xl backdrop-blur-sm">
+      <p className="text-sm font-medium text-white">{point.label}</p>
+      <div className="mt-3 space-y-2 text-xs text-gray-300">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">Avg sale price</span>
+          <span className="text-white">{formatUsd(point.averagePriceUsd)}</span>
+        </div>
+        {showCurrentValue ? (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-500">Current value</span>
+            <span className="text-gold-400">{formatUsd(point.displayPriceUsd)}</span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">Sales volume</span>
+          <span className="text-emerald-300">{formatUsd(point.salesVolumeUsd)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-gray-500">Total sales</span>
+          <span className="text-white">{formatCompactNumber(point.salesCount)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PriceHistory({
+  altAssetName,
+  cardName,
+  category,
+  grade: rawGrade,
+  gradingCompany,
+  gradingId,
+  nftAddress,
+  priceSource,
+  priceSourceId,
+  source,
+  tcgPlayerId,
+}: PriceHistoryProps) {
   const grade = normalizeGrade(rawGrade);
-  const [loading, setLoading] = useState(false);
+  const [analytics, setAnalytics] = useState<OracleAnalyticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [chartUrl, setChartUrl] = useState<string | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [salesCount, setSalesCount] = useState<number | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [ungradedPrice, setUngradedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; rarity: string } | null>(null);
-  const [sealedPrice, setSealedPrice] = useState<{ name: string; marketPrice: number; lowestPrice: number; tcg: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [sealedPrice, setSealedPrice] = useState<SealedPrice | null>(null);
+  const [ungradedPrice, setUngradedPrice] = useState<UngradedPrice | null>(null);
 
   const shouldShow = category === "TCG_CARDS" || category === "SPORTS_CARDS" || category === "WATCHES" || category === "SEALED";
 
   useEffect(() => {
     if (!shouldShow || !cardName) {
-      setChartUrl(null);
+      setAnalytics(null);
+      setSealedPrice(null);
+      setUngradedPrice(null);
       return;
     }
 
-    const fetchChart = async () => {
+    let cancelled = false;
+
+    const fetchPriceHistory = async () => {
       setLoading(true);
       setError(null);
-      setImageLoaded(false);
-      setChartUrl(null);
-      setSalesCount(null);
+      setAnalytics(null);
       setSealedPrice(null);
+      setUngradedPrice(null);
 
       try {
-        // Artifacte-minted cards: respect on-chain priceSource (TCGplayer or alt.xyz)
-        if (source === 'artifacte' && priceSource) {
-          const srcId = priceSourceId || tcgPlayerId;
-          if (priceSource === 'TCGplayer' && srcId) {
-            const tcgRes = await fetch(`/api/tcgplayer-price?id=${srcId}`, { signal: AbortSignal.timeout(10000) });
-            if (tcgRes.ok) {
-              const tcgData = await tcgRes.json();
-              if (tcgData.marketPrice || tcgData.lowestPrice) {
-                setUngradedPrice({
-                  name: tcgData.name || cardName,
-                  marketPrice: tcgData.marketPrice || tcgData.lowestPrice || 0,
-                  lowestPrice: tcgData.lowestPrice || 0,
-                  rarity: tcgData.rarity || '',
-                });
-              } else {
-                setError("No TCGplayer price data found");
-              }
-            } else {
-              setError("TCGplayer lookup failed");
-            }
+        const sourceId = priceSourceId || tcgPlayerId;
+
+        if (source === "artifacte" && priceSource === "TCGplayer" && sourceId) {
+          if (!cancelled) {
             setLoading(false);
-            return;
-          } else if (priceSource === 'alt.xyz' && srcId) {
-            // alt.xyz: srcId is the assetId — go straight to chart
-            const chartParams = new URLSearchParams();
-            const chartQuery = getPreferredChartQuery(cardName, { altAssetName });
-            chartParams.set("endpoint", "chart");
-            chartParams.set("assetId", srcId);
-            chartParams.set("q", chartQuery);
-            const chartRes = await fetch(`/api/oracle?${chartParams}`, { signal: AbortSignal.timeout(15000) });
-            if (chartRes.ok) {
-              const blob = await chartRes.blob();
-              if (blob.size > 1000) {
-                setChartUrl(URL.createObjectURL(blob));
-                // Get sales count from header
-                const sc = chartRes.headers.get("x-sales-count");
-                if (sc) setSalesCount(parseInt(sc));
-              } else {
-                setError("No alt.xyz price data found");
-              }
-            } else {
-              setError("alt.xyz chart unavailable");
-            }
-            setLoading(false);
-            return;
           }
+          return;
         }
 
-        // Phygitals without grading: fetch TCGplayer ungraded market price
-        // Graded phygitals with cert numbers fall through to cert lookup below
-        if (source === 'phygitals' && !gradingId) {
+        if (source === "phygitals" && !gradingId) {
           const cleanName = cardName
-            .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, '')
+            .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, "")
             .trim();
-          
-          const searchRes = await fetch(
+
+          const searchResponse = await fetch(
             `/api/oracle?endpoint=search&q=${encodeURIComponent(cleanName)}`,
-            { signal: AbortSignal.timeout(10000) }
+            { signal: AbortSignal.timeout(10000) },
           );
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            if (searchData.variants?.length > 0) {
-              // Find the ungraded/raw variant
-              const ungraded = searchData.variants.find((v: any) => 
-                !v.grade || v.grade === 'Ungraded' || v.grade === 'Raw'
+
+          if (searchResponse.ok) {
+            const searchData = (await searchResponse.json()) as OracleSearchResponse;
+            if (searchData.variants && searchData.variants.length > 0) {
+              const ungraded = searchData.variants.find(
+                (variant) => !variant.grade || variant.grade === "Ungraded" || variant.grade === "Raw",
               ) || searchData.variants[0];
-              
-              if (ungraded.marketPrice || ungraded.lowestPrice) {
+
+              if ((ungraded.marketPrice || ungraded.lowestPrice) && !cancelled) {
                 setSealedPrice({
-                  name: ungraded.fullName || ungraded.name || cleanName,
-                  marketPrice: ungraded.marketPrice || ungraded.lowestPrice || 0,
                   lowestPrice: ungraded.lowestPrice || 0,
-                  tcg: ungraded.tcg || 'Pokemon',
+                  marketPrice: ungraded.marketPrice || ungraded.lowestPrice || 0,
+                  name: ungraded.fullName || ungraded.name || cleanName,
+                  tcg: ungraded.tcg || "Pokemon",
                 });
-              } else {
+              } else if (!cancelled) {
                 setError("No TCGplayer price data found");
               }
-            } else {
+            } else if (!cancelled) {
               setError("No TCGplayer price data found");
             }
+          } else if (!cancelled) {
+            setError(await readApiError(searchResponse, "TCGplayer lookup failed"));
           }
-          setLoading(false);
+
+          if (!cancelled) {
+            setLoading(false);
+          }
           return;
         }
 
-        // Sealed products: fetch TCGplayer market price instead of graded chart
         if (category === "SEALED") {
-          // Extract search terms from sealed product name
-          // e.g. "Awakening of the New Era - Booster Box" from CC listing name
           const cleanName = cardName
-            .replace(/\b(PSA|CGC|BGS)\s*\d+/gi, '')
-            .replace(/\b\d{4}\b/g, '')
-            .replace(/\b(Collector Crypt|collector_crypt)\b/gi, '')
+            .replace(/\b(PSA|CGC|BGS)\s*\d+/gi, "")
+            .replace(/\b\d{4}\b/g, "")
+            .replace(/\b(Collector Crypt|collector_crypt)\b/gi, "")
             .trim();
-          
-          const sealedRes = await fetch(
+
+          const sealedResponse = await fetch(
             `/api/oracle?endpoint=sealed&q=${encodeURIComponent(cleanName)}`,
-            { signal: AbortSignal.timeout(10000) }
+            { signal: AbortSignal.timeout(10000) },
           );
-          if (sealedRes.ok) {
-            const sealedData = await sealedRes.json();
-            if (sealedData.results?.length > 0) {
-              const best = sealedData.results[0];
-              setSealedPrice({ name: best.name, marketPrice: best.marketPrice, lowestPrice: best.lowestPrice, tcg: best.tcg });
-            } else {
+
+          if (sealedResponse.ok) {
+            const sealedData = (await sealedResponse.json()) as { results?: SealedPrice[] };
+            const best = sealedData.results?.[0];
+            if (best && !cancelled) {
+              setSealedPrice(best);
+            } else if (!cancelled) {
               setError("No sealed price data found");
             }
-          } else {
-            setError("Sealed price lookup failed");
+          } else if (!cancelled) {
+            setError(await readApiError(sealedResponse, "Sealed price lookup failed"));
           }
-          setLoading(false);
+
+          if (!cancelled) {
+            setLoading(false);
+          }
           return;
         }
 
-        // Cert-based lookup — get exact assetId (PSA/BGS) or matched card name (CGC)
         let certAssetId: string | null = null;
-        let certValue: number | null = null;
         let certCardName: string | null = null;
+
         if (gradingId) {
           try {
-            if (gradingCompany === 'PSA' || gradingCompany === 'BGS') {
-              const certRes = await fetch(`/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`, { signal: AbortSignal.timeout(8000) });
-              if (certRes.ok) {
-                const certData = await certRes.json();
+            if (gradingCompany === "PSA" || gradingCompany === "BGS") {
+              const certResponse = await fetch(
+                `/api/oracle?endpoint=cert&cert=${encodeURIComponent(gradingId)}`,
+                { signal: AbortSignal.timeout(8000) },
+              );
+              if (certResponse.ok) {
+                const certData = (await certResponse.json()) as OracleCertResponse;
                 if (certData.card?.assetId) certAssetId = certData.card.assetId;
                 if (certData.card?.assetName) certCardName = certData.card.assetName;
-                if (certData.value) certValue = certData.value;
               }
-            } else if (gradingCompany === 'CGC') {
-              // CGC: use the same valuateByCgcCert path as portfolio (with language filter)
-              const gradeKey = grade || '';
-              const cgcRes = await fetch(`/api/oracle?endpoint=cert-cgc&cert=${encodeURIComponent(gradingId)}&grade=${encodeURIComponent(gradeKey)}`, { signal: AbortSignal.timeout(8000) });
-              if (cgcRes.ok) {
-                const cgcData = await cgcRes.json();
-                if (cgcData.assetId) certAssetId = cgcData.assetId;
-                if (cgcData.matchedName) certCardName = cgcData.matchedName;
-                else if (cgcData.card?.cardName) certCardName = [cgcData.card.cardName, cgcData.card.cardSet, cgcData.card.cardNumber].filter(Boolean).join(' ');
-                if (cgcData.value) certValue = cgcData.value;
-              }
-            }
-          } catch {}
-        }
-
-        // Cert lookup gave us an assetId — skip search, go straight to chart
-        if (certAssetId) {
-          const chartParams = new URLSearchParams();
-          const chartQuery = getPreferredChartQuery(cardName, { altAssetName, certCardName });
-          chartParams.set("endpoint", "chart");
-          chartParams.set("assetId", certAssetId);
-          chartParams.set("q", chartQuery);
-          if (grade) chartParams.set("grade", grade);
-          setChartUrl(`/api/oracle?${chartParams.toString()}`);
-          setLoading(false);
-          return;
-        }
-
-        // Live search using cert card name if available, otherwise build from CC name.
-        // When we have the mint, the oracle can often derive the right assetId directly
-        // from on-chain metadata even when the free-text variant search fails.
-        const searchQuery = getPreferredChartQuery(cardName, { altAssetName, certCardName });
-
-        if (nftAddress) {
-          try {
-            const chartParams = new URLSearchParams();
-            chartParams.set("endpoint", "chart");
-            chartParams.set("q", searchQuery);
-            chartParams.set("mint", nftAddress);
-            if (grade) chartParams.set("grade", grade);
-
-            const directChartRes = await fetch(
-              `/api/oracle?${chartParams.toString()}`,
-              { signal: AbortSignal.timeout(15000) }
-            );
-
-            if (directChartRes.ok) {
-              const blob = await directChartRes.blob();
-              if (blob.size > 1000) {
-                setChartUrl(URL.createObjectURL(blob));
-                const sc = directChartRes.headers.get("x-sales-count") || directChartRes.headers.get("x-total-sales");
-                if (sc) setSalesCount(parseInt(sc));
-                setLoading(false);
-                return;
-              }
-            }
-          } catch {}
-        }
-
-        const searchRes = await fetch(
-          `/api/oracle?endpoint=search&q=${encodeURIComponent(searchQuery)}`,
-          { signal: AbortSignal.timeout(15000) }
-        );
-        if (!searchRes.ok) throw new Error("Search failed");
-        const searchData = await searchRes.json();
-
-        if (!searchData.variants || searchData.variants.length === 0) {
-          setError("No price data found");
-          setLoading(false);
-          return;
-        }
-
-        // Pick the variant that matches the card number from the name
-        let chosen = searchData.variants[0];
-        const cardNumMatch = cardName.match(/#(\w+)/);
-        if (cardNumMatch && searchData.variants.length > 1) {
-          const targetNum = cardNumMatch[1];
-          const matchesNum = (cn: string) => cn === targetNum || cn.endsWith(`-${targetNum}`) || cn.endsWith(targetNum);
-          const exactMatch = searchData.variants.find(
-            (v: any) => matchesNum(String(v.cardNumber))
-          );
-          // If multiple variants share the same card number, further filter by variant type
-          if (exactMatch) {
-            const sameNumVariants = searchData.variants.filter(
-              (v: any) => matchesNum(String(v.cardNumber))
-            );
-            if (sameNumVariants.length > 1) {
-              const nameUpper = cardName.toUpperCase();
-              const isReverse = /REVERSE/i.test(nameUpper);
-              const isHolo = /HOLO/i.test(nameUpper) && !isReverse;
-              
-              // Filter by language first — CC names contain "Japanese"/"JPN" for JP cards
-              const isCardJapanese = /JAPANESE|JPN|\bJP\b/i.test(cardName);
-              let langFiltered = sameNumVariants;
-              if (isCardJapanese) {
-                const jpOnly = sameNumVariants.filter((v: any) => /JAPANESE/i.test(v.name || '') || /JAPANESE/i.test(v.brand || ''));
-                if (jpOnly.length > 0) langFiltered = jpOnly;
-              } else {
-                const enOnly = sameNumVariants.filter((v: any) => !/JAPANESE|CHINESE/i.test(v.name || '') && !/JAPANESE|CHINESE/i.test(v.brand || ''));
-                if (enOnly.length > 0) langFiltered = enOnly;
-              }
-              
-              // Apply holo/reverse filter
-              let pool = langFiltered;
-              if (isReverse) {
-                const rev = langFiltered.filter((v: any) => /REVERSE/i.test(v.name || ''));
-                if (rev.length > 0) pool = rev;
-              } else if (isHolo) {
-                const hol = langFiltered.filter((v: any) => /HOLO/i.test(v.name || '') && !/REVERSE/i.test(v.name || ''));
-                if (hol.length > 0) pool = hol;
-              }
-              
-              // Pick variant with most sales for requested grade
-              const gp = grade ? grade.split('-')[0]?.toUpperCase() : '';
-              const gn = grade ? grade.split('-')[1] : '';
-              if (gp && gn && pool.length > 1) {
-                let bestV = pool[0], bestC = 0;
-                for (const v of pool) {
-                  const cnt = (v.grades || []).filter((g: any) => g.grader?.toUpperCase() === gp && String(g.grade) === gn).length;
-                  if (cnt > bestC) { bestC = cnt; bestV = v; }
+            } else if (gradingCompany === "CGC") {
+              const certResponse = await fetch(
+                `/api/oracle?endpoint=cert-cgc&cert=${encodeURIComponent(gradingId)}&grade=${encodeURIComponent(grade || "")}`,
+                { signal: AbortSignal.timeout(8000) },
+              );
+              if (certResponse.ok) {
+                const certData = (await certResponse.json()) as OracleCgcCertResponse;
+                if (certData.assetId) certAssetId = certData.assetId;
+                if (certData.matchedName) {
+                  certCardName = certData.matchedName;
+                } else if (certData.card?.cardName) {
+                  certCardName = [certData.card.cardName, certData.card.cardSet, certData.card.cardNumber].filter(Boolean).join(" ");
                 }
-                chosen = bestV;
-              } else {
-                chosen = pool[0];
               }
-            } else {
-              chosen = exactMatch;
             }
+          } catch {
+            // Cert lookups are optional enhancements for chart matching.
           }
         }
 
-        // Get transaction count
-        if (chosen.assetId) {
-          try {
-            const txRes = await fetch(
-              `/api/oracle?endpoint=transactions&assetId=${encodeURIComponent(chosen.assetId)}`,
-              { signal: AbortSignal.timeout(10000) }
-            );
-            if (txRes.ok) {
-              const txData = await txRes.json();
-              setSalesCount(txData.count || txData.transactions?.length || null);
-            }
-          } catch {}
+        const analyticsParams = new URLSearchParams();
+        analyticsParams.set("endpoint", "analytics");
+        analyticsParams.set("q", getPreferredChartQuery(cardName, { altAssetName, certCardName }));
+        if (category) analyticsParams.set("category", category);
+        if (grade) analyticsParams.set("grade", grade);
+        if (nftAddress) analyticsParams.set("mint", nftAddress);
+
+        const analyticsAssetId = priceSource === "alt.xyz" && sourceId ? sourceId : certAssetId;
+        if (analyticsAssetId) {
+          analyticsParams.set("assetId", analyticsAssetId);
         }
 
-        // Build chart URL — cert assetId > search assetId > name query
-        const chartParams = new URLSearchParams();
-        chartParams.set("endpoint", "chart");
-        chartParams.set("q", searchQuery);
-        if (nftAddress) chartParams.set("mint", nftAddress);
-        if (certAssetId) {
-          chartParams.set("assetId", certAssetId);
-        } else if (chosen.assetId) {
-          chartParams.set("assetId", chosen.assetId);
+        const analyticsResponse = await fetch(
+          `/api/oracle?${analyticsParams.toString()}`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+        if (!analyticsResponse.ok) {
+          throw new Error(await readApiError(analyticsResponse, "Unable to load price history"));
         }
-        if (grade) chartParams.set("grade", grade);
-        
-        setChartUrl(`/api/oracle?${chartParams.toString()}`);
+
+        const analyticsData = (await analyticsResponse.json()) as OracleAnalyticsResponse;
+        if (cancelled) {
+          return;
+        }
+
+        setAnalytics(analyticsData);
         setLoading(false);
 
-        // Fetch ungraded NM price (non-blocking)
-        try {
-          const cardNum = cardName.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i)?.[1]
-            || cardName.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH)\d*[-/]\d+)/i)?.[1];
-          if (cardNum) {
-            const ugParams = new URLSearchParams({ endpoint: "ungraded", number: cardNum, ccName: cardName });
-            const ugRes = await fetch(`/api/oracle?${ugParams.toString()}`, { signal: AbortSignal.timeout(10000) });
-            if (ugRes.ok) {
-              const ugData = await ugRes.json();
-              if (ugData.found && ugData.marketPrice) {
-                setUngradedPrice({ name: ugData.name, marketPrice: ugData.marketPrice, lowestPrice: ugData.lowestPrice, rarity: ugData.rarity });
+        const cardNumber = cardName.match(/#?((?:OP|ST|EB|PRB?)\d+-\d+)/i)?.[1]
+          || cardName.match(/#?((?:SV|SM|XY|BW|DP|EX|SWSH)\d*[-/]\d+)/i)?.[1];
+
+        if (!analyticsData.empty && cardNumber) {
+          try {
+            const ungradedParams = new URLSearchParams({
+              endpoint: "ungraded",
+              number: cardNumber,
+              ccName: cardName,
+            });
+            const ungradedResponse = await fetch(
+              `/api/oracle?${ungradedParams.toString()}`,
+              { signal: AbortSignal.timeout(10000) },
+            );
+            if (ungradedResponse.ok) {
+              const ungradedData = (await ungradedResponse.json()) as {
+                found?: boolean;
+                lowestPrice?: number;
+                marketPrice?: number;
+                name?: string;
+                rarity?: string;
+              };
+
+              if (ungradedData.found && ungradedData.marketPrice && !cancelled) {
+                setUngradedPrice({
+                  lowestPrice: ungradedData.lowestPrice || 0,
+                  marketPrice: ungradedData.marketPrice,
+                  name: ungradedData.name || cardName,
+                  rarity: ungradedData.rarity || "",
+                });
               }
             }
+          } catch {
+            // Ungraded price is secondary data only.
           }
-        } catch {}
-      } catch (err: any) {
-        console.error("Price history error:", err);
-        setError(err.message || "Unable to load price data");
-        setChartUrl(null);
+        }
+      } catch (fetchError) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error("Price history error:", fetchError);
+        const message = fetchError instanceof Error ? fetchError.message : "Unable to load price data";
+        setAnalytics(null);
+        setError(message);
         setLoading(false);
       }
     };
 
-    fetchChart();
-  }, [altAssetName, cardName, category, grade, gradingCompany, gradingId, nftAddress, priceSource, priceSourceId, shouldShow, source, tcgPlayerId]);
+    void fetchPriceHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    altAssetName,
+    cardName,
+    category,
+    grade,
+    gradingCompany,
+    gradingId,
+    nftAddress,
+    priceSource,
+    priceSourceId,
+    shouldShow,
+    source,
+    tcgPlayerId,
+  ]);
 
   if (!shouldShow) return null;
 
   if (loading) {
     return (
-      <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-        <h2 className="text-white font-serif text-xl mb-4">Price History</h2>
-        <div className="animate-pulse space-y-4">
-          <div className="h-64 bg-dark-900 rounded-lg"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Sealed / Phygital product pricing display
-  if ((category === "SEALED" || source === 'phygitals') && sealedPrice) {
-    return (
-      <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h2 className="text-white font-serif text-xl">Market Price</h2>
-          <span className="text-xs text-gray-500 font-medium">Powered by Artifacte Oracle</span>
-        </div>
-        <div className="bg-dark-900 rounded-lg border border-white/5 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-gray-400 text-sm">TCGplayer Market Price</span>
-            <span className="text-white text-2xl font-semibold">${sealedPrice.marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-xl text-white">Price History</h2>
+            <div className="mt-2 h-4 w-56 animate-pulse rounded bg-dark-900" />
           </div>
-          {sealedPrice.lowestPrice && (
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-500 text-sm">Lowest Listed</span>
-              <span className="text-gray-300">${sealedPrice.lowestPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="text-xs font-medium text-gray-500">Powered by Artifacte Oracle</span>
+        </div>
+        <div className="mt-6 grid gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="rounded-2xl border border-white/5 bg-dark-900/80 px-4 py-4">
+              <div className="h-3 w-20 animate-pulse rounded bg-dark-700" />
+              <div className="mt-3 h-8 w-24 animate-pulse rounded bg-dark-700" />
+              <div className="mt-3 h-3 w-28 animate-pulse rounded bg-dark-700" />
             </div>
-          )}
-          <div className="pt-3 border-t border-white/5">
-            <p className="text-gray-600 text-xs">{sealedPrice.name} • {sealedPrice.tcg}</p>
+          ))}
+        </div>
+        <div className="mt-6 h-[340px] animate-pulse rounded-2xl border border-white/5 bg-dark-900" />
+      </div>
+    );
+  }
+
+  if ((category === "SEALED" || source === "phygitals") && sealedPrice) {
+    return (
+      <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <h2 className="font-serif text-xl text-white">Market Price</h2>
+          <span className="text-xs font-medium text-gray-500">Powered by Artifacte Oracle</span>
+        </div>
+        <div className="rounded-lg border border-white/5 bg-dark-900 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm text-gray-400">TCGplayer Market Price</span>
+            <span className="text-2xl font-semibold text-white">{formatUsd(sealedPrice.marketPrice)}</span>
+          </div>
+          {sealedPrice.lowestPrice ? (
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm text-gray-500">Lowest Listed</span>
+              <span className="text-gray-300">{formatUsd(sealedPrice.lowestPrice)}</span>
+            </div>
+          ) : null}
+          <div className="border-t border-white/5 pt-3">
+            <p className="text-xs text-gray-600">{sealedPrice.name} • {sealedPrice.tcg}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (category === "SEALED" && !sealedPrice && !loading && !chartUrl) return null;
-  if (source === 'phygitals' && !sealedPrice && !loading && !chartUrl && !error && !gradingId) return null;
+  if (category === "SEALED" && !sealedPrice && !loading) return null;
+  if (source === "phygitals" && !sealedPrice && !loading && !analytics && !error && !gradingId) return null;
 
-  if (error && !chartUrl && !sealedPrice) {
+  if (error && !analytics && !sealedPrice) {
     return (
-      <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-        <h2 className="text-white font-serif text-xl mb-4">Price History</h2>
-        <div className="text-gray-400 text-sm p-6 bg-dark-900 rounded-lg border border-white/5 text-center">
-          <p>📊 Price data unavailable</p>
-          <p className="text-xs text-gray-500 mt-2">{error}</p>
+      <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
+        <h2 className="mb-4 font-serif text-xl text-white">Price History</h2>
+        <div className="rounded-2xl border border-white/5 bg-dark-900 p-6 text-center text-sm text-gray-400">
+          <p>Price data unavailable</p>
+          <p className="mt-2 text-xs text-gray-500">{error}</p>
         </div>
       </div>
     );
   }
 
-  if (!chartUrl) return null;
+  if (!analytics) return null;
+
+  if (analytics.empty || analytics.periods.length === 0) {
+    return (
+      <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-xl text-white">Price History</h2>
+            <p className="mt-1 text-sm text-gray-400">{analytics.cardName}</p>
+          </div>
+          <span className="text-xs font-medium text-gray-500">Powered by Artifacte Oracle</span>
+        </div>
+        <div className="rounded-3xl border border-white/5 bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.12),_rgba(10,10,10,0.85)_55%)] p-8">
+          <p className="text-[11px] uppercase tracking-[0.28em] text-gold-500/70">No recorded sales yet</p>
+          <h3 className="mt-3 font-serif text-3xl text-white">{analytics.cardName}</h3>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-400">
+            This card resolved successfully, but the oracle has not tracked completed sales for it yet. The chart will appear automatically once historical sales are available.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const priceMetricLabel = analytics.altValueUsd !== null ? "Current value" : "Latest avg";
+  const priceMetricDetail = analytics.altValueUsd !== null ? "Latest oracle value" : "Latest monthly average";
 
   return (
-    <div className="bg-dark-800 rounded-lg border border-white/10 p-8 mb-8">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <h2 className="text-white font-serif text-xl">Price History</h2>
-        <div className="flex items-center gap-3">
-          {salesCount !== null && (
-            <span className="text-xs text-gray-500">{salesCount} sales tracked</span>
-          )}
-          <span className="text-xs text-gray-500 font-medium">Powered by Artifacte Oracle</span>
+    <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="font-serif text-xl text-white">Price History</h2>
+          <p className="mt-2 text-lg text-gray-100">{analytics.cardName}</p>
+          {analytics.gradeFilter ? (
+            <p className="mt-2 text-xs uppercase tracking-[0.24em] text-gray-500">Filtered to {analytics.gradeFilter}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-gold-500" />
+            Price history
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" />
+            Sales volume
+          </span>
+          <span className="font-medium">Powered by Artifacte Oracle</span>
         </div>
       </div>
 
-      <div
-        className="relative rounded-lg overflow-hidden border border-white/5 bg-dark-900 cursor-pointer"
-        onClick={() => setExpanded(true)}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={chartUrl}
-          alt="Price History Chart"
-          onLoad={() => setImageLoaded(true)}
-          onError={() => {
-            // If grade-filtered chart fails, retry without grade filter (shows all grades)
-            if (grade && chartUrl?.includes('grade=')) {
-              const fallbackUrl = chartUrl.replace(/&?grade=[^&]*/g, '');
-              setChartUrl(fallbackUrl);
-              setImageLoaded(false);
-            } else {
-              setError("Chart unavailable");
-              setChartUrl(null);
-            }
-          }}
-          className={`w-full h-auto transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
-          style={{ minHeight: "200px" }}
+      <div className="mb-6 grid gap-3 md:grid-cols-4">
+        <MetricCard
+          label="Total sales"
+          value={formatCompactNumber(analytics.totalSales)}
+          detail={analytics.totalObservedSales !== analytics.totalSales ? `${formatCompactNumber(analytics.totalObservedSales)} observed before filters` : "Tracked completed sales"}
         />
-        {!imageLoaded && !error && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="animate-pulse text-gray-500 text-sm">Generating chart...</div>
-          </div>
-        )}
-        {imageLoaded && (
-          <div className="absolute bottom-2 right-2 text-xs text-gray-500 bg-dark-900/80 px-2 py-1 rounded">
-            Tap to expand
-          </div>
-        )}
+        <MetricCard
+          label="Sales volume"
+          value={formatUsd(analytics.totalVolumeUsd)}
+          detail={analytics.averageSalePriceUsd !== null ? `${formatUsd(analytics.averageSalePriceUsd)} average sale` : "No average yet"}
+        />
+        <MetricCard
+          label={priceMetricLabel}
+          value={formatUsd(analytics.currentValueUsd)}
+          detail={priceMetricDetail}
+        />
+        <MetricCard
+          label="Coverage"
+          value={formatCoverage(analytics.coverageStart, analytics.coverageEnd)}
+          detail={`${formatCompactNumber(analytics.periods.length)} monthly points`}
+        />
       </div>
 
-      {/* Ungraded NM price */}
-      {ungradedPrice && (
-        <div className="mt-4 flex items-center justify-between bg-dark-900 rounded-lg border border-white/5 px-4 py-3">
-          <div>
-            <span className="text-gray-400 text-sm">NM Ungraded</span>
-            <span className="text-gray-600 text-xs ml-2">({ungradedPrice.name})</span>
-          </div>
-          <div className="text-right">
-            <span className="text-white font-medium">${(ungradedPrice.marketPrice ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            <span className="text-gray-500 text-xs ml-2">market</span>
-          </div>
+      <div className="rounded-3xl border border-white/5 bg-dark-900/80 p-4 sm:p-6">
+        <div className="h-[340px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={analytics.periods} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+              <defs>
+                <linearGradient id="priceHistoryGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#d4af37" stopOpacity={0.34} />
+                  <stop offset="100%" stopColor="#d4af37" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                axisLine={false}
+                dataKey="label"
+                minTickGap={20}
+                tick={{ fill: "#8a8f98", fontSize: 12 }}
+                tickLine={false}
+              />
+              <YAxis
+                axisLine={false}
+                tick={{ fill: "#d4af37", fontSize: 12 }}
+                tickFormatter={formatCompactUsd}
+                tickLine={false}
+                width={68}
+                yAxisId="price"
+              />
+              <YAxis
+                axisLine={false}
+                orientation="right"
+                tick={{ fill: "#5ac58a", fontSize: 12 }}
+                tickFormatter={formatCompactUsd}
+                tickLine={false}
+                width={76}
+                yAxisId="volume"
+              />
+              <Tooltip content={<AnalyticsTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+              <Bar
+                dataKey="salesVolumeUsd"
+                fill="rgba(72, 187, 120, 0.55)"
+                maxBarSize={36}
+                radius={[10, 10, 0, 0]}
+                yAxisId="volume"
+              />
+              <Area
+                activeDot={{ fill: "#d4af37", r: 4, stroke: "#111", strokeWidth: 1.5 }}
+                dataKey="displayPriceUsd"
+                fill="url(#priceHistoryGradient)"
+                stroke="#d4af37"
+                strokeWidth={2.5}
+                type="monotone"
+                yAxisId="price"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
-      )}
+      </div>
 
-      {/* Fullscreen lightbox */}
-      {expanded && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setExpanded(false)}
-        >
-          <div className="relative w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setExpanded(false)}
-              className="absolute -top-3 -right-3 z-10 bg-dark-800 border border-white/20 rounded-full w-8 h-8 flex items-center justify-center text-white hover:bg-dark-700 transition-colors"
-            >
-              ✕
-            </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={chartUrl}
-              alt="Price History Chart"
-              className="w-full h-auto rounded-lg"
-            />
-            <div className="text-center mt-3 text-gray-500 text-sm">Click anywhere to close</div>
+      {ungradedPrice ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/5 bg-dark-900 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-400">NM Ungraded</p>
+            <p className="mt-1 text-xs text-gray-600">{ungradedPrice.name}</p>
+          </div>
+          <div className="text-left sm:text-right">
+            <p className="text-lg font-medium text-white">{formatUsd(ungradedPrice.marketPrice)}</p>
+            <p className="text-xs text-gray-500">Current market price</p>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

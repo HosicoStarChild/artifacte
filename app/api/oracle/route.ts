@@ -6,6 +6,64 @@ const TIMEOUT_MS = 45000;
 
 export const maxDuration = 60;
 
+type OracleTransaction = {
+  date: string;
+  price: number;
+};
+
+type OracleTransactionsResponse = {
+  asset?: { id?: string | null } | null;
+  count?: number;
+  totalUnfiltered?: number;
+  transactions?: OracleTransaction[];
+};
+
+type OracleAnalyticsPeriod = {
+  averagePriceUsd: number | null;
+  displayPriceUsd: number | null;
+  hasAltValue: boolean;
+  label: string;
+  maxPriceUsd: number | null;
+  minPriceUsd: number | null;
+  periodStart: string;
+  salesCount: number;
+  salesVolumeUsd: number;
+};
+
+type OracleAnalyticsResponse = {
+  altValueUsd: number | null;
+  assetId: string | null;
+  averageSalePriceUsd: number | null;
+  cardName: string;
+  coverageEnd: string | null;
+  coverageStart: string | null;
+  currentValueUsd: number | null;
+  empty: boolean;
+  gradeFilter: string | null;
+  latestAveragePriceUsd: number | null;
+  maxPriceUsd: number | null;
+  minPriceUsd: number | null;
+  periods: OracleAnalyticsPeriod[];
+  title: string;
+  totalObservedSales: number;
+  totalSales: number;
+  totalVolumeUsd: number;
+};
+
+type LegacyChartResolution = {
+  altValueUsd: number | null;
+  assetId: string | null;
+  salesCount: number | null;
+};
+
+type MonthlyBucket = {
+  maxPriceUsd: number;
+  minPriceUsd: number;
+  prices: number[];
+  salesCount: number;
+  salesVolumeUsd: number;
+};
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -18,6 +76,254 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     clearTimeout(timeoutId);
     throw error;
   }
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function buildAnalyticsPeriods(transactions: OracleTransaction[]): OracleAnalyticsPeriod[] {
+  const monthly = new Map<string, MonthlyBucket>();
+
+  for (const transaction of transactions) {
+    const date = new Date(transaction.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    if (!monthly.has(key)) {
+      monthly.set(key, {
+        minPriceUsd: transaction.price,
+        maxPriceUsd: transaction.price,
+        prices: [],
+        salesCount: 0,
+        salesVolumeUsd: 0,
+      });
+    }
+
+    const bucket = monthly.get(key);
+    if (!bucket) {
+      continue;
+    }
+
+    bucket.prices.push(transaction.price);
+    bucket.salesCount += 1;
+    bucket.salesVolumeUsd += transaction.price;
+    bucket.minPriceUsd = Math.min(bucket.minPriceUsd, transaction.price);
+    bucket.maxPriceUsd = Math.max(bucket.maxPriceUsd, transaction.price);
+  }
+
+  return [...monthly.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, bucket]) => {
+      const averagePriceUsd = bucket.prices.length > 0
+        ? roundCurrency(bucket.prices.reduce((sum, price) => sum + price, 0) / bucket.prices.length)
+        : null;
+      const periodStart = `${month}-01`;
+      const [year, monthNumber] = month.split("-");
+      const labelDate = new Date(Number(year), Number(monthNumber) - 1, 1);
+
+      return {
+        averagePriceUsd,
+        displayPriceUsd: averagePriceUsd,
+        hasAltValue: false,
+        label: labelDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        maxPriceUsd: roundCurrency(bucket.maxPriceUsd),
+        minPriceUsd: roundCurrency(bucket.minPriceUsd),
+        periodStart,
+        salesCount: bucket.salesCount,
+        salesVolumeUsd: roundCurrency(bucket.salesVolumeUsd),
+      };
+    });
+}
+
+function buildLegacyAnalyticsResponse(
+  payload: OracleTransactionsResponse,
+  {
+    altValueUsd,
+    assetId,
+    cardName,
+    grade,
+  }: {
+    altValueUsd?: number | null;
+    assetId: string;
+    cardName: string;
+    grade: string | null;
+  },
+): OracleAnalyticsResponse {
+  const transactions = [...(payload.transactions || [])]
+    .filter((transaction) => Number.isFinite(transaction.price) && Boolean(transaction.date))
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+
+  const periods = buildAnalyticsPeriods(transactions);
+  const totalVolumeUsd = roundCurrency(transactions.reduce((sum, transaction) => sum + transaction.price, 0));
+  const latestAveragePriceUsd = periods.length > 0 ? periods[periods.length - 1]?.averagePriceUsd ?? null : null;
+  const minPriceUsd = transactions.length > 0
+    ? roundCurrency(Math.min(...transactions.map((transaction) => transaction.price)))
+    : null;
+  const maxPriceUsd = transactions.length > 0
+    ? roundCurrency(Math.max(...transactions.map((transaction) => transaction.price)))
+    : null;
+  const resolvedCardName = cardName || assetId;
+  const currentValueUsd = altValueUsd ?? latestAveragePriceUsd;
+
+  return {
+    altValueUsd: altValueUsd ?? null,
+    assetId: payload.asset?.id || assetId,
+    averageSalePriceUsd: transactions.length > 0 ? roundCurrency(totalVolumeUsd / transactions.length) : null,
+    cardName: resolvedCardName,
+    coverageEnd: transactions.length > 0 ? transactions[transactions.length - 1]?.date ?? null : null,
+    coverageStart: transactions.length > 0 ? transactions[0]?.date ?? null : null,
+    currentValueUsd,
+    empty: transactions.length === 0,
+    gradeFilter: grade,
+    latestAveragePriceUsd,
+    maxPriceUsd,
+    minPriceUsd,
+    periods,
+    title: `${resolvedCardName}${grade ? ` | ${grade}` : ""}`,
+    totalObservedSales: payload.totalUnfiltered || payload.count || transactions.length,
+    totalSales: transactions.length,
+    totalVolumeUsd,
+  };
+}
+
+function buildEmptyAnalyticsResponse(
+  {
+    assetId,
+    cardName,
+    grade,
+  }: {
+    assetId?: string | null;
+    cardName: string;
+    grade: string | null;
+  },
+): OracleAnalyticsResponse {
+  const resolvedCardName = cardName || assetId || "Unknown Card";
+
+  return {
+    altValueUsd: null,
+    assetId: assetId || null,
+    averageSalePriceUsd: null,
+    cardName: resolvedCardName,
+    coverageEnd: null,
+    coverageStart: null,
+    currentValueUsd: null,
+    empty: true,
+    gradeFilter: grade,
+    latestAveragePriceUsd: null,
+    maxPriceUsd: null,
+    minPriceUsd: null,
+    periods: [],
+    title: `${resolvedCardName}${grade ? ` | ${grade}` : ""}`,
+    totalObservedSales: 0,
+    totalSales: 0,
+    totalVolumeUsd: 0,
+  };
+}
+
+async function resolveLegacyChartAsset(searchParams: URLSearchParams): Promise<LegacyChartResolution | null> {
+  const set = searchParams.get("set");
+  const number = searchParams.get("number");
+  const q = searchParams.get("q");
+  const assetId = searchParams.get("assetId");
+  const mint = searchParams.get("mint") || "";
+  const category = searchParams.get("category") || "";
+  const language = searchParams.get("language") || "";
+  const variant = searchParams.get("variant") || "";
+  const grade = searchParams.get("grade") || "";
+
+  if (!set && !number && !q && !assetId) {
+    return null;
+  }
+
+  const params = new URLSearchParams();
+  if (set) params.set("set", set);
+  if (number) params.set("number", number);
+  if (q) params.set("q", q);
+  if (assetId) params.set("assetId", assetId);
+  if (mint) params.set("mint", mint);
+  if (category) params.set("category", category);
+  if (language) params.set("language", language);
+  if (variant) params.set("variant", variant);
+  if (grade) params.set("grade", grade);
+
+  const chartResponse = await fetchWithTimeout(
+    `${ORACLE_API}/api/live/chart?${params.toString()}`,
+    {},
+    TIMEOUT_MS,
+  );
+  if (!chartResponse.ok) {
+    return null;
+  }
+
+  const resolvedAssetId = chartResponse.headers.get("x-asset-id");
+  const altValueHeader = chartResponse.headers.get("x-alt-value");
+  const salesHeader = chartResponse.headers.get("x-total-sales") || chartResponse.headers.get("x-sales-count");
+
+  try {
+    await chartResponse.body?.cancel();
+  } catch {
+    // Ignore body cancellation failures; headers are enough for fallback resolution.
+  }
+
+  return {
+    altValueUsd: altValueHeader ? Number(altValueHeader) : null,
+    assetId: resolvedAssetId,
+    salesCount: salesHeader ? Number(salesHeader) : null,
+  };
+}
+
+async function tryLegacyAnalyticsFallback(searchParams: URLSearchParams, response: Response): Promise<OracleAnalyticsResponse | null> {
+  if (response.status !== 404) {
+    return null;
+  }
+
+  const errorText = (await response.text()).trim();
+  if (errorText && !/not found/i.test(errorText)) {
+    return null;
+  }
+
+  const assetId = searchParams.get("assetId");
+  const grade = searchParams.get("grade");
+  const cardName = searchParams.get("q") || assetId || "Unknown Card";
+
+  let resolvedAssetId = assetId;
+  let resolvedAltValueUsd: number | null = null;
+
+  if (!resolvedAssetId) {
+    const chartResolution = await resolveLegacyChartAsset(searchParams);
+    resolvedAssetId = chartResolution?.assetId || null;
+    resolvedAltValueUsd = chartResolution?.altValueUsd ?? null;
+  }
+
+  if (!resolvedAssetId) {
+    return buildEmptyAnalyticsResponse({
+      assetId: null,
+      cardName,
+      grade,
+    });
+  }
+
+  const params = new URLSearchParams({ assetId: resolvedAssetId });
+  if (grade) {
+    params.set("grade", grade);
+  }
+
+  const transactionsResponse = await fetchWithTimeout(
+    `${ORACLE_API}/api/live/transactions?${params.toString()}`,
+    {},
+    TIMEOUT_MS,
+  );
+  if (!transactionsResponse.ok) {
+    return null;
+  }
+
+  const transactionsPayload = (await transactionsResponse.json()) as OracleTransactionsResponse;
+  return buildLegacyAnalyticsResponse(transactionsPayload, {
+    altValueUsd: resolvedAltValueUsd,
+    assetId: resolvedAssetId,
+    cardName,
+    grade,
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -58,6 +364,7 @@ export async function GET(req: NextRequest) {
       const set = searchParams.get("set");
       const number = searchParams.get("number");
       const q = searchParams.get("q");
+      const category = searchParams.get("category") || "";
       const language = searchParams.get("language") || "";
       const variant = searchParams.get("variant") || "";
       const grade = searchParams.get("grade") || "";
@@ -71,6 +378,7 @@ export async function GET(req: NextRequest) {
       if (q) params.set("q", q);
       if (assetId) params.set("assetId", assetId);
       if (mint) params.set("mint", mint);
+      if (category) params.set("category", category);
       if (language) params.set("language", language);
       if (variant) params.set("variant", variant);
       if (grade) params.set("grade", grade);
@@ -81,6 +389,34 @@ export async function GET(req: NextRequest) {
 
       url = `${ORACLE_API}/api/live/chart?${params.toString()}`;
       responseType = "image";
+    } else if (endpoint === "analytics") {
+      const set = searchParams.get("set");
+      const number = searchParams.get("number");
+      const q = searchParams.get("q");
+      const category = searchParams.get("category") || "";
+      const language = searchParams.get("language") || "";
+      const variant = searchParams.get("variant") || "";
+      const grade = searchParams.get("grade") || "";
+
+      const assetId = searchParams.get("assetId") || "";
+      const mint = searchParams.get("mint") || "";
+
+      const params = new URLSearchParams();
+      if (set) params.set("set", set);
+      if (number) params.set("number", number);
+      if (q) params.set("q", q);
+      if (assetId) params.set("assetId", assetId);
+      if (mint) params.set("mint", mint);
+      if (category) params.set("category", category);
+      if (language) params.set("language", language);
+      if (variant) params.set("variant", variant);
+      if (grade) params.set("grade", grade);
+
+      if (!set && !number && !q && !assetId) {
+        return NextResponse.json({ error: "Missing set+number, q, or assetId parameter" }, { status: 400 });
+      }
+
+      url = `${ORACLE_API}/api/live/analytics?${params.toString()}`;
     } else if (endpoint === "transactions") {
       const assetId = searchParams.get("assetId");
       const grade = searchParams.get("grade") || "";
@@ -146,6 +482,21 @@ export async function GET(req: NextRequest) {
     const response = await fetchWithTimeout(url, {}, TIMEOUT_MS);
 
     if (!response.ok) {
+      if (endpoint === "analytics") {
+        const fallbackAnalytics = await tryLegacyAnalyticsFallback(searchParams, response.clone());
+        if (fallbackAnalytics) {
+          return NextResponse.json(fallbackAnalytics, {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET",
+              "Cache-Control": "public, max-age=300",
+              "X-Asset-Id": fallbackAnalytics.assetId || "",
+              "X-Total-Sales": String(fallbackAnalytics.totalSales),
+            },
+          });
+        }
+      }
+
       const contentType = response.headers.get("content-type") || "";
       let errorMessage = `Oracle API error: ${response.statusText}`;
 
