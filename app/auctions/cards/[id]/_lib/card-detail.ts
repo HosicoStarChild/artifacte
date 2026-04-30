@@ -178,6 +178,33 @@ function getAttributeValue(attributes: readonly HeliusAttribute[], name: string)
   return getAttributeTextValue(matchingAttribute?.value);
 }
 
+function resolvePriceSourceIdentity(
+  attributes: readonly HeliusAttribute[],
+  listing?: Pick<OracleListing, "priceSource" | "priceSourceId" | "tcgPlayerId"> | null,
+): {
+  priceSource?: string;
+  priceSourceId?: string;
+  tcgPlayerId?: string;
+} {
+  const explicitPriceSource = getAttributeValue(attributes, "Price Source").trim();
+  const explicitPriceSourceId = getAttributeValue(attributes, "Price Source ID").trim();
+  const rawTcgPlayerId = (
+    getAttributeValue(attributes, "TCGPlayer ID")
+    || getAttributeValue(attributes, "TCGplayer Product ID")
+    || listing?.tcgPlayerId
+    || ""
+  ).trim();
+  const priceSourceId = (explicitPriceSourceId || listing?.priceSourceId || rawTcgPlayerId || "").trim();
+  const priceSource = (explicitPriceSource || listing?.priceSource || (priceSourceId ? "TCGplayer" : "")).trim();
+  const tcgPlayerId = (priceSource === "TCGplayer" ? priceSourceId : rawTcgPlayerId).trim();
+
+  return {
+    priceSource: priceSource || undefined,
+    priceSourceId: priceSourceId || undefined,
+    tcgPlayerId: tcgPlayerId || undefined,
+  };
+}
+
 function resolveAssetDisplayName(asset: HeliusAsset | null | undefined): string {
   const attributes = getAssetAttributes(asset);
   const title = getAttributeValue(attributes, "Title").trim();
@@ -610,10 +637,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
     const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mint });
     const attributes = getAssetAttributes(asset);
     const assetDisplayName = resolveAssetDisplayName(asset);
-    const tcgPlayerId = getAttributeValue(attributes, "TCGPlayer ID")
-      || getAttributeValue(attributes, "TCGplayer Product ID")
-      || oracleListing?.tcgPlayerId
-      || "";
+    const { priceSource, priceSourceId, tcgPlayerId } = resolvePriceSourceIdentity(attributes, oracleListing);
     const oracleSolPrice = getRawListingPriceForCurrency(oracleListing, "SOL");
     const oracleUsdcPrice = getRawListingPriceForCurrency(oracleListing, "USDC");
     const solPrice = getFirstPositivePrice(
@@ -651,8 +675,8 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       name: resolvePreferredCardName(oracleListing?.name, assetDisplayName || mint.slice(0, 12)),
       nftAddress: mint,
       price: listingPrice,
-      priceSource: tcgPlayerId ? "TCGplayer" : undefined,
-      priceSourceId: tcgPlayerId || undefined,
+      priceSource,
+      priceSourceId,
       rarity: oracleListing?.rarity || getAttributeValue(attributes, "Rarity"),
       seller: auctionListing?.seller || oracleListing?.seller || "",
       set: oracleListing?.set || getAttributeValue(attributes, "Set"),
@@ -669,7 +693,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       usdcPrice,
       verifiedBy: (getAttributeValue(attributes, "Cert Number") || getAttributeValue(attributes, "Grading ID"))
         ? (getAttributeValue(attributes, "Grader") || "Graded")
-        : (tcgPlayerId ? "TCGplayer" : "Phygitals"),
+        : (priceSource === "TCGplayer" || tcgPlayerId ? "TCGplayer" : "Phygitals"),
       year: oracleListing?.year || getAttributeValue(attributes, "Year"),
     });
   } catch (error) {
@@ -748,7 +772,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
 
       const grade = getAttr("Grade") || "Ungraded";
       const gradeMatch = grade.match(/^(PSA|BGS|CGC|SGC)\s+(.+)$/i);
-      const tcgPlayerId = getAttr("TCGPlayer ID") || getAttr("TCGplayer Product ID") || "";
+      const { priceSource, priceSourceId, tcgPlayerId } = resolvePriceSourceIdentity(attributes);
 
       return buildCardDetail({
         cardNumber: getAttr("Card Number"),
@@ -764,8 +788,8 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         nftAddress: mintAddress,
         owner: asset.ownership?.owner || "",
         price: 0,
-        priceSource: tcgPlayerId ? "TCGplayer" : undefined,
-        priceSourceId: tcgPlayerId || undefined,
+        priceSource,
+        priceSourceId,
         rarity: getAttr("Rarity"),
         seller: asset.ownership?.owner || "",
         set: getAttr("Set"),
@@ -775,7 +799,7 @@ async function loadCardFromAsset(cardId: string, connection: Connection): Promis
         tcg: getAttr("TCG"),
         tcgPlayerId,
         usdcPrice: null,
-        verifiedBy: "TCGplayer",
+        verifiedBy: priceSource === "TCGplayer" || tcgPlayerId ? "TCGplayer" : "Phygitals",
         year: getAttr("Year"),
       });
     }

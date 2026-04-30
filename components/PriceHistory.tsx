@@ -600,10 +600,7 @@ export default function PriceHistory({
 
             if (currentPrice !== null && !cancelled) {
               setAnalytics(buildTcgplayerAnalytics({
-                history: [{
-                  date: new Date().toISOString(),
-                  marketPrice: currentPrice,
-                }],
+                history: [],
                 name: cardName,
                 productId: sourceId,
               }, { cardName, currentPrice }));
