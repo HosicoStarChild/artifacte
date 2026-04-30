@@ -303,6 +303,8 @@ function describeValueSource(valueSource?: string | null): string | null {
       return "Based on current Alt listing values";
     case "alt_direct":
       return "Based on direct Alt value";
+    case "pricecharting_ungraded_search":
+      return "Based on PriceCharting ungraded market value";
     case "legacy_chart_header":
       return "Based on cached oracle value";
     default:
