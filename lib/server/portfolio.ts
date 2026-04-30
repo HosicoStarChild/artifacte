@@ -91,6 +91,12 @@ interface ResolvedRwaAsset {
   item: PortfolioAssetCard;
 }
 
+interface PortfolioMarketLookupEntry {
+  name: string;
+  nftAddress: string;
+  priceSourceId?: string;
+}
+
 const ORACLE_API = getOracleApiUrl();
 const COLLECTOR_CRYPT_API = "https://api.collectorcrypt.com/marketplace";
 const COLLECTOR_CRYPT_USER_AGENT = "Artifacte-Portfolio/2.0";
@@ -480,42 +486,59 @@ async function fetchCollectorCryptResponse(wallet: string): Promise<CollectorCry
   return (await response.json()) as CollectorCryptResponse;
 }
 
-async function fetchCollectorCryptMarketValueMap(
-  cards: PortfolioCollectorCryptCard[]
+async function fetchPortfolioMarketValueMap(
+  entries: PortfolioMarketLookupEntry[]
 ): Promise<Record<string, { price: number; source: string }>> {
-  if (!cards.length) {
+  if (!entries.length) {
     return {};
   }
 
   try {
-    const nftAddresses = cards.map((card) => card.nftAddress).filter(Boolean);
-    const cardNames = cards.map((card) => card.itemName || "");
-    const response = await fetch(
-      `${ORACLE_API}/api/market/portfolio?nfts=${nftAddresses.join(",")}&names=${encodeURIComponent(cardNames.join("||"))}`,
-      {
-        cache: "no-store",
-        signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-      }
-    );
+    const combinedValues: Record<string, { price: number; source: string }> = {};
+    const BATCH_SIZE = 40;
 
-    if (!response.ok) {
-      return {};
+    for (let index = 0; index < entries.length; index += BATCH_SIZE) {
+      const batch = entries.slice(index, index + BATCH_SIZE);
+      const nftAddresses = batch.map((entry) => entry.nftAddress);
+      const cardNames = batch.map((entry) => entry.name);
+      const productRefs = batch
+        .filter((entry) => entry.priceSourceId)
+        .map((entry) => `${entry.nftAddress}:${entry.priceSourceId}`);
+      const searchParams = new URLSearchParams({
+        nfts: nftAddresses.join(","),
+        names: cardNames.join("||"),
+      });
+      if (productRefs.length > 0) {
+        searchParams.set("products", productRefs.join("||"));
+      }
+      const response = await fetch(
+        `${ORACLE_API}/api/market/portfolio?${searchParams.toString()}`,
+        {
+          cache: "no-store",
+          signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
+        }
+      );
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const payload = (await response.json()) as OraclePortfolioMarketResponse;
+      const values = payload.values ?? {};
+
+      for (const [nft, value] of Object.entries(values)) {
+        if (typeof value.marketValue !== "number") {
+          continue;
+        }
+
+        combinedValues[nft] = {
+          price: value.marketValue,
+          source: value.source ?? "oracle",
+        };
+      }
     }
 
-    const payload = (await response.json()) as OraclePortfolioMarketResponse;
-    const values = payload.values ?? {};
-
-    return Object.fromEntries(
-      Object.entries(values)
-        .filter(([, value]) => typeof value.marketValue === "number")
-        .map(([nft, value]) => [
-          nft,
-          {
-            price: value.marketValue ?? 0,
-            source: value.source ?? "oracle",
-          },
-        ])
-    );
+    return combinedValues;
   } catch {
     return {};
   }
@@ -538,7 +561,12 @@ async function buildCollectorCryptSnapshot(wallet: string): Promise<PortfolioCol
     };
   });
 
-  const marketPriceMap = await fetchCollectorCryptMarketValueMap(cards);
+  const marketPriceMap = await fetchPortfolioMarketValueMap(
+    cards.map((card) => ({
+      name: card.itemName || "",
+      nftAddress: card.nftAddress,
+    }))
+  );
   const enrichedCards = cards.map((card) => ({
     ...card,
     oracleValue: marketPriceMap[card.nftAddress]?.price ?? null,
@@ -748,9 +776,13 @@ async function resolveRwaAssetPrice(
 
 async function resolveRwaAsset(
   candidate: RwaCandidate,
+  marketValueMap: Record<string, { price: number; source: string }>,
   caches: PriceLookupCache
 ): Promise<ResolvedRwaAsset> {
-  const marketValue = await resolveRwaAssetPrice(candidate, caches);
+  const oracleMarketValue = marketValueMap[candidate.asset.id]?.price;
+  const marketValue = typeof oracleMarketValue === "number" && oracleMarketValue > 0
+    ? oracleMarketValue
+    : await resolveRwaAssetPrice(candidate, caches);
   const badge = getRwaCardBadge(candidate.kind);
 
   return {
@@ -827,11 +859,21 @@ export async function getPortfolioPageData(wallet: string): Promise<PortfolioPag
     }
   }
 
+  const rwaMarketValueMap = await fetchPortfolioMarketValueMap(
+    rwaCandidates.map((candidate) => ({
+      name: getAssetName(candidate.asset),
+      nftAddress: candidate.asset.id,
+      priceSourceId: candidate.priceSource?.toLowerCase() === "tcgplayer"
+        ? candidate.priceSourceId
+        : undefined,
+    }))
+  );
+
   const priceLookupCache = createPriceLookupCache();
   const resolvedRwaAssets = await mapWithConcurrency(
     rwaCandidates,
     6,
-    (candidate) => resolveRwaAsset(candidate, priceLookupCache)
+    (candidate) => resolveRwaAsset(candidate, rwaMarketValueMap, priceLookupCache)
   );
 
   const collectorsCryptCards = sortPortfolioItems(
