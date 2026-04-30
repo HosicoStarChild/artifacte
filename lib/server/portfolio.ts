@@ -31,6 +31,10 @@ import { ensureHeliusRpcUrl, fetchHeliusRpc } from "@/app/api/_lib/list-route-ut
 import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import { getFloorPriceSnapshot, type FloorPriceSnapshot } from "@/lib/server/floor-prices";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
+import {
+  resolvePortfolioRwaMarketValueMap,
+  type PortfolioMarketLookupEntry,
+} from "@/lib/server/portfolio-market-values";
 
 interface OraclePortfolioMarketValue {
   marketValue?: number;
@@ -62,12 +66,6 @@ interface RwaCandidate {
 interface ResolvedRwaAsset {
   kind: Exclude<PortfolioSectionId, "digital-collectibles">;
   item: PortfolioAssetCard;
-}
-
-interface PortfolioMarketLookupEntry {
-  name: string;
-  nftAddress: string;
-  priceSourceId?: string;
 }
 
 const ORACLE_API = getOracleApiUrl();
@@ -676,14 +674,17 @@ export async function getPortfolioPageData(wallet: string): Promise<PortfolioPag
     }
   }
 
-  const rwaMarketValueMap = await fetchPortfolioMarketValueMap(
+  const rwaMarketValueMap = await resolvePortfolioRwaMarketValueMap(
     rwaCandidates.map((candidate) => ({
       name: getAssetName(candidate.asset),
       nftAddress: candidate.asset.id,
       priceSourceId: candidate.priceSource?.toLowerCase() === "tcgplayer"
         ? candidate.priceSourceId
         : undefined,
-    }))
+    })),
+    {
+      fetchOracleMarketValueMap: fetchPortfolioMarketValueMap,
+    }
   );
 
   const resolvedRwaAssets = await mapWithConcurrency(
