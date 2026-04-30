@@ -32,6 +32,27 @@ type SealedPrice = {
   tcg: string;
 };
 
+type TcgPlayerPriceResponse = {
+  listedMedianPrice?: number | null;
+  marketPrice?: number | null;
+};
+
+type TcgPlayerHistoryPoint = {
+  date: string;
+  listedMedianPrice?: number | null;
+  marketPrice?: number | null;
+  price?: number | null;
+};
+
+type TcgPlayerHistoryResponse = {
+  history?: TcgPlayerHistoryPoint[];
+  key?: string;
+  name?: string;
+  productId?: number | string;
+  set?: string | null;
+  tcg?: string | null;
+};
+
 type ApiErrorPayload = {
   error?: string;
   message?: string;
@@ -88,6 +109,7 @@ type OracleAnalyticsResponse = {
   coverageEnd: string | null;
   coverageStart: string | null;
   currentValueUsd: number | null;
+  dataSource?: "sales" | "tcgplayer-market";
   empty: boolean;
   gradeFilter: string | null;
   latestAveragePriceUsd: number | null;
@@ -271,6 +293,133 @@ function formatCoverage(start?: string | null, end?: string | null): string {
   return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`;
 }
 
+function getTcgPlayerPriceValue(
+  pricePoint: TcgPlayerPriceResponse | TcgPlayerHistoryPoint | null | undefined,
+): number | null {
+  const marketPrice = pricePoint?.marketPrice;
+  if (typeof marketPrice === "number" && Number.isFinite(marketPrice)) {
+    return marketPrice;
+  }
+
+  const listedMedianPrice = pricePoint?.listedMedianPrice;
+  if (typeof listedMedianPrice === "number" && Number.isFinite(listedMedianPrice)) {
+    return listedMedianPrice;
+  }
+
+  if (pricePoint && "price" in pricePoint && typeof pricePoint.price === "number" && Number.isFinite(pricePoint.price)) {
+    return pricePoint.price;
+  }
+
+  return null;
+}
+
+function buildTcgplayerAnalytics(
+  payload: TcgPlayerHistoryResponse,
+  {
+    cardName,
+    currentPrice,
+  }: {
+    cardName: string;
+    currentPrice: number | null;
+  },
+): OracleAnalyticsResponse {
+  const snapshots = (payload.history || [])
+    .map((snapshot) => {
+      const price = getTcgPlayerPriceValue(snapshot);
+
+      if (!snapshot.date || price === null) {
+        return null;
+      }
+
+      return {
+        date: snapshot.date,
+        price,
+      };
+    })
+    .filter((snapshot): snapshot is { date: string; price: number } => Boolean(snapshot))
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+
+  const monthly = new Map<string, { maxPriceUsd: number; minPriceUsd: number; prices: number[] }>();
+
+  for (const snapshot of snapshots) {
+    const date = new Date(snapshot.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    if (!monthly.has(key)) {
+      monthly.set(key, {
+        maxPriceUsd: snapshot.price,
+        minPriceUsd: snapshot.price,
+        prices: [],
+      });
+    }
+
+    const bucket = monthly.get(key);
+    if (!bucket) {
+      continue;
+    }
+
+    bucket.prices.push(snapshot.price);
+    bucket.minPriceUsd = Math.min(bucket.minPriceUsd, snapshot.price);
+    bucket.maxPriceUsd = Math.max(bucket.maxPriceUsd, snapshot.price);
+  }
+
+  const periods = [...monthly.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, bucket]) => {
+      const averagePriceUsd = bucket.prices.length > 0
+        ? Number((bucket.prices.reduce((sum, price) => sum + price, 0) / bucket.prices.length).toFixed(2))
+        : null;
+      const [year, monthNumber] = month.split("-");
+      const labelDate = new Date(Number(year), Number(monthNumber) - 1, 1);
+
+      return {
+        averagePriceUsd,
+        displayPriceUsd: averagePriceUsd,
+        hasAltValue: false,
+        label: labelDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        maxPriceUsd: Number(bucket.maxPriceUsd.toFixed(2)),
+        minPriceUsd: Number(bucket.minPriceUsd.toFixed(2)),
+        periodStart: `${month}-01`,
+        salesCount: 0,
+        salesVolumeUsd: 0,
+      };
+    });
+
+  const latestAveragePriceUsd = periods.length > 0 ? periods[periods.length - 1]?.averagePriceUsd ?? null : null;
+  const minPriceUsd = snapshots.length > 0
+    ? Number(Math.min(...snapshots.map((snapshot) => snapshot.price)).toFixed(2))
+    : null;
+  const maxPriceUsd = snapshots.length > 0
+    ? Number(Math.max(...snapshots.map((snapshot) => snapshot.price)).toFixed(2))
+    : null;
+  const resolvedCardName = normalizeOptionalText(payload.name) ?? cardName;
+  const resolvedCurrentValue = currentPrice ?? latestAveragePriceUsd;
+  const resolvedProductId = payload.productId !== undefined && payload.productId !== null
+    ? String(payload.productId)
+    : null;
+
+  return {
+    altValueUsd: resolvedCurrentValue,
+    assetId: resolvedProductId,
+    averageSalePriceUsd: null,
+    cardName: resolvedCardName,
+    coverageEnd: snapshots.length > 0 ? snapshots[snapshots.length - 1]?.date ?? null : null,
+    coverageStart: snapshots.length > 0 ? snapshots[0]?.date ?? null : null,
+    currentValueUsd: resolvedCurrentValue,
+    dataSource: "tcgplayer-market",
+    empty: periods.length === 0,
+    gradeFilter: null,
+    latestAveragePriceUsd,
+    maxPriceUsd,
+    minPriceUsd,
+    periods,
+    title: resolvedCardName,
+    totalObservedSales: snapshots.length,
+    totalSales: 0,
+    totalVolumeUsd: 0,
+  };
+}
+
 async function readApiError(response: Response, fallback: string): Promise<string> {
   try {
     const payload = (await response.json()) as ApiErrorPayload;
@@ -308,6 +457,7 @@ function AnalyticsTooltip({ active, payload }: { active?: boolean; payload?: Ana
     return null;
   }
 
+  const isMarketSnapshot = point.salesCount === 0 && point.salesVolumeUsd === 0;
   const showCurrentValue = point.hasAltValue && point.displayPriceUsd !== point.averagePriceUsd;
 
   return (
@@ -315,7 +465,7 @@ function AnalyticsTooltip({ active, payload }: { active?: boolean; payload?: Ana
       <p className="text-sm font-medium text-white">{point.label}</p>
       <div className="mt-3 space-y-2 text-xs text-gray-300">
         <div className="flex items-center justify-between gap-4">
-          <span className="text-gray-500">Avg sale price</span>
+          <span className="text-gray-500">{isMarketSnapshot ? "Avg tracked price" : "Avg sale price"}</span>
           <span className="text-white">{formatUsd(point.averagePriceUsd)}</span>
         </div>
         {showCurrentValue ? (
@@ -324,14 +474,18 @@ function AnalyticsTooltip({ active, payload }: { active?: boolean; payload?: Ana
             <span className="text-gold-400">{formatUsd(point.displayPriceUsd)}</span>
           </div>
         ) : null}
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-gray-500">Sales volume</span>
-          <span className="text-emerald-300">{formatUsd(point.salesVolumeUsd)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-gray-500">Total sales</span>
-          <span className="text-white">{formatCompactNumber(point.salesCount)}</span>
-        </div>
+        {!isMarketSnapshot ? (
+          <>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Sales volume</span>
+              <span className="text-emerald-300">{formatUsd(point.salesVolumeUsd)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-gray-500">Total sales</span>
+              <span className="text-white">{formatCompactNumber(point.salesCount)}</span>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -387,6 +541,54 @@ export default function PriceHistory({
         }
 
         if (source === "phygitals" && !gradingId) {
+          if (sourceId) {
+            const [historyResponse, currentPriceResponse] = await Promise.all([
+              fetch(
+                `/api/tcgplayer-history?id=${encodeURIComponent(sourceId)}`,
+                { signal: AbortSignal.timeout(10000) },
+              ),
+              fetch(
+                `/api/tcgplayer-price?id=${encodeURIComponent(sourceId)}`,
+                { signal: AbortSignal.timeout(10000) },
+              ),
+            ]);
+
+            const currentPriceData = currentPriceResponse.ok
+              ? (await currentPriceResponse.json()) as TcgPlayerPriceResponse
+              : null;
+            const currentPrice = getTcgPlayerPriceValue(currentPriceData);
+
+            if (historyResponse.ok) {
+              const historyData = (await historyResponse.json()) as TcgPlayerHistoryResponse;
+
+              if (!cancelled) {
+                setAnalytics(buildTcgplayerAnalytics(historyData, { cardName, currentPrice }));
+                setLoading(false);
+              }
+
+              return;
+            }
+
+            if (historyResponse.status !== 404) {
+              if (!cancelled) {
+                setError(await readApiError(historyResponse, "TCGplayer history lookup failed"));
+                setLoading(false);
+              }
+
+              return;
+            }
+
+            if (currentPrice !== null && !cancelled) {
+              setAnalytics(buildTcgplayerAnalytics({
+                history: [],
+                name: cardName,
+                productId: sourceId,
+              }, { cardName, currentPrice }));
+              setLoading(false);
+              return;
+            }
+          }
+
           const cleanName = cardName
             .replace(/\b(Ungraded Card|POKEMON|phygitals?)\b/gi, "")
             .trim();
@@ -657,6 +859,8 @@ export default function PriceHistory({
 
   if (!analytics) return null;
 
+  const isTcgplayerMarketAnalytics = analytics.dataSource === "tcgplayer-market";
+
   if (analytics.empty || analytics.periods.length === 0) {
     return (
       <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
@@ -668,18 +872,41 @@ export default function PriceHistory({
           <span className="text-xs font-medium text-gray-500">Powered by Artifacte Oracle</span>
         </div>
         <div className="rounded-3xl border border-white/5 bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.12),_rgba(10,10,10,0.85)_55%)] p-8">
-          <p className="text-[11px] uppercase tracking-[0.28em] text-gold-500/70">No recorded sales yet</p>
+          <p className="text-[11px] uppercase tracking-[0.28em] text-gold-500/70">
+            {isTcgplayerMarketAnalytics ? "No tracked TCGplayer history yet" : "No recorded sales yet"}
+          </p>
           <h3 className="mt-3 font-serif text-3xl text-white">{analytics.cardName}</h3>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-400">
-            This card resolved successfully, but the oracle has not tracked completed sales for it yet. The chart will appear automatically once historical sales are available.
+            {isTcgplayerMarketAnalytics
+              ? "This card resolved to its TCGplayer product, but the oracle has not recorded daily market snapshots for it yet. The chart will appear automatically once snapshot history becomes available."
+              : "This card resolved successfully, but the oracle has not tracked completed sales for it yet. The chart will appear automatically once historical sales are available."}
           </p>
+          {isTcgplayerMarketAnalytics && analytics.currentValueUsd !== null ? (
+            <p className="mt-4 text-sm text-gold-400">Current market price: {formatUsd(analytics.currentValueUsd)}</p>
+          ) : null}
         </div>
       </div>
     );
   }
 
   const priceMetricLabel = analytics.altValueUsd !== null ? "Current value" : "Latest avg";
-  const priceMetricDetail = analytics.altValueUsd !== null ? "Latest oracle value" : "Latest monthly average";
+  const priceMetricDetail = isTcgplayerMarketAnalytics
+    ? (analytics.altValueUsd !== null ? "Latest TCGplayer market price" : "Latest tracked monthly average")
+    : (analytics.altValueUsd !== null ? "Latest oracle value" : "Latest monthly average");
+  const countMetricLabel = isTcgplayerMarketAnalytics ? "Snapshots" : "Total sales";
+  const countMetricValue = formatCompactNumber(isTcgplayerMarketAnalytics ? analytics.totalObservedSales : analytics.totalSales);
+  const countMetricDetail = isTcgplayerMarketAnalytics
+    ? "Tracked daily market snapshots"
+    : (analytics.totalObservedSales !== analytics.totalSales
+      ? `${formatCompactNumber(analytics.totalObservedSales)} observed before filters`
+      : "Tracked completed sales");
+  const secondaryMetricLabel = isTcgplayerMarketAnalytics ? "Range" : "Sales volume";
+  const secondaryMetricValue = isTcgplayerMarketAnalytics
+    ? formatUsd(analytics.maxPriceUsd)
+    : formatUsd(analytics.totalVolumeUsd);
+  const secondaryMetricDetail = isTcgplayerMarketAnalytics
+    ? (analytics.minPriceUsd !== null ? `${formatUsd(analytics.minPriceUsd)} low` : "No range yet")
+    : (analytics.averageSalePriceUsd !== null ? `${formatUsd(analytics.averageSalePriceUsd)} average sale` : "No average yet");
 
   return (
     <div className="mb-8 rounded-lg border border-white/10 bg-dark-800 p-8">
@@ -696,24 +923,26 @@ export default function PriceHistory({
             <span className="h-2.5 w-2.5 rounded-full bg-gold-500" />
             Price history
           </span>
-          <span className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" />
-            Sales volume
-          </span>
+          {!isTcgplayerMarketAnalytics ? (
+            <span className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" />
+              Sales volume
+            </span>
+          ) : null}
           <span className="font-medium">Powered by Artifacte Oracle</span>
         </div>
       </div>
 
       <div className="mb-6 grid gap-3 md:grid-cols-4">
         <MetricCard
-          label="Total sales"
-          value={formatCompactNumber(analytics.totalSales)}
-          detail={analytics.totalObservedSales !== analytics.totalSales ? `${formatCompactNumber(analytics.totalObservedSales)} observed before filters` : "Tracked completed sales"}
+          label={countMetricLabel}
+          value={countMetricValue}
+          detail={countMetricDetail}
         />
         <MetricCard
-          label="Sales volume"
-          value={formatUsd(analytics.totalVolumeUsd)}
-          detail={analytics.averageSalePriceUsd !== null ? `${formatUsd(analytics.averageSalePriceUsd)} average sale` : "No average yet"}
+          label={secondaryMetricLabel}
+          value={secondaryMetricValue}
+          detail={secondaryMetricDetail}
         />
         <MetricCard
           label={priceMetricLabel}
@@ -763,13 +992,15 @@ export default function PriceHistory({
                 yAxisId="volume"
               />
               <Tooltip content={<AnalyticsTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-              <Bar
-                dataKey="salesVolumeUsd"
-                fill="rgba(72, 187, 120, 0.55)"
-                maxBarSize={36}
-                radius={[10, 10, 0, 0]}
-                yAxisId="volume"
-              />
+              {!isTcgplayerMarketAnalytics ? (
+                <Bar
+                  dataKey="salesVolumeUsd"
+                  fill="rgba(72, 187, 120, 0.55)"
+                  maxBarSize={36}
+                  radius={[10, 10, 0, 0]}
+                  yAxisId="volume"
+                />
+              ) : null}
               <Area
                 activeDot={{ fill: "#d4af37", r: 4, stroke: "#111", strokeWidth: 1.5 }}
                 dataKey="displayPriceUsd"
