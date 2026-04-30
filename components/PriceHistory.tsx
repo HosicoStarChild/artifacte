@@ -721,6 +721,9 @@ export default function PriceHistory({
         if (category) analyticsParams.set("category", category);
         if (grade) analyticsParams.set("grade", grade);
         if (nftAddress) analyticsParams.set("mint", nftAddress);
+        if (priceSource === "TCGplayer" && sourceId) {
+          analyticsParams.set("productId", sourceId);
+        }
 
         const analyticsAssetId = priceSource === "alt.xyz" && sourceId ? sourceId : certAssetId;
         if (analyticsAssetId) {

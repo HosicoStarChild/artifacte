@@ -241,6 +241,7 @@ async function resolveLegacyChartAsset(searchParams: URLSearchParams): Promise<L
   const number = searchParams.get("number");
   const q = searchParams.get("q");
   const assetId = searchParams.get("assetId");
+  const productId = searchParams.get("productId");
   const mint = searchParams.get("mint") || "";
   const category = searchParams.get("category") || "";
   const language = searchParams.get("language") || "";
@@ -256,6 +257,7 @@ async function resolveLegacyChartAsset(searchParams: URLSearchParams): Promise<L
   if (number) params.set("number", number);
   if (q) params.set("q", q);
   if (assetId) params.set("assetId", assetId);
+  if (productId) params.set("productId", productId);
   if (mint) params.set("mint", mint);
   if (category) params.set("category", category);
   if (language) params.set("language", language);
@@ -390,6 +392,7 @@ export async function GET(req: NextRequest) {
       const set = searchParams.get("set");
       const number = searchParams.get("number");
       const q = searchParams.get("q");
+      const productId = searchParams.get("productId") || "";
       const category = searchParams.get("category") || "";
       const language = searchParams.get("language") || "";
       const variant = searchParams.get("variant") || "";
@@ -403,6 +406,7 @@ export async function GET(req: NextRequest) {
       if (number) params.set("number", number);
       if (q) params.set("q", q);
       if (assetId) params.set("assetId", assetId);
+      if (productId) params.set("productId", productId);
       if (mint) params.set("mint", mint);
       if (category) params.set("category", category);
       if (language) params.set("language", language);
@@ -419,6 +423,7 @@ export async function GET(req: NextRequest) {
       const set = searchParams.get("set");
       const number = searchParams.get("number");
       const q = searchParams.get("q");
+      const productId = searchParams.get("productId") || "";
       const category = searchParams.get("category") || "";
       const language = searchParams.get("language") || "";
       const variant = searchParams.get("variant") || "";
@@ -432,6 +437,7 @@ export async function GET(req: NextRequest) {
       if (number) params.set("number", number);
       if (q) params.set("q", q);
       if (assetId) params.set("assetId", assetId);
+      if (productId) params.set("productId", productId);
       if (mint) params.set("mint", mint);
       if (category) params.set("category", category);
       if (language) params.set("language", language);

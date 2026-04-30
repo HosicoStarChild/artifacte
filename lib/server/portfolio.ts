@@ -41,26 +41,6 @@ interface OraclePortfolioMarketResponse {
   values?: Record<string, OraclePortfolioMarketValue>;
 }
 
-interface OracleCertResponse {
-  value?: number | null;
-}
-
-interface OracleSearchResult {
-  marketPrice?: number | null;
-  price?: number | null;
-}
-
-interface OracleSearchResponse {
-  results?: OracleSearchResult[];
-}
-
-interface TcgplayerPricePoint {
-  marketPrice?: number | null;
-  listedMedianPrice?: number | null;
-  printingType?: string | null;
-  condition?: string | null;
-}
-
 interface HeliusRpcResponse {
   result?: {
     items?: HeliusAsset[];
@@ -68,13 +48,6 @@ interface HeliusRpcResponse {
   error?: {
     message?: string;
   };
-}
-
-interface PriceLookupCache {
-  cert: Map<string, Promise<number>>;
-  cgc: Map<string, Promise<number>>;
-  search: Map<string, Promise<number>>;
-  tcgplayer: Map<string, Promise<number>>;
 }
 
 interface RwaCandidate {
@@ -134,30 +107,6 @@ function createEmptyCollectorCryptSnapshot(wallet: string): PortfolioCollectorCr
     totalListedValue: 0,
     marketCategoriesByValue: {},
   };
-}
-
-function createPriceLookupCache(): PriceLookupCache {
-  return {
-    cert: new Map<string, Promise<number>>(),
-    cgc: new Map<string, Promise<number>>(),
-    search: new Map<string, Promise<number>>(),
-    tcgplayer: new Map<string, Promise<number>>(),
-  };
-}
-
-function getOrSetAsync<T>(
-  cache: Map<string, Promise<T>>,
-  key: string,
-  loader: () => Promise<T>
-): Promise<T> {
-  const existing = cache.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const promise = loader();
-  cache.set(key, promise);
-  return promise;
 }
 
 function parseNumericValue(rawValue?: string): number {
@@ -632,123 +581,7 @@ async function fetchHeliusAssetsByOwner(wallet: string): Promise<HeliusAsset[]> 
   }
 }
 
-async function fetchOracleCertPrice(cert: string): Promise<number> {
-  try {
-    const response = await fetch(`${ORACLE_API}/api/cert/${encodeURIComponent(cert)}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      return 0;
-    }
-
-    const payload = (await response.json()) as OracleCertResponse;
-    return typeof payload.value === "number" ? payload.value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function fetchOracleCgcPrice(cert: string, grade: string): Promise<number> {
-  try {
-    const response = await fetch(
-      `${ORACLE_API}/api/cert/cgc/${encodeURIComponent(cert)}?grade=${encodeURIComponent(grade)}`,
-      {
-        cache: "no-store",
-        signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-      }
-    );
-
-    if (!response.ok) {
-      return 0;
-    }
-
-    const payload = (await response.json()) as OracleCertResponse;
-    return typeof payload.value === "number" ? payload.value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function fetchTcgplayerPrice(productId: string): Promise<number> {
-  try {
-    const response = await fetch(
-      `https://mpapi.tcgplayer.com/v2/product/${encodeURIComponent(productId)}/pricepoints`,
-      {
-        cache: "no-store",
-        signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-      }
-    );
-
-    if (!response.ok) {
-      return 0;
-    }
-
-    const payload = (await response.json()) as TcgplayerPricePoint[];
-    const nearMintFoil = payload.find(
-      (pricePoint) =>
-        pricePoint.printingType === "Foil" && pricePoint.condition === "Near Mint"
-    );
-    const nearMintNormal = payload.find(
-      (pricePoint) =>
-        pricePoint.printingType === "Normal" && pricePoint.condition === "Near Mint"
-    );
-    const anyFoil = payload.find((pricePoint) => pricePoint.printingType === "Foil");
-    const bestPricePoint = nearMintFoil ?? nearMintNormal ?? anyFoil ?? payload[0];
-
-    return bestPricePoint?.marketPrice ?? bestPricePoint?.listedMedianPrice ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function fetchOracleSearchPrice(query: string): Promise<number> {
-  try {
-    const response = await fetch(
-      `${ORACLE_API}/api/live/search?q=${encodeURIComponent(query)}`,
-      {
-        cache: "no-store",
-        signal: AbortSignal.timeout(PORTFOLIO_TIMEOUT_MS),
-      }
-    );
-
-    if (!response.ok) {
-      return 0;
-    }
-
-    const payload = (await response.json()) as OracleSearchResponse;
-    const firstResult = payload.results?.[0];
-    return firstResult?.marketPrice ?? firstResult?.price ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function resolveRwaAssetPrice(
-  candidate: RwaCandidate,
-  caches: PriceLookupCache
-): Promise<number> {
-  const gradingId = getAttributeValue(candidate.attributes, "Grading ID", "Cert Number");
-  const gradingCompany = inferGradingCompany(candidate.attributes);
-
-  if (gradingId && (gradingCompany === "PSA" || gradingCompany === "BGS")) {
-    const price = await getOrSetAsync(caches.cert, gradingId, () => fetchOracleCertPrice(gradingId));
-    if (price > 0) {
-      return price;
-    }
-  }
-
-  if (gradingId && gradingCompany === "CGC") {
-    const gradeValue = getAttributeValue(candidate.attributes, "Grade", "The Grade") ?? "";
-    const gradeKey = `CGC-${gradeValue.replace(/[^0-9.]/g, "")}`;
-    const cacheKey = `${gradingId}:${gradeKey}`;
-    const price = await getOrSetAsync(caches.cgc, cacheKey, () => fetchOracleCgcPrice(gradingId, gradeKey));
-    if (price > 0) {
-      return price;
-    }
-  }
-
+function resolveRwaAssetFallbackPrice(candidate: RwaCandidate): number {
   if (candidate.kind === "collectors-crypt-rwa") {
     const insuredValue = parseNumericValue(getAttributeValue(candidate.attributes, "Insured Value"));
     if (insuredValue > 0) {
@@ -756,33 +589,17 @@ async function resolveRwaAssetPrice(
     }
   }
 
-  if (candidate.priceSource?.toLowerCase() === "tcgplayer" && candidate.priceSourceId) {
-    const price = await getOrSetAsync(caches.tcgplayer, candidate.priceSourceId, () =>
-      fetchTcgplayerPrice(candidate.priceSourceId as string)
-    );
-
-    if (price > 0) {
-      return price;
-    }
-  }
-
-  const searchTerm = getAssetName(candidate.asset) || candidate.asset.id;
-  if (!searchTerm) {
-    return 0;
-  }
-
-  return getOrSetAsync(caches.search, searchTerm, () => fetchOracleSearchPrice(searchTerm));
+  return 0;
 }
 
 async function resolveRwaAsset(
   candidate: RwaCandidate,
-  marketValueMap: Record<string, { price: number; source: string }>,
-  caches: PriceLookupCache
+  marketValueMap: Record<string, { price: number; source: string }>
 ): Promise<ResolvedRwaAsset> {
   const oracleMarketValue = marketValueMap[candidate.asset.id]?.price;
   const marketValue = typeof oracleMarketValue === "number" && oracleMarketValue > 0
     ? oracleMarketValue
-    : await resolveRwaAssetPrice(candidate, caches);
+    : resolveRwaAssetFallbackPrice(candidate);
   const badge = getRwaCardBadge(candidate.kind);
 
   return {
@@ -869,11 +686,10 @@ export async function getPortfolioPageData(wallet: string): Promise<PortfolioPag
     }))
   );
 
-  const priceLookupCache = createPriceLookupCache();
   const resolvedRwaAssets = await mapWithConcurrency(
     rwaCandidates,
     6,
-    (candidate) => resolveRwaAsset(candidate, rwaMarketValueMap, priceLookupCache)
+    (candidate) => resolveRwaAsset(candidate, rwaMarketValueMap)
   );
 
   const collectorsCryptCards = sortPortfolioItems(
