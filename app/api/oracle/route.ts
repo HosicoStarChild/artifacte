@@ -38,9 +38,11 @@ type OracleAnalyticsResponse = {
   coverageEnd: string | null;
   coverageStart: string | null;
   currentValueUsd: number | null;
+  dataSource?: "sales" | "tcgplayer-market";
   empty: boolean;
   gradeFilter: string | null;
   latestAveragePriceUsd: number | null;
+  marketValueUsd: number | null;
   maxPriceUsd: number | null;
   minPriceUsd: number | null;
   periods: OracleAnalyticsPeriod[];
@@ -48,12 +50,15 @@ type OracleAnalyticsResponse = {
   totalObservedSales: number;
   totalSales: number;
   totalVolumeUsd: number;
+  valueSource: string | null;
 };
 
 type LegacyChartResolution = {
   altValueUsd: number | null;
   assetId: string | null;
+  marketValueUsd: number | null;
   salesCount: number | null;
+  valueSource: string | null;
 };
 
 type MonthlyBucket = {
@@ -142,11 +147,15 @@ function buildLegacyAnalyticsResponse(
     assetId,
     cardName,
     grade,
+    marketValueUsd,
+    valueSource,
   }: {
     altValueUsd?: number | null;
     assetId: string;
     cardName: string;
     grade: string | null;
+    marketValueUsd?: number | null;
+    valueSource?: string | null;
   },
 ): OracleAnalyticsResponse {
   const transactions = [...(payload.transactions || [])]
@@ -163,7 +172,8 @@ function buildLegacyAnalyticsResponse(
     ? roundCurrency(Math.max(...transactions.map((transaction) => transaction.price)))
     : null;
   const resolvedCardName = cardName || assetId;
-  const currentValueUsd = altValueUsd ?? latestAveragePriceUsd;
+  const resolvedMarketValueUsd = marketValueUsd ?? altValueUsd ?? null;
+  const currentValueUsd = resolvedMarketValueUsd ?? latestAveragePriceUsd;
 
   return {
     altValueUsd: altValueUsd ?? null,
@@ -173,9 +183,11 @@ function buildLegacyAnalyticsResponse(
     coverageEnd: transactions.length > 0 ? transactions[transactions.length - 1]?.date ?? null : null,
     coverageStart: transactions.length > 0 ? transactions[0]?.date ?? null : null,
     currentValueUsd,
+    dataSource: "sales",
     empty: transactions.length === 0,
     gradeFilter: grade,
     latestAveragePriceUsd,
+    marketValueUsd: resolvedMarketValueUsd,
     maxPriceUsd,
     minPriceUsd,
     periods,
@@ -183,6 +195,7 @@ function buildLegacyAnalyticsResponse(
     totalObservedSales: payload.totalUnfiltered || payload.count || transactions.length,
     totalSales: transactions.length,
     totalVolumeUsd,
+    valueSource: valueSource ?? (resolvedMarketValueUsd !== null ? "legacy_chart_header" : null),
   };
 }
 
@@ -207,9 +220,11 @@ function buildEmptyAnalyticsResponse(
     coverageEnd: null,
     coverageStart: null,
     currentValueUsd: null,
+    dataSource: "sales",
     empty: true,
     gradeFilter: grade,
     latestAveragePriceUsd: null,
+    marketValueUsd: null,
     maxPriceUsd: null,
     minPriceUsd: null,
     periods: [],
@@ -217,6 +232,7 @@ function buildEmptyAnalyticsResponse(
     totalObservedSales: 0,
     totalSales: 0,
     totalVolumeUsd: 0,
+    valueSource: null,
   };
 }
 
@@ -256,8 +272,10 @@ async function resolveLegacyChartAsset(searchParams: URLSearchParams): Promise<L
   }
 
   const resolvedAssetId = chartResponse.headers.get("x-asset-id");
+  const marketValueHeader = chartResponse.headers.get("x-market-value");
   const altValueHeader = chartResponse.headers.get("x-alt-value");
   const salesHeader = chartResponse.headers.get("x-total-sales") || chartResponse.headers.get("x-sales-count");
+  const valueSource = chartResponse.headers.get("x-value-source");
 
   try {
     await chartResponse.body?.cancel();
@@ -268,7 +286,9 @@ async function resolveLegacyChartAsset(searchParams: URLSearchParams): Promise<L
   return {
     altValueUsd: altValueHeader ? Number(altValueHeader) : null,
     assetId: resolvedAssetId,
+    marketValueUsd: marketValueHeader ? Number(marketValueHeader) : null,
     salesCount: salesHeader ? Number(salesHeader) : null,
+    valueSource,
   };
 }
 
@@ -288,11 +308,15 @@ async function tryLegacyAnalyticsFallback(searchParams: URLSearchParams, respons
 
   let resolvedAssetId = assetId;
   let resolvedAltValueUsd: number | null = null;
+  let resolvedMarketValueUsd: number | null = null;
+  let resolvedValueSource: string | null = null;
 
   if (!resolvedAssetId) {
     const chartResolution = await resolveLegacyChartAsset(searchParams);
     resolvedAssetId = chartResolution?.assetId || null;
     resolvedAltValueUsd = chartResolution?.altValueUsd ?? null;
+    resolvedMarketValueUsd = chartResolution?.marketValueUsd ?? null;
+    resolvedValueSource = chartResolution?.valueSource ?? null;
   }
 
   if (!resolvedAssetId) {
@@ -323,6 +347,8 @@ async function tryLegacyAnalyticsFallback(searchParams: URLSearchParams, respons
     assetId: resolvedAssetId,
     cardName,
     grade,
+    marketValueUsd: resolvedMarketValueUsd,
+    valueSource: resolvedValueSource,
   });
 }
 

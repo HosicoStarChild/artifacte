@@ -113,6 +113,7 @@ type OracleAnalyticsResponse = {
   empty: boolean;
   gradeFilter: string | null;
   latestAveragePriceUsd: number | null;
+  marketValueUsd: number | null;
   maxPriceUsd: number | null;
   minPriceUsd: number | null;
   periods: OracleAnalyticsPeriod[];
@@ -120,6 +121,7 @@ type OracleAnalyticsResponse = {
   totalObservedSales: number;
   totalSales: number;
   totalVolumeUsd: number;
+  valueSource: string | null;
 };
 
 type AnalyticsTooltipPayloadItem = {
@@ -293,6 +295,21 @@ function formatCoverage(start?: string | null, end?: string | null): string {
   return `${formatter.format(new Date(start))} - ${formatter.format(new Date(end))}`;
 }
 
+function describeValueSource(valueSource?: string | null): string | null {
+  switch (valueSource) {
+    case "alt_sold_listings":
+      return "Based on recent Alt sold listings";
+    case "alt_listing_altvalue":
+      return "Based on current Alt listing values";
+    case "alt_direct":
+      return "Based on direct Alt value";
+    case "legacy_chart_header":
+      return "Based on cached oracle value";
+    default:
+      return null;
+  }
+}
+
 function getTcgPlayerPriceValue(
   pricePoint: TcgPlayerPriceResponse | TcgPlayerHistoryPoint | null | undefined,
 ): number | null {
@@ -410,6 +427,7 @@ function buildTcgplayerAnalytics(
     empty: periods.length === 0,
     gradeFilter: null,
     latestAveragePriceUsd,
+    marketValueUsd: resolvedCurrentValue,
     maxPriceUsd,
     minPriceUsd,
     periods,
@@ -417,6 +435,7 @@ function buildTcgplayerAnalytics(
     totalObservedSales: snapshots.length,
     totalSales: 0,
     totalVolumeUsd: 0,
+    valueSource: "tcgplayer-market",
   };
 }
 
@@ -892,10 +911,11 @@ export default function PriceHistory({
     );
   }
 
-  const priceMetricLabel = analytics.altValueUsd !== null ? "Current value" : "Latest avg";
+  const hasResolvedCurrentValue = analytics.marketValueUsd !== null || analytics.altValueUsd !== null;
+  const priceMetricLabel = hasResolvedCurrentValue ? "Current value" : "Latest avg";
   const priceMetricDetail = isTcgplayerMarketAnalytics
     ? (analytics.altValueUsd !== null ? "Latest TCGplayer market price" : "Latest tracked monthly average")
-    : (analytics.altValueUsd !== null ? "Latest oracle value" : "Latest monthly average");
+    : (hasResolvedCurrentValue ? (describeValueSource(analytics.valueSource) ?? "Latest oracle value") : "Latest monthly average");
   const countMetricLabel = isTcgplayerMarketAnalytics ? "Snapshots" : "Total sales";
   const countMetricValue = formatCompactNumber(isTcgplayerMarketAnalytics ? analytics.totalObservedSales : analytics.totalSales);
   const countMetricDetail = isTcgplayerMarketAnalytics
