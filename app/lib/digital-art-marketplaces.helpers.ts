@@ -33,6 +33,7 @@ export interface ExternalMarketplaceListing {
   listedAt?: number;
   buyKind: MarketplaceBuyKind;
   marketplaceUrl?: string;
+  tensorSlug?: string;
 }
 
 export interface MarketplaceSourceCounts {
@@ -84,6 +85,8 @@ export interface MarketplaceCursor {
   tensorCursor: string | null;
   meDone: boolean;
   tensorDone: boolean;
+  tensorCursors?: (string | null)[];
+  tensorDones?: boolean[];
 }
 
 export interface MagicEdenListingRaw {
@@ -261,16 +264,22 @@ export function getSiblingCollectionAddresses(
 
 export function getMarketplaceIds(entry: AllowlistEntry): {
   magicEdenSymbol?: string;
-  tensorCollId?: string;
+  tensorIdentifiers: string[];
 } {
   const magicEdenSymbol = entry.marketplaces?.magicEden?.symbol;
-  const tensorCollId =
+
+  const tensorSlugs = entry.marketplaces?.tensor?.slugs;
+  if (tensorSlugs && tensorSlugs.length > 0) {
+    return { magicEdenSymbol, tensorIdentifiers: tensorSlugs };
+  }
+
+  const singleIdentifier =
     entry.marketplaces?.tensor?.slug ||
     entry.marketplaces?.magicEden?.symbol ||
     entry.collectionAddress ||
-    entry.mintAuthority ||
-    undefined;
-  return { magicEdenSymbol, tensorCollId };
+    entry.mintAuthority;
+
+  return { magicEdenSymbol, tensorIdentifiers: singleIdentifier ? [singleIdentifier] : [] };
 }
 
 export function decodeCursor(cursor?: string | null): MarketplaceCursor {
@@ -281,7 +290,7 @@ export function decodeCursor(cursor?: string | null): MarketplaceCursor {
   try {
     const raw = Buffer.from(cursor, "base64url").toString("utf-8");
     const parsed = JSON.parse(raw) as Partial<MarketplaceCursor>;
-    return {
+    const result: MarketplaceCursor = {
       meOffset:
         typeof parsed.meOffset === "number" && Number.isFinite(parsed.meOffset)
           ? parsed.meOffset
@@ -291,6 +300,15 @@ export function decodeCursor(cursor?: string | null): MarketplaceCursor {
       meDone: Boolean(parsed.meDone),
       tensorDone: Boolean(parsed.tensorDone),
     };
+    if (Array.isArray(parsed.tensorCursors)) {
+      result.tensorCursors = parsed.tensorCursors.map(
+        (c) => (typeof c === "string" ? c : null)
+      );
+    }
+    if (Array.isArray(parsed.tensorDones)) {
+      result.tensorDones = parsed.tensorDones.map(Boolean);
+    }
+    return result;
   } catch {
     return { meOffset: 0, tensorCursor: null, meDone: false, tensorDone: false };
   }
@@ -318,12 +336,26 @@ export function hasMarketplaceCursorAdvanced(
   previous: MarketplaceCursor,
   next: MarketplaceCursor
 ): boolean {
-  return (
-    previous.meOffset !== next.meOffset ||
-    previous.tensorCursor !== next.tensorCursor ||
-    previous.meDone !== next.meDone ||
-    previous.tensorDone !== next.tensorDone
-  );
+  if (previous.meOffset !== next.meOffset || previous.meDone !== next.meDone) {
+    return true;
+  }
+
+  const prevCursors = previous.tensorCursors ?? [previous.tensorCursor];
+  const nextCursors = next.tensorCursors ?? [next.tensorCursor];
+  const prevDones = previous.tensorDones ?? [previous.tensorDone];
+  const nextDones = next.tensorDones ?? [next.tensorDone];
+
+  if (prevCursors.length !== nextCursors.length) {
+    return true;
+  }
+
+  for (let i = 0; i < prevCursors.length; i++) {
+    if (prevCursors[i] !== nextCursors[i] || prevDones[i] !== nextDones[i]) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export async function accumulateMarketplaceListingsPages({
@@ -721,7 +753,8 @@ export function normalizeTensorListing(
   assetMap: Map<string, HeliusAsset>,
   curatedAddresses: ReadonlySet<string>,
   collectionAddress: string,
-  collectionName: string
+  collectionName: string,
+  tensorSlug?: string
 ): ExternalMarketplaceListing | null {
   const mint = extractTensorMint(raw);
   if (!mint) return null;
@@ -776,6 +809,7 @@ export function normalizeTensorListing(
     ),
     buyKind: compressed ? "tensorCompressed" : "tensorStandard",
     marketplaceUrl: `https://www.tensor.trade/item/${mint}`,
+    ...(tensorSlug ? { tensorSlug } : undefined),
   };
 }
 

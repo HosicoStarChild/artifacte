@@ -230,10 +230,39 @@ export function CollectionMarketplaceSection({
   const [sourceFilter, setSourceFilter] = useState<MarketplaceSource>(defaultSource);
   const [sortOrder, setSortOrder] = useState<MarketplaceSortOrder>("price_asc");
 
+  const availableTensorSlugs = useMemo(() => {
+    const slugs = new Set<string>();
+    for (const listing of marketplaceListings) {
+      if (listing.source === "tensor" && listing.tensorSlug) {
+        slugs.add(listing.tensorSlug);
+      }
+    }
+    return Array.from(slugs).sort();
+  }, [marketplaceListings]);
+
+  const [selectedTensorSlugs, setSelectedTensorSlugs] = useState<ReadonlySet<string>>(
+    () => new Set(availableTensorSlugs)
+  );
+
+  // Keep selectedTensorSlugs in sync when new slugs appear in loaded listings
+  const prevAvailableSlugsRef = useRef<readonly string[]>([]);
+  useEffect(() => {
+    const prev = prevAvailableSlugsRef.current;
+    const added = availableTensorSlugs.filter((s) => !prev.includes(s));
+    if (added.length > 0) {
+      setSelectedTensorSlugs((current) => new Set([...current, ...added]));
+    }
+    prevAvailableSlugsRef.current = availableTensorSlugs;
+  }, [availableTensorSlugs]);
+
   const filteredListings = useMemo(() => {
     const baseListings = marketplaceListings
       .filter((listing) => listing.source === sourceFilter)
       .filter((listing) => listing.price > 0)
+      .filter((listing) => {
+        if (listing.source !== "tensor" || !listing.tensorSlug) return true;
+        return selectedTensorSlugs.has(listing.tensorSlug);
+      })
       .map((listing) => ({
         listing,
         payablePrice: resolveExternalMarketplacePayablePrice(listing, {
@@ -260,6 +289,7 @@ export function CollectionMarketplaceSection({
     collection.collectionAddress,
     collection.name,
     marketplaceListings,
+    selectedTensorSlugs,
     sortOrder,
     sourceFilter,
   ]);
@@ -409,6 +439,48 @@ export function CollectionMarketplaceSection({
             ))}
           </div>
 
+          {sourceFilter === "tensor" && availableTensorSlugs.length > 1 ? (
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/45">
+                Collection
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {availableTensorSlugs.map((slug) => {
+                  const label = slug
+                    .split("_")
+                    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                    .join(" ");
+                  const checked = selectedTensorSlugs.has(slug);
+                  return (
+                    <label
+                      key={slug}
+                      className="flex cursor-pointer select-none items-center gap-2 text-sm text-white/70 hover:text-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        className="h-3.5 w-3.5 accent-amber-400"
+                        onChange={() => {
+                          setSelectedTensorSlugs((current) => {
+                            const next = new Set(current);
+                            if (next.has(slug)) {
+                              // keep at least one selected
+                              if (next.size > 1) next.delete(slug);
+                            } else {
+                              next.add(slug);
+                            }
+                            return next;
+                          });
+                        }}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/45">
               Sort by
@@ -530,7 +602,12 @@ export function CollectionMarketplaceSection({
                       <Badge className="absolute left-2 top-2 border-white/10 bg-dark-900/90 text-white">
                         {formatMarketplaceSource(listing.source)}
                       </Badge>
-                      <Badge className="absolute right-2 top-2 border-emerald-500/20 bg-emerald-500/15 text-emerald-200">
+                      {listing.tensorSlug?.endsWith("_legacy") ? (
+                        <Badge className="absolute left-2 bottom-2 border-transparent bg-amber-500 text-dark-900">
+                          Legacy
+                        </Badge>
+                      ) : null}
+                      <Badge className="absolute right-2 top-2 border-transparent bg-emerald-500 text-white">
                         Buy Now
                       </Badge>
                     </div>

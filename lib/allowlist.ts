@@ -9,7 +9,8 @@ export interface CollectionMarketplaces {
     symbol: string;
   };
   tensor?: {
-    slug: string;
+    slug?: string;
+    slugs?: string[];
   };
   order?: Array<"artifacte" | "magiceden" | "tensor">;
 }
