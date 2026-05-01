@@ -119,14 +119,13 @@ fn close_token_account_cpi<'info>(
 }
 
 // Deploy authority — can initialize and update treasury config
-const DEPLOY_AUTHORITY: &str = "H3s3zhbcDNrLgPbUQFZYvRd9xy58nVNRC3vdg1hK1KPt";
+const DEPLOY_AUTHORITY_PUBKEY: Pubkey = pubkey!("H3s3zhbcDNrLgPbUQFZYvRd9xy58nVNRC3vdg1hK1KPt");
 
 // Fallback treasury (used only if config not yet initialized)
 const TREASURY_FALLBACK: &str = "82v8xATLqdvq3cS1CXwpygVUH926QKdAd4NVxD91r4a6";
 
 // Standard token mints
 const SOL_MINT: &str = "So11111111111111111111111111111111111111112";
-const USD1_MINT: &str = "USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB";
 const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDC_MINT_PUBKEY: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const PLATFORM_FEE_BPS: u64 = 200;
@@ -315,7 +314,7 @@ pub mod auction {
     /// Initialize the treasury config PDA (one-time setup by deploy authority)
     pub fn initialize_treasury(ctx: Context<InitializeTreasury>) -> Result<()> {
         require!(
-            ctx.accounts.authority.key().to_string() == DEPLOY_AUTHORITY,
+            ctx.accounts.authority.key() == DEPLOY_AUTHORITY_PUBKEY,
             AuctionError::Unauthorized
         );
         let config = &mut ctx.accounts.treasury_config;
@@ -328,7 +327,7 @@ pub mod auction {
     /// Update treasury address (deploy authority only)
     pub fn update_treasury(ctx: Context<UpdateTreasury>, new_treasury: Pubkey) -> Result<()> {
         require!(
-            ctx.accounts.authority.key().to_string() == DEPLOY_AUTHORITY,
+            ctx.accounts.authority.key() == DEPLOY_AUTHORITY_PUBKEY,
             AuctionError::Unauthorized
         );
         ctx.accounts.treasury_config.treasury = new_treasury;
@@ -406,6 +405,7 @@ pub mod auction {
         listing.highest_bidder = Pubkey::default();
         listing.baxus_fee = false;
         listing.is_token2022 = is_token2022;
+        listing.is_pnft = false;
         listing.royalty_basis_points = royalty_basis_points;
         listing.creator_address = creator_address;
         listing.bump = ctx.bumps.listing;
@@ -1200,105 +1200,6 @@ pub mod auction {
         Ok(())
     }
 
-    /// Buy a fixed-price pNFT listing.
-    pub fn buy_now_pnft<'info>(
-        ctx: Context<'_, '_, '_, 'info, BuyNowPnft<'info>>
-    ) -> Result<()> {
-        let listing = &mut ctx.accounts.listing;
-
-        require!(matches!(listing.listing_type, ListingType::FixedPrice), AuctionError::NotFixedPrice);
-        require!(listing.status == ListingStatus::Active, AuctionError::ListingNotActive);
-        require!(listing.is_pnft, AuctionError::InvalidTokenProgram);
-
-        let treasury_address = if let Some(ref config) = ctx.accounts.treasury_config {
-            config.treasury
-        } else {
-            TREASURY_FALLBACK.parse::<Pubkey>().unwrap()
-        };
-        require!(ctx.accounts.treasury_payment_account.owner == treasury_address, AuctionError::Unauthorized);
-        require!(ctx.accounts.treasury.key() == treasury_address, AuctionError::Unauthorized);
-
-        let platform_fee = listing.price.checked_mul(200).and_then(|x| x.checked_div(10000)).ok_or(AuctionError::CalculationError)?;
-        let creator_royalty = listing.price.checked_mul(listing.royalty_basis_points as u64).and_then(|x| x.checked_div(10000)).ok_or(AuctionError::CalculationError)?;
-        require!(listing.royalty_basis_points == 0 || listing.royalty_basis_points >= 100, AuctionError::InvalidRoyaltyBps);
-
-        if creator_royalty > 0 {
-            let expected_creator_ata = anchor_spl::associated_token::get_associated_token_address(&listing.creator_address, &listing.payment_mint);
-            require!(ctx.accounts.creator_payment_account.key() == expected_creator_ata, AuctionError::InvalidCreatorAccount);
-        }
-
-        listing.status = ListingStatus::Settled;
-
-        let seller_amount = listing.price.checked_sub(platform_fee).ok_or(AuctionError::CalculationError)?.checked_sub(creator_royalty).ok_or(AuctionError::CalculationError)?;
-
-        // Payment transfers
-        token::transfer(CpiContext::new(ctx.accounts.token_program.to_account_info(), Transfer {
-            from: ctx.accounts.buyer_payment_account.to_account_info(),
-            to: ctx.accounts.seller_payment_account.to_account_info(),
-            authority: ctx.accounts.buyer.to_account_info(),
-        }), seller_amount)?;
-
-        token::transfer(CpiContext::new(ctx.accounts.token_program.to_account_info(), Transfer {
-            from: ctx.accounts.buyer_payment_account.to_account_info(),
-            to: ctx.accounts.treasury_payment_account.to_account_info(),
-            authority: ctx.accounts.buyer.to_account_info(),
-        }), platform_fee)?;
-
-        if creator_royalty > 0 {
-            token::transfer(CpiContext::new(ctx.accounts.token_program.to_account_info(), Transfer {
-                from: ctx.accounts.buyer_payment_account.to_account_info(),
-                to: ctx.accounts.creator_payment_account.to_account_info(),
-                authority: ctx.accounts.buyer.to_account_info(),
-            }), creator_royalty)?;
-        }
-
-        // Transfer pNFT escrow → buyer via Token Metadata TransferV1 raw CPI
-        let nft_mint_key = listing.nft_mint;
-        let escrow_auth_bump = ctx.bumps.escrow_authority;
-        let escrow_auth_seeds: &[&[u8]] = &[b"escrow_authority", nft_mint_key.as_ref(), &[escrow_auth_bump]];
-
-        transfer_pnft(
-            &ctx.accounts.token_metadata_program.to_account_info(),
-            &ctx.accounts.escrow_nft_token.to_account_info(),
-            &ctx.accounts.escrow_authority.to_account_info(),
-            &ctx.accounts.buyer_nft_token.to_account_info(),
-            &ctx.accounts.buyer.to_account_info(),
-            &ctx.accounts.nft_mint.to_account_info(),
-            &ctx.accounts.nft_metadata.to_account_info(),
-            &ctx.accounts.nft_edition.to_account_info(),
-            &ctx.accounts.escrow_token_record.to_account_info(),
-            &ctx.accounts.buyer_token_record.to_account_info(),
-            &ctx.accounts.escrow_authority.to_account_info(),
-            &ctx.accounts.buyer.to_account_info(),
-            &ctx.accounts.system_program.to_account_info(),
-            &ctx.accounts.sysvar_instructions.to_account_info(),
-            &ctx.accounts.token_program.to_account_info(),
-            &ctx.accounts.ata_program.to_account_info(),
-            ctx.accounts.authorization_rules_program.as_ref().map(|a| a.as_ref() as &AccountInfo),
-            ctx.accounts.authorization_rules.as_ref().map(|a| a.as_ref() as &AccountInfo),
-            &[escrow_auth_seeds],
-        )?;
-
-        emit!(ItemPurchased {
-            nft_mint: listing.nft_mint,
-            seller: listing.seller,
-            buyer: ctx.accounts.buyer.key(),
-            price: listing.price,
-            platform_fee,
-            creator_royalty,
-        });
-
-        // Close listing — rent to treasury
-        let listing_info = ctx.accounts.listing.to_account_info();
-        let treasury_info = ctx.accounts.treasury.to_account_info();
-        **treasury_info.lamports.borrow_mut() = treasury_info.lamports().checked_add(listing_info.lamports()).unwrap();
-        **listing_info.lamports.borrow_mut() = 0;
-        listing_info.assign(&anchor_lang::solana_program::system_program::ID);
-        listing_info.realloc(0, false)?;
-
-        Ok(())
-    }
-
     /// Cancel a pNFT listing — return NFT to seller.
     pub fn cancel_listing_pnft<'info>(
         ctx: Context<'_, '_, '_, 'info, CancelListingPnft<'info>>
@@ -1881,88 +1782,6 @@ pub struct ListItemPnft<'info> {
 }
 
 #[derive(Accounts)]
-pub struct BuyNowPnft<'info> {
-    #[account(mut, seeds = [b"listing", nft_mint.key().as_ref()], bump = listing.bump)]
-    pub listing: Box<Account<'info, Listing>>,
-
-    /// CHECK: Must match listing.nft_mint — enforced by PDA seed constraint above
-    #[account(constraint = nft_mint.key() == listing.nft_mint @ AuctionError::Unauthorized)]
-    pub nft_mint: UncheckedAccount<'info>,
-
-    /// CHECK: Metaplex metadata PDA — verified by Token Metadata program during CPI
-    #[account(mut)]
-    pub nft_metadata: UncheckedAccount<'info>,
-
-    /// CHECK: Metaplex master edition PDA — verified by Token Metadata
-    pub nft_edition: UncheckedAccount<'info>,
-
-    /// Escrow authority PDA
-    #[account(
-        seeds = [b"escrow_authority", nft_mint.key().as_ref()],
-        bump,
-    )]
-    pub escrow_authority: SystemAccount<'info>,
-
-    /// CHECK: Escrow token account — verified by Token Metadata CPI
-    #[account(mut)]
-    pub escrow_nft_token: UncheckedAccount<'info>,
-
-    /// CHECK: Escrow token record — verified by Token Metadata CPI
-    #[account(mut)]
-    pub escrow_token_record: UncheckedAccount<'info>,
-
-    /// CHECK: Buyer NFT token account — verified by Token Metadata CPI
-    #[account(mut)]
-    pub buyer_nft_token: UncheckedAccount<'info>,
-
-    /// CHECK: Buyer token record — verified by Token Metadata CPI
-    #[account(mut)]
-    pub buyer_token_record: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    pub buyer_payment_account: Account<'info, TokenAccount>,
-
-    #[account(mut, constraint = seller_payment_account.owner == listing.seller @ AuctionError::Unauthorized)]
-    pub seller_payment_account: Account<'info, TokenAccount>,
-
-    #[account(mut)]
-    pub treasury_payment_account: Account<'info, TokenAccount>,
-
-    /// CHECK: Creator payment account
-    #[account(mut)]
-    pub creator_payment_account: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    pub buyer: Signer<'info>,
-
-    /// CHECK: Treasury wallet
-    #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
-
-    #[account(seeds = [b"treasury_config"], bump)]
-    pub treasury_config: Option<Account<'info, TreasuryConfig>>,
-
-    /// CHECK: Metaplex Token Metadata program
-    pub token_metadata_program: UncheckedAccount<'info>,
-
-    pub token_program: Program<'info, Token>,
-
-    /// CHECK: SPL ATA program
-    pub ata_program: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-
-    /// CHECK: Sysvar instructions
-    pub sysvar_instructions: UncheckedAccount<'info>,
-
-    /// CHECK: Optional authorization rules program
-    pub authorization_rules_program: Option<UncheckedAccount<'info>>,
-
-    /// CHECK: Optional authorization rules account
-    pub authorization_rules: Option<UncheckedAccount<'info>>,
-}
-
-#[derive(Accounts)]
 pub struct CancelListingPnft<'info> {
     #[account(mut, seeds = [b"listing", nft_mint.key().as_ref()], bump = listing.bump)]
     pub listing: Account<'info, Listing>,
@@ -2364,8 +2183,6 @@ pub enum AuctionError {
     InvalidPaymentMint,
     #[msg("Price must be greater than zero")]
     InvalidPrice,
-    #[msg("Insufficient WNS remaining accounts for Token-2022 transfer")]
-    InsufficientWNSAccounts,
     #[msg("Token-2022 transfer with hook failed")]
     TransferFailed,
     #[msg("Seller cannot bid on their own auction")]

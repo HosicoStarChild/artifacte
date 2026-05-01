@@ -68,14 +68,14 @@ export type Auction = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller payment account \u2014 must be owned by listing.seller"
+            "Seller payment account — must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -99,7 +99,7 @@ export type Auction = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -144,8 +144,9 @@ export type Auction = {
     {
       "name": "buy_now_core",
       "docs": [
-        "Public buy of a Core listing. Splits USDC (platform fee + royalty +",
-        "remainder), then CPIs TransferV1 to move the asset to the buyer."
+        "Public buy of a Core listing. Artifacte collection buys waive the",
+        "platform fee and only split USDC between creator royalty and seller.",
+        "Then CPI TransferV1 moves the asset to the buyer."
       ],
       "discriminator": [
         107,
@@ -307,188 +308,6 @@ export type Auction = {
       "args": []
     },
     {
-      "name": "buy_now_pnft",
-      "docs": [
-        "Buy a fixed-price pNFT listing."
-      ],
-      "discriminator": [
-        26,
-        178,
-        190,
-        138,
-        45,
-        22,
-        144,
-        30
-      ],
-      "accounts": [
-        {
-          "name": "listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "nft_mint"
-        },
-        {
-          "name": "nft_metadata",
-          "writable": true
-        },
-        {
-          "name": "nft_edition"
-        },
-        {
-          "name": "escrow_authority",
-          "docs": [
-            "Escrow authority PDA"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow_nft_token",
-          "writable": true
-        },
-        {
-          "name": "escrow_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_nft_token",
-          "writable": true
-        },
-        {
-          "name": "buyer_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_payment_account",
-          "writable": true
-        },
-        {
-          "name": "seller_payment_account",
-          "writable": true
-        },
-        {
-          "name": "treasury_payment_account",
-          "writable": true
-        },
-        {
-          "name": "creator_payment_account",
-          "writable": true
-        },
-        {
-          "name": "buyer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "treasury",
-          "writable": true
-        },
-        {
-          "name": "treasury_config",
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_metadata_program"
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
-          "name": "ata_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "sysvar_instructions"
-        },
-        {
-          "name": "authorization_rules_program",
-          "optional": true
-        },
-        {
-          "name": "authorization_rules",
-          "optional": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "cancel_core_listing",
       "docs": [
         "Cancel an active Core listing while the seller still holds the asset."
@@ -506,106 +325,6 @@ export type Auction = {
       "accounts": [
         {
           "name": "seller",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "asset",
-          "writable": true
-        },
-        {
-          "name": "collection",
-          "writable": true
-        },
-        {
-          "name": "core_listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "core_authority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "mpl_core_program",
-          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "close_stale_core_listing",
-      "docs": [
-        "Close a stale Core listing after ownership changed outside the program.",
-        "Allows the current holder to clear old state and re-list the asset."
-      ],
-      "discriminator": [
-        108,
-        204,
-        165,
-        119,
-        83,
-        128,
-        227,
-        162
-      ],
-      "accounts": [
-        {
-          "name": "holder",
           "writable": true,
           "signer": true
         },
@@ -758,7 +477,7 @@ export type Auction = {
     {
       "name": "cancel_listing_pnft",
       "docs": [
-        "Cancel a pNFT listing \u2014 return NFT to seller."
+        "Cancel a pNFT listing — return NFT to seller."
       ],
       "discriminator": [
         41,
@@ -885,6 +604,106 @@ export type Auction = {
         {
           "name": "authorization_rules",
           "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_stale_core_listing",
+      "docs": [
+        "Close a stale Core listing after ownership changed outside the program.",
+        "Allows the current holder to clear old state and re-list the asset."
+      ],
+      "discriminator": [
+        108,
+        204,
+        165,
+        119,
+        83,
+        128,
+        227,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "collection",
+          "writable": true
+        },
+        {
+          "name": "core_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "core_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -1049,7 +868,7 @@ export type Auction = {
         {
           "name": "core_listing",
           "docs": [
-            "CoreListing PDA \u2014 created on list, closed on cancel/buy."
+            "CoreListing PDA — created on list, closed on cancel/buy."
           ],
           "writable": true,
           "pda": {
@@ -1328,7 +1147,7 @@ export type Auction = {
         {
           "name": "escrow_authority",
           "docs": [
-            "Escrow authority PDA \u2014 owns the escrow token account"
+            "Escrow authority PDA — owns the escrow token account"
           ],
           "pda": {
             "seeds": [
@@ -1363,7 +1182,7 @@ export type Auction = {
         {
           "name": "escrow_nft_token",
           "docs": [
-            "Escrow token account \u2014 created by Token Metadata via ATA"
+            "Escrow token account — created by Token Metadata via ATA"
           ],
           "writable": true
         },
@@ -1468,7 +1287,7 @@ export type Auction = {
         {
           "name": "payment_mint",
           "docs": [
-            "Payment mint \u2014 must match the listing's payment mint"
+            "Payment mint — must match the listing's payment mint"
           ]
         },
         {
@@ -1617,14 +1436,14 @@ export type Auction = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller's payment token account \u2014 must be owned by listing.seller"
+            "Seller's payment token account — must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -1635,14 +1454,14 @@ export type Auction = {
         {
           "name": "buyer_nft_account",
           "docs": [
-            "Buyer NFT account \u2014 must be owned by highest bidder (or seller if no bids for return)"
+            "Buyer NFT account — must be owned by highest bidder (or seller if no bids for return)"
           ],
           "writable": true
         },
         {
           "name": "seller_nft_account",
           "docs": [
-            "Seller NFT account \u2014 must be owned by listing.seller (for no-bid return)"
+            "Seller NFT account — must be owned by listing.seller (for no-bid return)"
           ],
           "writable": true
         },
@@ -1657,7 +1476,7 @@ export type Auction = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -1992,61 +1811,56 @@ export type Auction = {
     },
     {
       "code": 6012,
-      "name": "InsufficientWNSAccounts",
-      "msg": "Insufficient WNS remaining accounts for Token-2022 transfer"
-    },
-    {
-      "code": 6013,
       "name": "TransferFailed",
       "msg": "Token-2022 transfer with hook failed"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "SellerCannotBid",
       "msg": "Seller cannot bid on their own auction"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "InvalidRefundAccount",
-      "msg": "Invalid refund account \u2014 must be previous bidder's ATA"
+      "msg": "Invalid refund account — must be previous bidder's ATA"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "RoyaltyTooHigh",
       "msg": "Royalty basis points too high (max 1000 = 10%)"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "InvalidBuyerAccount",
-      "msg": "Invalid buyer account \u2014 must be owned by highest bidder"
+      "msg": "Invalid buyer account — must be owned by highest bidder"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidCreatorAccount",
+      "msg": "Invalid creator account — must be creator's ATA for payment mint"
     },
     {
       "code": 6018,
-      "name": "InvalidCreatorAccount",
-      "msg": "Invalid creator account \u2014 must be creator's ATA for payment mint"
+      "name": "InvalidTokenProgram",
+      "msg": "Invalid token program — must be SPL Token or Token-2022"
     },
     {
       "code": 6019,
-      "name": "InvalidTokenProgram",
-      "msg": "Invalid token program \u2014 must be SPL Token or Token-2022"
+      "name": "InvalidRoyaltyBps",
+      "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
     },
     {
       "code": 6020,
-      "name": "InvalidRoyaltyBps",
-      "msg": "Invalid royalty basis points \u2014 must be 0 or >= 100 (1%)"
-    },
-    {
-      "code": 6021,
       "name": "InvalidCorePluginState",
       "msg": "Invalid Metaplex Core plugin state"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "StaleCoreListing",
       "msg": "Core listing is stale because the seller no longer owns the asset"
     },
     {
-      "code": 6023,
+      "code": 6022,
       "name": "CoreListingNotStale",
       "msg": "Core listing is not stale"
     }
@@ -2575,14 +2389,14 @@ export const IDL: Auction = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller payment account \u2014 must be owned by listing.seller"
+            "Seller payment account — must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -2606,7 +2420,7 @@ export const IDL: Auction = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -2651,8 +2465,9 @@ export const IDL: Auction = {
     {
       "name": "buy_now_core",
       "docs": [
-        "Public buy of a Core listing. Splits USDC (platform fee + royalty +",
-        "remainder), then CPIs TransferV1 to move the asset to the buyer."
+        "Public buy of a Core listing. Artifacte collection buys waive the",
+        "platform fee and only split USDC between creator royalty and seller.",
+        "Then CPI TransferV1 moves the asset to the buyer."
       ],
       "discriminator": [
         107,
@@ -2814,188 +2629,6 @@ export const IDL: Auction = {
       "args": []
     },
     {
-      "name": "buy_now_pnft",
-      "docs": [
-        "Buy a fixed-price pNFT listing."
-      ],
-      "discriminator": [
-        26,
-        178,
-        190,
-        138,
-        45,
-        22,
-        144,
-        30
-      ],
-      "accounts": [
-        {
-          "name": "listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "nft_mint"
-        },
-        {
-          "name": "nft_metadata",
-          "writable": true
-        },
-        {
-          "name": "nft_edition"
-        },
-        {
-          "name": "escrow_authority",
-          "docs": [
-            "Escrow authority PDA"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow_nft_token",
-          "writable": true
-        },
-        {
-          "name": "escrow_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_nft_token",
-          "writable": true
-        },
-        {
-          "name": "buyer_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_payment_account",
-          "writable": true
-        },
-        {
-          "name": "seller_payment_account",
-          "writable": true
-        },
-        {
-          "name": "treasury_payment_account",
-          "writable": true
-        },
-        {
-          "name": "creator_payment_account",
-          "writable": true
-        },
-        {
-          "name": "buyer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "treasury",
-          "writable": true
-        },
-        {
-          "name": "treasury_config",
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_metadata_program"
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
-          "name": "ata_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "sysvar_instructions"
-        },
-        {
-          "name": "authorization_rules_program",
-          "optional": true
-        },
-        {
-          "name": "authorization_rules",
-          "optional": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "cancel_core_listing",
       "docs": [
         "Cancel an active Core listing while the seller still holds the asset."
@@ -3013,106 +2646,6 @@ export const IDL: Auction = {
       "accounts": [
         {
           "name": "seller",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "asset",
-          "writable": true
-        },
-        {
-          "name": "collection",
-          "writable": true
-        },
-        {
-          "name": "core_listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "core_authority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "mpl_core_program",
-          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "close_stale_core_listing",
-      "docs": [
-        "Close a stale Core listing after ownership changed outside the program.",
-        "Allows the current holder to clear old state and re-list the asset."
-      ],
-      "discriminator": [
-        108,
-        204,
-        165,
-        119,
-        83,
-        128,
-        227,
-        162
-      ],
-      "accounts": [
-        {
-          "name": "holder",
           "writable": true,
           "signer": true
         },
@@ -3265,7 +2798,7 @@ export const IDL: Auction = {
     {
       "name": "cancel_listing_pnft",
       "docs": [
-        "Cancel a pNFT listing \u2014 return NFT to seller."
+        "Cancel a pNFT listing — return NFT to seller."
       ],
       "discriminator": [
         41,
@@ -3392,6 +2925,106 @@ export const IDL: Auction = {
         {
           "name": "authorization_rules",
           "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_stale_core_listing",
+      "docs": [
+        "Close a stale Core listing after ownership changed outside the program.",
+        "Allows the current holder to clear old state and re-list the asset."
+      ],
+      "discriminator": [
+        108,
+        204,
+        165,
+        119,
+        83,
+        128,
+        227,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "collection",
+          "writable": true
+        },
+        {
+          "name": "core_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "core_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -3556,7 +3189,7 @@ export const IDL: Auction = {
         {
           "name": "core_listing",
           "docs": [
-            "CoreListing PDA \u2014 created on list, closed on cancel/buy."
+            "CoreListing PDA — created on list, closed on cancel/buy."
           ],
           "writable": true,
           "pda": {
@@ -3835,7 +3468,7 @@ export const IDL: Auction = {
         {
           "name": "escrow_authority",
           "docs": [
-            "Escrow authority PDA \u2014 owns the escrow token account"
+            "Escrow authority PDA — owns the escrow token account"
           ],
           "pda": {
             "seeds": [
@@ -3870,7 +3503,7 @@ export const IDL: Auction = {
         {
           "name": "escrow_nft_token",
           "docs": [
-            "Escrow token account \u2014 created by Token Metadata via ATA"
+            "Escrow token account — created by Token Metadata via ATA"
           ],
           "writable": true
         },
@@ -3975,7 +3608,7 @@ export const IDL: Auction = {
         {
           "name": "payment_mint",
           "docs": [
-            "Payment mint \u2014 must match the listing's payment mint"
+            "Payment mint — must match the listing's payment mint"
           ]
         },
         {
@@ -4124,14 +3757,14 @@ export const IDL: Auction = {
         {
           "name": "seller_payment_account",
           "docs": [
-            "Seller's payment token account \u2014 must be owned by listing.seller"
+            "Seller's payment token account — must be owned by listing.seller"
           ],
           "writable": true
         },
         {
           "name": "treasury_payment_account",
           "docs": [
-            "Treasury payment account \u2014 validated in instruction body against treasury_config or fallback"
+            "Treasury payment account — validated in instruction body against treasury_config or fallback"
           ],
           "writable": true
         },
@@ -4142,14 +3775,14 @@ export const IDL: Auction = {
         {
           "name": "buyer_nft_account",
           "docs": [
-            "Buyer NFT account \u2014 must be owned by highest bidder (or seller if no bids for return)"
+            "Buyer NFT account — must be owned by highest bidder (or seller if no bids for return)"
           ],
           "writable": true
         },
         {
           "name": "seller_nft_account",
           "docs": [
-            "Seller NFT account \u2014 must be owned by listing.seller (for no-bid return)"
+            "Seller NFT account — must be owned by listing.seller (for no-bid return)"
           ],
           "writable": true
         },
@@ -4164,7 +3797,7 @@ export const IDL: Auction = {
         {
           "name": "treasury_config",
           "docs": [
-            "Treasury config PDA \u2014 if present, overrides hardcoded treasury address"
+            "Treasury config PDA — if present, overrides hardcoded treasury address"
           ],
           "optional": true,
           "pda": {
@@ -4499,61 +4132,56 @@ export const IDL: Auction = {
     },
     {
       "code": 6012,
-      "name": "InsufficientWNSAccounts",
-      "msg": "Insufficient WNS remaining accounts for Token-2022 transfer"
-    },
-    {
-      "code": 6013,
       "name": "TransferFailed",
       "msg": "Token-2022 transfer with hook failed"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "SellerCannotBid",
       "msg": "Seller cannot bid on their own auction"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "InvalidRefundAccount",
-      "msg": "Invalid refund account \u2014 must be previous bidder's ATA"
+      "msg": "Invalid refund account — must be previous bidder's ATA"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "RoyaltyTooHigh",
       "msg": "Royalty basis points too high (max 1000 = 10%)"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "InvalidBuyerAccount",
-      "msg": "Invalid buyer account \u2014 must be owned by highest bidder"
+      "msg": "Invalid buyer account — must be owned by highest bidder"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidCreatorAccount",
+      "msg": "Invalid creator account — must be creator's ATA for payment mint"
     },
     {
       "code": 6018,
-      "name": "InvalidCreatorAccount",
-      "msg": "Invalid creator account \u2014 must be creator's ATA for payment mint"
+      "name": "InvalidTokenProgram",
+      "msg": "Invalid token program — must be SPL Token or Token-2022"
     },
     {
       "code": 6019,
-      "name": "InvalidTokenProgram",
-      "msg": "Invalid token program \u2014 must be SPL Token or Token-2022"
+      "name": "InvalidRoyaltyBps",
+      "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
     },
     {
       "code": 6020,
-      "name": "InvalidRoyaltyBps",
-      "msg": "Invalid royalty basis points \u2014 must be 0 or >= 100 (1%)"
-    },
-    {
-      "code": 6021,
       "name": "InvalidCorePluginState",
       "msg": "Invalid Metaplex Core plugin state"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "StaleCoreListing",
       "msg": "Core listing is stale because the seller no longer owns the asset"
     },
     {
-      "code": 6023,
+      "code": 6022,
       "name": "CoreListingNotStale",
       "msg": "Core listing is not stale"
     }

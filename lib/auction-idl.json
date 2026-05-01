@@ -144,8 +144,9 @@
     {
       "name": "buy_now_core",
       "docs": [
-        "Public buy of a Core listing. Splits USDC (platform fee + royalty +",
-        "remainder), then CPIs TransferV1 to move the asset to the buyer."
+        "Public buy of a Core listing. Artifacte collection buys waive the",
+        "platform fee and only split USDC between creator royalty and seller.",
+        "Then CPI TransferV1 moves the asset to the buyer."
       ],
       "discriminator": [
         107,
@@ -307,188 +308,6 @@
       "args": []
     },
     {
-      "name": "buy_now_pnft",
-      "docs": [
-        "Buy a fixed-price pNFT listing."
-      ],
-      "discriminator": [
-        26,
-        178,
-        190,
-        138,
-        45,
-        22,
-        144,
-        30
-      ],
-      "accounts": [
-        {
-          "name": "listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "nft_mint"
-        },
-        {
-          "name": "nft_metadata",
-          "writable": true
-        },
-        {
-          "name": "nft_edition"
-        },
-        {
-          "name": "escrow_authority",
-          "docs": [
-            "Escrow authority PDA"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "nft_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow_nft_token",
-          "writable": true
-        },
-        {
-          "name": "escrow_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_nft_token",
-          "writable": true
-        },
-        {
-          "name": "buyer_token_record",
-          "writable": true
-        },
-        {
-          "name": "buyer_payment_account",
-          "writable": true
-        },
-        {
-          "name": "seller_payment_account",
-          "writable": true
-        },
-        {
-          "name": "treasury_payment_account",
-          "writable": true
-        },
-        {
-          "name": "creator_payment_account",
-          "writable": true
-        },
-        {
-          "name": "buyer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "treasury",
-          "writable": true
-        },
-        {
-          "name": "treasury_config",
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_metadata_program"
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
-          "name": "ata_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "sysvar_instructions"
-        },
-        {
-          "name": "authorization_rules_program",
-          "optional": true
-        },
-        {
-          "name": "authorization_rules",
-          "optional": true
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "cancel_core_listing",
       "docs": [
         "Cancel an active Core listing while the seller still holds the asset."
@@ -506,106 +325,6 @@
       "accounts": [
         {
           "name": "seller",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "asset",
-          "writable": true
-        },
-        {
-          "name": "collection",
-          "writable": true
-        },
-        {
-          "name": "core_listing",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  108,
-                  105,
-                  115,
-                  116,
-                  105,
-                  110,
-                  103
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "core_authority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  114,
-                  101,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "asset"
-              }
-            ]
-          }
-        },
-        {
-          "name": "mpl_core_program",
-          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "close_stale_core_listing",
-      "docs": [
-        "Close a stale Core listing after ownership changed outside the program.",
-        "Allows the current holder to clear old state and re-list the asset."
-      ],
-      "discriminator": [
-        108,
-        204,
-        165,
-        119,
-        83,
-        128,
-        227,
-        162
-      ],
-      "accounts": [
-        {
-          "name": "holder",
           "writable": true,
           "signer": true
         },
@@ -885,6 +604,106 @@
         {
           "name": "authorization_rules",
           "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_stale_core_listing",
+      "docs": [
+        "Close a stale Core listing after ownership changed outside the program.",
+        "Allows the current holder to clear old state and re-list the asset."
+      ],
+      "discriminator": [
+        108,
+        204,
+        165,
+        119,
+        83,
+        128,
+        227,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset",
+          "writable": true
+        },
+        {
+          "name": "collection",
+          "writable": true
+        },
+        {
+          "name": "core_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "core_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  114,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mpl_core_program",
+          "address": "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -1992,61 +1811,56 @@
     },
     {
       "code": 6012,
-      "name": "InsufficientWNSAccounts",
-      "msg": "Insufficient WNS remaining accounts for Token-2022 transfer"
-    },
-    {
-      "code": 6013,
       "name": "TransferFailed",
       "msg": "Token-2022 transfer with hook failed"
     },
     {
-      "code": 6014,
+      "code": 6013,
       "name": "SellerCannotBid",
       "msg": "Seller cannot bid on their own auction"
     },
     {
-      "code": 6015,
+      "code": 6014,
       "name": "InvalidRefundAccount",
       "msg": "Invalid refund account — must be previous bidder's ATA"
     },
     {
-      "code": 6016,
+      "code": 6015,
       "name": "RoyaltyTooHigh",
       "msg": "Royalty basis points too high (max 1000 = 10%)"
     },
     {
-      "code": 6017,
+      "code": 6016,
       "name": "InvalidBuyerAccount",
       "msg": "Invalid buyer account — must be owned by highest bidder"
     },
     {
-      "code": 6018,
+      "code": 6017,
       "name": "InvalidCreatorAccount",
       "msg": "Invalid creator account — must be creator's ATA for payment mint"
     },
     {
-      "code": 6019,
+      "code": 6018,
       "name": "InvalidTokenProgram",
       "msg": "Invalid token program — must be SPL Token or Token-2022"
     },
     {
-      "code": 6020,
+      "code": 6019,
       "name": "InvalidRoyaltyBps",
       "msg": "Invalid royalty basis points — must be 0 or >= 100 (1%)"
     },
     {
-      "code": 6021,
+      "code": 6020,
       "name": "InvalidCorePluginState",
       "msg": "Invalid Metaplex Core plugin state"
     },
     {
-      "code": 6022,
+      "code": 6021,
       "name": "StaleCoreListing",
       "msg": "Core listing is stale because the seller no longer owns the asset"
     },
     {
-      "code": 6023,
+      "code": 6022,
       "name": "CoreListingNotStale",
       "msg": "Core listing is not stale"
     }
