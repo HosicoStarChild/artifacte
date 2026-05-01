@@ -221,14 +221,12 @@ export function buildAssetSections(
   return sections;
 }
 
-export function getAssetSelectionListingMode(asset: ListPageAsset): "fixed" | "auction" {
-  const flags = getAssetFlags(asset);
-  return flags.isCompressed || flags.isRwa || flags.isCore ? "fixed" : "auction";
+export function getAssetSelectionListingMode(_asset: ListPageAsset): "fixed" | "auction" {
+  return "fixed";
 }
 
-export function isAuctionAllowed(asset: ListPageAsset): boolean {
-  const flags = getAssetFlags(asset);
-  return !flags.isCompressed && !flags.isRwa && !flags.isCore;
+export function isAuctionAllowed(_asset: ListPageAsset): boolean {
+  return false;
 }
 
 export function getListingTypeHint(asset: ListPageAsset): string | null {
