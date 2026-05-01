@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showToast } from "@/components/ToastContainer";
 import { Card, CardContent } from "@/components/ui/card";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
 import type { MyListingsPageData, MyListingRecord, MyListingStatus } from "@/lib/my-listings";
@@ -19,7 +20,9 @@ import { MyListingsTabs } from "./_components/my-listings-tabs";
 import {
   executeMyListingAction,
   fetchMyListings,
+  updateCachedListingStatus,
 } from "./_lib/client";
+import { getMyListingsQueryKey } from "./_lib/query-key";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
 
@@ -28,6 +31,65 @@ const EMPTY_COUNTS: Record<MyListingStatus, number> = {
   cancelled: 0,
   completed: 0,
 };
+
+const POST_ACTION_SYNC_ATTEMPTS = 6;
+const POST_ACTION_SYNC_DELAY_MS = 1_000;
+
+function hasActiveListing(data: MyListingsPageData, listing: MyListingRecord): boolean {
+  return data.listings.some(
+    (currentListing) =>
+      currentListing.nftMint === listing.nftMint
+      && currentListing.source === listing.source
+      && currentListing.status === "active",
+  );
+}
+
+function applyOptimisticListingAction(
+  data: MyListingsPageData,
+  listing: MyListingRecord,
+): MyListingsPageData {
+  if (listing.source === "artifacte") {
+    return updateCachedListingStatus(data, listing.nftMint, "cancelled");
+  }
+
+  return {
+    ...data,
+    listings: data.listings.filter(
+      (currentListing) => !(
+        currentListing.nftMint === listing.nftMint
+        && currentListing.source === listing.source
+      ),
+    ),
+    updatedAt: Date.now(),
+  };
+}
+
+function getListingActionSuccessMessage(listing: MyListingRecord): string {
+  return listing.source === "tensor"
+    ? "NFT delisted successfully."
+    : "Listing cancelled successfully.";
+}
+
+async function waitForListingsSync(
+  walletAddress: string,
+  listing: MyListingRecord,
+): Promise<MyListingsPageData | null> {
+  for (let attempt = 0; attempt < POST_ACTION_SYNC_ATTEMPTS; attempt += 1) {
+    const freshData = await fetchMyListings(walletAddress);
+
+    if (!hasActiveListing(freshData, listing)) {
+      return freshData;
+    }
+
+    if (attempt < POST_ACTION_SYNC_ATTEMPTS - 1) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, POST_ACTION_SYNC_DELAY_MS);
+      });
+    }
+  }
+
+  return null;
+}
 
 export default function MyListingsPage() {
   const {
@@ -38,6 +100,7 @@ export default function MyListingsPage() {
     sendTransaction,
     signTransaction,
   } = useWalletCapabilities();
+  const queryClient = useQueryClient();
 
   const walletAddress = publicKey?.toBase58() ?? null;
   const [activeTab, setActiveTab] = useState<MyListingStatus>("active");
@@ -101,20 +164,44 @@ export default function MyListingsPage() {
         walletAddress,
       });
 
-      const refreshedResult = await myListingsQuery.refetch();
-
-      if (refreshedResult.error) {
-        throw refreshedResult.error;
-      }
-    } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update listing",
+      queryClient.setQueryData<MyListingsPageData | undefined>(
+        getMyListingsQueryKey(walletAddress),
+        (currentData) => (
+          currentData
+            ? applyOptimisticListingAction(currentData, listing)
+            : currentData
+        ),
       );
+
+      showToast.success(getListingActionSuccessMessage(listing));
+
+      void waitForListingsSync(walletAddress, listing)
+        .then((freshData) => {
+          if (freshData) {
+            queryClient.setQueryData(getMyListingsQueryKey(walletAddress), freshData);
+            return;
+          }
+
+          showToast.info("Listing updated on-chain. Refreshing the page may take a few more seconds.");
+        })
+        .catch(() => {
+          showToast.info("Listing updated on-chain. Refreshing the page may take a few more seconds.");
+        });
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Failed to update listing";
+
+      showToast.error(message);
+      setActionError(message);
     } finally {
       setPendingMint(null);
     }
+  };
+
+  const handleRetry = (): void => {
+    setActionError(null);
+    void handleRefresh();
   };
 
   return (
@@ -135,7 +222,7 @@ export default function MyListingsPage() {
           ) : myListingsQuery.isError ? (
             <MyListingsErrorState
               errorMessage={myListingsQuery.error.message}
-              onRetry={() => { void handleRefresh(); }}
+              onRetry={handleRetry}
             />
           ) : (
             <div className="space-y-6">
