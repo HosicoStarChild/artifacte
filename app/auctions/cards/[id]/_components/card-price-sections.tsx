@@ -15,11 +15,23 @@ function getResolvedMarketPrice(payload: TcgPlayerPriceResponse): number | null 
   return payload.marketPrice || payload.listedMedianPrice || null;
 }
 
-export function TcgPlayerPriceBox({ productId }: { productId: string }) {
+export function TcgPlayerPriceBox({ productId }: { productId?: string | null }) {
   const [price, setPrice] = useState<number | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "unavailable">(
+    productId ? "loading" : "unavailable",
+  );
 
   useEffect(() => {
+    if (!productId) {
+      setPrice(null);
+      setStatus("unavailable");
+      return;
+    }
+
     let cancelled = false;
+
+    setPrice(null);
+    setStatus("loading");
 
     fetch(`/api/tcgplayer-price?id=${productId}`)
       .then(async (response) => {
@@ -31,12 +43,32 @@ export function TcgPlayerPriceBox({ productId }: { productId: string }) {
       })
       .then((payload) => {
         if (cancelled || !payload) {
+          if (!cancelled) {
+            setPrice(null);
+            setStatus("unavailable");
+          }
           return;
         }
 
-        setPrice(getResolvedMarketPrice(payload));
+        const resolvedPrice = getResolvedMarketPrice(payload);
+
+        if (resolvedPrice === null) {
+          setPrice(null);
+          setStatus("unavailable");
+          return;
+        }
+
+        setPrice(resolvedPrice);
+        setStatus("ready");
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
+        setPrice(null);
+        setStatus("unavailable");
+      });
 
     return () => {
       cancelled = true;
@@ -48,9 +80,13 @@ export function TcgPlayerPriceBox({ productId }: { productId: string }) {
       <CardContent className="space-y-2 px-6 py-6">
         <h3 className="text-sm font-medium tracking-wider text-white uppercase">Market Price</h3>
         <p className="font-serif text-3xl font-bold text-white">
-          {price ? `$${price.toFixed(2)}` : "Loading..."}
+          {status === "ready" && price !== null ? `$${price.toFixed(2)}` : status === "loading" ? "Loading..." : "Not available"}
         </p>
-        <p className="text-xs text-gray-500">Current market price per TCGplayer</p>
+        <p className="text-xs text-gray-500">
+          {status === "unavailable"
+            ? "Market price is not available for this card right now."
+            : "Current market price per TCGplayer"}
+        </p>
       </CardContent>
     </Card>
   );

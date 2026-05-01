@@ -561,13 +561,17 @@ function CardDetailPageContent() {
             </div>
           </div>
 
+          {/* Artifacte cards: always show market price box, even when metadata is missing */}
+          {card.source === 'artifacte' && (
+            <TcgPlayerPriceBox productId={card.priceSourceId || card.tcgPlayerId} />
+          )}
           {/* Phygitals: show TCGplayer price box */}
-          {card.source === 'phygitals' && card.priceSourceId && (
-            <TcgPlayerPriceBox productId={card.priceSourceId} />
+          {card.source === 'phygitals' && (
+            <TcgPlayerPriceBox productId={card.priceSourceId || card.tcgPlayerId} />
           )}
           {/* CC cards with TCGplayer source: show TCGplayer price box */}
-          {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
-            <TcgPlayerPriceBox productId={card.priceSourceId} />
+          {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && (
+            <TcgPlayerPriceBox productId={card.priceSourceId || card.tcgPlayerId} />
           )}
 
           {/* NFT Details */}
