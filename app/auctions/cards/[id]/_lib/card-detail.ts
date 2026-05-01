@@ -630,9 +630,10 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       mint,
       source: "phygitals",
     });
-    const [asset, auctionListing] = await Promise.all([
+    const [asset, auctionListing, tensorPrice] = await Promise.all([
       fetchNftAsset(mint),
       fetchAuctionListing(connection, mint),
+      fetchTensorPrice(connection, mint),
     ]);
     const resolvedAssetImage = resolveHeliusAssetImageSrc(asset, { fallbackMint: mint });
     const attributes = getAssetAttributes(asset);
@@ -642,16 +643,20 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
     const oracleUsdcPrice = getRawListingPriceForCurrency(oracleListing, "USDC");
     const solPrice = getFirstPositivePrice(
       auctionListing?.currency === "SOL" ? auctionListing.price : null,
+      tensorPrice?.solPrice,
       oracleListing?.solPrice,
       oracleSolPrice,
     );
     const usdcPrice = getFirstPositiveNullable(
       auctionListing?.currency === "USDC" ? auctionListing.price : null,
+      tensorPrice?.usdcPrice,
       oracleUsdcPrice,
       oracleListing?.usdcPrice,
     );
-    const listingCurrency = auctionListing?.currency || (usdcPrice ? "USDC" : (oracleListing?.currency || "SOL"));
-    const listingPrice = auctionListing?.price || getFirstPositivePrice(
+    const listingCurrency = auctionListing?.currency
+      || (tensorPrice?.usdcPrice ? "USDC" : tensorPrice?.solPrice ? "SOL" : null)
+      || (usdcPrice ? "USDC" : (oracleListing?.currency || "SOL"));
+    const listingPrice = auctionListing?.price || tensorPrice?.usdcPrice || tensorPrice?.solPrice || getFirstPositivePrice(
       listingCurrency === "USDC" ? usdcPrice : solPrice,
       usdcPrice,
       solPrice,
@@ -678,7 +683,8 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       priceSource,
       priceSourceId,
       rarity: oracleListing?.rarity || getAttributeValue(attributes, "Rarity"),
-      seller: auctionListing?.seller || oracleListing?.seller || "",
+      marketplace: !auctionListing && (tensorPrice?.usdcPrice || tensorPrice?.solPrice) ? "tensor" : undefined,
+      seller: auctionListing?.seller || tensorPrice?.seller || oracleListing?.seller || "",
       set: oracleListing?.set || getAttributeValue(attributes, "Set"),
       solPrice,
       source: "phygitals",

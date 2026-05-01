@@ -91,6 +91,8 @@ function shouldFilterArtifacteRows(category: string | null): boolean {
 }
 
 function shouldServeFreshArtifacteListings(category: string | null, source: string | null): boolean {
+  // No category = single-asset card detail lookup; always serve fresh.
+  if (!category) return true;
   return category === 'TCG_CARDS' && (!source || source === 'artifacte');
 }
 
