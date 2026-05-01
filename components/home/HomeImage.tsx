@@ -1,4 +1,6 @@
-import type { SyntheticEvent } from "react";
+"use client";
+
+import { useState, type SyntheticEvent } from "react";
 
 import { resolveHomeImageSrc } from "@/lib/home-image";
 import { cn } from "@/lib/utils";
@@ -23,9 +25,22 @@ export function HomeImage({
   onError,
 }: HomeImageProps) {
   const resolvedSrc = resolveHomeImageSrc(src);
+  const [broken, setBroken] = useState(false);
 
-  if (!resolvedSrc) {
-    return <div className="absolute inset-0 bg-dark-900" aria-hidden="true" />;
+  if (!resolvedSrc || broken) {
+    return (
+      <img
+        src="/placeholder-card.svg"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-contain"
+      />
+    );
+  }
+
+  function handleError(event: SyntheticEvent<HTMLImageElement, Event>) {
+    setBroken(true);
+    onError?.(event);
   }
 
   return (
@@ -38,7 +53,7 @@ export function HomeImage({
         contain ? "object-contain" : "object-cover",
         className
       )}
-      onError={onError}
+      onError={handleError}
     />
   );
 }
