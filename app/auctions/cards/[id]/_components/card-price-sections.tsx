@@ -57,37 +57,6 @@ export function TcgPlayerPriceBox({ productId }: { productId: string }) {
 }
 
 export function ArtifactePriceSection({ card, children }: { card: CardDetail; children?: ReactNode }) {
-  const [marketPrice, setMarketPrice] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!card.priceSourceId || card.priceSource !== "TCGplayer") {
-      return;
-    }
-
-    let cancelled = false;
-
-    fetch(`/api/tcgplayer-price?id=${card.priceSourceId}`)
-      .then(async (response) => {
-        if (!response.ok) {
-          return null;
-        }
-
-        return (await response.json()) as TcgPlayerPriceResponse;
-      })
-      .then((payload) => {
-        if (cancelled || !payload) {
-          return;
-        }
-
-        setMarketPrice(getResolvedMarketPrice(payload));
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [card.priceSource, card.priceSourceId]);
-
   const auctionListing: AuctionListing | null = card.auctionListing ?? null;
   const hasListing = Boolean(auctionListing || card.price);
 
@@ -127,14 +96,6 @@ export function ArtifactePriceSection({ card, children }: { card: CardDetail; ch
             <p className="font-serif text-4xl text-white">Unlisted</p>
           </div>
         )}
-
-        <div>
-          <p className="mb-2 text-xs font-medium tracking-wider text-gray-500 uppercase">Market Price</p>
-          <div className="mb-2 flex items-baseline gap-3">
-            <p className="font-serif text-2xl text-white">{marketPrice ? `$${marketPrice.toFixed(2)}` : "—"}</p>
-            {card.priceSource ? <span className="text-xs font-medium text-gold-500">via {card.priceSource}</span> : null}
-          </div>
-        </div>
 
         <div className="flex flex-wrap gap-3 text-xs text-gray-400">
           {card.variant ? <span className="rounded bg-dark-700 px-2 py-1">{card.variant}</span> : null}

@@ -17,7 +17,6 @@ import {
   isTransactionRequestRejected,
   TRANSACTION_REQUEST_REJECTED_MESSAGE,
 } from "@/lib/client/transaction-errors";
-import PriceHistory from "@/components/PriceHistory";
 import { resolveListingDisplayPrice, resolveListingPayablePrice } from "@/lib/data";
 import { buildNftImageFallbackPath } from "@/lib/helius-asset-image";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
@@ -569,23 +568,6 @@ function CardDetailPageContent() {
           {/* CC cards with TCGplayer source: show TCGplayer price box */}
           {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && card.priceSourceId && (
             <TcgPlayerPriceBox productId={card.priceSourceId} />
-          )}
-          {/* Oracle Price History — CC, Sports, Phygitals */}
-          {card.category !== 'MERCHANDISE' && (
-            <PriceHistory 
-              cardName={card.name} 
-              altAssetName={card.altAssetName ?? undefined}
-              category={card.category} 
-              grade={card.gradingCompany && card.gradeNum ? `${card.gradingCompany} ${card.gradeNum}` : undefined}
-              year={card.year ?? undefined}
-              nftAddress={card.nftAddress}
-              source={card.source}
-              tcgPlayerId={card.tcgPlayerId || card.priceSourceId}
-              gradingId={card.gradingId || undefined}
-              gradingCompany={card.gradingCompany ?? undefined}
-              priceSource={card.priceSource}
-              priceSourceId={card.priceSourceId}
-            />
           )}
 
           {/* NFT Details */}
