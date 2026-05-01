@@ -1,7 +1,7 @@
 "use client";
 
-import { startTransition, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { useWalletCapabilities } from "@/hooks/useWalletCapabilities";
@@ -19,9 +19,7 @@ import { MyListingsTabs } from "./_components/my-listings-tabs";
 import {
   executeMyListingAction,
   fetchMyListings,
-  updateCachedListingStatus,
 } from "./_lib/client";
-import { getMyListingsQueryKey } from "./_lib/query-key";
 
 const EMPTY_LISTINGS: MyListingRecord[] = [];
 
@@ -40,7 +38,6 @@ export default function MyListingsPage() {
     sendTransaction,
     signTransaction,
   } = useWalletCapabilities();
-  const queryClient = useQueryClient();
 
   const walletAddress = publicKey?.toBase58() ?? null;
   const [activeTab, setActiveTab] = useState<MyListingStatus>("active");
@@ -49,8 +46,9 @@ export default function MyListingsPage() {
 
   const myListingsQuery = useQuery<MyListingsPageData, Error>({
     enabled: Boolean(connected && walletAddress),
+    gcTime: 0,
     queryFn: () => fetchMyListings(walletAddress ?? ""),
-    queryKey: getMyListingsQueryKey(walletAddress),
+    queryKey: ["my-listings", walletAddress],
     refetchOnMount: "always",
     refetchOnReconnect: true,
     refetchOnWindowFocus: true,
@@ -103,18 +101,16 @@ export default function MyListingsPage() {
         walletAddress,
       });
 
-      startTransition(() => {
-        queryClient.setQueryData<MyListingsPageData | undefined>(
-          getMyListingsQueryKey(walletAddress),
-          (currentData) =>
-            currentData
-              ? updateCachedListingStatus(currentData, listing.nftMint, "cancelled")
-              : currentData,
-        );
-      });
+      const refreshedResult = await myListingsQuery.refetch();
+
+      if (refreshedResult.error) {
+        throw refreshedResult.error;
+      }
     } catch (error) {
       setActionError(
-        error instanceof Error ? error.message : "Failed to update listing",
+        error instanceof Error
+          ? error.message
+          : "Failed to update listing",
       );
     } finally {
       setPendingMint(null);
