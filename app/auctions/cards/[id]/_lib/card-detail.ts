@@ -918,7 +918,11 @@ export function formatListingQuote(amount: number, currency: string): string {
     : `$${formattedAmount} ${currency}`;
 }
 
-export function getCardBackHref(category: string): string {
+export function getCardBackHref(category: string, source?: string): string {
+  if (source === "artifacte") {
+    return "/auctions/categories/artifacte";
+  }
+
   if (category === "MERCHANDISE") {
     return "/auctions/categories/merchandise";
   }
@@ -934,7 +938,11 @@ export function getCardBackHref(category: string): string {
   return "/auctions/categories/tcg-cards";
 }
 
-export function getCardBackLabel(category: string): string {
+export function getCardBackLabel(category: string, source?: string): string {
+  if (source === "artifacte") {
+    return "Artifacte";
+  }
+
   if (category === "MERCHANDISE") {
     return "Merchandise";
   }

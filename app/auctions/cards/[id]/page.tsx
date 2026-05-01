@@ -348,8 +348,8 @@ function CardDetailPageContent() {
     connected,
     viewerPublicKey: publicKey?.toBase58() ?? null,
   });
-  const backHref = getCardBackHref(card.category);
-  const backLabel = getCardBackLabel(card.category);
+  const backHref = getCardBackHref(card.category, card.source);
+  const backLabel = getCardBackLabel(card.category, card.source);
   const fallbackCardImageSrc = buildNftImageFallbackPath(card.nftAddress);
 
   return (

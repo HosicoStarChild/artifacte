@@ -1,7 +1,12 @@
 import assert from "node:assert";
 
 import { applyArtifacteMarketplaceState } from "../app/auctions/cards/[id]/_lib/artifacte-marketplace-state.ts";
-import type { AuctionListing, CardDetail } from "../app/auctions/cards/[id]/_lib/card-detail.ts";
+import {
+  getCardBackHref,
+  getCardBackLabel,
+  type AuctionListing,
+  type CardDetail,
+} from "../app/auctions/cards/[id]/_lib/card-detail.ts";
 
 function createAuctionListing(overrides: Partial<AuctionListing> = {}): AuctionListing {
   return {
@@ -70,5 +75,17 @@ describe("applyArtifacteMarketplaceState", () => {
     assert.equal(card.auctionListing, null);
     assert.equal(card.usdcPrice, null);
     assert.equal(card.solPrice, 0);
+  });
+});
+
+describe("Artifacte card detail back link", () => {
+  it("routes Artifacte cards back to the Artifacte category page", () => {
+    assert.equal(getCardBackHref("TCG_CARDS", "artifacte"), "/auctions/categories/artifacte");
+    assert.equal(getCardBackLabel("TCG_CARDS", "artifacte"), "Artifacte");
+  });
+
+  it("keeps non-Artifacte TCG cards on the generic TCG category page", () => {
+    assert.equal(getCardBackHref("TCG_CARDS", "collector-crypt"), "/auctions/categories/tcg-cards");
+    assert.equal(getCardBackLabel("TCG_CARDS", "collector-crypt"), "TCG Cards");
   });
 });
