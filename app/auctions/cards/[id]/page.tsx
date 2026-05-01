@@ -236,30 +236,7 @@ function CardDetailPageContent() {
         return;
       }
 
-      // Detect NFT type to choose the correct Tensor delist route
-      let delistRoute = '/api/tensor-delist'; // default: compressed
-      try {
-        const nftRes = await fetch(`/api/nft?mint=${card.nftAddress}`);
-        const nftData = await nftRes.json();
-        const rawAsset = nftData.result || {};
-        const isCompressed = rawAsset.compression?.compressed === true;
-        if (isCompressed) {
-          delistRoute = '/api/tensor-delist';
-        } else {
-          const mintInfo = await connection.getAccountInfo(new PublicKey(card.nftAddress));
-          const isToken2022 = mintInfo?.owner.toBase58() === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
-          if (isToken2022) {
-            delistRoute = '/api/tensor-delist-t22';
-          } else {
-            delistRoute = '/api/tensor-delist-legacy';
-          }
-        }
-        console.log('[delist] route:', delistRoute, 'compressed:', isCompressed);
-      } catch {
-        // If detection fails, try compressed (original behavior)
-      }
-
-      const res = await fetch(delistRoute, {
+      const res = await fetch('/api/tensor-delist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,7 +262,7 @@ function CardDetailPageContent() {
       }
 
       showToast.success("NFT unlisted successfully!");
-      setCard((prevCard) => prevCard ? { ...prevCard, price: 0, usdcPrice: null, solPrice: 0 } : prevCard);
+  setCard((prevCard) => prevCard ? { ...prevCard, price: 0, usdcPrice: null, solPrice: 0, auctionListing: null } : prevCard);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to unlist";
       console.error("Unlist failed:", error);
