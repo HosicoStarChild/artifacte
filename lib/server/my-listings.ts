@@ -423,6 +423,7 @@ async function fetchProgramAccounts(
       params: [
         programId,
         {
+          commitment: "confirmed",
           encoding: "base64",
           filters,
         },
