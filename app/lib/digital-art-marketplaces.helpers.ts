@@ -266,8 +266,8 @@ export function getMarketplaceIds(entry: AllowlistEntry): {
   const magicEdenSymbol = entry.marketplaces?.magicEden?.symbol;
   const tensorCollId =
     entry.marketplaces?.tensor?.slug ||
-    entry.collectionAddress ||
-    entry.mintAuthority;
+    (entry.marketplaces ? null : entry.collectionAddress || entry.mintAuthority || null) ||
+    undefined;
   return { magicEdenSymbol, tensorCollId };
 }
 

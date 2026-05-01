@@ -399,12 +399,12 @@ function mapCollectionDetails(entry: AllowlistEntry, targetAddresses: string[]):
     collectionAddress: identifier,
     description: entry.description ?? null,
     hasMagicEden: Boolean(entry.marketplaces?.magicEden?.symbol),
-    hasMarketplaceConfig: Boolean(
-      entry.marketplaces?.magicEden?.symbol ||
-        entry.marketplaces?.tensor?.slug ||
-        entry.collectionAddress
-    ),
-    hasTensor: Boolean(entry.marketplaces?.tensor?.slug || entry.collectionAddress),
+    hasMarketplaceConfig: entry.marketplaces
+      ? Boolean(entry.marketplaces.magicEden?.symbol || entry.marketplaces.tensor?.slug)
+      : Boolean(entry.collectionAddress || entry.mintAuthority),
+    hasTensor: entry.marketplaces
+      ? Boolean(entry.marketplaces.tensor?.slug)
+      : Boolean(entry.collectionAddress || entry.mintAuthority),
     imageSrc: getResolvedImageSrc(entry.image),
     isFeeExempt: isArtifacteExternalFeeExempt({
       collectionAddress: identifier,
