@@ -101,9 +101,9 @@ export const homeProcessSteps: readonly HomeProcessStep[] = [
   },
   {
     step: "02",
-    title: "Bid or Buy",
+    title: "Buy",
     description:
-      "Place bids on live auctions or purchase items at fixed prices using USD1 or USDC on Solana.",
+      "Purchase items at fixed prices using USDC on Solana.",
   },
   {
     step: "03",
