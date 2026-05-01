@@ -181,7 +181,7 @@ function MarketplaceEmptyState({ message, title }: { message: string; title: str
 
 function MarketplaceLoadingGrid() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {Array.from({ length: 16 }).map((_, index) => (
         <Skeleton key={index} className="aspect-4/5 rounded-xl bg-white/8" />
       ))}
@@ -506,7 +506,7 @@ export function CollectionMarketplaceSection({
 
       {filteredListings.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {filteredListings.map(({ listing, payablePrice }) => {
               const listedAt = formatListedAt(listing.listedAt);
               const feeSummary = buildFeeSummary(payablePrice);
