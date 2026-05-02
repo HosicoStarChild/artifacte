@@ -72,6 +72,17 @@ export function resolveHeliusAssetImageSrc(
   options: ResolveHeliusAssetImageOptions = {}
 ): string | null {
   const files = asset?.content?.files ?? [];
+  const cdnUri = files.find((file) => {
+    const normalizedUri = file.cdn_uri?.trim();
+
+    return Boolean(normalizedUri && normalizedUri.length > 40 && !normalizedUri.endsWith("//"));
+  })?.cdn_uri;
+
+  const resolvedCdnUri = resolveAssetImageUri(cdnUri);
+  if (resolvedCdnUri) {
+    return resolvedCdnUri;
+  }
+
   const resolvedPrimaryUri = resolveAssetImageUri(
     asset?.content?.links?.image || asset?.image
   );
@@ -82,17 +93,6 @@ export function resolveHeliusAssetImageSrc(
   const resolvedFileUri = resolveAssetImageUri(getFirstImageFileUri(files));
   if (resolvedFileUri) {
     return resolvedFileUri;
-  }
-
-  const cdnUri = files.find((file) => {
-    const normalizedUri = file.cdn_uri?.trim();
-
-    return Boolean(normalizedUri && normalizedUri.length > 40 && !normalizedUri.endsWith("//"));
-  })?.cdn_uri;
-
-  const resolvedCdnUri = resolveAssetImageUri(cdnUri);
-  if (resolvedCdnUri) {
-    return resolvedCdnUri;
   }
 
   const fallbackMint = options.fallbackMint || asset?.id?.trim();
