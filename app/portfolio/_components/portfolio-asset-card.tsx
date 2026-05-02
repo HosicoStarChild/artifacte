@@ -38,7 +38,7 @@ function getValueClasses(accent: PortfolioAccent): string {
 
 export function PortfolioAssetCard({ asset }: PortfolioAssetCardProps) {
   const imageClasses = asset.imageFit === "contain"
-    ? "h-full w-full object-contain p-4"
+    ? "h-full w-full object-contain p-2"
     : "h-full w-full object-cover";
   const ratioClass = asset.aspectRatio === "portrait" ? "aspect-3/4" : "aspect-square";
 

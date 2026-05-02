@@ -243,14 +243,14 @@ function getRwaCardBadge(kind: Exclude<PortfolioSectionId, "digital-collectibles
         label: "ARTIFACTE",
         accent: "gold",
         aspectRatio: "square",
-        imageFit: "cover",
+        imageFit: "contain",
       };
     case "phygitals-rwa":
       return {
         label: "PHYGITALS",
         accent: "violet",
         aspectRatio: "square",
-        imageFit: "cover",
+        imageFit: "contain",
       };
     case "collectors-crypt-rwa":
       return {
