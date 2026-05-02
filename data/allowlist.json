@@ -11,7 +11,9 @@
       "verified": true,
       "description": "Mad Lads are a collection of 10,000 dynamic NFTs on the Solana blockchain, built by the Backpack team. Holders gain access to the Backpack ecosystem and exclusive drops.",
       "links": {
-        "twitter": "https://twitter.com/MadLads"
+        "twitter": "https://twitter.com/MadLads",
+        "discord": "https://discord.gg/madlads",
+        "website": "https://www.madlads.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -30,7 +32,9 @@
       "verified": true,
       "description": "SMB is a collection of 5,000 unique randomly generated SolanaMonkeys stored on the blockchain. Reject humanity, return to monke.",
       "links": {
-        "twitter": "https://twitter.com/SolanaMBS"
+        "twitter": "https://twitter.com/SolanaMBS",
+        "discord": "https://discord.gg/MonkeDAO",
+        "website": "https://solanamonkey.business/"
       },
       "marketplaces": {
         "magicEden": {
@@ -49,7 +53,9 @@
       "verified": true,
       "description": "The next generation of Solana Monkey Business. 5,000 unique monkeys with enhanced art and utility, building on the legacy of the original SMB collection.",
       "links": {
-        "twitter": "https://twitter.com/SolanaMBS"
+        "twitter": "https://twitter.com/SolanaMBS",
+        "discord": "https://discord.gg/monkedao",
+        "website": "https://solanamonkey.business"
       },
       "marketplaces": {
         "magicEden": {
@@ -68,7 +74,9 @@
       "verified": true,
       "description": "A collection of 7,777 foxes building the Famous Fox Federation — a community-driven ecosystem on Solana with staking, raffles, and governance.",
       "links": {
-        "twitter": "https://twitter.com/FamousFoxFed"
+        "twitter": "https://twitter.com/FamousFoxFed",
+        "discord": "https://discord.gg/famousfoxes",
+        "website": "https://famousfoxes.com"
       },
       "marketplaces": {
         "magicEden": {
@@ -129,7 +137,9 @@
       "verified": true,
       "description": "Taiyo Robotics features 2,348 unique robots on Solana, combining Japanese-inspired design with DeFi utility and community rewards.",
       "links": {
-        "twitter": "https://twitter.com/TaiyoRobotics"
+        "twitter": "https://twitter.com/TaiyoRobotics",
+        "discord": "https://discord.gg/66MQBHMn4n",
+        "website": "https://taiyorobotics.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -148,7 +158,9 @@
       "verified": true,
       "description": "Galactic Gecko Space Garage is a collection of 10,000 unique geckos on Solana, known for their staking rewards and community-driven initiatives.",
       "links": {
-        "twitter": "https://twitter.com/GalacticGeckoSG"
+        "twitter": "https://twitter.com/GalacticGeckoSG",
+        "discord": "https://discord.com/invite/TheGeckoDAO",
+        "website": "https://galacticgeckos.io/"
       },
       "marketplaces": {
         "magicEden": {
@@ -167,7 +179,8 @@
       "verified": true,
       "description": "little swag world is a collection of 3,333 characters on Solana, featuring unique pixel art and a focus on community, creativity, and vibes.",
       "links": {
-        "twitter": "https://twitter.com/littleswagworld"
+        "twitter": "https://twitter.com/littleswagworld",
+        "website": "https://littleswag.world/"
       },
       "marketplaces": {
         "magicEden": {
@@ -186,7 +199,8 @@
       "verified": true,
       "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters.",
       "links": {
-        "twitter": "https://x.com/quekz_"
+        "twitter": "https://x.com/quekz_",
+        "website": "https://quekz.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -209,7 +223,8 @@
       "matchBy": "authority",
       "description": "Quekz is a collection of 5,000 WNS NFTs on Solana with enforced royalties via transfer hooks. A community-driven collection of quirky characters.",
       "links": {
-        "twitter": "https://x.com/quekz_"
+        "twitter": "https://x.com/quekz_",
+        "website": "https://quekz.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -229,7 +244,9 @@
       "matchBy": "authority",
       "description": "Hot Heads is an exclusive collection of unique 1/1 hand-drawn characters on Solana, each with its own personality and story.",
       "links": {
-        "twitter": "https://twitter.com/HotHeadsNFT"
+        "twitter": "https://twitter.com/HotHeadsNFT",
+        "discord": "https://discord.gg/hotheads",
+        "website": "https://hotheads.xyz/about"
       },
       "marketplaces": {
         "magicEden": {
@@ -248,7 +265,8 @@
       "verified": true,
       "description": "DeGods is a digital art collection on Solana. A deflationary collection of degenerates, punks, and misfits. DUST. Season III.",
       "links": {
-        "twitter": "https://twitter.com/DeGodsNFT"
+        "twitter": "https://twitter.com/DeGodsNFT",
+        "website": "https://degods.com"
       },
       "marketplaces": {
         "magicEden": {
@@ -267,7 +285,9 @@
       "verified": true,
       "description": "Degen Ape Academy is a collection of 10,000 randomly generated, unique apes on the Solana blockchain. One of the OG Solana NFT collections.",
       "links": {
-        "twitter": "https://twitter.com/DegenApeAcademy"
+        "twitter": "https://twitter.com/DegenApeAcademy",
+        "discord": "https://discord.gg/degenapeacademy",
+        "website": "https://www.degenape.academy/"
       },
       "marketplaces": {
         "magicEden": {
@@ -286,7 +306,9 @@
       "verified": true,
       "description": "Sensei is a Metaplex Core collection on Solana featuring unique characters with martial arts themes and community-driven utility.",
       "links": {
-        "twitter": "https://x.com/SolanaSensei"
+        "twitter": "https://x.com/SolanaSensei",
+        "discord": "https://discord.gg/dUvtmNpvwz",
+        "website": "https://www.solanasensei.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -305,7 +327,9 @@
       "verified": true,
       "description": "Dead King Society is a curated collection of 1/1 art pieces on Solana, featuring royal characters with dark, gothic aesthetics.",
       "links": {
-        "twitter": "https://twitter.com/DeadKingSociety"
+        "twitter": "https://twitter.com/DeadKingSociety",
+        "discord": "https://discord.gg/mYAWBjkzaF",
+        "website": "https://deadkingsociety.io/"
       },
       "marketplaces": {
         "magicEden": {
@@ -324,7 +348,9 @@
       "verified": true,
       "description": "Okay Bears is a culture shift. A collection of 10,000 bears on the Solana blockchain, bringing Web3 to the mainstream with premium art and partnerships.",
       "links": {
-        "twitter": "https://x.com/okaybears"
+        "twitter": "https://x.com/okaybears",
+        "discord": "https://discord.com/invite/okaybears",
+        "website": "https://www.okaybears.com"
       },
       "marketplaces": {
         "magicEden": {
@@ -381,7 +407,9 @@
       "verified": true,
       "description": "Monkey Baby Business (MBB) is a collection of ProgrammableNFTs on Solana.",
       "links": {
-        "twitter": "https://x.com/MonkeyBabyBiz"
+        "twitter": "https://x.com/MonkeyBabyBiz",
+        "discord": "https://discord.gg/monkeybb",
+        "website": "https://monkeybaby.business"
       },
       "marketplaces": {
         "magicEden": {
@@ -400,7 +428,8 @@
       "verified": true,
       "description": "Zero Monke Biz (ZMB) is a collection of NFTs on Solana.",
       "links": {
-        "twitter": "https://x.com/zeromonkebiz"
+        "twitter": "https://x.com/zeromonkebiz",
+        "discord": "https://discord.gg/2SsN2NPyKg"
       },
       "marketplaces": {
         "magicEden": {
@@ -419,7 +448,8 @@
       "verified": true,
       "description": "Zero Monke Biz (ZMB) Wave 1.",
       "links": {
-        "twitter": "https://x.com/zeromonkebiz"
+        "twitter": "https://x.com/zeromonkebiz",
+        "discord": "https://discord.gg/2SsN2NPyKg"
       }
     },
     {
@@ -433,7 +463,8 @@
       "verified": true,
       "description": "Zero Monke Biz (ZMB) Wave 2.",
       "links": {
-        "twitter": "https://x.com/zeromonkebiz"
+        "twitter": "https://x.com/zeromonkebiz",
+        "discord": "https://discord.gg/2SsN2NPyKg"
       }
     },
     {
@@ -447,7 +478,8 @@
       "verified": true,
       "description": "Zero Monke Biz (ZMB) Wave 3.",
       "links": {
-        "twitter": "https://x.com/zeromonkebiz"
+        "twitter": "https://x.com/zeromonkebiz",
+        "discord": "https://discord.gg/2SsN2NPyKg"
       }
     },
     {
@@ -461,7 +493,9 @@
       "verified": true,
       "description": "CHADS is a collection of ProgrammableNFTs on Solana.",
       "links": {
-        "twitter": "https://x.com/CHADSwtf"
+        "twitter": "https://x.com/CHADSwtf",
+        "discord": "https://discord.gg/QRRft7FZ",
+        "website": "https://www.chads.wtf/"
       },
       "marketplaces": {
         "magicEden": {
