@@ -16,6 +16,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "mad_lads"
+        },
+        "tensor": {
+          "slug": "madlads"
         }
       }
     },
@@ -35,6 +38,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "solana_monkey_business"
+        },
+        "tensor": {
+          "slug": "solana_monkey_business"
         }
       }
     },
@@ -54,6 +60,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "smb_gen3"
+        },
+        "tensor": {
+          "slug": "smb_gen3"
         }
       }
     },
@@ -73,6 +82,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "famous_fox_federation"
+        },
+        "tensor": {
+          "slug": "famous_fox_federation"
         }
       }
     },
@@ -92,6 +104,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "claynosaurz"
+        },
+        "tensor": {
+          "slug": "claynosaurz"
         }
       }
     },
@@ -111,6 +126,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "saga"
+        },
+        "tensor": {
+          "slug": "saga"
         }
       }
     },
@@ -130,6 +148,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "taiyo_robotics"
+        },
+        "tensor": {
+          "slug": "taiyo_robotics"
         }
       }
     },
@@ -149,6 +170,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "galactic_geckos"
+        },
+        "tensor": {
+          "slug": "galactic_geckos"
         }
       }
     },
@@ -168,6 +192,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "littleswagworld"
+        },
+        "tensor": {
+          "slug": "little_swag_world"
         }
       }
     },
@@ -230,6 +257,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "hot_heads"
+        },
+        "tensor": {
+          "slug": "hot_heads"
         }
       }
     },
@@ -249,6 +279,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "degods"
+        },
+        "tensor": {
+          "slug": "degods"
         }
       }
     },
@@ -268,6 +301,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "degenerate_ape_academy"
+        },
+        "tensor": {
+          "slug": "degenerate_ape_academy"
         }
       }
     },
@@ -287,6 +323,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "sensei"
+        },
+        "tensor": {
+          "slug": "sensei"
         }
       }
     },
@@ -306,6 +345,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "deadkingsociety"
+        },
+        "tensor": {
+          "slug": "deadkingsociety"
         }
       }
     },
@@ -325,6 +367,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "okay_bears"
+        },
+        "tensor": {
+          "slug": "okay_bears"
         }
       }
     },
@@ -344,6 +389,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "drifella2"
+        },
+        "tensor": {
+          "slug": "drifella_2"
         }
       }
     },
@@ -363,6 +411,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "drifella_iii"
+        },
+        "tensor": {
+          "slug": "drifella3"
         }
       }
     },
@@ -382,6 +433,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "monkey_baby_business"
+        },
+        "tensor": {
+          "slug": "monkey_baby_business"
         }
       }
     },
@@ -401,6 +455,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "zmb_0735"
+        },
+        "tensor": {
+          "slug": "zmb"
         }
       }
     },
@@ -462,6 +519,9 @@
       "marketplaces": {
         "magicEden": {
           "symbol": "chadswtf"
+        },
+        "tensor": {
+          "slug": "chads"
         }
       }
     },

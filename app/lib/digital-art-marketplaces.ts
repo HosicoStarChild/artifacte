@@ -158,13 +158,14 @@ const TENSOR_COLL_ID_SUCCESS_TTL_MS = 15 * 60 * 1000;
 const TENSOR_COLL_ID_EMPTY_TTL_MS = 5 * 60 * 1000;
 const TENSOR_COLL_ID_ERROR_TTL_MS = 30 * 1000;
 const TENSOR_COLL_ID_LOOKUP_TIMEOUT_MS = 3_000;
-const MARKETPLACE_LISTINGS_CACHE_TTL_MS = 30 * 1000;
+const MARKETPLACE_LISTINGS_CACHE_TTL_MS = 120 * 1000;
 const MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS = 10 * 1000;
 const MARKETPLACE_LISTINGS_STALE_TTL_MS = 5 * 60 * 1000;
 const MARKETPLACE_DETAIL_CACHE_TTL_MS = 15 * 1000;
 const MAX_MARKETPLACE_PAGE_PASSES = 4;
 const MAX_TENSOR_DETAIL_FALLBACK_PASSES = 4;
 const TENSOR_DETAIL_FALLBACK_PAGE_SIZE = 60;
+const TENSOR_RATE_LIMIT_BACKOFF_MS = 60_000;
 
 function isTransientMarketplaceStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
@@ -172,6 +173,13 @@ function isTransientMarketplaceStatus(status: number): boolean {
 
 function getMarketplaceErrorReason(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+class TensorRateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TensorRateLimitError";
+  }
 }
 
 function normalizeTensorMarketplaceListingCandidate(
@@ -304,6 +312,7 @@ async function searchTensorMarketplaceListingInCollection(input: {
 }
 
 export function __resetDigitalArtMarketplaceCachesForTests(): void {
+  tensorApiRateLimitedUntilMs = 0;
   tensorCollIdCache.clear();
   tensorCollIdRequests.clear();
   marketplaceListingsCache.clear();
@@ -391,6 +400,10 @@ async function fetchMagicEdenListedCount(symbol: string): Promise<number | null>
     return null;
   }
 }
+
+// Tracks when a Tensor API rate-limit (429) was last encountered so all
+// subsequent calls skip the API until the backoff window expires.
+let tensorApiRateLimitedUntilMs = 0;
 
 // Cache resolved Tensor collIds so we only call find_collection once per address
 const tensorCollIdCache = new Map<string, TensorCollIdCacheEntry>();
@@ -533,8 +546,14 @@ async function fetchTensorCollectionListings(
   cursor: string | null,
   limit: number
 ): Promise<TensorPage> {
-  if (!process.env.TENSOR_API_KEY) {
+  const tensorApiKey = process.env.TENSOR_API_KEY;
+
+  if (!tensorApiKey) {
     return { listings: [], nextCursor: null, hasMore: false };
+  }
+
+  if (Date.now() < tensorApiRateLimitedUntilMs) {
+    throw new TensorRateLimitError("Tensor API rate limit backoff active");
   }
 
   const params = new URLSearchParams({
@@ -545,15 +564,29 @@ async function fetchTensorCollectionListings(
   });
   if (cursor) params.set("cursor", cursor);
 
-  const response = await fetch(`${TENSOR_API}/mint/collection?${params.toString()}`, {
-    headers: {
-      "x-tensor-api-key": process.env.TENSOR_API_KEY,
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(15000),
-  });
+  const fetchPage = () =>
+    fetch(`${TENSOR_API}/mint/collection?${params.toString()}`, {
+      headers: { "x-tensor-api-key": tensorApiKey },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+
+  let response = await fetchPage();
+
+  if (response.status === 429) {
+    const retryAfterHeader = response.headers.get("Retry-After");
+    const retryAfterMs = retryAfterHeader
+      ? Math.min(parseFloat(retryAfterHeader) * 1000, 5_000)
+      : 2_000;
+    await new Promise<void>((resolve) => setTimeout(resolve, retryAfterMs));
+    response = await fetchPage();
+  }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      tensorApiRateLimitedUntilMs = Date.now() + TENSOR_RATE_LIMIT_BACKOFF_MS;
+      throw new TensorRateLimitError(`Tensor listings request failed with status 429`);
+    }
     throw new Error(`Tensor listings request failed with status ${response.status}`);
   }
 
@@ -654,9 +687,11 @@ async function loadCuratedMarketplaceListingsFresh(
               page: createEmptyMagicEdenPage(cursor.meOffset),
             });
 
+      const isTensorRateLimited = Date.now() < tensorApiRateLimitedUntilMs;
+
       const tensorRequests: Promise<MarketplaceFetchResult<TensorPage>>[] =
         validTensorCollIds.map((collId, index) =>
-          shouldIncludeTensor && !activeTensorDones[index]
+          shouldIncludeTensor && !activeTensorDones[index] && !isTensorRateLimited
             ? fetchTensorCollectionListings(collId, activeTensorCursors[index] ?? null, limit)
                 .then((page) => ({ error: null, page }))
                 .catch((error) => ({
@@ -666,7 +701,10 @@ async function loadCuratedMarketplaceListingsFresh(
                       : "Failed to load Tensor listings",
                   page: createEmptyTensorPage(),
                 }))
-            : Promise.resolve({ error: null, page: createEmptyTensorPage() })
+            : Promise.resolve({
+                error: isTensorRateLimited ? "Tensor API rate limit backoff active" : null,
+                page: createEmptyTensorPage(),
+              })
         );
 
       const [magicEdenResult, tensorResultsAll] = await Promise.all([
