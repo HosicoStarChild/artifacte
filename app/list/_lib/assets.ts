@@ -177,7 +177,7 @@ export function toAssetCardModel(
     flags,
     id: asset.id,
     imageAlt: name,
-    imageClassName: flags.isRwa ? "object-contain p-2" : "object-cover",
+    imageClassName: flags.isRwa ? "h-full w-full object-contain p-2" : "h-full w-full object-cover",
     imageSrc: resolveListPageImageSrc(asset),
     mintAddress: asset.nftAddress || asset.id,
     name,

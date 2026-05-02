@@ -6,7 +6,7 @@ const ARWEAVE_GATEWAYS = [
   "https://arweave.net",
 ];
 
-const FETCH_TIMEOUT = 2500; // Keep placeholder fallback snappy when gateways are down.
+const FETCH_TIMEOUT = 5000; // Give Arweave gateway fallbacks enough time without hanging the grid.
 
 function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = FETCH_TIMEOUT): Promise<Response> {
   const controller = new AbortController();
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Invalid URL", { status: 400 });
   }
   const hostname = parsedUrl.hostname;
-  const allowedHosts = ["arweave.net", "gateway.irys.xyz", "ar-io.dev", "cdn.helius-rpc.com", "nftstorage.link", "dweb.link", "w3s.link", "cloudflare-ipfs.com"];
+  const allowedHosts = ["arweave.net", "www.arweave.net", "gateway.irys.xyz", "ar-io.dev", "cdn.helius-rpc.com", "nftstorage.link", "dweb.link", "w3s.link", "cloudflare-ipfs.com"];
   const isIpfs = hostname.endsWith(".ipfs.nftstorage.link") || hostname.endsWith(".ipfs.dweb.link") || hostname.endsWith(".ipfs.w3s.link");
   const isArIoSubdomain = hostname.endsWith(".ar-io.dev");
   if (!allowedHosts.includes(hostname) && !isIpfs && !isArIoSubdomain && !hostname.endsWith(".mypinata.cloud")) {
