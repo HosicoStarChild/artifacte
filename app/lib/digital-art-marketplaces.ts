@@ -156,7 +156,7 @@ const BUNDLED_ALLOWLIST: CuratedCollectionFile = bundledAllowlist;
 
 const TENSOR_COLL_ID_SUCCESS_TTL_MS = 15 * 60 * 1000;
 const TENSOR_COLL_ID_EMPTY_TTL_MS = 5 * 60 * 1000;
-const TENSOR_COLL_ID_ERROR_TTL_MS = 30 * 1000;
+const TENSOR_COLL_ID_ERROR_TTL_MS = 5 * 1000;
 const TENSOR_COLL_ID_LOOKUP_TIMEOUT_MS = 3_000;
 const MARKETPLACE_LISTINGS_CACHE_TTL_MS = 120 * 1000;
 const MARKETPLACE_LISTINGS_DEGRADED_CACHE_TTL_MS = 10 * 1000;
@@ -812,7 +812,7 @@ async function loadCuratedMarketplaceListingsFresh(
           meOffset: shouldIncludeMagicEden ? magicEdenPage.nextOffset : cursor.meOffset,
           meDone: shouldIncludeMagicEden ? !magicEdenPage.hasMore : cursor.meDone,
           tensorCursor: nextTensorCursors[0] ?? null,
-          tensorDone: nextTensorDones[0] ?? true,
+          tensorDone: nextTensorDones[0] ?? (tensorIdentifiers.length === 0),
           tensorCursors: nextTensorCursors,
           tensorDones: nextTensorDones,
         },
