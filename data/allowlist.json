@@ -87,7 +87,9 @@
       "verified": true,
       "description": "Claynosaurz is a collection of 10,000 hand-crafted clay dinosaurs on Solana. A vibrant community with gaming, merchandise, and ecosystem partnerships.",
       "links": {
-        "twitter": "https://twitter.com/Claynosaurz"
+        "twitter": "https://twitter.com/Claynosaurz",
+        "discord": "https://discord.gg/claynosaurz",
+        "website": "https://claynosaurz.com/"
       },
       "marketplaces": {
         "magicEden": {
@@ -106,7 +108,9 @@
       "verified": true,
       "description": "Call of Saga is the Claynosaurz companion collection — 2,000 saga-themed clay dinosaurs with unique lore and utility within the Claynosaurz ecosystem.",
       "links": {
-        "twitter": "https://twitter.com/Claynosaurz"
+        "twitter": "https://twitter.com/Claynosaurz",
+        "discord": "https://discord.gg/claynosaurz",
+        "website": "https://claynosaurz.com/"
       },
       "marketplaces": {
         "magicEden": {
