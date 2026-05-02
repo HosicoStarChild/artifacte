@@ -56,26 +56,42 @@ function CollectionLinks({
   website?: string;
 }) {
   const items = [
-    website ? { href: website, label: "Website" } : null,
-    twitter ? { href: twitter, label: "Twitter" } : null,
-    discord ? { href: discord, label: "Discord" } : null,
-  ].filter((item): item is { href: string; label: string } => item !== null);
+    twitter ? { href: twitter, label: "View collection on X", icon: "x" as const } : null,
+    discord ? { href: discord, label: "Join collection Discord", icon: "discord" as const } : null,
+    website ? { href: website, label: "Visit collection website", icon: "website" as const } : null,
+  ].filter((item): item is { href: string; label: string; icon: "x" | "discord" | "website" } => item !== null);
 
   if (!items.length) {
     return null;
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {items.map((item) => (
         <a
           key={item.label}
           href={item.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-gold-400 transition hover:text-gold-300"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-gold-400 transition hover:border-gold-500/40 hover:bg-gold-500/10 hover:text-gold-300"
+          aria-label={item.label}
+          title={item.label}
         >
-          {item.label}
+          {item.icon === "x" ? (
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+          ) : item.icon === "discord" ? (
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037 13.9 13.9 0 0 0-.608 1.25 18.3 18.3 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.25-.19.372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.8 19.8 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.18 0-2.15-1.08-2.15-2.41 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.33-.95 2.41-2.15 2.41Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.41 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.33-.94 2.41-2.15 2.41Z" />
+            </svg>
+          ) : (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12h20" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
+            </svg>
+          )}
         </a>
       ))}
     </div>

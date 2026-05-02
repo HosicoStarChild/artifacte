@@ -11,6 +11,10 @@ const DIRECT_IMAGE_HOSTS = new Set([
   "cloudflare-ipfs.com",
 ]);
 
+function shouldUseImageProxy(hostname: string): boolean {
+  return hostname === "arweave.net" || hostname === "www.arweave.net";
+}
+
 export function resolveHomeImageSrc(src: string | undefined): string | null {
   if (!src) {
     return null;
@@ -29,7 +33,11 @@ export function resolveHomeImageSrc(src: string | undefined): string | null {
       hostname.endsWith(".ipfs.w3s.link") ||
       hostname.endsWith(".mypinata.cloud");
 
-    if (DIRECT_IMAGE_HOSTS.has(hostname) || hostname.endsWith(".ar-io.dev") || isIpfsSubdomain) {
+    if (shouldUseImageProxy(hostname)) {
+      return `/api/img-proxy?url=${encodeURIComponent(src)}`;
+    }
+
+    if (DIRECT_IMAGE_HOSTS.has(hostname) || isIpfsSubdomain) {
       return src;
     }
 

@@ -6,7 +6,6 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 import {
-  aboutMetrics,
   aboutProcessSteps,
   aboutSectionContent,
   aboutValuePillars,
@@ -15,7 +14,6 @@ import {
 import { AboutHero } from "./_components/about-hero"
 import {
   AboutSection,
-  MetricsGrid,
   MissionPointsCard,
   ProcessGrid,
   ValuePillarsGrid,
@@ -77,18 +75,6 @@ export default function AboutPage() {
             <ValuePillarsGrid pillars={aboutValuePillars} />
           </AboutSection>
 
-          <Separator className="bg-linear-to-r from-transparent via-white/10 to-transparent" />
-
-          <AboutSection
-            id="metrics"
-            eyebrow={aboutSectionContent.metrics.eyebrow}
-            title={aboutSectionContent.metrics.title}
-            description={aboutSectionContent.metrics.description}
-          >
-            <div className="space-y-8">
-              <MetricsGrid metrics={aboutMetrics} />
-            </div>
-          </AboutSection>
         </div>
       </div>
     </main>

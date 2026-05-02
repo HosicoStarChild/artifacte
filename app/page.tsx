@@ -1,6 +1,5 @@
 import { HomeCollectionsSection } from "@/components/home/HomeCollectionsSection";
 import { HomeHowItWorksSection } from "@/components/home/HomeHowItWorksSection";
-import { HomeLiveAuctionsSection } from "@/components/home/HomeLiveAuctionsSection";
 import { HomeSpiritsSection } from "@/components/home/HomeSpiritsSection";
 import { HomeTCGSection } from "@/components/HomeTCGSection";
 import {
@@ -38,7 +37,6 @@ export default async function Home() {
 
       <HomeTCGSection />
 
-      <HomeLiveAuctionsSection />
       <HomeHowItWorksSection />
     </div>
   );
