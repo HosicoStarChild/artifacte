@@ -66,7 +66,7 @@ export const aboutHeroContent: AboutHeroContent = {
   eyebrow: "About Artifacte",
   title: "Curating authenticated assets for transparent digital ownership.",
   description:
-    "Artifacte combines rigorous real-world verification with blockchain-native settlement so collectors and institutions can acquire premium assets with clear provenance and open price discovery.",
+    "Artifacte combines rigorous real-world verification with blockchain-native settlement so collectors can acquire premium assets with clear provenance and open price discovery.",
   backLink: {
     href: "/",
     label: "Back to Home",
@@ -153,7 +153,7 @@ export const aboutProcessSteps: readonly ProcessStep[] = [
     number: "01",
     title: "Curate",
     description:
-      "We select premium assets from credible sources with the provenance required for serious collectors and institutions.",
+      "We select premium assets from credible sources with the provenance required for serious collectors.",
     icon: Gem,
   },
   {
