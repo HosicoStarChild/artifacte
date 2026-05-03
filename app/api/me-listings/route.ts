@@ -3,7 +3,6 @@ import {
   loadActiveArtifacteFixedPriceListings,
   type ArtifacteProgramListing,
 } from '@/lib/artifacte-listings';
-import { buildNftImageFallbackPath } from '@/lib/helius-asset-image';
 import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 const ORACLE_API = getOracleApiUrl();
@@ -121,36 +120,6 @@ function getOracleListingMint(listing: OracleListing): string | null {
   if (typeof listing.nftAddress === 'string' && listing.nftAddress) return listing.nftAddress;
   if (typeof listing.id === 'string' && listing.id) return listing.id;
   return null;
-}
-
-function isLikelySolanaAddress(value: string): boolean {
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
-}
-
-function shouldUseHeliusListingImage(listing: OracleListing): boolean {
-  return isBaxusOracleListing(listing);
-}
-
-function preferHeliusListingImages(listings: OracleListing[]): OracleListing[] {
-  return listings.map((listing) => {
-    if (!shouldUseHeliusListingImage(listing)) {
-      return listing;
-    }
-
-    const mint = getOracleListingMint(listing);
-    if (!mint) {
-      return listing;
-    }
-
-    if (!isLikelySolanaAddress(mint)) {
-      return listing;
-    }
-
-    return {
-      ...listing,
-      image: buildNftImageFallbackPath(mint),
-    };
-  });
 }
 
 function mergeArtifacteListingSnapshots(
@@ -380,7 +349,7 @@ export async function GET(request: Request) {
 
     const responsePayload: OracleListingsResponse = {
       ...data,
-      listings: preferHeliusListingImages(listings),
+      listings,
       total,
       page: requestedPage,
       perPage: requestedPerPage,
