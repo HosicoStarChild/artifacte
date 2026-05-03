@@ -104,6 +104,7 @@ export function HomeTCGCarousel({
                 const canBuyHere =
                   Boolean(showBuyButton) && isInAppExternalCardListing(listing) && Boolean(listing.nftAddress);
                 const isPurchased = Boolean(purchasedIds?.[listing.id]);
+                const imageAspect = listing.source === "collector-crypt" ? "portrait" : "square";
 
                 return (
                   <div key={listing.id} className="w-72 shrink-0 snap-start">
@@ -117,6 +118,7 @@ export function HomeTCGCarousel({
                       priceLabel={displayPrice.currency === "SOL" ? `◎ ${primaryAmount}` : `$${primaryAmount}`}
                       currencyLabel={displayPrice.currency}
                       imageFit="contain"
+                      imageAspect={imageAspect}
                       imageSizes="288px"
                       action={
                         showBuyButton ? (
