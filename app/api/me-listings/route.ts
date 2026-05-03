@@ -127,14 +127,13 @@ function isLikelySolanaAddress(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
-function shouldUseHeliusListingImage(listing: OracleListing, requestedCategory: string | null): boolean {
-  const category = typeof listing.category === 'string' ? listing.category : requestedCategory;
-  return category !== 'DIGITAL_ART';
+function shouldUseHeliusListingImage(listing: OracleListing): boolean {
+  return isBaxusOracleListing(listing);
 }
 
-function preferHeliusListingImages(listings: OracleListing[], requestedCategory: string | null): OracleListing[] {
+function preferHeliusListingImages(listings: OracleListing[]): OracleListing[] {
   return listings.map((listing) => {
-    if (!shouldUseHeliusListingImage(listing, requestedCategory)) {
+    if (!shouldUseHeliusListingImage(listing)) {
       return listing;
     }
 
@@ -381,7 +380,7 @@ export async function GET(request: Request) {
 
     const responsePayload: OracleListingsResponse = {
       ...data,
-      listings: preferHeliusListingImages(listings, category),
+      listings: preferHeliusListingImages(listings),
       total,
       page: requestedPage,
       perPage: requestedPerPage,

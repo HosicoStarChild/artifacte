@@ -28,7 +28,7 @@ import {
   type CollectorCryptResponse,
 } from "@/lib/portfolio";
 import { ensureHeliusRpcUrl, fetchHeliusRpc } from "@/app/api/_lib/list-route-utils";
-import { buildNftImageFallbackPath, resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
+import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import { getFloorPriceSnapshot, type FloorPriceSnapshot } from "@/lib/server/floor-prices";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 import {
@@ -262,22 +262,15 @@ function getRwaCardBadge(kind: Exclude<PortfolioSectionId, "digital-collectibles
   }
 }
 
-function isLikelySolanaAddress(value: string): boolean {
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
-}
-
 function createCollectorCryptDisplayCard(card: PortfolioCollectorCryptCard): PortfolioAssetCard {
   const marketValue = card.oracleValue ?? card.insuredValueNum;
   const gradeLabel = [card.gradingCompany, card.grade].filter(Boolean).join(" ");
-  const imageSrc = isLikelySolanaAddress(card.nftAddress)
-    ? buildNftImageFallbackPath(card.nftAddress)
-    : resolvePortfolioImageSrc(card.frontImage);
 
   return {
     id: card.nftAddress,
     href: getPortfolioAssetHref(card.nftAddress),
     name: card.itemName,
-    imageSrc,
+    imageSrc: resolvePortfolioImageSrc(card.frontImage),
     badgeLabel: "COLLECTORS CRYPT",
     badgeAccent: "violet",
     marketValue,

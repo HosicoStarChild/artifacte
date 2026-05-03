@@ -135,7 +135,7 @@ function isLikelySolanaAddress(value: string): boolean {
 }
 
 function preferHeliusListingImage(listing: HomeListing): HomeListing {
-  if (listing.category === "DIGITAL_ART") {
+  if (!isBaxusListing(listing)) {
     return listing;
   }
 
