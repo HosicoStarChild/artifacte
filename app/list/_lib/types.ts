@@ -65,6 +65,7 @@ export interface ListPageAssetCardModel {
   flags: ListPageAssetFlags;
   id: string;
   imageAlt: string;
+  imageAspect: "square" | "portrait";
   imageClassName: string;
   imageSrc: string;
   mintAddress: string;

@@ -84,6 +84,8 @@ const SOURCE_FILTER_MAP: Record<string, string> = {
   Artifacte: "artifacte",
 };
 
+const CONTAIN_IMAGE_CATEGORIES = new Set(["TCG_CARDS", "SPORTS_CARDS", "SEALED", "MERCHANDISE", "SPIRITS", "WATCHES", "ARTIFACTE"]);
+
 export const CATEGORY_FILTERS: Record<string, readonly CategoryFilterDefinition[]> = {
   TCG_CARDS: [
     { label: "Source", key: "source", options: ["All", "Collectors Crypt", "Phygitals", "Artifacte"] },
@@ -268,9 +270,16 @@ export function getListingSourceBadge(listing: CategoryMarketplaceListing): Cate
 }
 
 export function getListingImageFit(listing: CategoryMarketplaceListing): "contain" | "cover" {
-  return listing.source === "collector-crypt" || listing.source === "phygitals" || listing.source === "artifacte"
+  return listing.source === "collector-crypt"
+    || listing.source === "phygitals"
+    || listing.source === "artifacte"
+    || (typeof listing.category === "string" && CONTAIN_IMAGE_CATEGORIES.has(listing.category))
     ? "contain"
     : "cover";
+}
+
+export function getListingImageAspect(listing: CategoryMarketplaceListing): "square" | "portrait" {
+  return listing.source === "collector-crypt" ? "portrait" : "square";
 }
 
 export function usesMarketplaceFeed(category: string | undefined): boolean {

@@ -177,6 +177,7 @@ export function toAssetCardModel(
     flags,
     id: asset.id,
     imageAlt: name,
+    imageAspect: collection.address === LIST_PAGE_CC_COLLECTION ? "portrait" : "square",
     imageClassName: flags.isRwa ? "h-full w-full object-contain p-2" : "h-full w-full object-cover",
     imageSrc: resolveListPageImageSrc(asset),
     mintAddress: asset.nftAddress || asset.id,

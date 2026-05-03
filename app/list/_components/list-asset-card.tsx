@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 import type { ListPageAssetCardModel } from "../_lib/types";
 
@@ -15,7 +16,12 @@ export function ListAssetCard({ card, onSelect }: ListAssetCardProps) {
         onClick={() => onSelect(card)}
         type="button"
       >
-        <div className="relative aspect-square overflow-hidden bg-dark-900">
+        <div
+          className={cn(
+            "relative overflow-hidden bg-dark-900",
+            card.imageAspect === "portrait" ? "aspect-[3/4]" : "aspect-square"
+          )}
+        >
           <img
             alt={card.imageAlt}
             className={`transition duration-300 group-hover:scale-[1.02] ${card.imageClassName}`}

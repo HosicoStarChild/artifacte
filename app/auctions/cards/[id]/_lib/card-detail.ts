@@ -2,6 +2,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 
 import type { Listing } from "@/lib/data";
 import {
+  buildHeliusImageCdnUrl,
   buildNftImageFallbackPath,
   resolveHeliusAssetImageSrc,
 } from "@/lib/helius-asset-image";
@@ -319,11 +320,16 @@ function getAssetCollectionAddress(asset: HeliusAsset | null | undefined): strin
   return collectionAddress || asset.collection || null;
 }
 
+const OPTIMIZED_CARD_DETAIL_IMAGE_CATEGORIES = new Set(["TCG_CARDS", "SPORTS_CARDS", "SEALED", "MERCHANDISE"]);
+
 function buildCardDetail(base: Partial<CardDetail> & Pick<CardDetail, "id" | "name">): CardDetail {
   const source = base.source || "collector-crypt";
   const category = base.category || "TCG_CARDS";
   const nftAddress = base.nftAddress || base.id;
-  const image = base.image || "/placeholder-card.svg";
+  const rawImage = base.image || "/placeholder-card.svg";
+  const image = OPTIMIZED_CARD_DETAIL_IMAGE_CATEGORIES.has(category)
+    ? buildHeliusImageCdnUrl(rawImage, { width: 1200, quality: 82 }) ?? rawImage
+    : rawImage;
   const subtitle = base.subtitle || "Collectible asset";
   const currency = base.currency || (base.usdcPrice ? "USDC" : "SOL");
 

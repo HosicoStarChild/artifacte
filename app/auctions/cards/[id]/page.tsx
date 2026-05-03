@@ -343,7 +343,7 @@ function CardDetailPageContent() {
           {/* Left: Image */}
           <div className="self-start lg:sticky lg:top-28">
             <Card className="overflow-hidden border-white/5 bg-dark-800 py-0">
-              <div className="relative aspect-square bg-dark-900">
+              <div className={`relative bg-dark-900 ${card.source === "collector-crypt" ? "aspect-[3/4]" : "aspect-square"}`}>
                 <HomeImage
                   src={cardImageSrc || fallbackCardImageSrc}
                   alt={card.name}

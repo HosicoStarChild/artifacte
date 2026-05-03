@@ -23,6 +23,13 @@ interface ResolveHeliusAssetImageOptions {
   fallbackMint?: string;
 }
 
+interface HeliusImageCdnOptions {
+  quality?: number;
+  width?: number;
+}
+
+const HELIUS_IMAGE_CDN_BASE = "https://cdn.helius-rpc.com/cdn-cgi/image";
+
 const IMAGE_FILE_URI_PATTERN = /\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/i;
 
 function normalizeAssetImageUri(value: string | undefined): string | null {
@@ -65,6 +72,39 @@ function getFirstImageFileUri(files: readonly ResolvableHeliusAssetFile[]): stri
 
 export function buildNftImageFallbackPath(mint: string): string {
   return `/api/nft-image?mint=${encodeURIComponent(mint)}`;
+}
+
+export function buildHeliusImageCdnUrl(
+  source: string | null | undefined,
+  options: HeliusImageCdnOptions = {}
+): string | null {
+  const normalizedSource = source?.trim();
+  if (!normalizedSource || normalizedSource.startsWith("/") || normalizedSource.startsWith("data:")) {
+    return normalizedSource || null;
+  }
+
+  let parsedSource: URL;
+  try {
+    parsedSource = new URL(normalizedSource);
+  } catch {
+    return normalizedSource;
+  }
+
+  if (!parsedSource.protocol.startsWith("http")) {
+    return normalizedSource;
+  }
+
+  if (parsedSource.hostname === "cdn.helius-rpc.com" && parsedSource.pathname.startsWith("/cdn-cgi/image/")) {
+    return normalizedSource;
+  }
+
+  const transforms = [
+    options.width ? `width=${Math.round(options.width)}` : null,
+    options.quality ? `quality=${Math.round(options.quality)}` : null,
+    "format=auto",
+  ].filter(Boolean).join(",");
+
+  return `${HELIUS_IMAGE_CDN_BASE}/${transforms}/${normalizedSource}`;
 }
 
 export function resolveHeliusAssetImageSrc(

@@ -12,6 +12,7 @@ import { resolveListingPayablePrice, type Auction } from "@/lib/data";
 
 import {
   getListingHref,
+  getListingImageAspect,
   getListingImageFit,
   getListingSourceBadge,
   ITEMS_PER_PAGE,
@@ -214,7 +215,8 @@ export function CategoryListingsSection({
               currencyLabel={isDigitalArt ? "SOL" : payablePrice.currency}
               sourceBadge={getListingSourceBadge(listing)}
               imageFit={getListingImageFit(listing)}
-              imageLoading={index < 3 ? "eager" : "lazy"}
+              imageAspect={getListingImageAspect(listing)}
+              imageLoading="eager"
               imageSizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               action={
                 <CategoryListingPurchaseAction

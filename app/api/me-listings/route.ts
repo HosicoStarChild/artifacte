@@ -3,11 +3,13 @@ import {
   loadActiveArtifacteFixedPriceListings,
   type ArtifacteProgramListing,
 } from '@/lib/artifacte-listings';
+import { buildHeliusImageCdnUrl } from '@/lib/helius-asset-image';
 import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 const ORACLE_API = getOracleApiUrl();
 const REQUEST_TIMEOUT_MS = 12000;
 const ARTIFACTE_FILTER_REFILL_PAGES = 2;
+const OPTIMIZED_LISTING_IMAGE_CATEGORIES = new Set(['TCG_CARDS', 'SPORTS_CARDS', 'SEALED', 'MERCHANDISE']);
 
 export const maxDuration = 30;
 
@@ -120,6 +122,19 @@ function getOracleListingMint(listing: OracleListing): string | null {
   if (typeof listing.nftAddress === 'string' && listing.nftAddress) return listing.nftAddress;
   if (typeof listing.id === 'string' && listing.id) return listing.id;
   return null;
+}
+
+function optimizeMarketplaceListingImages(listings: OracleListing[]): OracleListing[] {
+  return listings.map((listing) => {
+    if (typeof listing.category !== 'string' || !OPTIMIZED_LISTING_IMAGE_CATEGORIES.has(listing.category) || typeof listing.image !== 'string') {
+      return listing;
+    }
+
+    return {
+      ...listing,
+      image: buildHeliusImageCdnUrl(listing.image, { width: 480, quality: 72 }) ?? listing.image,
+    };
+  });
 }
 
 function mergeArtifacteListingSnapshots(
@@ -349,7 +364,7 @@ export async function GET(request: Request) {
 
     const responsePayload: OracleListingsResponse = {
       ...data,
-      listings,
+      listings: optimizeMarketplaceListingImages(listings),
       total,
       page: requestedPage,
       perPage: requestedPerPage,

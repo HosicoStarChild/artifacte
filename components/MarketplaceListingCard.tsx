@@ -28,6 +28,7 @@ type MarketplaceListingCardProps = {
   sourceBadge?: MarketplaceListingCardBadge;
   action?: ReactNode;
   imageFit?: "contain" | "cover";
+  imageAspect?: "square" | "portrait";
   imageLoading?: "lazy" | "eager";
   imageSizes?: string;
   className?: string;
@@ -48,7 +49,8 @@ export function MarketplaceListingCard({
   sourceBadge,
   action,
   imageFit = "cover",
-  imageLoading = "lazy",
+  imageAspect = "square",
+  imageLoading = "eager",
   imageSizes = "(max-width: 768px) 100vw, 288px",
   className,
 }: MarketplaceListingCardProps) {
@@ -56,7 +58,12 @@ export function MarketplaceListingCard({
 
   const content = (
     <>
-      <div className="relative aspect-square overflow-hidden bg-dark-900">
+      <div
+        className={cn(
+          "relative overflow-hidden bg-dark-900",
+          imageAspect === "portrait" ? "aspect-[3/4]" : "aspect-square"
+        )}
+      >
         <img
           src={resolvedImageSrc}
           alt={imageAlt}
