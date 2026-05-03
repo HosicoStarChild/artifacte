@@ -22,6 +22,7 @@ import { buildNftImageFallbackPath } from "@/lib/helius-asset-image";
 import { isTensorMarketplaceListing } from "@/lib/marketplace-routing";
 
 import { CardDetailActionPanel } from "./_components/card-action-panel";
+import { CardSaleHistory } from "./_components/card-sale-history";
 import { ArtifactePriceSection, TcgPlayerPriceBox } from "./_components/card-price-sections";
 import { CardDetailLoadingState, CardDetailNotFoundState } from "./_components/card-detail-states";
 import { resolveCardDetailActionState } from "./_lib/card-action-state";
@@ -573,6 +574,8 @@ function CardDetailPageContent() {
           {card.source !== 'phygitals' && card.priceSource === 'TCGplayer' && (
             <TcgPlayerPriceBox productId={card.priceSourceId || card.tcgPlayerId} />
           )}
+
+          <CardSaleHistory mint={card.nftAddress} />
 
           {/* NFT Details */}
           <div className="bg-dark-800 rounded-xl border border-white/5 p-6">
