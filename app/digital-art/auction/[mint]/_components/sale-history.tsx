@@ -49,7 +49,7 @@ export function SaleHistory({ items }: SaleHistoryProps) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-serif text-2xl text-white">Sale History</h2>
-            <p className="mt-1 text-sm text-white/45">Recent on-chain marketplace sales for this NFT.</p>
+            <p className="mt-1 text-sm text-white/45">Recent Tensor-indexed marketplace sales for this NFT.</p>
           </div>
           <Badge className="border-white/10 bg-white/5 text-white/70">
             {items.length ? `${items.length} found` : "No sales"}

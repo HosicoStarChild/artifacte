@@ -36,8 +36,10 @@ const LISTING_ACCOUNT_SIZE = 240;
 const OWNER_ASSETS_PAGE_SIZE = 1000;
 const FALLBACK_IMAGE = "/placeholder.png";
 const SOLANA_RPC_TIMEOUT_MS = 5_000;
-const HELIUS_ENHANCED_TX_TIMEOUT_MS = 8_000;
+const TENSOR_TXS_GRAPHQL = "https://graphql-txs.tensor.trade/graphql";
+const TENSOR_SALE_HISTORY_TIMEOUT_MS = 3_000;
 const SALE_HISTORY_LIMIT = 12;
+const TENSOR_SALE_TX_TYPES = ["SALE_BUY_NOW", "SALE_ACCEPT_BID"] as const;
 
 const OFFSET_LISTING_SELLER = 8;
 const OFFSET_LISTING_NFT_MINT = 40;
@@ -104,32 +106,31 @@ interface RpcAccountInfoResponse {
   };
 }
 
-interface HeliusEnhancedNftEvent {
-  amount?: number;
-  buyer?: string;
-  nfts?: Array<{ mint?: string; tokenStandard?: string }>;
-  seller?: string;
-  source?: string;
-  type?: string;
+interface TensorSaleHistoryTx {
+  buyerId?: string | null;
+  grossAmount?: string | number | null;
+  grossAmountUnit?: string | number | null;
+  grossAmountUnitInfo?: {
+    decimals?: number | null;
+    symbol?: string | null;
+  } | null;
+  sellerId?: string | null;
+  source?: string | null;
+  txAt?: number | null;
+  txId?: string | null;
+  txKey?: string | null;
+  txType?: string | null;
 }
 
-interface HeliusEnhancedTransaction {
-  description?: string;
-  events?: {
-    nft?: HeliusEnhancedNftEvent;
+interface TensorSaleHistoryResponse {
+  data?: {
+    mintTransactions?: {
+      txs?: Array<{
+        tx?: TensorSaleHistoryTx | null;
+      }> | null;
+    } | null;
   };
-  feePayer?: string;
-  nativeTransfers?: Array<{ amount?: number; fromUserAccount?: string; toUserAccount?: string }>;
-  signature?: string;
-  source?: string;
-  timestamp?: number;
-  tokenTransfers?: Array<{
-    fromUserAccount?: string;
-    mint?: string;
-    toUserAccount?: string;
-    tokenAmount?: number;
-  }>;
-  type?: string;
+  errors?: Array<{ message?: string }>;
 }
 
 type DigitalArtListingType = "fixed" | "auction";
@@ -200,7 +201,7 @@ export interface DigitalArtOwnedNft {
 
 export interface DigitalArtSaleHistoryItem {
   buyer: string | null;
-  currency: "SOL" | "UNKNOWN";
+  currency: string;
   marketplace: string | null;
   price: number | null;
   seller: string | null;
@@ -222,15 +223,15 @@ function getResolvedImageSrc(source: string | undefined): string {
   return resolveHomeImageSrc(source) ?? FALLBACK_IMAGE;
 }
 
-function getHeliusApiKey(): string | null {
-  const value = process.env.HELIUS_API_KEY?.trim();
-  return value ? value : null;
-}
-
 function formatMarketplaceLabel(value?: string | null): string | null {
   if (!value) {
     return null;
   }
+
+  const normalized = value.toUpperCase();
+  if (normalized.includes("MAGICEDEN")) return "Magic Eden";
+  if (normalized.includes("TCOMP") || normalized.includes("TENSOR")) return "Tensor";
+  if (normalized.includes("HADESWAP")) return "Hadeswap";
 
   return value
     .toLowerCase()
@@ -240,42 +241,45 @@ function formatMarketplaceLabel(value?: string | null): string | null {
     .join(" ");
 }
 
-function lamportsToSol(value: number | undefined): number | null {
-  if (!Number.isFinite(value) || value === undefined || value <= 0) {
+function parseNumericAmount(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) {
     return null;
   }
 
-  return value / 1_000_000_000;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function parseSaleHistoryItem(
-  mint: string,
-  transaction: HeliusEnhancedTransaction
-): DigitalArtSaleHistoryItem | null {
-  const nftEvent = transaction.events?.nft;
-  const nfts = nftEvent?.nfts ?? [];
-  const touchesMint =
-    nfts.length === 0 || nfts.some((nft) => nft.mint === mint) || transaction.description?.includes(mint);
+function parseTensorSalePrice(tx: TensorSaleHistoryTx): { currency: string; price: number | null } {
+  const unitAmount = parseNumericAmount(tx.grossAmountUnit);
+  const unitSymbol = tx.grossAmountUnitInfo?.symbol?.trim();
+  if (unitAmount !== null && unitSymbol) {
+    return { currency: unitSymbol, price: unitAmount };
+  }
 
-  if (!touchesMint || !transaction.signature) {
+  const rawAmount = parseNumericAmount(tx.grossAmount);
+  return { currency: "SOL", price: rawAmount === null ? null : rawAmount / 1_000_000_000 };
+}
+
+function parseTensorSaleHistoryItem(tx: TensorSaleHistoryTx | null | undefined): DigitalArtSaleHistoryItem | null {
+  const signature = tx?.txId ?? tx?.txKey?.split(":")[0] ?? null;
+
+  if (!tx || !signature) {
     return null;
   }
 
-  const eventPrice = lamportsToSol(nftEvent?.amount);
-  const largestNativeTransfer = transaction.nativeTransfers
-    ?.map((transfer) => transfer.amount)
-    .filter((amount): amount is number => amount !== undefined && Number.isFinite(amount) && amount > 0)
-    .sort((left, right) => right - left)[0];
-  const price = eventPrice ?? lamportsToSol(largestNativeTransfer);
+  const { currency, price } = parseTensorSalePrice(tx);
+
+  const txAt = parseNumericAmount(tx.txAt);
 
   return {
-    buyer: nftEvent?.buyer ?? transaction.nativeTransfers?.[0]?.toUserAccount ?? null,
-    currency: price === null ? "UNKNOWN" : "SOL",
-    marketplace: formatMarketplaceLabel(nftEvent?.source ?? transaction.source),
+    buyer: tx.buyerId ?? null,
+    currency: price === null ? "UNKNOWN" : currency,
+    marketplace: formatMarketplaceLabel(tx.source),
     price,
-    seller: nftEvent?.seller ?? transaction.nativeTransfers?.[0]?.fromUserAccount ?? null,
-    signature: transaction.signature,
-    timestamp: Number.isFinite(transaction.timestamp) ? transaction.timestamp ?? null : null,
+    seller: tx.sellerId ?? null,
+    signature,
+    timestamp: txAt === null ? null : Math.floor(txAt / 1000),
   };
 }
 
@@ -724,37 +728,64 @@ export const getDigitalArtNativeListingDetail = cache(
 export const getDigitalArtSaleHistory = cache(
   async (mint: string): Promise<DigitalArtSaleHistoryItem[]> => {
     const normalizedMint = `${address(mint)}`;
-    const apiKey = getHeliusApiKey();
-
-    if (!apiKey) {
-      return [];
-    }
-
-    const requestUrl = new URL(
-      `https://api.helius.xyz/v0/addresses/${normalizedMint}/transactions`
-    );
-    requestUrl.searchParams.set("api-key", apiKey);
-    requestUrl.searchParams.set("type", "NFT_SALE");
-    requestUrl.searchParams.set("limit", `${SALE_HISTORY_LIMIT}`);
 
     try {
-      const response = await fetch(requestUrl, {
+      const response = await fetch(TENSOR_TXS_GRAPHQL, {
+        body: JSON.stringify({
+          operationName: "MintSaleTransactions",
+          query: `query MintSaleTransactions($mint: String!, $saleTxTypes: [TransactionType!]!, $limit: Int) {
+            mintTransactions(mint: $mint, filters: { txTypes: $saleTxTypes }, limit: $limit) {
+              txs {
+                tx {
+                  source
+                  txKey
+                  txId
+                  txType
+                  grossAmount
+                  grossAmountUnit
+                  grossAmountUnitInfo {
+                    decimals
+                    symbol
+                  }
+                  sellerId
+                  buyerId
+                  txAt
+                }
+              }
+            }
+          }`,
+          variables: {
+            limit: SALE_HISTORY_LIMIT,
+            mint: normalizedMint,
+            saleTxTypes: TENSOR_SALE_TX_TYPES,
+          },
+        }),
         cache: "no-store",
-        signal: AbortSignal.timeout(HELIUS_ENHANCED_TX_TIMEOUT_MS),
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://www.tensor.trade",
+          Referer: "https://www.tensor.trade/",
+        },
+        method: "POST",
+        signal: AbortSignal.timeout(TENSOR_SALE_HISTORY_TIMEOUT_MS),
       });
 
       if (!response.ok) {
-        throw new Error(`Helius enhanced transactions error: ${response.status}`);
+        throw new Error(`Tensor sale history request failed with status ${response.status}`);
       }
 
-      const transactions = (await response.json()) as HeliusEnhancedTransaction[];
+      const payload = (await response.json()) as TensorSaleHistoryResponse;
+      if (payload.errors?.length) {
+        throw new Error(payload.errors.map((error) => error.message).filter(Boolean).join("; "));
+      }
 
-      return transactions
-        .map((transaction) => parseSaleHistoryItem(normalizedMint, transaction))
+      const txs = payload.data?.mintTransactions?.txs ?? [];
+      return txs
+        .map((item) => parseTensorSaleHistoryItem(item.tx))
         .filter((item): item is DigitalArtSaleHistoryItem => Boolean(item))
         .slice(0, SALE_HISTORY_LIMIT);
     } catch (error) {
-      console.error("[digital-art/sale-history] Failed to load sale history", error);
+      console.error("[digital-art/sale-history] Failed to load Tensor sale history", error);
       return [];
     }
   }
