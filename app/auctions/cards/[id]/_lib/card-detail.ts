@@ -165,6 +165,10 @@ function getAttributeTextValue(value: AttributeValue): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function isLikelySolanaAddress(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
 function getAssetAttributes(asset: HeliusAsset | null | undefined): HeliusAttribute[] {
   return asset?.content?.metadata?.attributes || asset?.attributes || [];
 }
@@ -393,6 +397,7 @@ async function hydrateArtifacteCard(card: CardDetail, connection: Connection): P
   return {
     ...nextCard,
     collectionAddress: nextCard.collectionAddress ?? getAssetCollectionAddress(liveAsset) ?? card.collectionAddress,
+    image: resolveHeliusAssetImageSrc(liveAsset, { fallbackMint: card.nftAddress }) || buildNftImageFallbackPath(card.nftAddress),
     isCore: normalizedAuctionListing?.program === "core" || liveArtifacteListing?.isCore || card.isCore,
     owner,
     seller: normalizedAuctionListing?.seller || liveArtifacteListing?.seller || nextCard.seller || "",
@@ -676,7 +681,7 @@ async function loadPhygitalCard(cardId: string, connection: Connection): Promise
       gradingCompany: oracleListing?.gradingCompany || (gradingCompanyMatch ? gradingCompanyMatch[1].toUpperCase() : getAttributeValue(attributes, "Grader") || null),
       gradingId: getAttributeValue(attributes, "Cert Number") || getAttributeValue(attributes, "Grading ID") || null,
       id: cardId,
-      image: oracleListing?.image || resolvedAssetImage || "",
+      image: resolvedAssetImage || buildNftImageFallbackPath(mint),
       name: resolvePreferredCardName(oracleListing?.name, assetDisplayName || mint.slice(0, 12)),
       nftAddress: mint,
       price: listingPrice,
@@ -746,6 +751,10 @@ async function loadOracleCard(cardId: string, connection: Connection): Promise<C
 
     if (card.source === "artifacte") {
       return hydrateArtifacteCard(card, connection);
+    }
+
+    if (card.nftAddress && isLikelySolanaAddress(card.nftAddress)) {
+      card.image = buildNftImageFallbackPath(card.nftAddress);
     }
 
     return card;

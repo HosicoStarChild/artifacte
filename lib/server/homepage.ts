@@ -1,5 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 
+import { buildNftImageFallbackPath } from "@/lib/helius-asset-image";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 
 const ORACLE_API = getOracleApiUrl();
@@ -129,6 +130,26 @@ function hasDisplayableListingData(listing: HomeListing): boolean {
   return Boolean(listing.image) && typeof listing.price === "number" && listing.price > 0;
 }
 
+function isLikelySolanaAddress(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function preferHeliusListingImage(listing: HomeListing): HomeListing {
+  if (listing.category === "DIGITAL_ART") {
+    return listing;
+  }
+
+  const mint = listing.nftAddress || listing.id;
+  if (!mint || !isLikelySolanaAddress(mint)) {
+    return listing;
+  }
+
+  return {
+    ...listing,
+    image: buildNftImageFallbackPath(mint),
+  };
+}
+
 export function hasVisibleListingData(listing: HomeListing): boolean {
   return !isBaxusListing(listing) && hasDisplayableListingData(listing);
 }
@@ -176,7 +197,7 @@ async function fetchHomeListings(query: string): Promise<HomeListing[]> {
   }
 
   const data: HomeListingsResponse = await response.json();
-  return data.listings ?? [];
+  return (data.listings ?? []).map(preferHeliusListingImage);
 }
 
 export async function getSpiritsCarousel(): Promise<HomeListing[]> {

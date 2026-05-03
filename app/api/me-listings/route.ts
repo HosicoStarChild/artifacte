@@ -3,6 +3,7 @@ import {
   loadActiveArtifacteFixedPriceListings,
   type ArtifacteProgramListing,
 } from '@/lib/artifacte-listings';
+import { buildNftImageFallbackPath } from '@/lib/helius-asset-image';
 import { getOracleApiUrl } from '@/lib/server/oracle-env';
 
 const ORACLE_API = getOracleApiUrl();
@@ -120,6 +121,37 @@ function getOracleListingMint(listing: OracleListing): string | null {
   if (typeof listing.nftAddress === 'string' && listing.nftAddress) return listing.nftAddress;
   if (typeof listing.id === 'string' && listing.id) return listing.id;
   return null;
+}
+
+function isLikelySolanaAddress(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function shouldUseHeliusListingImage(listing: OracleListing, requestedCategory: string | null): boolean {
+  const category = typeof listing.category === 'string' ? listing.category : requestedCategory;
+  return category !== 'DIGITAL_ART';
+}
+
+function preferHeliusListingImages(listings: OracleListing[], requestedCategory: string | null): OracleListing[] {
+  return listings.map((listing) => {
+    if (!shouldUseHeliusListingImage(listing, requestedCategory)) {
+      return listing;
+    }
+
+    const mint = getOracleListingMint(listing);
+    if (!mint) {
+      return listing;
+    }
+
+    if (!isLikelySolanaAddress(mint)) {
+      return listing;
+    }
+
+    return {
+      ...listing,
+      image: buildNftImageFallbackPath(mint),
+    };
+  });
 }
 
 function mergeArtifacteListingSnapshots(
@@ -349,7 +381,7 @@ export async function GET(request: Request) {
 
     const responsePayload: OracleListingsResponse = {
       ...data,
-      listings,
+      listings: preferHeliusListingImages(listings, category),
       total,
       page: requestedPage,
       perPage: requestedPerPage,
