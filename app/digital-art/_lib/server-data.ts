@@ -36,6 +36,8 @@ const LISTING_ACCOUNT_SIZE = 240;
 const OWNER_ASSETS_PAGE_SIZE = 1000;
 const FALLBACK_IMAGE = "/placeholder.png";
 const SOLANA_RPC_TIMEOUT_MS = 5_000;
+const HELIUS_ENHANCED_TX_TIMEOUT_MS = 8_000;
+const SALE_HISTORY_LIMIT = 12;
 
 const OFFSET_LISTING_SELLER = 8;
 const OFFSET_LISTING_NFT_MINT = 40;
@@ -100,6 +102,34 @@ interface RpcAccountInfoResponse {
       data: [string, string];
     } | null;
   };
+}
+
+interface HeliusEnhancedNftEvent {
+  amount?: number;
+  buyer?: string;
+  nfts?: Array<{ mint?: string; tokenStandard?: string }>;
+  seller?: string;
+  source?: string;
+  type?: string;
+}
+
+interface HeliusEnhancedTransaction {
+  description?: string;
+  events?: {
+    nft?: HeliusEnhancedNftEvent;
+  };
+  feePayer?: string;
+  nativeTransfers?: Array<{ amount?: number; fromUserAccount?: string; toUserAccount?: string }>;
+  signature?: string;
+  source?: string;
+  timestamp?: number;
+  tokenTransfers?: Array<{
+    fromUserAccount?: string;
+    mint?: string;
+    toUserAccount?: string;
+    tokenAmount?: number;
+  }>;
+  type?: string;
 }
 
 type DigitalArtListingType = "fixed" | "auction";
@@ -168,6 +198,16 @@ export interface DigitalArtOwnedNft {
   name: string;
 }
 
+export interface DigitalArtSaleHistoryItem {
+  buyer: string | null;
+  currency: "SOL" | "UNKNOWN";
+  marketplace: string | null;
+  price: number | null;
+  seller: string | null;
+  signature: string;
+  timestamp: number | null;
+}
+
 export interface DigitalArtCollectionPageData {
   collection: DigitalArtCollectionDetails | null;
   marketplaceHasMore: boolean;
@@ -180,6 +220,63 @@ export interface DigitalArtCollectionPageData {
 
 function getResolvedImageSrc(source: string | undefined): string {
   return resolveHomeImageSrc(source) ?? FALLBACK_IMAGE;
+}
+
+function getHeliusApiKey(): string | null {
+  const value = process.env.HELIUS_API_KEY?.trim();
+  return value ? value : null;
+}
+
+function formatMarketplaceLabel(value?: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value
+    .toLowerCase()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function lamportsToSol(value: number | undefined): number | null {
+  if (!Number.isFinite(value) || value === undefined || value <= 0) {
+    return null;
+  }
+
+  return value / 1_000_000_000;
+}
+
+function parseSaleHistoryItem(
+  mint: string,
+  transaction: HeliusEnhancedTransaction
+): DigitalArtSaleHistoryItem | null {
+  const nftEvent = transaction.events?.nft;
+  const nfts = nftEvent?.nfts ?? [];
+  const touchesMint =
+    nfts.length === 0 || nfts.some((nft) => nft.mint === mint) || transaction.description?.includes(mint);
+
+  if (!touchesMint || !transaction.signature) {
+    return null;
+  }
+
+  const eventPrice = lamportsToSol(nftEvent?.amount);
+  const largestNativeTransfer = transaction.nativeTransfers
+    ?.map((transfer) => transfer.amount)
+    .filter((amount): amount is number => amount !== undefined && Number.isFinite(amount) && amount > 0)
+    .sort((left, right) => right - left)[0];
+  const price = eventPrice ?? lamportsToSol(largestNativeTransfer);
+
+  return {
+    buyer: nftEvent?.buyer ?? transaction.nativeTransfers?.[0]?.toUserAccount ?? null,
+    currency: price === null ? "UNKNOWN" : "SOL",
+    marketplace: formatMarketplaceLabel(nftEvent?.source ?? transaction.source),
+    price,
+    seller: nftEvent?.seller ?? transaction.nativeTransfers?.[0]?.fromUserAccount ?? null,
+    signature: transaction.signature,
+    timestamp: Number.isFinite(transaction.timestamp) ? transaction.timestamp ?? null : null,
+  };
 }
 
 function normalizeAddressList(values: readonly string[]): string[] {
@@ -621,6 +718,45 @@ export const getDigitalArtNativeListingDetail = cache(
 
     const assetMap = await fetchAssetMapByMint(rpcUrl, [normalizedMint]);
     return mapNativeListing(parsed, assetMap.get(normalizedMint));
+  }
+);
+
+export const getDigitalArtSaleHistory = cache(
+  async (mint: string): Promise<DigitalArtSaleHistoryItem[]> => {
+    const normalizedMint = `${address(mint)}`;
+    const apiKey = getHeliusApiKey();
+
+    if (!apiKey) {
+      return [];
+    }
+
+    const requestUrl = new URL(
+      `https://api.helius.xyz/v0/addresses/${normalizedMint}/transactions`
+    );
+    requestUrl.searchParams.set("api-key", apiKey);
+    requestUrl.searchParams.set("type", "NFT_SALE");
+    requestUrl.searchParams.set("limit", `${SALE_HISTORY_LIMIT}`);
+
+    try {
+      const response = await fetch(requestUrl, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(HELIUS_ENHANCED_TX_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Helius enhanced transactions error: ${response.status}`);
+      }
+
+      const transactions = (await response.json()) as HeliusEnhancedTransaction[];
+
+      return transactions
+        .map((transaction) => parseSaleHistoryItem(normalizedMint, transaction))
+        .filter((item): item is DigitalArtSaleHistoryItem => Boolean(item))
+        .slice(0, SALE_HISTORY_LIMIT);
+    } catch (error) {
+      console.error("[digital-art/sale-history] Failed to load sale history", error);
+      return [];
+    }
   }
 );
 

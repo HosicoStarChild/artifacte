@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   getDigitalArtExternalListingDetail,
   getDigitalArtNativeListingDetail,
+  getDigitalArtSaleHistory,
 } from "@/app/digital-art/_lib/server-data";
 import type { MarketplaceSource } from "@/app/lib/digital-art-marketplaces";
 import { HomeImage } from "@/components/home/HomeImage";
@@ -13,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import { AuctionDetailActionPanel } from "./_components/action-panel";
+import { SaleHistory } from "./_components/sale-history";
 
 interface AuctionDetailPageProps {
   params: Promise<{
@@ -98,6 +100,8 @@ export default async function AuctionDetailPage({
     return <ListingNotFoundState backHref={backHref} />;
   }
 
+  const saleHistory = await getDigitalArtSaleHistory(mint);
+
   const imageSrc = externalListing?.image ?? nativeListing?.imageSrc ?? "/placeholder.png";
   const collectionName = externalListing?.collectionName ?? nativeListing?.collectionName ?? "Unknown Collection";
   const title = externalListing?.name ?? nativeListing?.name ?? "Untitled";
@@ -178,6 +182,8 @@ export default async function AuctionDetailPage({
               mint={mint}
               nativeListing={nativeListing}
             />
+
+            <SaleHistory items={saleHistory} />
           </div>
         </div>
       </div>
