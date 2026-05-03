@@ -28,7 +28,7 @@ import {
   type CollectorCryptResponse,
 } from "@/lib/portfolio";
 import { ensureHeliusRpcUrl, fetchHeliusRpc } from "@/app/api/_lib/list-route-utils";
-import { resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
+import { buildHeliusImageCdnUrl, resolveHeliusAssetImageSrc } from "@/lib/helius-asset-image";
 import { getFloorPriceSnapshot, type FloorPriceSnapshot } from "@/lib/server/floor-prices";
 import { getOracleApiUrl } from "@/lib/server/oracle-env";
 import {
@@ -167,7 +167,8 @@ function getAssetName(asset: HeliusAsset): string {
 }
 
 function getAssetImageSrc(asset: HeliusAsset): string | null {
-  return resolveHeliusAssetImageSrc(asset);
+  const imageSrc = resolveHeliusAssetImageSrc(asset);
+  return buildHeliusImageCdnUrl(imageSrc, { width: 480, quality: 72 }) ?? imageSrc;
 }
 
 function getNonEmptyString(value: string | null | undefined): string | null {

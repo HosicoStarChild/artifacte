@@ -40,7 +40,7 @@ export function PortfolioAssetCard({ asset }: PortfolioAssetCardProps) {
   const imageClasses = asset.imageFit === "contain"
     ? "h-full w-full object-contain p-2"
     : "h-full w-full object-cover";
-  const ratioClass = asset.aspectRatio === "portrait" ? "aspect-3/4" : "aspect-square";
+  const ratioClass = asset.aspectRatio === "portrait" ? "aspect-[3/4]" : "aspect-square";
 
   return (
     <Link href={asset.href} className="group block h-full">

@@ -1,3 +1,4 @@
+import { buildHeliusImageCdnUrl } from "@/lib/helius-asset-image";
 import { resolveHomeImageSrc } from "@/lib/home-image";
 
 export interface PortfolioListing {
@@ -246,7 +247,8 @@ export function formatPortfolioValue(
 }
 
 export function resolvePortfolioImageSrc(src?: string): string | null {
-  return resolveHomeImageSrc(src);
+  const resolvedSrc = resolveHomeImageSrc(src);
+  return buildHeliusImageCdnUrl(resolvedSrc, { width: 480, quality: 72 }) ?? resolvedSrc;
 }
 
 export function getPortfolioAssetHref(assetId: string): string {
